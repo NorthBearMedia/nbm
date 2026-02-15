@@ -3,204 +3,141 @@
 ## Overview
 
 Automate the workflow for "Spotted" community Facebook pages:
-1. **Receive** messages submitted by community members
+1. **Receive** DMs submitted by community members
 2. **Filter/Moderate** content using AI (approve, reject, flag for review)
-3. **Post** approved messages to the Facebook page
+3. **Auto-post** approved messages to the Facebook page
+
+---
+
+## Decisions Made
+
+- **Input method:** DMs (Messenger) only
+- **Pages:** Single page to start, expandable later
+- **Posting:** Fully automatic — approved messages post immediately
+- **Hosting:** Railway.app (recommended — simple, cheap, auto-deploys from GitHub)
 
 ---
 
 ## Architecture
 
 ```
-[Facebook Page Inbox / Webhooks]
+[People DM the Spotted page]
         |
         v
-[Node.js Server (Express)]
+[Node.js Server polls Facebook inbox every 60s]
         |
         v
-[AI Moderation Layer (Claude API)]
+[Claude AI evaluates each message]
         |
-    Approve / Reject / Flag
+    APPROVE / REJECT / FLAG
         |
         v
-[Post to Facebook via Graph API]  or  [Queue for manual review]
+APPROVE → Auto-post to page + notify sender
+REJECT  → Notify sender with reason
+FLAG    → Saved for manual review
 ```
 
 ---
 
-## Components
+## How It Works
 
-### 1. Facebook Integration (Graph API)
-
-- **Read incoming messages**: Use Facebook Graph API to fetch messages/conversations from page inbox
-- **Post approved content**: Publish approved messages as page posts
-- **Webhook listener**: Receive real-time notifications when new messages arrive
-- **Required**: Facebook App, Page Access Token with `pages_messaging`, `pages_manage_posts` permissions
-
-### 2. AI Moderation Engine (Claude API)
-
-The AI reviews each submission and decides:
-- **APPROVE** — Post it to the page
-- **REJECT** — Block (spam, inappropriate, etc.)
-- **FLAG** — Needs human review (borderline cases)
-
-Moderation criteria (configurable per page):
-- No hate speech, harassment, or threats
-- No personal information (phone numbers, addresses)
-- No spam or advertising
-- No illegal content
-- Follows the specific "Spotted" page rules
-- Content relevance check
-
-### 3. Web Dashboard (optional, phase 2)
-
-- View pending/approved/rejected messages
-- Override AI decisions
-- Configure moderation rules per page
-- Analytics (volume, approval rate, etc.)
-
-### 4. Database
-
-- Store messages and their moderation status
-- Store page configurations and rules
-- Audit trail of AI decisions
+1. The server polls the Facebook page inbox every 60 seconds for new DMs
+2. Each new message is sent to Claude for moderation
+3. Claude returns a decision (APPROVE/REJECT/FLAG) with a confidence score
+4. If APPROVE with high confidence → automatically posted to the page
+5. If REJECT with high confidence → sender is notified
+6. If FLAG or low confidence → saved to database for you to review manually
+7. All decisions are logged in a SQLite database for audit trail
 
 ---
 
-## Tech Stack
+## Status API Endpoints
 
-| Component          | Technology                     |
-|--------------------|--------------------------------|
-| Runtime            | Node.js (v20+)                 |
-| Framework          | Express.js                     |
-| AI                 | Anthropic Claude API           |
-| Facebook           | Facebook Graph API v21.0       |
-| Database           | SQLite (simple) or PostgreSQL  |
-| Queue              | Bull (Redis) or simple in-memory |
-| Config             | dotenv                         |
+The server exposes simple endpoints to check on things:
+
+- `GET /` — Is the service running?
+- `GET /stats` — How many approved/rejected/flagged
+- `GET /messages` — Recent messages and their decisions
+- `GET /flagged` — Messages that need your manual review
 
 ---
 
-## Implementation Phases
-
-### Phase 1 — Core Pipeline (MVP)
-
-1. **Project setup** — Node.js project, dependencies, config
-2. **Facebook API client** — Authenticate, fetch messages, post to page
-3. **AI moderation module** — Send message to Claude, parse decision
-4. **Polling service** — Periodically check for new messages
-5. **Auto-post service** — Post approved messages to the page
-6. **Basic logging** — Console + file logging of all decisions
-
-### Phase 2 — Production Hardening
-
-7. **Webhook support** — Replace polling with real-time webhooks
-8. **Multi-page support** — Handle multiple Spotted pages from one instance
-9. **SQLite database** — Persist messages, decisions, audit trail
-10. **Rate limiting** — Respect Facebook API limits
-11. **Error handling & retries** — Robust failure recovery
-
-### Phase 3 — Dashboard & Management
-
-12. **Web dashboard** — View and override moderation decisions
-13. **Per-page rules config** — Customise moderation rules per page
-14. **Analytics** — Approval rates, volume trends, common rejections
-
----
-
-## Facebook Setup Required
-
-1. Create a **Facebook App** at https://developers.facebook.com
-2. Add the **Facebook Login** and **Messenger** products
-3. Generate a **Page Access Token** (long-lived) for each Spotted page
-4. Required permissions:
-   - `pages_show_list`
-   - `pages_read_engagement`
-   - `pages_manage_posts`
-   - `pages_messaging`
-   - `pages_read_user_content`
-5. For webhooks: set up a callback URL (needs public HTTPS endpoint)
-
----
-
-## AI Moderation Prompt Strategy
-
-Each incoming message will be evaluated with a structured prompt:
-
-```
-You are a content moderator for a local community "Spotted" page on Facebook.
-People submit anonymous messages about things they've spotted in the local area.
-
-Rules:
-- APPROVE: Lighthearted, funny, community-relevant sightings
-- REJECT: Hate speech, personal info, spam, threats, illegal content
-- FLAG: Borderline — could go either way, needs human review
-
-Respond with JSON:
-{
-  "decision": "APPROVE" | "REJECT" | "FLAG",
-  "reason": "Brief explanation",
-  "confidence": 0.0-1.0
-}
-```
-
----
-
-## File Structure (Planned)
+## File Structure
 
 ```
 nbm/
 ├── src/
-│   ├── index.js              # Entry point
-│   ├── config.js             # Configuration loader
+│   ├── index.js              # Entry point — starts server + polling
+│   ├── config.js             # Loads environment variables
 │   ├── facebook/
-│   │   ├── client.js         # Facebook Graph API client
-│   │   ├── webhook.js        # Webhook handler
-│   │   └── poster.js         # Post approved messages
+│   │   ├── client.js         # Facebook Graph API (read DMs, post)
+│   │   └── poster.js         # Post approved messages, notify senders
 │   ├── moderation/
-│   │   ├── moderator.js      # AI moderation logic
-│   │   └── rules.js          # Configurable rules per page
+│   │   └── moderator.js      # Claude AI moderation logic
 │   ├── services/
-│   │   ├── poller.js         # Polling service for new messages
-│   │   └── processor.js      # Message processing pipeline
+│   │   ├── poller.js         # Polling loop (check inbox every 60s)
+│   │   └── processor.js      # Pipeline: fetch → moderate → post
 │   └── db/
-│       ├── database.js       # Database connection
-│       └── schema.sql        # Database schema
+│       └── database.js       # SQLite database for message history
 ├── .env.example              # Environment variable template
+├── .gitignore
 ├── package.json
-├── PLAN.md                   # This file
-└── README.md
+└── PLAN.md
 ```
 
 ---
 
-## Environment Variables Needed
+## Setup Instructions
 
+### 1. Facebook App Setup
+
+1. Go to https://developers.facebook.com and create a new App
+2. Choose "Business" type
+3. Add the "Facebook Login" product
+4. Go to your App Settings > Basic to get your App ID and Secret
+5. Use the Graph API Explorer to generate a Page Access Token:
+   - Select your app
+   - Select your Spotted page
+   - Add permissions: `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `pages_messaging`, `pages_read_user_content`
+   - Generate token
+6. Convert to a long-lived token (short-lived tokens expire in ~1 hour)
+7. Find your Page ID: go to your page → About → scroll down to see the Page ID
+
+### 2. Anthropic API Key
+
+1. Go to https://console.anthropic.com
+2. Create an account and add billing
+3. Go to API Keys and create a new key
+
+### 3. Environment Setup
+
+```bash
+cp .env.example .env
+# Edit .env with your actual values
 ```
-# Facebook
-FACEBOOK_APP_ID=
-FACEBOOK_APP_SECRET=
-FACEBOOK_PAGE_ACCESS_TOKEN=
-FACEBOOK_PAGE_ID=
-FACEBOOK_VERIFY_TOKEN=
 
-# Anthropic
-ANTHROPIC_API_KEY=
+### 4. Install & Run
 
-# Server
-PORT=3000
-NODE_ENV=development
-
-# Database
-DATABASE_URL=./data/moderation.db
+```bash
+npm install
+npm start
 ```
+
+### 5. Deploy to Railway (recommended)
+
+1. Push this repo to GitHub
+2. Go to https://railway.app and sign in with GitHub
+3. Click "New Project" → "Deploy from GitHub Repo"
+4. Select this repository
+5. Add your environment variables in Railway's dashboard
+6. Railway auto-deploys on every push
 
 ---
 
-## Key Decisions to Make
+## Future Enhancements (Phase 2+)
 
-1. **Polling vs Webhooks** — Polling is simpler to start; webhooks need a public URL
-2. **Auto-post vs queue** — Should approved messages post immediately, or queue for batch posting?
-3. **Multiple pages** — How many Spotted pages need support from day one?
-4. **Hosting** — Where will this run? (VPS, cloud function, local machine?)
-5. **Message format** — Do submissions follow a template, or are they freeform?
+- **Webhooks** — Replace polling with real-time message notifications
+- **Multi-page support** — Run multiple Spotted pages from one instance
+- **Web dashboard** — Visual interface to review flagged messages
+- **Custom rules per page** — Different moderation criteria for different pages
+- **Analytics** — Approval rates, volume trends, peak times
