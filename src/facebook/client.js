@@ -117,15 +117,41 @@ export async function fetchUpdatedConversations(sinceTimestamp) {
     for (const msg of messages.reverse()) {
       const isPage = msg.from?.id === pageId;
 
-      // Extract image URLs from attachments
+      // Extract ONLY real user-uploaded images from attachments.
+      // Skip profile pics, stickers, GIFs, shares, and other junk.
       const images = [];
       if (msg.attachments?.data) {
         for (const att of msg.attachments.data) {
-          if (att.image_data?.url) {
-            images.push(att.image_data.url);
-          } else if (att.type === "image" && att.payload?.url) {
-            images.push(att.payload.url);
+          // Only accept explicit image types — skip fallback, sticker,
+          // animated_image (GIFs), share, video, audio, file, etc.
+          if (att.type && att.type !== "image" && att.type !== "photo") {
+            continue;
           }
+
+          const url = att.image_data?.url || att.payload?.url;
+          if (!url) continue;
+
+          // Skip Facebook CDN profile pics and platform images
+          // (profile pics contain /p/ or profilepic in the URL)
+          if (
+            url.includes("/p50x50/") ||
+            url.includes("/p75x75/") ||
+            url.includes("/p100x100/") ||
+            url.includes("profilepic") ||
+            url.includes("platform/profilepic")
+          ) {
+            continue;
+          }
+
+          // Skip tiny images (stickers/emoji/thumbnails) — real photos
+          // are at least 200px in both dimensions
+          const w = att.image_data?.width || 0;
+          const h = att.image_data?.height || 0;
+          if (w > 0 && h > 0 && (w < 200 || h < 200)) {
+            continue;
+          }
+
+          images.push(url);
         }
       }
 
