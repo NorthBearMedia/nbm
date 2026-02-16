@@ -1,7 +1,7 @@
 import { postApprovedMessage, notifyRejection, notifyFlagged, correctPost, removePost } from "../facebook/poster.js";
 import { moderateConversation } from "../moderation/moderator.js";
 import { resolveAction } from "../moderation/moderator.js";
-import { isConversationProcessed, getConversationPostId, saveConversation } from "../db/database.js";
+import { isConversationProcessed, getConversationUpdatedAt, getConversationPostId, saveConversation } from "../db/database.js";
 import { sendNotification } from "./notifier.js";
 
 /**
@@ -25,11 +25,16 @@ export async function processNewMessages(client) {
   const tag = `[${client.pageName}]`;
   console.log(`${tag} [POLL] Checking for new messages...`);
 
-  // Skip if: already in our database, OR conversation was last updated before we booted
+  // Skip rules:
+  // 1. ALWAYS skip anything last updated before we booted (hard cutoff — never touch old stuff)
+  // 2. If never seen before and updated after boot — process it (new conversation)
+  // 3. If already processed but updated_time changed — process it (follow-up message)
+  // 4. If already processed and updated_time unchanged — skip (nothing new)
   const shouldSkip = (conversationId, updatedTime) => {
-    if (isConversationProcessed(conversationId)) return true;
     if (updatedTime < BOOT_TIME) return true;
-    return false;
+    if (!isConversationProcessed(conversationId)) return false;
+    const storedAt = getConversationUpdatedAt(conversationId);
+    return updatedTime <= storedAt;
   };
 
   let conversations;
