@@ -32,8 +32,4 @@ export const config = {
   storage: {
     dataDir: process.env.DATA_DIR || "./data",
   },
-  email: {
-    resendApiKey: process.env.RESEND_API_KEY || "",
-    notifyTo: process.env.NOTIFICATION_EMAIL || "",
-  },
 };

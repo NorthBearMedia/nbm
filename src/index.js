@@ -2,7 +2,6 @@ import express from "express";
 import { config } from "./config.js";
 import { initDatabase, getRecentMessages, getFlaggedMessages, getStats } from "./db/database.js";
 import { startPolling } from "./services/poller.js";
-import { initEmail } from "./services/notifier.js";
 
 // Initialise database (use DATA_DIR for persistent volume on Railway)
 initDatabase(config.storage.dataDir);
@@ -34,9 +33,6 @@ app.get("/flagged", (req, res) => {
 
 app.listen(config.server.port, () => {
   console.log(`[SERVER] Status API running on port ${config.server.port}`);
-
-  // Initialise email in background (non-blocking)
-  initEmail();
 
   // Start polling for new messages
   startPolling();
