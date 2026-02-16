@@ -131,7 +131,11 @@ export function getLastChecked(pageId) {
   if (!data.lastChecked || typeof data.lastChecked !== "object") {
     data.lastChecked = {};
   }
-  return data.lastChecked[pageId] || Date.now();
+  if (!data.lastChecked[pageId]) {
+    data.lastChecked[pageId] = Date.now();
+    save();
+  }
+  return data.lastChecked[pageId];
 }
 
 /**
