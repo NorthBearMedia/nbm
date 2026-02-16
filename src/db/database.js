@@ -7,8 +7,12 @@ let data;
 function load() {
   if (existsSync(dbPath)) {
     data = JSON.parse(readFileSync(dbPath, "utf-8"));
+    // Migrate: ensure conversations array exists
+    if (!data.conversations) {
+      data.conversations = [];
+    }
   } else {
-    data = { messages: [], lastChecked: Date.now() };
+    data = { messages: [], conversations: [], lastChecked: Date.now() };
   }
 }
 
@@ -29,26 +33,40 @@ export function initDatabase(dataDir = "./data") {
 }
 
 /**
- * Check if a message has already been processed.
+ * Check if a conversation has already been processed.
  */
-export function isProcessed(messageId) {
-  return data.messages.some((m) => m.id === messageId);
+export function isConversationProcessed(conversationId) {
+  return data.conversations.some((c) => c.conversation_id === conversationId);
 }
 
 /**
- * Save a message and its moderation result.
+ * Get the number of user messages we last saw in a conversation.
+ * Returns 0 if the conversation has never been processed.
  */
-export function saveMessage(submission, moderation, action, postId = null) {
-  // Remove existing entry if present (upsert)
-  data.messages = data.messages.filter((m) => m.id !== submission.id);
+export function getConversationMessageCount(conversationId) {
+  const entry = data.conversations.find((c) => c.conversation_id === conversationId);
+  return entry?.user_message_count || 0;
+}
 
-  data.messages.push({
-    id: submission.id,
-    conversation_id: submission.conversationId,
-    sender_name: submission.senderName,
-    sender_id: submission.senderId,
-    text: submission.text,
-    received_at: submission.timestamp,
+/**
+ * Save a conversation and its moderation result.
+ */
+export function saveConversation(convo, moderation, action, postId = null) {
+  // Remove existing entry if present (upsert)
+  data.conversations = data.conversations.filter(
+    (c) => c.conversation_id !== convo.conversationId
+  );
+
+  const userMessages = convo.thread.filter((m) => !m.isPage);
+
+  data.conversations.push({
+    conversation_id: convo.conversationId,
+    sender_name: convo.senderName,
+    sender_id: convo.senderId,
+    submission_text: moderation.submissionText || null,
+    submission_message_id: moderation.submissionMessageId || null,
+    user_message_count: userMessages.length,
+    updated_at: convo.updatedTime,
     decision: moderation.decision,
     reason: moderation.reason,
     confidence: moderation.confidence,
@@ -61,21 +79,21 @@ export function saveMessage(submission, moderation, action, postId = null) {
 }
 
 /**
- * Get recent messages for a simple status overview.
+ * Get recent conversations for a simple status overview.
  */
 export function getRecentMessages(limit = 20) {
-  return [...data.messages]
-    .sort((a, b) => b.received_at - a.received_at)
+  return [...data.conversations]
+    .sort((a, b) => b.updated_at - a.updated_at)
     .slice(0, limit);
 }
 
 /**
- * Get flagged messages that need manual review.
+ * Get flagged conversations that need manual review.
  */
 export function getFlaggedMessages() {
-  return data.messages
-    .filter((m) => m.action === "FLAG")
-    .sort((a, b) => b.received_at - a.received_at);
+  return data.conversations
+    .filter((c) => c.action === "FLAG")
+    .sort((a, b) => b.updated_at - a.updated_at);
 }
 
 /**
@@ -83,8 +101,8 @@ export function getFlaggedMessages() {
  */
 export function getStats() {
   const counts = {};
-  for (const msg of data.messages) {
-    counts[msg.action] = (counts[msg.action] || 0) + 1;
+  for (const c of data.conversations) {
+    counts[c.action] = (counts[c.action] || 0) + 1;
   }
   return counts;
 }

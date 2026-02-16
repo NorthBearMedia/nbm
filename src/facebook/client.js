@@ -94,13 +94,13 @@ export async function sendReply(recipientId, message) {
 }
 
 /**
- * Fetch new DMs from the page inbox.
- * Filters to only messages sent by users (not by the page itself),
- * and only messages newer than the given timestamp.
+ * Fetch new DM conversations from the page inbox.
+ * Returns whole conversations (with all recent messages) that have been
+ * updated since the given timestamp, so the AI can analyse the full thread.
  */
-export async function fetchNewSubmissions(sinceTimestamp) {
+export async function fetchUpdatedConversations(sinceTimestamp) {
   const conversations = await getConversations();
-  const newMessages = [];
+  const updated = [];
 
   for (const convo of conversations) {
     const updatedTime = new Date(convo.updated_time).getTime();
@@ -110,16 +110,12 @@ export async function fetchNewSubmissions(sinceTimestamp) {
       continue;
     }
 
-    const messages = await getMessages(convo.id, 5);
+    const messages = await getMessages(convo.id, 10);
 
-    for (const msg of messages) {
-      // Skip messages from the page itself
-      if (msg.from?.id === pageId) continue;
-
-      const msgTime = new Date(msg.created_time).getTime();
-
-      // Skip messages older than our last check
-      if (sinceTimestamp && msgTime <= sinceTimestamp) continue;
+    // Build the full thread (oldest first)
+    const thread = [];
+    for (const msg of messages.reverse()) {
+      const isPage = msg.from?.id === pageId;
 
       // Extract image URLs from attachments
       const images = [];
@@ -133,22 +129,29 @@ export async function fetchNewSubmissions(sinceTimestamp) {
         }
       }
 
-      const text = msg.message?.trim() || "";
-
-      // Skip messages with no text AND no images
-      if (!text && images.length === 0) continue;
-
-      newMessages.push({
+      thread.push({
         id: msg.id,
-        conversationId: convo.id,
-        text,
+        text: msg.message?.trim() || "",
         images,
+        isPage,
         senderName: msg.from?.name || "Anonymous",
         senderId: msg.from?.id,
-        timestamp: msgTime,
+        timestamp: new Date(msg.created_time).getTime(),
       });
     }
+
+    // Only include if there are user messages
+    const userMessages = thread.filter((m) => !m.isPage);
+    if (userMessages.length === 0) continue;
+
+    updated.push({
+      conversationId: convo.id,
+      updatedTime,
+      senderName: userMessages[0].senderName,
+      senderId: userMessages[0].senderId,
+      thread,
+    });
   }
 
-  return newMessages;
+  return updated;
 }
