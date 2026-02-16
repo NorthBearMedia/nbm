@@ -85,3 +85,19 @@ export function getStats() {
   }
   return counts;
 }
+
+/**
+ * Get the last-checked timestamp (persisted across restarts).
+ * Returns 0 on first run so all inbox messages are scanned.
+ */
+export function getLastChecked() {
+  return data.lastChecked || 0;
+}
+
+/**
+ * Persist the last-checked timestamp.
+ */
+export function setLastChecked(timestamp) {
+  data.lastChecked = timestamp;
+  save();
+}
