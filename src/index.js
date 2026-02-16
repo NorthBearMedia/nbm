@@ -7,13 +7,7 @@ import { initEmail } from "./services/notifier.js";
 // Initialise database
 initDatabase();
 
-// Initialise email (verify connection and send startup notification)
-await initEmail();
-
-// Start the polling service
-const stopPolling = startPolling();
-
-// Simple status API
+// Start the HTTP server FIRST so Railway sees the port open
 const app = express();
 
 app.get("/", (req, res) => {
@@ -38,18 +32,20 @@ app.get("/flagged", (req, res) => {
   res.json(getFlaggedMessages());
 });
 
-app.listen(config.server.port, () => {
-  console.log(`[SERVER] Status API running on http://localhost:${config.server.port}`);
-  console.log(`[SERVER] Endpoints:`);
-  console.log(`  GET /         — Service status`);
-  console.log(`  GET /stats    — Moderation stats`);
-  console.log(`  GET /messages — Recent messages`);
-  console.log(`  GET /flagged  — Messages needing review`);
+app.listen(config.server.port, async () => {
+  console.log(`[SERVER] Status API running on port ${config.server.port}`);
+
+  // Now that the server is up, initialise email (can take a few seconds)
+  await initEmail();
+
+  // Start polling for new messages
+  startPolling();
+
+  console.log("[SERVER] All systems ready.");
 });
 
 // Graceful shutdown
 process.on("SIGINT", () => {
   console.log("\n[SHUTDOWN] Stopping...");
-  stopPolling();
   process.exit(0);
 });
