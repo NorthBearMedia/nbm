@@ -2,9 +2,13 @@ import express from "express";
 import { config } from "./config.js";
 import { initDatabase, getRecentMessages, getFlaggedMessages, getStats } from "./db/database.js";
 import { startPolling } from "./services/poller.js";
+import { initEmail } from "./services/notifier.js";
 
 // Initialise database
 initDatabase();
+
+// Initialise email (verify connection and send startup notification)
+await initEmail();
 
 // Start the polling service
 const stopPolling = startPolling();
