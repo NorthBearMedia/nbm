@@ -88,11 +88,26 @@ export async function processNewMessages(sinceTimestamp) {
     const submissionMsg = convo.thread.find(
       (m) => m.id === moderation.submissionMessageId
     );
+
+    // Collect images: prefer the specific submission message's images,
+    // but fall back to ALL user images in the thread (the AI might return
+    // a slightly wrong message ID but the images are still there)
+    let images = submissionMsg?.images || [];
+    if (images.length === 0) {
+      images = convo.thread
+        .filter((m) => !m.isPage)
+        .flatMap((m) => m.images || []);
+    }
+
+    if (images.length > 0) {
+      console.log(`[IMAGES] Found ${images.length} image(s) to post`);
+    }
+
     const submission = {
       id: moderation.submissionMessageId || convo.conversationId,
       conversationId: convo.conversationId,
       text: moderation.submissionText || "",
-      images: submissionMsg?.images || [],
+      images,
       senderName: convo.senderName,
       senderId: convo.senderId,
       timestamp: submissionMsg?.timestamp || convo.updatedTime,
