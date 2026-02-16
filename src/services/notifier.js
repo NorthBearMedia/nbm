@@ -12,12 +12,19 @@ export function initEmail() {
     return;
   }
 
-  console.log(`[EMAIL] Notifications will be sent to: ${config.email.notifyTo}`);
+  if (!config.email.notifyTo) {
+    console.log("[EMAIL] Email notifications disabled (no NOTIFICATION_EMAIL set).");
+    return;
+  }
+
+  console.log(`[EMAIL] From: ${config.email.from}`);
+  console.log(`[EMAIL] To: ${config.email.notifyTo}`);
+  console.log(`[EMAIL] API key: ${config.email.resendApiKey.substring(0, 8)}...`);
   resend = new Resend(config.email.resendApiKey);
 
   // Send startup notification
   resend.emails.send({
-    from: "Spotted Moderator <onboarding@resend.dev>",
+    from: config.email.from,
     to: config.email.notifyTo,
     subject: "Spotted Moderator — Online",
     html: `
@@ -28,10 +35,10 @@ export function initEmail() {
       <p><strong>Confidence threshold:</strong> ${config.moderation.confidenceThreshold}</p>
       <p><em>Started at ${new Date().toLocaleString("en-GB", { timeZone: "Europe/London" })}</em></p>
     `,
-  }).then(() => {
-    console.log("[EMAIL] Startup notification sent.");
+  }).then((result) => {
+    console.log(`[EMAIL] Startup notification sent. ID: ${result?.data?.id || "unknown"}`);
   }).catch((err) => {
-    console.error(`[EMAIL] Startup email failed: ${err.message}`);
+    console.error(`[EMAIL] Startup email failed: ${JSON.stringify(err)}`);
   });
 }
 
@@ -73,7 +80,7 @@ export async function sendNotification(submission, moderation, action) {
 
   try {
     await resend.emails.send({
-      from: "Spotted Moderator <onboarding@resend.dev>",
+      from: config.email.from,
       to: config.email.notifyTo,
       subject,
       html,

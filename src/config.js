@@ -35,5 +35,6 @@ export const config = {
   email: {
     resendApiKey: process.env.RESEND_API_KEY || "",
     notifyTo: process.env.NOTIFICATION_EMAIL || "",
+    from: process.env.EMAIL_FROM || "Spotted Moderator <onboarding@resend.dev>",
   },
 };
