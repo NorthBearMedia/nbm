@@ -12,7 +12,7 @@ function load() {
       data.conversations = [];
     }
   } else {
-    data = { messages: [], conversations: [], lastChecked: {} };
+    data = { messages: [], conversations: [] };
   }
 }
 
@@ -114,37 +114,4 @@ export function getStats() {
     counts[c.action] = (counts[c.action] || 0) + 1;
   }
   return counts;
-}
-
-/**
- * Get the last-checked timestamp for a specific page.
- * Defaults to Date.now() so fresh starts only see new messages.
- */
-export function getLastChecked(pageId) {
-  // Migrate: old format was a single number, new format is an object keyed by page ID
-  if (typeof data.lastChecked === "number") {
-    const old = data.lastChecked;
-    data.lastChecked = { [pageId]: old };
-    save();
-    return old;
-  }
-  if (!data.lastChecked || typeof data.lastChecked !== "object") {
-    data.lastChecked = {};
-  }
-  if (!data.lastChecked[pageId]) {
-    data.lastChecked[pageId] = Date.now();
-    save();
-  }
-  return data.lastChecked[pageId];
-}
-
-/**
- * Persist the last-checked timestamp for a specific page.
- */
-export function setLastChecked(pageId, timestamp) {
-  if (!data.lastChecked || typeof data.lastChecked !== "object") {
-    data.lastChecked = {};
-  }
-  data.lastChecked[pageId] = timestamp;
-  save();
 }

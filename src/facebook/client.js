@@ -125,24 +125,18 @@ export function createPageClient(page) {
   }
 
   /**
-   * Fetch new DM conversations from the page inbox.
-   * Returns whole conversations (with all recent messages) that have been
-   * updated since the given timestamp.
+   * Fetch DM conversations from the page inbox with their recent messages.
    */
-  async function fetchUpdatedConversations(sinceTimestamp) {
+  async function fetchConversations() {
     const conversations = await getConversations();
-    const updated = [];
+    const result = [];
 
     console.log(
-      `[DEBUG] [${page.name}] Facebook returned ${conversations.length} conversation(s), filtering since ${new Date(sinceTimestamp).toISOString()}`
+      `[DEBUG] [${page.name}] Facebook returned ${conversations.length} conversation(s)`
     );
 
     for (const convo of conversations) {
       const updatedTime = new Date(convo.updated_time).getTime();
-
-      if (sinceTimestamp && updatedTime <= sinceTimestamp) {
-        continue;
-      }
 
       const messages = await getMessages(convo.id, 10);
 
@@ -194,7 +188,7 @@ export function createPageClient(page) {
       const userMessages = thread.filter((m) => !m.isPage);
       if (userMessages.length === 0) continue;
 
-      updated.push({
+      result.push({
         conversationId: convo.id,
         updatedTime,
         senderName: userMessages[0].senderName,
@@ -203,7 +197,7 @@ export function createPageClient(page) {
       });
     }
 
-    return updated;
+    return result;
   }
 
   return {
@@ -215,6 +209,6 @@ export function createPageClient(page) {
     publishPhotoPost,
     deletePost,
     sendReply,
-    fetchUpdatedConversations,
+    fetchConversations,
   };
 }

@@ -12,29 +12,26 @@ import { sendNotification } from "./notifier.js";
  * 4. Post/reject/flag based on the AI decision
  * 5. Reply to the sender once per conversation
  *
- * @param {number} sinceTimestamp
  * @param {object} client — page client from createPageClient()
  */
-export async function processNewMessages(sinceTimestamp, client) {
+export async function processNewMessages(client) {
   const tag = `[${client.pageName}]`;
   console.log(`${tag} [POLL] Checking for new messages...`);
 
   let conversations;
   try {
-    conversations = await client.fetchUpdatedConversations(sinceTimestamp);
+    conversations = await client.fetchConversations();
   } catch (err) {
     console.error(`${tag} [ERROR] Failed to fetch conversations: ${err.message}`);
-    return { processed: 0, latestTimestamp: sinceTimestamp };
+    return { processed: 0 };
   }
 
   if (conversations.length === 0) {
-    console.log(`${tag} [POLL] No updated conversations found.`);
-    return { processed: 0, latestTimestamp: sinceTimestamp };
+    console.log(`${tag} [POLL] No conversations found.`);
+    return { processed: 0 };
   }
 
-  console.log(`${tag} [POLL] Found ${conversations.length} updated conversation(s).`);
-
-  let latestTimestamp = sinceTimestamp || 0;
+  console.log(`${tag} [POLL] Found ${conversations.length} conversation(s).`);
 
   for (const convo of conversations) {
     const userMessages = convo.thread.filter((m) => !m.isPage);
@@ -75,9 +72,6 @@ export async function processNewMessages(sinceTimestamp, client) {
         `${tag} [SKIP] No submission found in conversation ${convo.conversationId}: ${moderation.reason}`
       );
       saveConversation(convo, moderation, "SKIP", null);
-      if (convo.updatedTime > latestTimestamp) {
-        latestTimestamp = convo.updatedTime;
-      }
       continue;
     }
 
@@ -208,12 +202,7 @@ export async function processNewMessages(sinceTimestamp, client) {
 
     // Send email notification
     await sendNotification(submission, moderation, action);
-
-    // Track the latest timestamp
-    if (convo.updatedTime > latestTimestamp) {
-      latestTimestamp = convo.updatedTime;
-    }
   }
 
-  return { processed: conversations.length, latestTimestamp };
+  return { processed: conversations.length };
 }
