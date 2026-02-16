@@ -1,8 +1,8 @@
-import { fetchUpdatedConversations } from "../facebook/client.js";
-import { postApprovedMessage, notifyRejection, notifyFlagged } from "../facebook/poster.js";
+import { fetchUpdatedConversations, sendReply } from "../facebook/client.js";
+import { postApprovedMessage, notifyRejection, notifyFlagged, correctPost, removePost } from "../facebook/poster.js";
 import { moderateConversation } from "../moderation/moderator.js";
 import { resolveAction } from "../moderation/moderator.js";
-import { isConversationProcessed, getConversationMessageCount, saveConversation } from "../db/database.js";
+import { isConversationProcessed, getConversationMessageCount, getConversationPostId, saveConversation } from "../db/database.js";
 import { sendNotification } from "./notifier.js";
 
 /**
@@ -90,10 +90,22 @@ export async function processNewMessages(sinceTimestamp) {
       (m) => m.id === moderation.submissionMessageId
     );
 
-    // Collect images: prefer the specific submission message's images,
-    // but fall back to ALL user images in the thread (the AI might return
-    // a slightly wrong message ID but the images are still there)
-    let images = submissionMsg?.images || [];
+    // For CORRECTION requests, get images from the correction message specifically
+    // (the user sent new/correct images in their follow-up)
+    let images = [];
+    if (action === "CORRECTION" && moderation.useImagesFromMessageId) {
+      const correctionMsg = convo.thread.find(
+        (m) => m.id === moderation.useImagesFromMessageId
+      );
+      images = correctionMsg?.images || [];
+    }
+
+    // Fall back to the submission message's images
+    if (images.length === 0) {
+      images = submissionMsg?.images || [];
+    }
+
+    // Last resort: collect ALL user images in the thread
     if (images.length === 0) {
       images = convo.thread
         .filter((m) => !m.isPage)
@@ -126,6 +138,59 @@ export async function processNewMessages(sinceTimestamp) {
         );
         saveConversation(convo, moderation, "FLAG", null);
         continue;
+      }
+    } else if (action === "CORRECTION") {
+      const oldPostId = getConversationPostId(convo.conversationId);
+      if (!oldPostId) {
+        console.warn(
+          `[WARN] Correction requested for conversation ${convo.conversationId} but no existing post found — treating as new post`
+        );
+        try {
+          const result = await postApprovedMessage(submission, moderation.reply);
+          postId = result.id;
+        } catch (err) {
+          console.error(
+            `[ERROR] Failed to post correction for conversation ${convo.conversationId}: ${err.message}`
+          );
+          saveConversation(convo, moderation, "FLAG", null);
+          continue;
+        }
+      } else {
+        try {
+          const result = await correctPost(oldPostId, submission, moderation.reply);
+          postId = result.id;
+        } catch (err) {
+          console.error(
+            `[ERROR] Failed to correct post for conversation ${convo.conversationId}: ${err.message}`
+          );
+          saveConversation(convo, moderation, "FLAG", null);
+          continue;
+        }
+      }
+    } else if (action === "DELETE") {
+      const oldPostId = getConversationPostId(convo.conversationId);
+      if (!oldPostId) {
+        console.warn(
+          `[WARN] Delete requested for conversation ${convo.conversationId} but no existing post found`
+        );
+        try {
+          await sendReply(
+            convo.senderId,
+            moderation.reply || "We couldn't find the original post to remove — it may have already been taken down."
+          );
+        } catch (err) {
+          console.warn(`[WARN] Could not reply for delete: ${err.message}`);
+        }
+      } else {
+        try {
+          await removePost(oldPostId, submission, moderation.reply);
+        } catch (err) {
+          console.error(
+            `[ERROR] Failed to delete post for conversation ${convo.conversationId}: ${err.message}`
+          );
+          saveConversation(convo, moderation, "FLAG", null);
+          continue;
+        }
       }
     } else if (action === "REJECT") {
       await notifyRejection(submission, moderation.reply);

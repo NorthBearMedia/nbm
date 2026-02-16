@@ -79,6 +79,15 @@ export function saveConversation(convo, moderation, action, postId = null) {
 }
 
 /**
+ * Get the stored post ID for a conversation (if it was posted).
+ * Returns null if not found or not posted.
+ */
+export function getConversationPostId(conversationId) {
+  const entry = data.conversations.find((c) => c.conversation_id === conversationId);
+  return entry?.post_id || null;
+}
+
+/**
  * Get recent conversations for a simple status overview.
  */
 export function getRecentMessages(limit = 20) {

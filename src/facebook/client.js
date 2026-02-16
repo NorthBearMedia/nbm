@@ -80,6 +80,14 @@ export async function publishPhotoPost(imageUrl, caption) {
 }
 
 /**
+ * Delete a post from the Facebook page by its post ID.
+ * Used for correcting posts (wrong image, typo, etc.).
+ */
+export async function deletePost(postId) {
+  return graphRequest(`/${postId}`, { method: "DELETE" });
+}
+
+/**
  * Send a DM reply to a user via the Page Send API.
  * Uses the recipient's PSID (Page-Scoped ID).
  */
