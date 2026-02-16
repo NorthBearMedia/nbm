@@ -1,17 +1,14 @@
-import { publishPost, publishPhotoPost, sendReply, deletePost } from "./client.js";
-
 /**
  * Format and publish an approved message as a page post.
  * If the submission includes images, publishes as a photo post.
  * The sender's name is not included (anonymous "Spotted" style).
  */
-export async function postApprovedMessage(submission, replyText) {
+export async function postApprovedMessage(submission, replyText, client) {
   let result;
   if (submission.images?.length > 0) {
-    // Post first image with text as caption
-    result = await publishPhotoPost(submission.images[0], submission.text);
+    result = await client.publishPhotoPost(submission.images[0], submission.text);
   } else {
-    result = await publishPost(submission.text);
+    result = await client.publishPost(submission.text);
   }
   console.log(
     `[POSTED] Message ${submission.id} published as post ${result.id}`
@@ -19,7 +16,7 @@ export async function postApprovedMessage(submission, replyText) {
 
   // Reply to the sender via DM
   try {
-    await sendReply(
+    await client.sendReply(
       submission.senderId,
       replyText || "Your message has been approved and posted to the page!"
     );
@@ -36,9 +33,9 @@ export async function postApprovedMessage(submission, replyText) {
 /**
  * Notify sender that their message was rejected, with AI-generated reply.
  */
-export async function notifyRejection(submission, replyText) {
+export async function notifyRejection(submission, replyText, client) {
   try {
-    await sendReply(
+    await client.sendReply(
       submission.senderId,
       replyText || "Sorry, your message wasn't approved for posting."
     );
@@ -54,10 +51,10 @@ export async function notifyRejection(submission, replyText) {
  * Correct a post: delete the old one, repost with corrected content, notify the user.
  * Returns the new post result (with new post ID).
  */
-export async function correctPost(oldPostId, submission, replyText) {
+export async function correctPost(oldPostId, submission, replyText, client) {
   // Step 1: Delete the old post
   try {
-    await deletePost(oldPostId);
+    await client.deletePost(oldPostId);
     console.log(`[DELETED] Old post ${oldPostId} removed for correction`);
   } catch (err) {
     console.error(`[ERROR] Failed to delete old post ${oldPostId}: ${err.message}`);
@@ -67,9 +64,9 @@ export async function correctPost(oldPostId, submission, replyText) {
   // Step 2: Repost with corrected content
   let result;
   if (submission.images?.length > 0) {
-    result = await publishPhotoPost(submission.images[0], submission.text);
+    result = await client.publishPhotoPost(submission.images[0], submission.text);
   } else {
-    result = await publishPost(submission.text);
+    result = await client.publishPost(submission.text);
   }
   console.log(
     `[CORRECTED] Reposted as ${result.id} (replaced ${oldPostId})`
@@ -77,7 +74,7 @@ export async function correctPost(oldPostId, submission, replyText) {
 
   // Step 3: Notify the user
   try {
-    await sendReply(
+    await client.sendReply(
       submission.senderId,
       replyText || "No worries! The old post has been removed and the corrected version is now live."
     );
@@ -94,9 +91,9 @@ export async function correctPost(oldPostId, submission, replyText) {
 /**
  * Delete a post and notify the user (no repost).
  */
-export async function removePost(oldPostId, submission, replyText) {
+export async function removePost(oldPostId, submission, replyText, client) {
   try {
-    await deletePost(oldPostId);
+    await client.deletePost(oldPostId);
     console.log(`[DELETED] Post ${oldPostId} removed at user request`);
   } catch (err) {
     console.error(`[ERROR] Failed to delete post ${oldPostId}: ${err.message}`);
@@ -104,7 +101,7 @@ export async function removePost(oldPostId, submission, replyText) {
   }
 
   try {
-    await sendReply(
+    await client.sendReply(
       submission.senderId,
       replyText || "Done! The post has been taken down as requested."
     );
@@ -119,9 +116,9 @@ export async function removePost(oldPostId, submission, replyText) {
 /**
  * Notify sender that their message was flagged for review.
  */
-export async function notifyFlagged(submission, replyText) {
+export async function notifyFlagged(submission, replyText, client) {
   try {
-    await sendReply(
+    await client.sendReply(
       submission.senderId,
       replyText || "Thanks for your message! It's been queued for review and will be posted shortly if approved."
     );

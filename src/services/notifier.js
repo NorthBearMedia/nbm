@@ -30,7 +30,7 @@ export function initEmail() {
     html: `
       <h2>Spotted Moderator is running</h2>
       <p>The bot has started successfully and email notifications are working.</p>
-      <p><strong>Page ID:</strong> ${config.facebook.pageId}</p>
+      <p><strong>Pages:</strong> ${config.facebook.pages.map((p) => `${p.name} (${p.id})`).join(", ")}</p>
       <p><strong>Polling interval:</strong> ${config.polling.intervalSeconds}s</p>
       <p><strong>Confidence threshold:</strong> ${config.moderation.confidenceThreshold}</p>
       <p><em>Started at ${new Date().toLocaleString("en-GB", { timeZone: "Europe/London" })}</em></p>
@@ -67,6 +67,7 @@ export async function sendNotification(submission, moderation, action) {
 
   const html = `
     <h2>${emoji} Message ${action}</h2>
+    <p><strong>Page:</strong> ${submission.pageName || "Unknown"}</p>
     <p><strong>From:</strong> ${submission.senderName}</p>
     <p><strong>Message:</strong></p>
     <blockquote>${submission.text || "<em>(no text — image only)</em>"}</blockquote>

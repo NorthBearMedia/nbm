@@ -8,10 +8,52 @@ const required = (name) => {
   return value;
 };
 
+/**
+ * Parse Facebook page configs.
+ *
+ * Option A – JSON array in FACEBOOK_PAGES:
+ *   [{"id":"123","token":"abc","name":"Spotted Derby"}, ...]
+ *
+ * Option B – legacy single-page env vars (backwards compatible):
+ *   FACEBOOK_PAGE_ID + FACEBOOK_PAGE_ACCESS_TOKEN
+ */
+function parseFacebookPages() {
+  if (process.env.FACEBOOK_PAGES) {
+    try {
+      const pages = JSON.parse(process.env.FACEBOOK_PAGES);
+      if (!Array.isArray(pages) || pages.length === 0) {
+        throw new Error("FACEBOOK_PAGES must be a non-empty JSON array");
+      }
+      for (const p of pages) {
+        if (!p.id || !p.token) {
+          throw new Error(
+            'Each entry in FACEBOOK_PAGES must have "id" and "token" fields'
+          );
+        }
+        p.name = p.name || `Page ${p.id}`;
+      }
+      return pages;
+    } catch (err) {
+      if (err instanceof SyntaxError) {
+        throw new Error(`FACEBOOK_PAGES is not valid JSON: ${err.message}`);
+      }
+      throw err;
+    }
+  }
+
+  // Fallback: single page from legacy env vars
+  return [
+    {
+      id: required("FACEBOOK_PAGE_ID"),
+      token: required("FACEBOOK_PAGE_ACCESS_TOKEN"),
+      name: process.env.FACEBOOK_PAGE_NAME || "Spotted",
+    },
+  ];
+}
+
 export const config = {
   facebook: {
-    pageAccessToken: required("FACEBOOK_PAGE_ACCESS_TOKEN"),
-    pageId: required("FACEBOOK_PAGE_ID"),
+    pages: parseFacebookPages(),
     graphApiBase: "https://graph.facebook.com/v21.0",
   },
   anthropic: {

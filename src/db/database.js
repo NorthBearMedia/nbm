@@ -12,7 +12,7 @@ function load() {
       data.conversations = [];
     }
   } else {
-    data = { messages: [], conversations: [], lastChecked: Date.now() - 24 * 60 * 60 * 1000 };
+    data = { messages: [], conversations: [], lastChecked: {} };
   }
 }
 
@@ -117,18 +117,30 @@ export function getStats() {
 }
 
 /**
- * Get the last-checked timestamp.
- * On fresh starts (no saved timestamp), look back 24 hours so we don't miss
- * messages that arrived just before a container restart / redeployment.
+ * Get the last-checked timestamp for a specific page.
+ * Defaults to Date.now() so fresh starts only see new messages.
  */
-export function getLastChecked() {
-  return data.lastChecked || Date.now() - 24 * 60 * 60 * 1000;
+export function getLastChecked(pageId) {
+  // Migrate: old format was a single number, new format is an object keyed by page ID
+  if (typeof data.lastChecked === "number") {
+    const old = data.lastChecked;
+    data.lastChecked = { [pageId]: old };
+    save();
+    return old;
+  }
+  if (!data.lastChecked || typeof data.lastChecked !== "object") {
+    data.lastChecked = {};
+  }
+  return data.lastChecked[pageId] || Date.now();
 }
 
 /**
- * Persist the last-checked timestamp.
+ * Persist the last-checked timestamp for a specific page.
  */
-export function setLastChecked(timestamp) {
-  data.lastChecked = timestamp;
+export function setLastChecked(pageId, timestamp) {
+  if (!data.lastChecked || typeof data.lastChecked !== "object") {
+    data.lastChecked = {};
+  }
+  data.lastChecked[pageId] = timestamp;
   save();
 }

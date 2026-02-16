@@ -14,7 +14,7 @@ app.get("/", (req, res) => {
   res.json({
     status: "running",
     service: "Spotted Moderator",
-    pageId: config.facebook.pageId,
+    pages: config.facebook.pages.map((p) => ({ id: p.id, name: p.name })),
     pollingInterval: `${config.polling.intervalSeconds}s`,
   });
 });

@@ -1,4 +1,3 @@
-import { fetchUpdatedConversations, sendReply } from "../facebook/client.js";
 import { postApprovedMessage, notifyRejection, notifyFlagged, correctPost, removePost } from "../facebook/poster.js";
 import { moderateConversation } from "../moderation/moderator.js";
 import { resolveAction } from "../moderation/moderator.js";
@@ -6,30 +5,34 @@ import { isConversationProcessed, getConversationMessageCount, getConversationPo
 import { sendNotification } from "./notifier.js";
 
 /**
- * Process updated conversations:
+ * Process updated conversations for a single page:
  * 1. Fetch conversations with new messages
  * 2. Skip conversations already fully processed
  * 3. Give the AI the full thread to identify the submission
  * 4. Post/reject/flag based on the AI decision
  * 5. Reply to the sender once per conversation
+ *
+ * @param {number} sinceTimestamp
+ * @param {object} client — page client from createPageClient()
  */
-export async function processNewMessages(sinceTimestamp) {
-  console.log(`[POLL] Checking for new messages...`);
+export async function processNewMessages(sinceTimestamp, client) {
+  const tag = `[${client.pageName}]`;
+  console.log(`${tag} [POLL] Checking for new messages...`);
 
   let conversations;
   try {
-    conversations = await fetchUpdatedConversations(sinceTimestamp);
+    conversations = await client.fetchUpdatedConversations(sinceTimestamp);
   } catch (err) {
-    console.error(`[ERROR] Failed to fetch conversations: ${err.message}`);
+    console.error(`${tag} [ERROR] Failed to fetch conversations: ${err.message}`);
     return { processed: 0, latestTimestamp: sinceTimestamp };
   }
 
   if (conversations.length === 0) {
-    console.log(`[POLL] No updated conversations found.`);
+    console.log(`${tag} [POLL] No updated conversations found.`);
     return { processed: 0, latestTimestamp: sinceTimestamp };
   }
 
-  console.log(`[POLL] Found ${conversations.length} updated conversation(s).`);
+  console.log(`${tag} [POLL] Found ${conversations.length} updated conversation(s).`);
 
   let latestTimestamp = sinceTimestamp || 0;
 
@@ -38,14 +41,13 @@ export async function processNewMessages(sinceTimestamp) {
     const storedCount = getConversationMessageCount(convo.conversationId);
 
     // Skip if we've already processed this conversation with the same message count
-    // (no new user messages since we last looked)
     if (isConversationProcessed(convo.conversationId) && userMessages.length <= storedCount) {
-      console.log(`[SKIP] Conversation ${convo.conversationId} already processed (${storedCount} msgs).`);
+      console.log(`${tag} [SKIP] Conversation ${convo.conversationId} already processed (${storedCount} msgs).`);
       continue;
     }
 
     console.log(
-      `[ANALYSE] Conversation ${convo.conversationId} from ${convo.senderName} (${userMessages.length} user msgs)`
+      `${tag} [ANALYSE] Conversation ${convo.conversationId} from ${convo.senderName} (${userMessages.length} user msgs)`
     );
 
     // Give the AI the full thread
@@ -54,7 +56,7 @@ export async function processNewMessages(sinceTimestamp) {
       moderation = await moderateConversation(convo.thread);
     } catch (err) {
       console.error(
-        `[ERROR] Moderation failed for conversation ${convo.conversationId}: ${err.message}`
+        `${tag} [ERROR] Moderation failed for conversation ${convo.conversationId}: ${err.message}`
       );
       moderation = {
         decision: "FLAG",
@@ -70,7 +72,7 @@ export async function processNewMessages(sinceTimestamp) {
     // SKIP means the AI found no submission in the thread
     if (moderation.decision === "SKIP") {
       console.log(
-        `[SKIP] No submission found in conversation ${convo.conversationId}: ${moderation.reason}`
+        `${tag} [SKIP] No submission found in conversation ${convo.conversationId}: ${moderation.reason}`
       );
       saveConversation(convo, moderation, "SKIP", null);
       if (convo.updatedTime > latestTimestamp) {
@@ -82,7 +84,7 @@ export async function processNewMessages(sinceTimestamp) {
     const action = resolveAction(moderation);
 
     console.log(
-      `[DECISION] ${action} (${moderation.decision} @ ${moderation.confidence}) — ${moderation.reason}`
+      `${tag} [DECISION] ${action} (${moderation.decision} @ ${moderation.confidence}) — ${moderation.reason}`
     );
 
     // Build a submission object for the poster
@@ -91,7 +93,6 @@ export async function processNewMessages(sinceTimestamp) {
     );
 
     // For CORRECTION requests, get images from the correction message specifically
-    // (the user sent new/correct images in their follow-up)
     let images = [];
     if (action === "CORRECTION" && moderation.useImagesFromMessageId) {
       const correctionMsg = convo.thread.find(
@@ -113,7 +114,7 @@ export async function processNewMessages(sinceTimestamp) {
     }
 
     if (images.length > 0) {
-      console.log(`[IMAGES] Found ${images.length} image(s) to post`);
+      console.log(`${tag} [IMAGES] Found ${images.length} image(s) to post`);
     }
 
     const submission = {
@@ -124,17 +125,18 @@ export async function processNewMessages(sinceTimestamp) {
       senderName: convo.senderName,
       senderId: convo.senderId,
       timestamp: submissionMsg?.timestamp || convo.updatedTime,
+      pageName: client.pageName,
     };
 
     let postId = null;
 
     if (action === "POST") {
       try {
-        const result = await postApprovedMessage(submission, moderation.reply);
+        const result = await postApprovedMessage(submission, moderation.reply, client);
         postId = result.id;
       } catch (err) {
         console.error(
-          `[ERROR] Failed to post from conversation ${convo.conversationId}: ${err.message}`
+          `${tag} [ERROR] Failed to post from conversation ${convo.conversationId}: ${err.message}`
         );
         saveConversation(convo, moderation, "FLAG", null);
         continue;
@@ -143,25 +145,25 @@ export async function processNewMessages(sinceTimestamp) {
       const oldPostId = getConversationPostId(convo.conversationId);
       if (!oldPostId) {
         console.warn(
-          `[WARN] Correction requested for conversation ${convo.conversationId} but no existing post found — treating as new post`
+          `${tag} [WARN] Correction requested for conversation ${convo.conversationId} but no existing post found — treating as new post`
         );
         try {
-          const result = await postApprovedMessage(submission, moderation.reply);
+          const result = await postApprovedMessage(submission, moderation.reply, client);
           postId = result.id;
         } catch (err) {
           console.error(
-            `[ERROR] Failed to post correction for conversation ${convo.conversationId}: ${err.message}`
+            `${tag} [ERROR] Failed to post correction for conversation ${convo.conversationId}: ${err.message}`
           );
           saveConversation(convo, moderation, "FLAG", null);
           continue;
         }
       } else {
         try {
-          const result = await correctPost(oldPostId, submission, moderation.reply);
+          const result = await correctPost(oldPostId, submission, moderation.reply, client);
           postId = result.id;
         } catch (err) {
           console.error(
-            `[ERROR] Failed to correct post for conversation ${convo.conversationId}: ${err.message}`
+            `${tag} [ERROR] Failed to correct post for conversation ${convo.conversationId}: ${err.message}`
           );
           saveConversation(convo, moderation, "FLAG", null);
           continue;
@@ -171,34 +173,34 @@ export async function processNewMessages(sinceTimestamp) {
       const oldPostId = getConversationPostId(convo.conversationId);
       if (!oldPostId) {
         console.warn(
-          `[WARN] Delete requested for conversation ${convo.conversationId} but no existing post found`
+          `${tag} [WARN] Delete requested for conversation ${convo.conversationId} but no existing post found`
         );
         try {
-          await sendReply(
+          await client.sendReply(
             convo.senderId,
             moderation.reply || "We couldn't find the original post to remove — it may have already been taken down."
           );
         } catch (err) {
-          console.warn(`[WARN] Could not reply for delete: ${err.message}`);
+          console.warn(`${tag} [WARN] Could not reply for delete: ${err.message}`);
         }
       } else {
         try {
-          await removePost(oldPostId, submission, moderation.reply);
+          await removePost(oldPostId, submission, moderation.reply, client);
         } catch (err) {
           console.error(
-            `[ERROR] Failed to delete post for conversation ${convo.conversationId}: ${err.message}`
+            `${tag} [ERROR] Failed to delete post for conversation ${convo.conversationId}: ${err.message}`
           );
           saveConversation(convo, moderation, "FLAG", null);
           continue;
         }
       }
     } else if (action === "REJECT") {
-      await notifyRejection(submission, moderation.reply);
+      await notifyRejection(submission, moderation.reply, client);
     } else {
       console.log(
-        `[FLAG] Conversation ${convo.conversationId} flagged for manual review.`
+        `${tag} [FLAG] Conversation ${convo.conversationId} flagged for manual review.`
       );
-      await notifyFlagged(submission, moderation.reply);
+      await notifyFlagged(submission, moderation.reply, client);
     }
 
     // Save to database
