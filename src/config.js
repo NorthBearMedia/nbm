@@ -22,11 +22,15 @@ export const config = {
   },
   polling: {
     intervalSeconds: parseInt(process.env.POLL_INTERVAL_SECONDS || "60", 10),
+    paused: process.env.PAUSED === "true",
   },
   moderation: {
     confidenceThreshold: parseFloat(
       process.env.CONFIDENCE_THRESHOLD || "0.85"
     ),
+  },
+  storage: {
+    dataDir: process.env.DATA_DIR || "./data",
   },
   email: {
     resendApiKey: process.env.RESEND_API_KEY || "",

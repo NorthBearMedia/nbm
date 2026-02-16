@@ -38,24 +38,43 @@ export async function processNewMessages(sinceTimestamp) {
       continue;
     }
 
+    const hasImages = submission.images?.length > 0;
+    const preview = submission.text
+      ? `"${submission.text.substring(0, 50)}..."`
+      : `[${submission.images.length} image(s), no text]`;
+
     console.log(
-      `[MODERATE] Processing message from ${submission.senderName}: "${submission.text.substring(0, 50)}..."`
+      `[MODERATE] Processing message from ${submission.senderName}: ${preview}`
     );
 
     // Run AI moderation
     let moderation;
-    try {
-      moderation = await moderateMessage(submission.text);
-    } catch (err) {
-      console.error(
-        `[ERROR] Moderation failed for message ${submission.id}: ${err.message}`
-      );
+
+    if (!submission.text && hasImages) {
+      // Image-only messages can't be moderated by text AI — flag for review
       moderation = {
         decision: "FLAG",
-        reason: "Moderation error — flagged for manual review",
+        reason: "Image-only message — flagged for manual review",
         confidence: 0,
-        reply: "Thanks for your message! It's been queued for review.",
+        reply: "Thanks for sending your image! It's been queued for review and will be posted if approved.",
       };
+    } else {
+      try {
+        const moderationText = hasImages
+          ? `${submission.text}\n\n[This message also includes ${submission.images.length} image(s)]`
+          : submission.text;
+        moderation = await moderateMessage(moderationText);
+      } catch (err) {
+        console.error(
+          `[ERROR] Moderation failed for message ${submission.id}: ${err.message}`
+        );
+        moderation = {
+          decision: "FLAG",
+          reason: "Moderation error — flagged for manual review",
+          confidence: 0,
+          reply: "Thanks for your message! It's been queued for review.",
+        };
+      }
     }
 
     const action = resolveAction(moderation);

@@ -7,18 +7,19 @@ import { getLastChecked, setLastChecked } from "../db/database.js";
  */
 export function startPolling() {
   const intervalMs = config.polling.intervalSeconds * 1000;
-  let lastChecked = getLastChecked(); // 0 on first run → scans all messages
+  let lastChecked = getLastChecked();
 
   console.log(
-    `[POLLER] Starting — checking every ${config.polling.intervalSeconds}s`
+    `[POLLER] Starting — checking every ${config.polling.intervalSeconds}s (lastChecked: ${new Date(lastChecked).toISOString()})`
   );
-
-  if (lastChecked === 0) {
-    console.log("[POLLER] First run — scanning entire inbox for unprocessed messages.");
-  }
 
   // Run immediately on start, then on interval
   async function poll() {
+    if (config.polling.paused) {
+      console.log("[POLLER] Paused — set PAUSED=false to resume.");
+      return;
+    }
+
     try {
       const result = await processNewMessages(lastChecked);
       if (result.latestTimestamp > lastChecked) {

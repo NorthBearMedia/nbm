@@ -4,8 +4,8 @@ import { initDatabase, getRecentMessages, getFlaggedMessages, getStats } from ".
 import { startPolling } from "./services/poller.js";
 import { initEmail } from "./services/notifier.js";
 
-// Initialise database
-initDatabase();
+// Initialise database (use DATA_DIR for persistent volume on Railway)
+initDatabase(config.storage.dataDir);
 
 // Start the HTTP server FIRST so Railway sees the port open
 const app = express();

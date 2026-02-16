@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+import { join } from "path";
 
 let dbPath;
 let data;
@@ -7,7 +8,7 @@ function load() {
   if (existsSync(dbPath)) {
     data = JSON.parse(readFileSync(dbPath, "utf-8"));
   } else {
-    data = { messages: [] };
+    data = { messages: [], lastChecked: Date.now() };
   }
 }
 
@@ -17,11 +18,13 @@ function save() {
 
 /**
  * Initialise the JSON-based database and create the file if needed.
+ * Uses DATA_DIR env var for the directory (mount a Railway Volume there).
  */
-export function initDatabase(path = "./data/moderation.json") {
-  mkdirSync("./data", { recursive: true });
-  dbPath = path;
+export function initDatabase(dataDir = "./data") {
+  mkdirSync(dataDir, { recursive: true });
+  dbPath = join(dataDir, "moderation.json");
   load();
+  save(); // persist immediately so the file exists
   return data;
 }
 
@@ -87,11 +90,11 @@ export function getStats() {
 }
 
 /**
- * Get the last-checked timestamp (persisted across restarts).
- * Returns 0 on first run so all inbox messages are scanned.
+ * Get the last-checked timestamp.
+ * Always defaults to Date.now() so fresh starts only see new messages.
  */
 export function getLastChecked() {
-  return data.lastChecked || 0;
+  return data.lastChecked || Date.now();
 }
 
 /**
