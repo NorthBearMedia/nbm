@@ -1,7 +1,7 @@
 import { postApprovedMessage, notifyRejection, notifyFlagged, correctPost, removePost } from "../facebook/poster.js";
 import { moderateConversation } from "../moderation/moderator.js";
 import { resolveAction } from "../moderation/moderator.js";
-import { isConversationProcessed, getConversationMessageCount, getConversationUpdatedAt, getConversationPostId, saveConversation } from "../db/database.js";
+import { isConversationProcessed, getConversationPostId, saveConversation } from "../db/database.js";
 import { sendNotification } from "./notifier.js";
 
 /**
@@ -18,11 +18,8 @@ export async function processNewMessages(client) {
   const tag = `[${client.pageName}]`;
   console.log(`${tag} [POLL] Checking for new messages...`);
 
-  // Skip fetching messages for conversations whose updated_time hasn't changed
-  const shouldSkip = (conversationId, updatedTime) => {
-    const storedAt = getConversationUpdatedAt(conversationId);
-    return storedAt > 0 && updatedTime <= storedAt;
-  };
+  // Never re-examine conversations we've already processed
+  const shouldSkip = (conversationId) => isConversationProcessed(conversationId);
 
   let conversations;
   try {
@@ -41,13 +38,6 @@ export async function processNewMessages(client) {
 
   for (const convo of conversations) {
     const userMessages = convo.thread.filter((m) => !m.isPage);
-    const storedCount = getConversationMessageCount(convo.conversationId);
-
-    // Skip if we've already processed this conversation with the same message count
-    if (isConversationProcessed(convo.conversationId) && userMessages.length <= storedCount) {
-      console.log(`${tag} [SKIP] Conversation ${convo.conversationId} already processed (${storedCount} msgs).`);
-      continue;
-    }
 
     console.log(
       `${tag} [ANALYSE] Conversation ${convo.conversationId} from ${convo.senderName} (${userMessages.length} user msgs)`

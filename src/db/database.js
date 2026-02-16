@@ -40,15 +40,6 @@ export function isConversationProcessed(conversationId) {
 }
 
 /**
- * Get the number of user messages we last saw in a conversation.
- * Returns 0 if the conversation has never been processed.
- */
-export function getConversationMessageCount(conversationId) {
-  const entry = data.conversations.find((c) => c.conversation_id === conversationId);
-  return entry?.user_message_count || 0;
-}
-
-/**
  * Save a conversation and its moderation result.
  */
 export function saveConversation(convo, moderation, action, postId = null) {
@@ -76,15 +67,6 @@ export function saveConversation(convo, moderation, action, postId = null) {
   });
 
   save();
-}
-
-/**
- * Get the stored updated_at timestamp for a conversation.
- * Returns 0 if the conversation has never been processed.
- */
-export function getConversationUpdatedAt(conversationId) {
-  const entry = data.conversations.find((c) => c.conversation_id === conversationId);
-  return entry?.updated_at || 0;
 }
 
 /**
