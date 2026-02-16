@@ -5,9 +5,16 @@ import { isConversationProcessed, getConversationPostId, saveConversation } from
 import { sendNotification } from "./notifier.js";
 
 /**
+ * Hard cutoff: only process conversations updated AFTER the bot started.
+ * This prevents re-processing old conversations even if the database is wiped.
+ */
+const BOOT_TIME = Date.now();
+console.log(`[PROCESSOR] Boot time recorded: ${new Date(BOOT_TIME).toISOString()} — ignoring all older conversations`);
+
+/**
  * Process updated conversations for a single page:
- * 1. Fetch conversations with new messages
- * 2. Skip conversations already fully processed
+ * 1. Fetch conversations with new messages (only those updated after boot)
+ * 2. Skip conversations already processed
  * 3. Give the AI the full thread to identify the submission
  * 4. Post/reject/flag based on the AI decision
  * 5. Reply to the sender once per conversation
@@ -18,8 +25,12 @@ export async function processNewMessages(client) {
   const tag = `[${client.pageName}]`;
   console.log(`${tag} [POLL] Checking for new messages...`);
 
-  // Never re-examine conversations we've already processed
-  const shouldSkip = (conversationId) => isConversationProcessed(conversationId);
+  // Skip if: already in our database, OR conversation was last updated before we booted
+  const shouldSkip = (conversationId, updatedTime) => {
+    if (isConversationProcessed(conversationId)) return true;
+    if (updatedTime < BOOT_TIME) return true;
+    return false;
+  };
 
   let conversations;
   try {

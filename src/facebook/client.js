@@ -45,32 +45,14 @@ export function createPageClient(page) {
   }
 
   /**
-   * Fetch conversations (DM threads) from the page inbox.
-   * Follows pagination to get all conversations (up to a reasonable limit).
+   * Fetch the most recent conversations (DM threads) from the page inbox.
+   * Only fetches a single page of results — we only care about recent activity.
    */
   async function getConversations() {
-    const allConversations = [];
-    const url = `/${pageId}/conversations`;
-    let params = { fields: "id,updated_time,participants", limit: "25" };
-    const maxPages = 2;
-
-    for (let pg = 0; pg < maxPages; pg++) {
-      const data = await graphRequest(url, { params });
-      const items = data.data || [];
-      allConversations.push(...items);
-
-      if (data.paging?.cursors?.after) {
-        params = {
-          fields: "id,updated_time,participants",
-          limit: "25",
-          after: data.paging.cursors.after,
-        };
-      } else {
-        break;
-      }
-    }
-
-    return allConversations;
+    const data = await graphRequest(`/${pageId}/conversations`, {
+      params: { fields: "id,updated_time,participants", limit: "25" },
+    });
+    return data.data || [];
   }
 
   /**
