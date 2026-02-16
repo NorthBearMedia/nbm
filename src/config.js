@@ -28,4 +28,10 @@ export const config = {
       process.env.CONFIDENCE_THRESHOLD || "0.8"
     ),
   },
+  email: {
+    enabled: !!process.env.GMAIL_USER,
+    user: process.env.GMAIL_USER || "",
+    appPassword: process.env.GMAIL_APP_PASSWORD || "",
+    notifyTo: process.env.NOTIFICATION_EMAIL || process.env.GMAIL_USER || "",
+  },
 };

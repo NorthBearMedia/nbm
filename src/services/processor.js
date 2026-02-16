@@ -2,6 +2,7 @@ import { fetchNewSubmissions } from "../facebook/client.js";
 import { postApprovedMessage, notifyRejection } from "../facebook/poster.js";
 import { moderateMessage, resolveAction } from "../moderation/moderator.js";
 import { isProcessed, saveMessage } from "../db/database.js";
+import { sendNotification } from "./notifier.js";
 
 /**
  * Process all new DM submissions:
@@ -86,6 +87,9 @@ export async function processNewMessages(sinceTimestamp) {
 
     // Save to database
     saveMessage(submission, moderation, action, postId);
+
+    // Send email notification
+    await sendNotification(submission, moderation, action);
 
     // Track the latest timestamp
     if (submission.timestamp > latestTimestamp) {
