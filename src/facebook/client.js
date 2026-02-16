@@ -37,13 +37,38 @@ async function graphRequest(endpoint, options = {}) {
 
 /**
  * Fetch conversations (DM threads) from the page inbox.
- * Returns an array of conversation objects.
+ * Follows pagination to get all conversations (up to a reasonable limit).
  */
 export async function getConversations() {
-  const data = await graphRequest(`/${pageId}/conversations`, {
-    params: { fields: "id,updated_time,participants" },
-  });
-  return data.data || [];
+  const allConversations = [];
+  let url = `/${pageId}/conversations`;
+  let params = { fields: "id,updated_time,participants", limit: "25" };
+  const maxPages = 5; // Safety limit — at most 125 conversations
+
+  for (let page = 0; page < maxPages; page++) {
+    const data = await graphRequest(url, { params });
+    const items = data.data || [];
+    allConversations.push(...items);
+
+    // Follow pagination if there's a next page
+    if (data.paging?.next) {
+      // The next URL is a full URL; extract the path + query for our graphRequest helper
+      // Simpler approach: just use fetch directly for the next page
+      try {
+        const nextUrl = new URL(data.paging.next);
+        // Re-use graphRequest with the cursor params
+        const afterCursor = data.paging?.cursors?.after;
+        if (!afterCursor) break;
+        params = { fields: "id,updated_time,participants", limit: "25", after: afterCursor };
+      } catch {
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+
+  return allConversations;
 }
 
 /**
@@ -110,11 +135,18 @@ export async function fetchUpdatedConversations(sinceTimestamp) {
   const conversations = await getConversations();
   const updated = [];
 
+  console.log(
+    `[DEBUG] Facebook returned ${conversations.length} conversation(s), filtering since ${new Date(sinceTimestamp).toISOString()}`
+  );
+
   for (const convo of conversations) {
     const updatedTime = new Date(convo.updated_time).getTime();
 
     // Skip conversations not updated since last check
     if (sinceTimestamp && updatedTime <= sinceTimestamp) {
+      console.log(
+        `[DEBUG] Skipping conversation ${convo.id} — updated ${convo.updated_time} is before threshold`
+      );
       continue;
     }
 

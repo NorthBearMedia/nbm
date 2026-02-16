@@ -12,7 +12,7 @@ function load() {
       data.conversations = [];
     }
   } else {
-    data = { messages: [], conversations: [], lastChecked: Date.now() };
+    data = { messages: [], conversations: [], lastChecked: Date.now() - 24 * 60 * 60 * 1000 };
   }
 }
 
@@ -118,10 +118,11 @@ export function getStats() {
 
 /**
  * Get the last-checked timestamp.
- * Always defaults to Date.now() so fresh starts only see new messages.
+ * On fresh starts (no saved timestamp), look back 24 hours so we don't miss
+ * messages that arrived just before a container restart / redeployment.
  */
 export function getLastChecked() {
-  return data.lastChecked || Date.now();
+  return data.lastChecked || Date.now() - 24 * 60 * 60 * 1000;
 }
 
 /**
