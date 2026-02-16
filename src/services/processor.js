@@ -3,6 +3,7 @@ import { postApprovedMessage, notifyRejection, notifyFlagged } from "../facebook
 import { moderateConversation } from "../moderation/moderator.js";
 import { resolveAction } from "../moderation/moderator.js";
 import { isConversationProcessed, getConversationMessageCount, saveConversation } from "../db/database.js";
+import { sendNotification } from "./notifier.js";
 
 /**
  * Process updated conversations:
@@ -137,6 +138,9 @@ export async function processNewMessages(sinceTimestamp) {
 
     // Save to database
     saveConversation(convo, moderation, action, postId);
+
+    // Send email notification
+    await sendNotification(submission, moderation, action);
 
     // Track the latest timestamp
     if (convo.updatedTime > latestTimestamp) {
