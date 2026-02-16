@@ -32,11 +32,11 @@ app.get("/flagged", (req, res) => {
   res.json(getFlaggedMessages());
 });
 
-app.listen(config.server.port, async () => {
+app.listen(config.server.port, () => {
   console.log(`[SERVER] Status API running on port ${config.server.port}`);
 
-  // Now that the server is up, initialise email (can take a few seconds)
-  await initEmail();
+  // Initialise email in background (non-blocking)
+  initEmail();
 
   // Start polling for new messages
   startPolling();

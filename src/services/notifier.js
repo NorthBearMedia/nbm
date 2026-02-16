@@ -4,10 +4,10 @@ import { config } from "../config.js";
 let transporter = null;
 
 /**
- * Initialise and verify the email transporter.
- * Call once at startup — logs clearly whether email will work.
+ * Initialise the email transporter.
+ * Does NOT block startup — sends a test email in the background.
  */
-export async function initEmail() {
+export function initEmail() {
   if (!config.email.enabled) {
     console.log("[EMAIL] Email notifications disabled (no GMAIL_USER set).");
     return;
@@ -16,21 +16,24 @@ export async function initEmail() {
   console.log(`[EMAIL] Setting up with user: ${config.email.user}`);
   console.log(`[EMAIL] Notifications will be sent to: ${config.email.notifyTo}`);
 
+  // Use port 465 with SSL (more likely to work on Railway than port 587)
   transporter = nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
     auth: {
       user: config.email.user,
       pass: config.email.appPassword,
     },
   });
 
-  // Verify the connection works
-  try {
-    await transporter.verify();
+  // Test connection in background — don't block startup
+  transporter.verify().then(() => {
     console.log("[EMAIL] Gmail connection verified — email is working!");
-
-    // Send a startup test email
-    await transporter.sendMail({
+    // Send startup notification
+    transporter.sendMail({
       from: config.email.user,
       to: config.email.notifyTo,
       subject: "Spotted Moderator — Online",
@@ -42,18 +45,16 @@ export async function initEmail() {
         <p><strong>Confidence threshold:</strong> ${config.moderation.confidenceThreshold}</p>
         <p><em>Started at ${new Date().toLocaleString("en-GB", { timeZone: "Europe/London" })}</em></p>
       `,
+    }).then(() => {
+      console.log("[EMAIL] Startup notification sent.");
+    }).catch((err) => {
+      console.error(`[EMAIL] Startup email failed: ${err.message}`);
     });
-    console.log("[EMAIL] Startup notification sent.");
-  } catch (err) {
+  }).catch((err) => {
     console.error(`[EMAIL] Connection FAILED: ${err.message}`);
-    console.error(
-      "[EMAIL] Check GMAIL_USER and GMAIL_APP_PASSWORD are correct."
-    );
-    console.error(
-      "[EMAIL] Make sure you're using a Gmail App Password, not your normal password."
-    );
+    console.error("[EMAIL] Check GMAIL_USER and GMAIL_APP_PASSWORD are correct.");
     transporter = null;
-  }
+  });
 }
 
 /**
@@ -61,11 +62,11 @@ export async function initEmail() {
  */
 export async function sendNotification(submission, moderation, action) {
   if (!transporter) {
-    console.log("[EMAIL] Skipping notification — email not configured or failed to connect.");
+    console.log("[EMAIL] Skipping notification — email not configured.");
     return;
   }
 
-  const emoji = action === "POST" ? "✅" : action === "REJECT" ? "❌" : "⚠️";
+  const emoji = action === "POST" ? "\u2705" : action === "REJECT" ? "\u274C" : "\u26A0\uFE0F";
   const subject = `${emoji} Spotted: ${action} — "${submission.text.substring(0, 40)}..."`;
 
   const html = `

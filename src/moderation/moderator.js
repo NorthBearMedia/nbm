@@ -52,7 +52,10 @@ export async function moderateMessage(messageText) {
     ],
   });
 
-  const text = response.content[0]?.text;
+  let text = response.content[0]?.text || "";
+
+  // Strip markdown code fences if present (```json ... ```)
+  text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
 
   try {
     const result = JSON.parse(text);
