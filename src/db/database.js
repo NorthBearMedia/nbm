@@ -79,6 +79,15 @@ export function saveConversation(convo, moderation, action, postId = null) {
 }
 
 /**
+ * Get the stored updated_at timestamp for a conversation.
+ * Returns 0 if the conversation has never been processed.
+ */
+export function getConversationUpdatedAt(conversationId) {
+  const entry = data.conversations.find((c) => c.conversation_id === conversationId);
+  return entry?.updated_at || 0;
+}
+
+/**
  * Get the stored post ID for a conversation (if it was posted).
  * Returns null if not found or not posted.
  */

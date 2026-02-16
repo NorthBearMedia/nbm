@@ -1,7 +1,7 @@
 import { postApprovedMessage, notifyRejection, notifyFlagged, correctPost, removePost } from "../facebook/poster.js";
 import { moderateConversation } from "../moderation/moderator.js";
 import { resolveAction } from "../moderation/moderator.js";
-import { isConversationProcessed, getConversationMessageCount, getConversationPostId, saveConversation } from "../db/database.js";
+import { isConversationProcessed, getConversationMessageCount, getConversationUpdatedAt, getConversationPostId, saveConversation } from "../db/database.js";
 import { sendNotification } from "./notifier.js";
 
 /**
@@ -18,9 +18,15 @@ export async function processNewMessages(client) {
   const tag = `[${client.pageName}]`;
   console.log(`${tag} [POLL] Checking for new messages...`);
 
+  // Skip fetching messages for conversations whose updated_time hasn't changed
+  const shouldSkip = (conversationId, updatedTime) => {
+    const storedAt = getConversationUpdatedAt(conversationId);
+    return storedAt > 0 && updatedTime <= storedAt;
+  };
+
   let conversations;
   try {
-    conversations = await client.fetchConversations();
+    conversations = await client.fetchConversations(shouldSkip);
   } catch (err) {
     console.error(`${tag} [ERROR] Failed to fetch conversations: ${err.message}`);
     return { processed: 0 };

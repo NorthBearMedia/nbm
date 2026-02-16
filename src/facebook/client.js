@@ -52,7 +52,7 @@ export function createPageClient(page) {
     const allConversations = [];
     const url = `/${pageId}/conversations`;
     let params = { fields: "id,updated_time,participants", limit: "25" };
-    const maxPages = 5;
+    const maxPages = 2;
 
     for (let pg = 0; pg < maxPages; pg++) {
       const data = await graphRequest(url, { params });
@@ -126,8 +126,10 @@ export function createPageClient(page) {
 
   /**
    * Fetch DM conversations from the page inbox with their recent messages.
+   * @param {(id: string, updatedTime: number) => boolean} [shouldSkip] —
+   *   optional callback; return true to skip fetching messages for a conversation.
    */
-  async function fetchConversations() {
+  async function fetchConversations(shouldSkip) {
     const conversations = await getConversations();
     const result = [];
 
@@ -137,6 +139,10 @@ export function createPageClient(page) {
 
     for (const convo of conversations) {
       const updatedTime = new Date(convo.updated_time).getTime();
+
+      if (shouldSkip && shouldSkip(convo.id, updatedTime)) {
+        continue;
+      }
 
       const messages = await getMessages(convo.id, 10);
 
