@@ -11,13 +11,14 @@ const required = (name) => {
 /**
  * Parse Facebook page configs.
  *
- * Option A – JSON array in FACEBOOK_PAGES:
- *   [{"id":"123","token":"abc","name":"Spotted Derby"}, ...]
- *
- * Option B – legacy single-page env vars (backwards compatible):
- *   FACEBOOK_PAGE_ID + FACEBOOK_PAGE_ACCESS_TOKEN
+ * Option A – JSON array in FACEBOOK_PAGES env var
+ * Option B – Numbered env vars (auto-detected):
+ *   FACEBOOK_PAGE_ID   + FACEBOOK_PAGE_ACCESS_TOKEN   + FACEBOOK_PAGE_NAME
+ *   FACEBOOK_PAGE_ID_2 + FACEBOOK_PAGE_ACCESS_TOKEN_2 + FACEBOOK_PAGE_NAME_2
+ *   FACEBOOK_PAGE_ID_3 + ...
  */
 function parseFacebookPages() {
+  // Option A: JSON array
   if (process.env.FACEBOOK_PAGES) {
     try {
       const pages = JSON.parse(process.env.FACEBOOK_PAGES);
@@ -41,14 +42,38 @@ function parseFacebookPages() {
     }
   }
 
-  // Fallback: single page from legacy env vars
-  return [
-    {
-      id: required("FACEBOOK_PAGE_ID"),
-      token: required("FACEBOOK_PAGE_ACCESS_TOKEN"),
+  // Option B: numbered env vars
+  const pages = [];
+
+  // First page (no suffix)
+  if (process.env.FACEBOOK_PAGE_ID && process.env.FACEBOOK_PAGE_ACCESS_TOKEN) {
+    pages.push({
+      id: process.env.FACEBOOK_PAGE_ID,
+      token: process.env.FACEBOOK_PAGE_ACCESS_TOKEN,
       name: process.env.FACEBOOK_PAGE_NAME || "Spotted",
-    },
-  ];
+    });
+  }
+
+  // Additional pages (_2, _3, _4, ...)
+  for (let i = 2; i <= 10; i++) {
+    const id = process.env[`FACEBOOK_PAGE_ID_${i}`];
+    const token = process.env[`FACEBOOK_PAGE_ACCESS_TOKEN_${i}`];
+    if (id && token) {
+      pages.push({
+        id,
+        token,
+        name: process.env[`FACEBOOK_PAGE_NAME_${i}`] || `Spotted ${i}`,
+      });
+    }
+  }
+
+  if (pages.length === 0) {
+    throw new Error(
+      "No Facebook pages configured. Set FACEBOOK_PAGE_ID + FACEBOOK_PAGE_ACCESS_TOKEN, or FACEBOOK_PAGES JSON."
+    );
+  }
+
+  return pages;
 }
 
 export const config = {
