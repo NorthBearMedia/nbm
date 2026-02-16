@@ -18,8 +18,7 @@
   "license": "UNLICENSED",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
-    "better-sqlite3": "^11.7.0",
-    "dotenv": "^16.4.7",
+"dotenv": "^16.4.7",
     "express": "^4.21.2",
     "nodemailer": "^8.0.1"
   }

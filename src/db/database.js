@@ -1,97 +1,87 @@
-import Database from "better-sqlite3";
-import { mkdirSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 
-let db;
+let dbPath;
+let data;
+
+function load() {
+  if (existsSync(dbPath)) {
+    data = JSON.parse(readFileSync(dbPath, "utf-8"));
+  } else {
+    data = { messages: [] };
+  }
+}
+
+function save() {
+  writeFileSync(dbPath, JSON.stringify(data, null, 2));
+}
 
 /**
- * Initialise the SQLite database and create tables if needed.
+ * Initialise the JSON-based database and create the file if needed.
  */
-export function initDatabase(dbPath = "./data/moderation.db") {
-  // Ensure the data directory exists
+export function initDatabase(path = "./data/moderation.json") {
   mkdirSync("./data", { recursive: true });
-
-  db = new Database(dbPath);
-  db.pragma("journal_mode = WAL");
-
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS messages (
-      id TEXT PRIMARY KEY,
-      conversation_id TEXT NOT NULL,
-      sender_name TEXT,
-      sender_id TEXT,
-      text TEXT NOT NULL,
-      received_at INTEGER NOT NULL,
-      decision TEXT,
-      reason TEXT,
-      confidence REAL,
-      action TEXT,
-      post_id TEXT,
-      processed_at INTEGER
-    )
-  `);
-
-  return db;
+  dbPath = path;
+  load();
+  return data;
 }
 
 /**
  * Check if a message has already been processed.
  */
 export function isProcessed(messageId) {
-  const row = db.prepare("SELECT id FROM messages WHERE id = ?").get(messageId);
-  return !!row;
+  return data.messages.some((m) => m.id === messageId);
 }
 
 /**
  * Save a message and its moderation result.
  */
 export function saveMessage(submission, moderation, action, postId = null) {
-  db.prepare(
-    `INSERT OR REPLACE INTO messages
-     (id, conversation_id, sender_name, sender_id, text, received_at,
-      decision, reason, confidence, action, post_id, processed_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    submission.id,
-    submission.conversationId,
-    submission.senderName,
-    submission.senderId,
-    submission.text,
-    submission.timestamp,
-    moderation.decision,
-    moderation.reason,
-    moderation.confidence,
+  // Remove existing entry if present (upsert)
+  data.messages = data.messages.filter((m) => m.id !== submission.id);
+
+  data.messages.push({
+    id: submission.id,
+    conversation_id: submission.conversationId,
+    sender_name: submission.senderName,
+    sender_id: submission.senderId,
+    text: submission.text,
+    received_at: submission.timestamp,
+    decision: moderation.decision,
+    reason: moderation.reason,
+    confidence: moderation.confidence,
     action,
-    postId,
-    Date.now()
-  );
+    post_id: postId,
+    processed_at: Date.now(),
+  });
+
+  save();
 }
 
 /**
  * Get recent messages for a simple status overview.
  */
 export function getRecentMessages(limit = 20) {
-  return db
-    .prepare("SELECT * FROM messages ORDER BY received_at DESC LIMIT ?")
-    .all(limit);
+  return [...data.messages]
+    .sort((a, b) => b.received_at - a.received_at)
+    .slice(0, limit);
 }
 
 /**
  * Get flagged messages that need manual review.
  */
 export function getFlaggedMessages() {
-  return db
-    .prepare(
-      "SELECT * FROM messages WHERE action = 'FLAG' ORDER BY received_at DESC"
-    )
-    .all();
+  return data.messages
+    .filter((m) => m.action === "FLAG")
+    .sort((a, b) => b.received_at - a.received_at);
 }
 
 /**
  * Get counts by action type.
  */
 export function getStats() {
-  const rows = db
-    .prepare("SELECT action, COUNT(*) as count FROM messages GROUP BY action")
-    .all();
-  return Object.fromEntries(rows.map((r) => [r.action, r.count]));
+  const counts = {};
+  for (const msg of data.messages) {
+    counts[msg.action] = (counts[msg.action] || 0) + 1;
+  }
+  return counts;
 }
