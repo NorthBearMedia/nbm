@@ -1,59 +1,37 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import { config } from "../config.js";
 
-let transporter = null;
+let resend = null;
 
 /**
- * Initialise the email transporter.
- * Does NOT block startup — sends a test email in the background.
+ * Initialise the Resend email client.
  */
 export function initEmail() {
-  if (!config.email.enabled) {
-    console.log("[EMAIL] Email notifications disabled (no GMAIL_USER set).");
+  if (!config.email.resendApiKey) {
+    console.log("[EMAIL] Email notifications disabled (no RESEND_API_KEY set).");
     return;
   }
 
-  console.log(`[EMAIL] Setting up with user: ${config.email.user}`);
   console.log(`[EMAIL] Notifications will be sent to: ${config.email.notifyTo}`);
+  resend = new Resend(config.email.resendApiKey);
 
-  // Use port 465 with SSL (more likely to work on Railway than port 587)
-  transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    auth: {
-      user: config.email.user,
-      pass: config.email.appPassword,
-    },
-  });
-
-  // Test connection in background — don't block startup
-  transporter.verify().then(() => {
-    console.log("[EMAIL] Gmail connection verified — email is working!");
-    // Send startup notification
-    transporter.sendMail({
-      from: config.email.user,
-      to: config.email.notifyTo,
-      subject: "Spotted Moderator — Online",
-      html: `
-        <h2>Spotted Moderator is running</h2>
-        <p>The bot has started successfully and email notifications are working.</p>
-        <p><strong>Page ID:</strong> ${config.facebook.pageId}</p>
-        <p><strong>Polling interval:</strong> ${config.polling.intervalSeconds}s</p>
-        <p><strong>Confidence threshold:</strong> ${config.moderation.confidenceThreshold}</p>
-        <p><em>Started at ${new Date().toLocaleString("en-GB", { timeZone: "Europe/London" })}</em></p>
-      `,
-    }).then(() => {
-      console.log("[EMAIL] Startup notification sent.");
-    }).catch((err) => {
-      console.error(`[EMAIL] Startup email failed: ${err.message}`);
-    });
+  // Send startup notification
+  resend.emails.send({
+    from: "Spotted Moderator <onboarding@resend.dev>",
+    to: config.email.notifyTo,
+    subject: "Spotted Moderator — Online",
+    html: `
+      <h2>Spotted Moderator is running</h2>
+      <p>The bot has started successfully and email notifications are working.</p>
+      <p><strong>Page ID:</strong> ${config.facebook.pageId}</p>
+      <p><strong>Polling interval:</strong> ${config.polling.intervalSeconds}s</p>
+      <p><strong>Confidence threshold:</strong> ${config.moderation.confidenceThreshold}</p>
+      <p><em>Started at ${new Date().toLocaleString("en-GB", { timeZone: "Europe/London" })}</em></p>
+    `,
+  }).then(() => {
+    console.log("[EMAIL] Startup notification sent.");
   }).catch((err) => {
-    console.error(`[EMAIL] Connection FAILED: ${err.message}`);
-    console.error("[EMAIL] Check GMAIL_USER and GMAIL_APP_PASSWORD are correct.");
-    transporter = null;
+    console.error(`[EMAIL] Startup email failed: ${err.message}`);
   });
 }
 
@@ -61,8 +39,7 @@ export function initEmail() {
  * Send an email notification for a moderation event.
  */
 export async function sendNotification(submission, moderation, action) {
-  if (!transporter) {
-    console.log("[EMAIL] Skipping notification — email not configured.");
+  if (!resend) {
     return;
   }
 
@@ -82,8 +59,8 @@ export async function sendNotification(submission, moderation, action) {
   `;
 
   try {
-    await transporter.sendMail({
-      from: config.email.user,
+    await resend.emails.send({
+      from: "Spotted Moderator <onboarding@resend.dev>",
       to: config.email.notifyTo,
       subject,
       html,

@@ -29,9 +29,7 @@ export const config = {
     ),
   },
   email: {
-    enabled: !!process.env.GMAIL_USER,
-    user: process.env.GMAIL_USER || "",
-    appPassword: process.env.GMAIL_APP_PASSWORD || "",
-    notifyTo: process.env.NOTIFICATION_EMAIL || process.env.GMAIL_USER || "",
+    resendApiKey: process.env.RESEND_API_KEY || "",
+    notifyTo: process.env.NOTIFICATION_EMAIL || "",
   },
 };
