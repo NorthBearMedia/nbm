@@ -4,24 +4,22 @@ import { publishPost, sendReply } from "./client.js";
  * Format and publish an approved message as a page post.
  * The sender's name is not included (anonymous "Spotted" style).
  */
-export async function postApprovedMessage(submission) {
-  const postText = submission.text;
-
-  const result = await publishPost(postText);
+export async function postApprovedMessage(submission, replyText) {
+  const result = await publishPost(submission.text);
   console.log(
     `[POSTED] Message ${submission.id} published as post ${result.id}`
   );
 
-  // Optionally notify the sender that their message was posted
+  // Reply to the sender via DM
   try {
     await sendReply(
-      submission.conversationId,
-      "Your message has been approved and posted to the page! 🎉"
+      submission.senderId,
+      replyText || "Your message has been approved and posted to the page!"
     );
+    console.log(`[REPLY] Sent approval reply to ${submission.senderName}`);
   } catch (err) {
-    // Non-critical — don't fail if reply doesn't send
     console.warn(
-      `[WARN] Could not notify sender for message ${submission.id}: ${err.message}`
+      `[WARN] Could not reply to sender for message ${submission.id}: ${err.message}`
     );
   }
 
@@ -29,17 +27,35 @@ export async function postApprovedMessage(submission) {
 }
 
 /**
- * Notify sender that their message was rejected.
+ * Notify sender that their message was rejected, with AI-generated reply.
  */
-export async function notifyRejection(submission, reason) {
+export async function notifyRejection(submission, replyText) {
   try {
     await sendReply(
-      submission.conversationId,
-      `Your message was not approved for posting. Reason: ${reason}`
+      submission.senderId,
+      replyText || "Sorry, your message wasn't approved for posting."
     );
+    console.log(`[REPLY] Sent rejection reply to ${submission.senderName}`);
   } catch (err) {
     console.warn(
-      `[WARN] Could not notify sender of rejection for message ${submission.id}: ${err.message}`
+      `[WARN] Could not reply to sender for message ${submission.id}: ${err.message}`
+    );
+  }
+}
+
+/**
+ * Notify sender that their message was flagged for review.
+ */
+export async function notifyFlagged(submission, replyText) {
+  try {
+    await sendReply(
+      submission.senderId,
+      replyText || "Thanks for your message! It's been queued for review and will be posted shortly if approved."
+    );
+    console.log(`[REPLY] Sent flagged reply to ${submission.senderName}`);
+  } catch (err) {
+    console.warn(
+      `[WARN] Could not reply to sender for message ${submission.id}: ${err.message}`
     );
   }
 }

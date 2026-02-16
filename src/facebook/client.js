@@ -70,11 +70,16 @@ export async function publishPost(message) {
 }
 
 /**
- * Send a reply within a conversation (to notify the sender).
+ * Send a DM reply to a user via the Page Send API.
+ * Uses the recipient's PSID (Page-Scoped ID).
  */
-export async function sendReply(conversationId, message) {
-  return graphRequest(`/${conversationId}/messages`, {
-    body: { message },
+export async function sendReply(recipientId, message) {
+  return graphRequest(`/${pageId}/messages`, {
+    body: {
+      recipient: { id: recipientId },
+      message: { text: message },
+      messaging_type: "RESPONSE",
+    },
   });
 }
 

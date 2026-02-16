@@ -1,5 +1,5 @@
 import { fetchNewSubmissions } from "../facebook/client.js";
-import { postApprovedMessage, notifyRejection } from "../facebook/poster.js";
+import { postApprovedMessage, notifyRejection, notifyFlagged } from "../facebook/poster.js";
 import { moderateMessage, resolveAction } from "../moderation/moderator.js";
 import { isProcessed, saveMessage } from "../db/database.js";
 import { sendNotification } from "./notifier.js";
@@ -9,6 +9,7 @@ import { sendNotification } from "./notifier.js";
  * 1. Fetch new messages from the page inbox
  * 2. Run each through AI moderation
  * 3. Auto-post approved ones, reject bad ones, flag borderline ones
+ * 4. Reply to the sender via DM with AI-generated message
  */
 export async function processNewMessages(sinceTimestamp) {
   console.log(`[POLL] Checking for new messages...`);
@@ -53,6 +54,7 @@ export async function processNewMessages(sinceTimestamp) {
         decision: "FLAG",
         reason: "Moderation error — flagged for manual review",
         confidence: 0,
+        reply: "Thanks for your message! It's been queued for review.",
       };
     }
 
@@ -67,22 +69,22 @@ export async function processNewMessages(sinceTimestamp) {
 
     if (action === "POST") {
       try {
-        const result = await postApprovedMessage(submission);
+        const result = await postApprovedMessage(submission, moderation.reply);
         postId = result.id;
       } catch (err) {
         console.error(
           `[ERROR] Failed to post message ${submission.id}: ${err.message}`
         );
-        // Save as FLAG so it can be retried manually
         saveMessage(submission, moderation, "FLAG");
         continue;
       }
     } else if (action === "REJECT") {
-      await notifyRejection(submission, moderation.reason);
+      await notifyRejection(submission, moderation.reply);
     } else {
       console.log(
         `[FLAG] Message ${submission.id} flagged for manual review.`
       );
+      await notifyFlagged(submission, moderation.reply);
     }
 
     // Save to database
