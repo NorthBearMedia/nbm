@@ -43,6 +43,12 @@ export function isConversationProcessed(conversationId) {
  * Save a conversation and its moderation result.
  */
 export function saveConversation(convo, moderation, action, postId = null) {
+  // Carry forward the old post_id if we're not replacing it
+  const existing = data.conversations.find((c) => c.conversation_id === convo.conversationId);
+  if (!postId && existing?.post_id) {
+    postId = existing.post_id;
+  }
+
   // Remove existing entry if present (upsert)
   data.conversations = data.conversations.filter(
     (c) => c.conversation_id !== convo.conversationId
@@ -76,6 +82,15 @@ export function saveConversation(convo, moderation, action, postId = null) {
 export function getConversationUpdatedAt(conversationId) {
   const entry = data.conversations.find((c) => c.conversation_id === conversationId);
   return entry?.updated_at || 0;
+}
+
+/**
+ * Get the stored processed_at timestamp for a conversation.
+ * Returns 0 if the conversation has never been processed.
+ */
+export function getConversationProcessedAt(conversationId) {
+  const entry = data.conversations.find((c) => c.conversation_id === conversationId);
+  return entry?.processed_at || 0;
 }
 
 /**

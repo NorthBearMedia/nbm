@@ -1,7 +1,7 @@
 import { postApprovedMessage, notifyRejection, notifyFlagged, correctPost, removePost } from "../facebook/poster.js";
 import { moderateConversation } from "../moderation/moderator.js";
 import { resolveAction } from "../moderation/moderator.js";
-import { isConversationProcessed, getConversationUpdatedAt, getConversationPostId, saveConversation } from "../db/database.js";
+import { isConversationProcessed, getConversationUpdatedAt, getConversationPostId, saveConversation, getConversationProcessedAt } from "../db/database.js";
 import { sendNotification } from "./notifier.js";
 
 /**
@@ -59,10 +59,17 @@ export async function processNewMessages(client) {
       `${tag} [ANALYSE] Conversation ${convo.conversationId} from ${convo.senderName} (${userMessages.length} user msgs)`
     );
 
+    // Mark messages as new if this is a follow-up to an already-processed conversation
+    const lastProcessedAt = getConversationProcessedAt(convo.conversationId);
+    const threadWithNewMarkers = convo.thread.map((msg) => ({
+      ...msg,
+      isNew: lastProcessedAt > 0 && msg.timestamp > lastProcessedAt,
+    }));
+
     // Give the AI the full thread
     let moderation;
     try {
-      moderation = await moderateConversation(convo.thread);
+      moderation = await moderateConversation(threadWithNewMarkers);
     } catch (err) {
       console.error(
         `${tag} [ERROR] Moderation failed for conversation ${convo.conversationId}: ${err.message}`
@@ -84,6 +91,24 @@ export async function processNewMessages(client) {
         `${tag} [SKIP] No submission found in conversation ${convo.conversationId}: ${moderation.reason}`
       );
       saveConversation(convo, moderation, "SKIP", null);
+      continue;
+    }
+
+    // ASK means the AI needs clarification — reply and wait for their response
+    if (moderation.decision === "ASK") {
+      console.log(
+        `${tag} [ASK] Requesting clarification for conversation ${convo.conversationId}: ${moderation.reason}`
+      );
+      if (moderation.reply) {
+        try {
+          await client.sendReply(convo.senderId, moderation.reply);
+        } catch (err) {
+          console.warn(`${tag} [WARN] Could not send ASK reply: ${err.message}`);
+        }
+      }
+      // Save as ASK — when the user replies, updated_at will change
+      // and shouldSkip will let us re-process the conversation
+      saveConversation(convo, moderation, "ASK", null);
       continue;
     }
 
