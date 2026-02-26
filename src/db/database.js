@@ -56,6 +56,14 @@ export function saveConversation(convo, moderation, action, postId = null) {
 
   const userMessages = convo.thread.filter((m) => !m.isPage);
 
+  // Use Date.now() for updated_at rather than convo.updatedTime.
+  // The bot's own DM reply bumps Facebook's updated_time for the conversation.
+  // If we stored the original updatedTime, the next poll would see a newer
+  // updated_time (from our reply) and re-process → duplicate posts.
+  // By storing Date.now() (which is AFTER our reply was sent), shouldSkip
+  // will correctly see updatedTime <= storedAt on the next poll.
+  const now = Date.now();
+
   data.conversations.push({
     conversation_id: convo.conversationId,
     sender_name: convo.senderName,
@@ -63,13 +71,13 @@ export function saveConversation(convo, moderation, action, postId = null) {
     submission_text: moderation.submissionText || null,
     submission_message_id: moderation.submissionMessageId || null,
     user_message_count: userMessages.length,
-    updated_at: convo.updatedTime,
+    updated_at: now,
     decision: moderation.decision,
     reason: moderation.reason,
     confidence: moderation.confidence,
     action,
     post_id: postId,
-    processed_at: Date.now(),
+    processed_at: now,
   });
 
   save();
