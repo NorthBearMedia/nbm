@@ -1,6 +1,6 @@
 import express from "express";
 import { config } from "./config.js";
-import { initDatabase, getRecentMessages, getFlaggedMessages, getStats } from "./db/database.js";
+import { initDatabase, getRecentMessages, getFlaggedMessages, getStats, clearFlaggedConversations } from "./db/database.js";
 import { startPolling } from "./services/poller.js";
 import { initEmail } from "./services/notifier.js";
 
@@ -30,6 +30,12 @@ app.get("/messages", (req, res) => {
 
 app.get("/flagged", (req, res) => {
   res.json(getFlaggedMessages());
+});
+
+app.post("/retry-flagged", (req, res) => {
+  const cleared = clearFlaggedConversations();
+  console.log(`[ADMIN] Cleared ${cleared} flagged conversation(s) for retry`);
+  res.json({ cleared, message: `${cleared} flagged conversation(s) will be re-processed on the next poll cycle` });
 });
 
 app.listen(config.server.port, () => {

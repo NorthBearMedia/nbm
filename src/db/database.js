@@ -129,6 +129,19 @@ export function getFlaggedMessages() {
 }
 
 /**
+ * Remove flagged conversations from the database so they get
+ * re-processed on the next poll cycle.
+ * Returns the number of conversations cleared.
+ */
+export function clearFlaggedConversations() {
+  const before = data.conversations.length;
+  data.conversations = data.conversations.filter((c) => c.action !== "FLAG");
+  const cleared = before - data.conversations.length;
+  if (cleared > 0) save();
+  return cleared;
+}
+
+/**
  * Get counts by action type.
  */
 export function getStats() {

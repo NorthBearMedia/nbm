@@ -85,9 +85,17 @@ You MUST respond with valid JSON only, no other text:
   "hasImages": true/false,
   "useImagesFromMessageId": "for CORRECTION — the message id containing the correct images to use (null otherwise)",
   "reason": "Brief one-sentence explanation of your decision",
-  "confidence": 0.0 to 1.0,
+  "confidence": 0.0 to 1.0 (see CONFIDENCE GUIDE below),
   "reply": "Your conversational reply to send back to the person. ALWAYS provide this — even for ASK. Be friendly and natural, like a real person running the page."
 }
+
+CONFIDENCE GUIDE:
+- 0.9 to 1.0: Clear-cut cases. Event flyers, community messages, selling items, recommendations,
+  shoutouts, lost/found posts — obvious submissions with no moderation concerns. USE THIS MOST OF THE TIME.
+- 0.7 to 0.9: Mostly clear but minor uncertainty (e.g. slightly edgy humour, borderline tone)
+- Below 0.7: Genuinely uncertain — use FLAG instead
+Most submissions to a community Spotted page are perfectly fine. Default to high confidence unless
+there is a specific reason to doubt the content.
 
 DECISION GUIDE:
 - APPROVE: Clear submission that passes moderation → post it

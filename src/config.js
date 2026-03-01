@@ -93,7 +93,7 @@ export const config = {
   },
   moderation: {
     confidenceThreshold: parseFloat(
-      process.env.CONFIDENCE_THRESHOLD || "0.85"
+      process.env.CONFIDENCE_THRESHOLD || "0.7"
     ),
   },
   storage: {
