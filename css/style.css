@@ -262,12 +262,13 @@ h1, h2, h3, h4, h5, h6 {
    ============================================ */
 .hero {
     position: relative;
-    min-height: 100vh;
+    min-height: 676px;
     display: flex;
     align-items: center;
     justify-content: center;
     text-align: center;
     overflow: hidden;
+    background: #2a2a2a;
 }
 
 .hero-bg {
@@ -289,7 +290,7 @@ h1, h2, h3, h4, h5, h6 {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.55);
+    background: rgba(0, 0, 0, 0.5);
 }
 
 .hero .container {
@@ -1137,13 +1138,17 @@ h1, h2, h3, h4, h5, h6 {
 /* ============================================
    SCROLL ANIMATIONS
    ============================================ */
+/* Elements visible by default - JS adds .js-ready to body to enable animations */
 .slide-up {
-    opacity: 0;
-    transform: translateY(30px);
     transition: opacity 0.6s ease, transform 0.6s ease;
 }
 
-.slide-up.visible {
+.js-ready .slide-up {
+    opacity: 0;
+    transform: translateY(30px);
+}
+
+.js-ready .slide-up.visible {
     opacity: 1;
     transform: translateY(0);
 }
@@ -1465,10 +1470,18 @@ h1, h2, h3, h4, h5, h6 {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 32px;
+    justify-items: center;
 }
 
 .service-card {
     text-align: center;
+    max-width: 400px;
+    width: 100%;
+}
+
+/* Center the last row when it has fewer than 3 items */
+.services-card-grid .service-card:last-child:nth-child(3n+1) {
+    grid-column: 2;
 }
 
 .service-card-img {

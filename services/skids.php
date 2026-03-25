@@ -2,7 +2,7 @@
 $currentPage = 'services';
 $pageTitle = 'Pre-fabricated Skids and Process Packages';
 $pageDescription = 'Musk Engineering designs and fabricates process packages including heating and cooling skids, CIP systems, valve manifolds and pump skids.';
-include $_SERVER['DOCUMENT_ROOT'] . '/includes/header.php';
+include __DIR__.'/../includes/header.php';
 ?>
 
     <section class="service-sub-hero">
@@ -37,4 +37,4 @@ include $_SERVER['DOCUMENT_ROOT'] . '/includes/header.php';
         </div>
     </section>
 
-<?php include $_SERVER['DOCUMENT_ROOT'] . '/includes/footer.php'; ?>
+<?php include __DIR__.'/../includes/footer.php'; ?>

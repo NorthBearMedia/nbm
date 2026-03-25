@@ -2,7 +2,7 @@
 $currentPage = 'projects';
 $pageTitle = 'Food & Beverage';
 $pageDescription = 'Musk Engineering food and beverage projects including cleaning soap baths, process heating skids, and raw ingredients mixing and storage vessels.';
-include $_SERVER['DOCUMENT_ROOT'] . '/includes/header.php';
+include __DIR__.'/../includes/header.php';
 ?>
 
     <section class="service-sub-hero">
@@ -33,4 +33,4 @@ include $_SERVER['DOCUMENT_ROOT'] . '/includes/header.php';
         </div>
     </section>
 
-<?php include $_SERVER['DOCUMENT_ROOT'] . '/includes/footer.php'; ?>
+<?php include __DIR__.'/../includes/footer.php'; ?>

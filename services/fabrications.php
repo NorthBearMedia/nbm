@@ -2,7 +2,7 @@
 $currentPage = 'services';
 $pageTitle = 'General Fabrications';
 $pageDescription = 'Musk Engineering provides a wide range of high-quality stainless steel fabrications including bespoke fabrications, platforming, tools trolleys and catch trays.';
-include $_SERVER['DOCUMENT_ROOT'] . '/includes/header.php';
+include __DIR__.'/../includes/header.php';
 ?>
 
     <section class="service-sub-hero">
@@ -37,4 +37,4 @@ include $_SERVER['DOCUMENT_ROOT'] . '/includes/header.php';
         </div>
     </section>
 
-<?php include $_SERVER['DOCUMENT_ROOT'] . '/includes/footer.php'; ?>
+<?php include __DIR__.'/../includes/footer.php'; ?>

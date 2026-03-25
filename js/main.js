@@ -2,6 +2,9 @@
 
 document.addEventListener('DOMContentLoaded', function() {
 
+    // Enable scroll animations only when JS is running
+    document.body.classList.add('js-ready');
+
     // Mobile navigation toggle
     var mobileToggle = document.getElementById('mobileToggle');
     var mainNav = document.getElementById('mainNav');

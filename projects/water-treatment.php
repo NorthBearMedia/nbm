@@ -2,7 +2,7 @@
 $currentPage = 'projects';
 $pageTitle = 'Water Treatment';
 $pageDescription = 'Musk Engineering water treatment projects including sludge pump skids, coded welding frameworks and duplex pipework fabrication for desalination RO Systems.';
-include $_SERVER['DOCUMENT_ROOT'] . '/includes/header.php';
+include __DIR__.'/../includes/header.php';
 ?>
 
     <section class="service-sub-hero">
@@ -30,4 +30,4 @@ include $_SERVER['DOCUMENT_ROOT'] . '/includes/header.php';
         </div>
     </section>
 
-<?php include $_SERVER['DOCUMENT_ROOT'] . '/includes/footer.php'; ?>
+<?php include __DIR__.'/../includes/footer.php'; ?>

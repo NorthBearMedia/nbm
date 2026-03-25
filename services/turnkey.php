@@ -2,7 +2,7 @@
 $currentPage = 'services';
 $pageTitle = 'Turnkey Solutions';
 $pageDescription = 'Musk Engineering provides complete turnkey solutions including software and electrical installation for your projects.';
-include $_SERVER['DOCUMENT_ROOT'] . '/includes/header.php';
+include __DIR__.'/../includes/header.php';
 ?>
 
     <section class="service-sub-hero">
@@ -29,4 +29,4 @@ include $_SERVER['DOCUMENT_ROOT'] . '/includes/header.php';
         </div>
     </section>
 
-<?php include $_SERVER['DOCUMENT_ROOT'] . '/includes/footer.php'; ?>
+<?php include __DIR__.'/../includes/footer.php'; ?>

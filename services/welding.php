@@ -2,7 +2,7 @@
 $currentPage = 'services';
 $pageTitle = 'Coded Welding & Quality';
 $pageDescription = 'Musk Engineering puts quality at the forefront with certified welding, testing and full weld certification to BS EN or ASME standards.';
-include $_SERVER['DOCUMENT_ROOT'] . '/includes/header.php';
+include __DIR__.'/../includes/header.php';
 ?>
 
     <section class="service-sub-hero">
@@ -31,4 +31,4 @@ include $_SERVER['DOCUMENT_ROOT'] . '/includes/header.php';
         </div>
     </section>
 
-<?php include $_SERVER['DOCUMENT_ROOT'] . '/includes/footer.php'; ?>
+<?php include __DIR__.'/../includes/footer.php'; ?>

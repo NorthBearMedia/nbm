@@ -2,7 +2,7 @@
 $currentPage = 'services';
 $pageTitle = 'Process Vessels';
 $pageDescription = 'Musk Engineering provides high-quality vessel fabrication with 50 years of family expertise, from atmospheric storage to pressure heating and cooling vessels.';
-include $_SERVER['DOCUMENT_ROOT'] . '/includes/header.php';
+include __DIR__.'/../includes/header.php';
 ?>
 
     <section class="service-sub-hero">
@@ -42,4 +42,4 @@ include $_SERVER['DOCUMENT_ROOT'] . '/includes/header.php';
         </div>
     </section>
 
-<?php include $_SERVER['DOCUMENT_ROOT'] . '/includes/footer.php'; ?>
+<?php include __DIR__.'/../includes/footer.php'; ?>

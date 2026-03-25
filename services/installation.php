@@ -2,7 +2,7 @@
 $currentPage = 'services';
 $pageTitle = 'On Site Installation';
 $pageDescription = 'Musk Engineering provides on-site fabrication and installation services across a wide range of sectors and industries around the globe.';
-include $_SERVER['DOCUMENT_ROOT'] . '/includes/header.php';
+include __DIR__.'/../includes/header.php';
 ?>
 
     <section class="service-sub-hero">
@@ -32,4 +32,4 @@ include $_SERVER['DOCUMENT_ROOT'] . '/includes/header.php';
         </div>
     </section>
 
-<?php include $_SERVER['DOCUMENT_ROOT'] . '/includes/footer.php'; ?>
+<?php include __DIR__.'/../includes/footer.php'; ?>
