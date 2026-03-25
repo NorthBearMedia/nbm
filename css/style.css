@@ -398,10 +398,23 @@ h1, h2, h3, h4, h5, h6 {
     align-items: center;
 }
 
+.what-images {
+    position: relative;
+}
+
 .what-img-person {
-    width: 100%;
+    width: 65%;
     border-radius: 20px;
     display: block;
+}
+
+.what-img-overlap {
+    position: absolute;
+    bottom: -30px;
+    right: 0;
+    width: 45%;
+    border-radius: 20px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.15);
 }
 
 .what-text h3 {
@@ -423,24 +436,8 @@ h1, h2, h3, h4, h5, h6 {
     font-weight: 500;
 }
 
-.what-checklist {
-    list-style: none;
-    margin: 1.5rem 0;
-}
-
-.what-checklist li {
-    padding: 6px 0;
-    font-size: 1rem;
-    color: var(--dark-text);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.check-mark {
-    color: var(--primary-teal);
-    font-weight: 600;
-    font-size: 1rem;
+.teal-highlight strong {
+    font-weight: 700;
 }
 
 /* ============================================
@@ -472,43 +469,34 @@ h1, h2, h3, h4, h5, h6 {
 
 .industry-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 24px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 32px;
 }
 
-.industry-card {
+.industry-cell {
+    position: relative;
+    padding-bottom: 60px;
+}
+
+.industry-img {
+    width: 100%;
     border-radius: 20px;
-    overflow: hidden;
-    background: var(--white);
-    transition: transform var(--transition), box-shadow var(--transition);
-}
-
-.industry-card:hover {
-    transform: translateY(-6px);
-    box-shadow: 0 12px 30px rgba(0,0,0,0.15);
-}
-
-.industry-card-image {
-    width: 100%;
-    height: 200px;
-    overflow: hidden;
-}
-
-.industry-card-image img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
     display: block;
+    height: 300px;
+    object-fit: cover;
 }
 
-.industry-card-label {
-    padding: 20px 16px;
+.industry-label-card {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--white);
+    border-radius: 0;
+    padding: 24px 20px;
     text-align: center;
-}
-
-.industry-card-label span {
-    font-size: 0.95rem;
-    font-weight: 500;
+    width: 70%;
+    font-size: 1rem;
     color: var(--dark-text);
     line-height: 1.4;
 }
@@ -1167,10 +1155,6 @@ h1, h2, h3, h4, h5, h6 {
     .hero-content h1 { font-size: 48px; }
     .hero-subtitle { font-size: 24px; }
 
-    .industry-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
     .who-text h3,
     .what-text h3 {
         font-size: 36px;
@@ -1259,9 +1243,12 @@ h1, h2, h3, h4, h5, h6 {
 
     .industry-grid {
         grid-template-columns: 1fr;
-        max-width: 400px;
+        max-width: 500px;
         margin: 0 auto;
     }
+
+    .what-img-person { width: 100%; }
+    .what-img-overlap { display: none; }
 
     .industry-header h3 {
         font-size: 2rem;
