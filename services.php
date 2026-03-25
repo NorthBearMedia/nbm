@@ -18,41 +18,47 @@ include 'includes/header.php';
         <div class="container">
             <div class="services-card-grid">
 
-                <div class="service-card">
-                    <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=768,h=538,fit=crop/Yanqkw6EPbi7qy6G/avicad-piping-project-1024x650-AoPWPR55L8CK2wrE.jpg" alt="Process & Instrumentation Diagrams" class="service-card-img">
-                    <h6 class="service-card-title">Process &amp; Instrumentation Diagrams (P&amp;IDs)</h6>
-                    <p class="service-card-desc">Developing detailed system diagrams to ensure seamless mechanical integration.</p>
-                </div>
+                <a href="/services/design.php" class="service-card service-card-link">
+                    <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=768,h=538,fit=crop/Yanqkw6EPbi7qy6G/avicad-piping-project-1024x650-AoPWPR55L8CK2wrE.jpg" alt="Design, Management & Planning" class="service-card-img">
+                    <h6 class="service-card-title">Design, Management &amp; Planning</h6>
+                    <p class="service-card-desc">Accurate designs and planning to ensure a clear path to project success.</p>
+                </a>
 
-                <div class="service-card">
-                    <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=768,h=538,fit=crop/Yanqkw6EPbi7qy6G/engineer-4922775_1920-YZ98p263GVIWBo3K.jpg" alt="Equipment Selection & Specification" class="service-card-img">
-                    <h6 class="service-card-title">Equipment Selection &amp; Specification</h6>
-                    <p class="service-card-desc">Helping clients choose the most efficient and industry-compliant components.</p>
-                </div>
+                <a href="/services/skids.php" class="service-card service-card-link">
+                    <img src="/images/hot-water-skid.png" alt="Pre-fabricated Skids" class="service-card-img">
+                    <h6 class="service-card-title">Pre-fabricated Skids</h6>
+                    <p class="service-card-desc">In-house designed and fabricated process packages and skid systems.</p>
+                </a>
 
-                <div class="service-card">
-                    <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=768,h=538,fit=crop/Yanqkw6EPbi7qy6G/engineer-4915807_1920-YNqBLJa8ExHlJoZO.jpg" alt="General & Detailed Arrangement Drawings" class="service-card-img">
-                    <h6 class="service-card-title">General &amp; Detailed Arrangement Drawings</h6>
-                    <p class="service-card-desc">Creating precise engineering designs for smooth project execution, including 3D modeling where required.</p>
-                </div>
+                <a href="/services/vessels.php" class="service-card service-card-link">
+                    <img src="/images/IMG_0066.jpg" alt="Process Vessels" class="service-card-img">
+                    <h6 class="service-card-title">Process Vessels</h6>
+                    <p class="service-card-desc">High-quality vessel fabrication backed by 50 years of family expertise.</p>
+                </a>
 
-                <div class="service-card">
-                    <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=768,h=538,fit=crop/Yanqkw6EPbi7qy6G/welding-9370143_1920-mv0WXj1zDoSoGbOg.jpg" alt="Pressure Vessel Design & Fabrication" class="service-card-img">
-                    <h6 class="service-card-title">Pressure Vessel Design &amp; Fabrication</h6>
-                    <p class="service-card-desc">High-specification vessels built to industry standards for maximum safety and durability.</p>
-                </div>
+                <a href="/services/fabrications.php" class="service-card service-card-link">
+                    <img src="/images/IMG_0144.jpg" alt="General Fabrications" class="service-card-img">
+                    <h6 class="service-card-title">General Fabrications</h6>
+                    <p class="service-card-desc">A wide range of high-quality stainless steel fabrications.</p>
+                </a>
 
-                <div class="service-card">
-                    <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=768,h=538,fit=crop/Yanqkw6EPbi7qy6G/pgpff6_w-mePxanNODXTywwGj.jpeg" alt="Offsite Design for Manufacture" class="service-card-img">
-                    <h6 class="service-card-title">Offsite Design for Manufacture (DfMA)</h6>
-                    <p class="service-card-desc">Prefabricated components designed for cost-effective, offsite assembly and on-site efficiency.</p>
-                </div>
+                <a href="/services/installation.php" class="service-card service-card-link">
+                    <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=768,h=538,fit=crop/Yanqkw6EPbi7qy6G/engineer-4915807_1920-YNqBLJa8ExHlJoZO.jpg" alt="On Site Installation" class="service-card-img">
+                    <h6 class="service-card-title">On Site Installation</h6>
+                    <p class="service-card-desc">On-site fabrication and installation across a wide range of sectors.</p>
+                </a>
 
-                <div class="service-card">
-                    <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=768,h=538,fit=crop/Yanqkw6EPbi7qy6G/screenshot-2025-03-07-at-11.32.08-A3QO05Q0zbFkGwWY.png" alt="On-Site Installation" class="service-card-img">
-                    <h6 class="service-card-title">On-Site Installation</h6>
-                    <p class="service-card-desc">Seamless, high-quality installation of mechanical systems, ensuring reliability and compliance.</p>
-                </div>
+                <a href="/services/turnkey.php" class="service-card service-card-link">
+                    <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=768,h=538,fit=crop/Yanqkw6EPbi7qy6G/engineer-4922775_1920-YZ98p263GVIWBo3K.jpg" alt="Turnkey Solutions" class="service-card-img">
+                    <h6 class="service-card-title">Turnkey Solutions</h6>
+                    <p class="service-card-desc">Complete turnkey solutions including software and electrical installation.</p>
+                </a>
+
+                <a href="/services/welding.php" class="service-card service-card-link">
+                    <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=768,h=538,fit=crop/Yanqkw6EPbi7qy6G/welding-9370143_1920-mv0WXj1zDoSoGbOg.jpg" alt="Coded Welding & Quality" class="service-card-img">
+                    <h6 class="service-card-title">Coded Welding &amp; Quality</h6>
+                    <p class="service-card-desc">Quality at the forefront with certified welding and testing.</p>
+                </a>
 
             </div>
         </div>

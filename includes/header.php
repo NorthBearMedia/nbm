@@ -21,8 +21,27 @@
                     <ul>
                         <li><a href="/" <?php echo (!isset($currentPage) || $currentPage === 'home') ? 'class="active"' : ''; ?>>Home</a></li>
                         <li><a href="/about.php" <?php echo (isset($currentPage) && $currentPage === 'about') ? 'class="active"' : ''; ?>>About</a></li>
-                        <li><a href="/services.php" <?php echo (isset($currentPage) && $currentPage === 'services') ? 'class="active"' : ''; ?>>Services</a></li>
-                        <li><a href="/projects.php" <?php echo (isset($currentPage) && $currentPage === 'projects') ? 'class="active"' : ''; ?>>Projects</a></li>
+                        <li class="nav-dropdown">
+                            <a href="/services.php" <?php echo (isset($currentPage) && $currentPage === 'services') ? 'class="active"' : ''; ?>>Services</a>
+                            <ul class="dropdown-menu">
+                                <li><a href="/services/design.php">Design, Management &amp; Planning</a></li>
+                                <li><a href="/services/skids.php">Pre-fabricated Skids</a></li>
+                                <li><a href="/services/vessels.php">Process Vessels</a></li>
+                                <li><a href="/services/fabrications.php">General Fabrications</a></li>
+                                <li><a href="/services/installation.php">On Site Installation</a></li>
+                                <li><a href="/services/turnkey.php">Turnkey Solutions</a></li>
+                                <li><a href="/services/welding.php">Coded Welding &amp; Quality</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-dropdown">
+                            <a href="/projects.php" <?php echo (isset($currentPage) && $currentPage === 'projects') ? 'class="active"' : ''; ?>>Projects</a>
+                            <ul class="dropdown-menu">
+                                <li><a href="/projects/fabrications.php">General Fabrications &amp; Skids</a></li>
+                                <li><a href="/projects/water-treatment.php">Water Treatment</a></li>
+                                <li><a href="/projects/food-beverage.php">Food &amp; Beverage</a></li>
+                                <li><a href="/projects/chemical-pharma.php">Chemical &amp; Pharmaceutical</a></li>
+                            </ul>
+                        </li>
                         <li><a href="/contact.php" <?php echo (isset($currentPage) && $currentPage === 'contact') ? 'class="active"' : ''; ?>>Contact</a></li>
                     </ul>
                 </nav>

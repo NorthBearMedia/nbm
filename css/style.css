@@ -1605,4 +1605,227 @@ h1, h2, h3, h4, h5, h6 {
     .services-card-grid {
         grid-template-columns: repeat(2, 1fr);
     }
+
+    .project-category-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* ============================================
+   DROPDOWN NAVIGATION
+   ============================================ */
+.nav-dropdown {
+    position: relative;
+}
+
+.nav-dropdown > .dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--white);
+    min-width: 260px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    border-radius: 8px;
+    padding: 8px 0;
+    z-index: 1001;
+    list-style: none;
+}
+
+.nav-dropdown:hover > .dropdown-menu {
+    display: block;
+}
+
+.dropdown-menu li a {
+    display: block;
+    padding: 10px 20px;
+    color: var(--dark-text);
+    font-size: 0.9rem;
+    font-weight: 400;
+    transition: all var(--transition);
+    white-space: nowrap;
+}
+
+.dropdown-menu li a:hover {
+    background: rgba(78, 193, 180, 0.1);
+    color: var(--accent-teal);
+}
+
+/* ============================================
+   SERVICE SUB-PAGES
+   ============================================ */
+.service-sub-hero {
+    padding: 160px 0 60px;
+    background: var(--accent-teal);
+    text-align: center;
+}
+
+.service-sub-title {
+    font-size: 48px;
+    font-weight: 600;
+    color: var(--dark-text);
+}
+
+.service-bullet-list {
+    list-style: none;
+    max-width: 800px;
+    margin: 1.5rem auto 0;
+    text-align: left;
+}
+
+.service-bullet-list li {
+    padding: 10px 0 10px 28px;
+    position: relative;
+    color: var(--gray-text);
+    font-size: 1rem;
+    line-height: 1.8;
+}
+
+.service-bullet-list li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    background: var(--accent-teal);
+    border-radius: 50%;
+}
+
+.service-bullet-list li strong {
+    color: var(--dark-text);
+}
+
+.service-sub-images {
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.service-sub-images-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+.service-sub-img {
+    width: 100%;
+    border-radius: 20px;
+    display: block;
+}
+
+/* ============================================
+   SERVICE CARD LINKS
+   ============================================ */
+.service-card-link {
+    display: block;
+    text-decoration: none;
+    transition: transform 0.3s ease;
+}
+
+.service-card-link:hover {
+    transform: translateY(-4px);
+}
+
+/* ============================================
+   PROJECT CATEGORY CARDS
+   ============================================ */
+.project-category-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 32px;
+}
+
+.project-category-card {
+    display: block;
+    text-decoration: none;
+    text-align: center;
+    transition: transform 0.3s ease;
+}
+
+.project-category-card:hover {
+    transform: translateY(-4px);
+}
+
+.project-category-img {
+    width: 100%;
+    border-radius: 20px;
+    display: block;
+    height: 300px;
+    object-fit: cover;
+    margin-bottom: 1rem;
+}
+
+.project-category-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--dark-text);
+}
+
+/* ============================================
+   PHOTO GALLERY
+   ============================================ */
+.photo-gallery {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.gallery-img {
+    width: 100%;
+    border-radius: 20px;
+    display: block;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+}
+
+/* ============================================
+   RESPONSIVE - SUB-PAGES
+   ============================================ */
+@media (max-width: 768px) {
+    .service-sub-hero {
+        padding: 130px 0 40px;
+    }
+
+    .service-sub-title {
+        font-size: 32px;
+    }
+
+    .service-sub-images-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .project-category-grid {
+        grid-template-columns: 1fr;
+        max-width: 500px;
+        margin: 0 auto;
+    }
+
+    .photo-gallery {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .nav-dropdown > .dropdown-menu {
+        position: static;
+        box-shadow: none;
+        padding-left: 16px;
+        display: none;
+    }
+
+    .nav-dropdown.mobile-open > .dropdown-menu {
+        display: block;
+    }
+}
+
+@media (max-width: 480px) {
+    .photo-gallery {
+        grid-template-columns: 1fr;
+    }
+
+    .service-sub-title {
+        font-size: 28px;
+    }
 }
