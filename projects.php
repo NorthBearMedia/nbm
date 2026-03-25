@@ -1,24 +1,24 @@
 <?php
-$currentPage = 'sectors';
-$pageTitle = 'Sectors';
-$pageDescription = 'Musk Engineering serves the most demanding sectors including food and beverage, pharmaceutical, chemical processing, dairy, brewing, and confectionery industries.';
+$currentPage = 'projects';
+$pageTitle = 'Projects';
+$pageDescription = 'Musk Engineering projects across the most demanding sectors including food and beverage, pharmaceutical, chemical processing, energy and infrastructure industries.';
 include 'includes/header.php';
 ?>
 
     <section class="page-hero">
         <div class="container">
-            <span class="section-label">Our Sectors</span>
+            <span class="section-label">Our Projects</span>
             <h1>Supporting the Most Demanding Industries</h1>
             <p>Our work supports sectors where precision and quality are non-negotiable, providing precision-driven mechanical process solutions.</p>
         </div>
     </section>
 
-    <section class="sectors-detail">
+    <section class="projects-detail">
         <div class="container">
-            <div class="sectors-detail-grid">
+            <div class="projects-detail-grid">
 
-                <div class="sector-detail-card">
-                    <div class="sector-detail-icon">
+                <div class="project-detail-card">
+                    <div class="project-detail-icon">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
                     </div>
                     <h3>Food &amp; Beverage</h3>
@@ -31,8 +31,8 @@ include 'includes/header.php';
                     </ul>
                 </div>
 
-                <div class="sector-detail-card">
-                    <div class="sector-detail-icon">
+                <div class="project-detail-card">
+                    <div class="project-detail-icon">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
                     </div>
                     <h3>Pharmaceutical &amp; Healthcare</h3>
@@ -45,8 +45,8 @@ include 'includes/header.php';
                     </ul>
                 </div>
 
-                <div class="sector-detail-card">
-                    <div class="sector-detail-icon">
+                <div class="project-detail-card">
+                    <div class="project-detail-icon">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                     </div>
                     <h3>Chemical Processing</h3>
@@ -59,8 +59,8 @@ include 'includes/header.php';
                     </ul>
                 </div>
 
-                <div class="sector-detail-card">
-                    <div class="sector-detail-icon">
+                <div class="project-detail-card">
+                    <div class="project-detail-icon">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
                     </div>
                     <h3>Dairy &amp; Brewing</h3>
@@ -73,22 +73,22 @@ include 'includes/header.php';
                     </ul>
                 </div>
 
-                <div class="sector-detail-card">
-                    <div class="sector-detail-icon">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                <div class="project-detail-card">
+                    <div class="project-detail-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                     </div>
-                    <h3>Confectionery</h3>
-                    <p>We have extensive experience working with leading UK confectionery companies, providing engineering solutions for chocolate, sugar, and other confectionery production processes. Our expertise includes contamination removal systems and process optimisation.</p>
+                    <h3>Energy, Utilities &amp; Infrastructure</h3>
+                    <p>We support the energy and utilities sectors with robust mechanical process engineering solutions. From power generation to water treatment, our expertise delivers reliable infrastructure solutions.</p>
                     <ul class="check-list">
-                        <li>Confectionery process systems</li>
-                        <li>Powder handling and transfer</li>
-                        <li>Contamination removal solutions</li>
-                        <li>Production line optimisation</li>
+                        <li>Power generation systems</li>
+                        <li>Water and wastewater treatment</li>
+                        <li>Infrastructure pipework</li>
+                        <li>Utility system installations</li>
                     </ul>
                 </div>
 
-                <div class="sector-detail-card">
-                    <div class="sector-detail-icon">
+                <div class="project-detail-card">
+                    <div class="project-detail-icon">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
                     </div>
                     <h3>General Industrial</h3>
@@ -110,7 +110,7 @@ include 'includes/header.php';
             <div class="cta-content">
                 <h2>Need Engineering Support for Your Sector?</h2>
                 <p>Contact us to discuss how our expertise can benefit your industry-specific requirements.</p>
-                <a href="/contact.php" class="btn btn-primary">Discuss Your Project</a>
+                <a href="/contact.php" class="btn btn-hero-outline">Discuss Your Project</a>
             </div>
         </div>
     </section>

@@ -1,52 +1,27 @@
     <footer class="site-footer">
         <div class="container">
             <div class="footer-grid">
-                <div class="footer-col">
-                    <div class="footer-logo">
-                        <span class="logo-text">MUSK</span>
-                        <span class="logo-sub">ENGINEERING LTD</span>
-                    </div>
-                    <p>Precision and Innovation in Engineering. Over five decades of expertise in mechanical process engineering.</p>
+                <div class="footer-col footer-col-left">
+                    <a href="https://www.linkedin.com/company/steve-musk-engineering" target="_blank" rel="noopener noreferrer" class="footer-linkedin" aria-label="LinkedIn">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+                    </a>
+                    <h5 class="footer-title">Musk Engineering Ltd</h5>
+                    <p class="footer-desc">With a legacy in mechanical process engineering, Musk Engineering provides high-quality, precision-driven solutions for complex industrial projects.</p>
+                    <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=375,h=316,fit=crop/Yanqkw6EPbi7qy6G/musk-engineering-UkIrDbzowfyWOjjS.png" alt="Musk Engineering" class="footer-musk-logo">
                 </div>
-                <div class="footer-col">
-                    <h4>Quick Links</h4>
-                    <ul>
-                        <li><a href="/">Home</a></li>
-                        <li><a href="/about.php">About Us</a></li>
-                        <li><a href="/services.php">Services</a></li>
-                        <li><a href="/sectors.php">Sectors</a></li>
-                        <li><a href="/contact.php">Contact</a></li>
-                    </ul>
-                </div>
-                <div class="footer-col">
-                    <h4>Our Services</h4>
-                    <ul>
-                        <li><a href="/services.php#mechanical">Mechanical Process Systems</a></li>
-                        <li><a href="/services.php#fabrication">Custom Fabrication</a></li>
-                        <li><a href="/services.php#installation">Integration &amp; Installation</a></li>
-                        <li><a href="/services.php#design">Design &amp; Engineering</a></li>
-                    </ul>
-                </div>
-                <div class="footer-col">
-                    <h4>Contact Us</h4>
-                    <ul class="contact-list">
-                        <li>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                            Derbyshire, United Kingdom
-                        </li>
-                        <li>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                            <a href="tel:+441234567890">Get in Touch</a>
-                        </li>
-                        <li>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                            <a href="/contact.php">Send a Message</a>
-                        </li>
-                    </ul>
+                <div class="footer-col footer-col-right">
+                    <h5 class="footer-contact-heading">Contact</h5>
+                    <a href="mailto:info@muskengineering.co.uk" class="footer-email">info@muskengineering.co.uk</a>
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>&copy; <?php echo date('Y'); ?> Musk Engineering Ltd. All rights reserved.</p>
+                <p class="footer-copyright">&copy; 2025. All rights reserved.</p>
+                <div class="footer-built-by">
+                    <span>Website built &amp; maintained by</span>
+                    <a href="#" target="_blank" rel="noopener noreferrer">
+                        <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=375,h=250,fit=crop/Yanqkw6EPbi7qy6G/nbm-logo-no-ng-light-lines-mk3vWrxjqeSpqL62.png" alt="NBM" class="nbm-logo">
+                    </a>
+                </div>
             </div>
         </div>
     </footer>

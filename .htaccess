@@ -6,6 +6,10 @@ RewriteEngine On
 # Set default index
 DirectoryIndex index.php
 
+# Redirect old sectors page to projects
+RewriteRule ^sectors\.php$ /projects.php [R=301,L]
+RewriteRule ^sectors$ /projects [R=301,L]
+
 # Remove .php extension
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME}\.php -f

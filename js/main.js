@@ -3,8 +3,8 @@
 document.addEventListener('DOMContentLoaded', function() {
 
     // Mobile navigation toggle
-    const mobileToggle = document.getElementById('mobileToggle');
-    const mainNav = document.getElementById('mainNav');
+    var mobileToggle = document.getElementById('mobileToggle');
+    var mainNav = document.getElementById('mainNav');
 
     if (mobileToggle && mainNav) {
         mobileToggle.addEventListener('click', function() {
@@ -19,18 +19,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 mobileToggle.classList.remove('active');
             });
         });
+
+        // Close nav when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!mainNav.contains(e.target) && !mobileToggle.contains(e.target)) {
+                mainNav.classList.remove('active');
+                mobileToggle.classList.remove('active');
+            }
+        });
     }
 
     // Header scroll effect
-    const header = document.querySelector('.site-header');
+    var header = document.querySelector('.site-header');
     if (header) {
         window.addEventListener('scroll', function() {
             if (window.scrollY > 50) {
-                header.style.background = 'rgba(15, 38, 64, 0.98)';
-                header.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)';
+                header.style.boxShadow = '0 2px 16px rgba(0,0,0,0.1)';
             } else {
-                header.style.background = 'rgba(15, 38, 64, 0.95)';
-                header.style.boxShadow = 'none';
+                header.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
             }
         });
     }
@@ -50,10 +56,28 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Simple scroll animation
-    var animateElements = document.querySelectorAll('.service-card, .stat-card, .sector-card, .value-card, .sector-detail-card, .process-step, .stat-block');
+    // Scroll animations (slide-up elements)
+    var slideElements = document.querySelectorAll('.slide-up');
 
-    if ('IntersectionObserver' in window) {
+    if ('IntersectionObserver' in window && slideElements.length > 0) {
+        var slideObserver = new IntersectionObserver(function(entries) {
+            entries.forEach(function(entry) {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    slideObserver.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+        slideElements.forEach(function(el) {
+            slideObserver.observe(el);
+        });
+    }
+
+    // Generic card animations
+    var animateElements = document.querySelectorAll('.industry-card, .value-card, .project-detail-card, .process-step, .stat-block');
+
+    if ('IntersectionObserver' in window && animateElements.length > 0) {
         var observer = new IntersectionObserver(function(entries) {
             entries.forEach(function(entry) {
                 if (entry.isIntersecting) {

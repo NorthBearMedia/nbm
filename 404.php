@@ -13,7 +13,7 @@ include 'includes/header.php';
 
     <section style="padding: 80px 0; text-align: center;">
         <div class="container">
-            <p style="color: var(--text-light); margin-bottom: 2rem;">Let us help you find what you're looking for.</p>
+            <p style="color: var(--gray-text); margin-bottom: 2rem;">Let us help you find what you're looking for.</p>
             <a href="/" class="btn btn-primary">Return to Homepage</a>
         </div>
     </section>

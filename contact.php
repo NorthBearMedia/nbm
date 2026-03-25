@@ -49,7 +49,7 @@ include 'includes/header.php';
     <section class="contact-section">
         <div class="container">
             <div class="contact-grid">
-                <div class="contact-info">
+                <div class="contact-info slide-up">
                     <h2>Contact Information</h2>
                     <p>Reach out to us and our team will respond promptly to discuss your engineering requirements.</p>
 
@@ -91,7 +91,7 @@ include 'includes/header.php';
                     </div>
                 </div>
 
-                <div class="contact-form-wrapper">
+                <div class="contact-form-wrapper slide-up">
                     <?php if ($formSubmitted): ?>
                         <div class="form-success">
                             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>

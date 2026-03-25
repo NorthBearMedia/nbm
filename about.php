@@ -16,18 +16,14 @@ include 'includes/header.php';
     <section class="about-intro">
         <div class="container">
             <div class="about-grid">
-                <div class="about-text">
+                <div class="about-text slide-up">
                     <h2>Who We Are</h2>
                     <p>Musk Engineering Ltd provides high-quality, precision-driven solutions for complex industrial projects. We work with industry leaders to develop custom solutions, from design and fabrication to on-site installation.</p>
                     <p>From concept to completion, we provide end-to-end engineering solutions tailored to industrial needs. From design to installation, we deliver trusted engineering services for industry leaders across the United Kingdom.</p>
                     <p>Our team brings together decades of hands-on experience with the latest engineering techniques, ensuring every project meets the highest standards of quality, safety, and efficiency.</p>
                 </div>
-                <div class="about-image">
-                    <div class="image-placeholder">
-                        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-                            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                        </svg>
-                    </div>
+                <div class="about-image slide-up">
+                    <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=768,h=583,fit=crop/Yanqkw6EPbi7qy6G/industry-2147404_1920-m5KMgbOLn9iGgLze.jpg" alt="Industrial engineering">
                 </div>
             </div>
         </div>
@@ -67,7 +63,7 @@ include 'includes/header.php';
     <section class="experience-section">
         <div class="container">
             <div class="experience-grid">
-                <div class="experience-content">
+                <div class="experience-content slide-up">
                     <span class="section-label">Our Experience</span>
                     <h2>Trusted by Industry Leaders</h2>
                     <p>Our work supports some of the most demanding sectors, where precision and quality are non-negotiable. We provide precision-driven mechanical process solutions backed by over 50 years of expertise.</p>
@@ -79,7 +75,7 @@ include 'includes/header.php';
                         <li>Ongoing maintenance and support services</li>
                     </ul>
                 </div>
-                <div class="experience-stats">
+                <div class="experience-stats slide-up">
                     <div class="stat-block">
                         <span class="stat-number">50+</span>
                         <span class="stat-text">Years of Combined Experience</span>
@@ -102,7 +98,7 @@ include 'includes/header.php';
             <div class="cta-content">
                 <h2>Partner with Us on Your Next Project</h2>
                 <p>Discover how our engineering expertise can support your business objectives.</p>
-                <a href="/contact.php" class="btn btn-primary">Get in Touch</a>
+                <a href="/contact.php" class="btn btn-hero-outline">Get in Touch</a>
             </div>
         </div>
     </section>
