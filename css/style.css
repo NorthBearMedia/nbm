@@ -1534,8 +1534,7 @@ h1, h2, h3, h4, h5, h6 {
 .pdf-embed-wrapper {
     margin-top: 3rem;
     width: 100%;
-    aspect-ratio: 8.5 / 11;
-    max-height: 85vh;
+    aspect-ratio: 16 / 10;
     border-radius: 12px;
     overflow: hidden;
     box-shadow: 0 4px 20px rgba(0,0,0,0.1);
