@@ -16,7 +16,7 @@ include __DIR__.'/../includes/header.php';
             <p class="about-body-gray">Our chemical and pharmaceutical work includes stainless schedule pipework pre-fabricated in house and installed on site for acetone supply lines, and installation of third party packaged chemical dilution systems including the design and fabrication of 1,500L water storage vessels, skid fabrication, and process components all integrated on site around existing production.</p>
 
             <div class="photo-gallery" style="margin-top: 2rem;">
-                <img src="/images/IMG_4134.JPG" alt="Chemical & Pharmaceutical" class="gallery-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_4134.JPG" alt="Chemical & Pharmaceutical" class="gallery-img">
             </div>
         </div>
     </section>

@@ -29,8 +29,8 @@ include __DIR__.'/../includes/header.php';
             <p class="about-body-gray" style="margin-top: 1rem;">Our vessels are fabricated to meet all your requirements: from atmospheric storage vessels, to pressure heating or cooling vessels, we have the skills and capabilities to deliver them with the internal and external finishes as required.</p>
 
             <div class="service-sub-images service-sub-images-grid" style="margin-top: 2rem;">
-                <img src="/images/IMG_0066.jpg" alt="Process Vessel" class="service-sub-img">
-                <img src="/images/95340377-5628-478c-b70d-6cc6646e4707.jpg" alt="Process Vessel" class="service-sub-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_0066.jpg" alt="Process Vessel" class="service-sub-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/95340377-5628-478c-b70d-6cc6646e4707.jpg" alt="Process Vessel" class="service-sub-img">
             </div>
         </div>
     </section>

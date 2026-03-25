@@ -25,19 +25,19 @@ include 'includes/header.php';
                 </a>
 
                 <a href="/services/skids.php" class="service-card service-card-link">
-                    <img src="/images/hot-water-skid.png" alt="Pre-fabricated Skids" class="service-card-img">
+                    <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/hot-water-skid.png" alt="Pre-fabricated Skids" class="service-card-img">
                     <h6 class="service-card-title">Pre-fabricated Skids</h6>
                     <p class="service-card-desc">In-house designed and fabricated process packages and skid systems.</p>
                 </a>
 
                 <a href="/services/vessels.php" class="service-card service-card-link">
-                    <img src="/images/IMG_0066.jpg" alt="Process Vessels" class="service-card-img">
+                    <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_0066.jpg" alt="Process Vessels" class="service-card-img">
                     <h6 class="service-card-title">Process Vessels</h6>
                     <p class="service-card-desc">High-quality vessel fabrication backed by 50 years of family expertise.</p>
                 </a>
 
                 <a href="/services/fabrications.php" class="service-card service-card-link">
-                    <img src="/images/IMG_0144.jpg" alt="General Fabrications" class="service-card-img">
+                    <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_0144.jpg" alt="General Fabrications" class="service-card-img">
                     <h6 class="service-card-title">General Fabrications</h6>
                     <p class="service-card-desc">A wide range of high-quality stainless steel fabrications.</p>
                 </a>

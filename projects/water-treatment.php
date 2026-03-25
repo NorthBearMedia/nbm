@@ -16,9 +16,9 @@ include __DIR__.'/../includes/header.php';
             <p class="about-body-gray">Sludge pump skids, fabricated and assembled to our client's design. With an EXC1 fabricated framework and coded welding, allowing our client to apply a UKCA mark to this standard product package. We also deliver duplex pipework fabrication for desalination RO Systems.</p>
 
             <div class="photo-gallery" style="margin-top: 2rem;">
-                <img src="/images/IMG_4123.JPG" alt="Water Treatment" class="gallery-img">
-                <img src="/images/IMG_4124.JPG" alt="Water Treatment" class="gallery-img">
-                <img src="/images/IMG_4125.JPG" alt="Water Treatment" class="gallery-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_4123.JPG" alt="Water Treatment" class="gallery-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_4124.JPG" alt="Water Treatment" class="gallery-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_4125.JPG" alt="Water Treatment" class="gallery-img">
             </div>
         </div>
     </section>

@@ -25,7 +25,7 @@ include __DIR__.'/../includes/header.php';
             <p class="about-body-gray" style="margin-top: 2rem;">Are just a few of the areas in which we have supported clients with Design for Manufacture [DfMA] packages.</p>
 
             <div class="service-sub-images" style="margin-top: 2rem;">
-                <img src="/images/hot-water-skid.png" alt="Pre-fabricated Skids" class="service-sub-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/hot-water-skid.png" alt="Pre-fabricated Skids" class="service-sub-img">
             </div>
         </div>
     </section>

@@ -25,7 +25,7 @@ include __DIR__.'/../includes/header.php';
             <p class="about-body-gray" style="margin-top: 2rem;">All of our works, no matter the size, receive the same level of care, attention and quality.</p>
 
             <div class="service-sub-images" style="margin-top: 2rem;">
-                <img src="/images/IMG_0144.jpg" alt="General Fabrications" class="service-sub-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_0144.jpg" alt="General Fabrications" class="service-sub-img">
             </div>
         </div>
     </section>

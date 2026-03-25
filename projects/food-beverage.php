@@ -16,12 +16,12 @@ include __DIR__.'/../includes/header.php';
             <p class="about-body-gray">Our food and beverage projects include cleaning soap baths with integrated pumps for recirculation, process heating skids with integrated controls and heat exchangers, and raw ingredients mixing and storage vessels designed, fabricated, delivered and installed on site.</p>
 
             <div class="photo-gallery" style="margin-top: 2rem;">
-                <img src="/images/IMG_0144.jpg" alt="Food & Beverage" class="gallery-img">
-                <img src="/images/IMG_0157.jpg" alt="Food & Beverage" class="gallery-img">
-                <img src="/images/IMG_0169.jpg" alt="Food & Beverage" class="gallery-img">
-                <img src="/images/hot-water-skid.png" alt="Food & Beverage" class="gallery-img">
-                <img src="/images/IMG_0066.jpg" alt="Food & Beverage" class="gallery-img">
-                <img src="/images/95340377-5628-478c-b70d-6cc6646e4707.jpg" alt="Food & Beverage" class="gallery-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_0144.jpg" alt="Food & Beverage" class="gallery-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_0157.jpg" alt="Food & Beverage" class="gallery-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_0169.jpg" alt="Food & Beverage" class="gallery-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/hot-water-skid.png" alt="Food & Beverage" class="gallery-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_0066.jpg" alt="Food & Beverage" class="gallery-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/95340377-5628-478c-b70d-6cc6646e4707.jpg" alt="Food & Beverage" class="gallery-img">
             </div>
         </div>
     </section>

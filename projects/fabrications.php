@@ -16,11 +16,11 @@ include __DIR__.'/../includes/header.php';
             <p class="about-body-gray">Some of our recent fabrication works including product chutes, platforming and access solutions, storage trolleys and frames, and packing line workstations.</p>
 
             <div class="photo-gallery" style="margin-top: 2rem;">
-                <img src="/images/IMG_4132.jpg" alt="General Fabrication" class="gallery-img">
-                <img src="/images/IMG_4133.jpg" alt="General Fabrication" class="gallery-img">
-                <img src="/images/IMG_4134.JPG" alt="General Fabrication" class="gallery-img">
-                <img src="/images/IMG_0554.jpg" alt="General Fabrication" class="gallery-img">
-                <img src="/images/IMG_0556.jpg" alt="General Fabrication" class="gallery-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_4132.jpg" alt="General Fabrication" class="gallery-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_4133.jpg" alt="General Fabrication" class="gallery-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_4134.JPG" alt="General Fabrication" class="gallery-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_0554.jpg" alt="General Fabrication" class="gallery-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_0556.jpg" alt="General Fabrication" class="gallery-img">
             </div>
         </div>
     </section>
