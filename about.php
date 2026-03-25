@@ -5,100 +5,69 @@ $pageDescription = 'Learn about Musk Engineering Ltd - over five decades of expe
 include 'includes/header.php';
 ?>
 
-    <section class="page-hero">
+    <!-- About Musk Engineering -->
+    <section class="about-centered-section about-white">
         <div class="container">
-            <span class="section-label">About Us</span>
-            <h1>Engineering Excellence Since Day One</h1>
-            <p>With a legacy in mechanical process engineering, our reputation is built on innovation, reliability, and over five decades of expertise.</p>
+            <h3 class="about-heading">About Musk Engineering</h3>
+            <p class="about-body-gray">Founded on a legacy of precision and reliability, Steve Musk Engineering delivers high-quality mechanical process solutions for industry leaders. With decades of expertise, we specialise in mechanical design, fabrication, and installation.</p>
         </div>
     </section>
 
-    <section class="about-intro">
+    <!-- Our Story -->
+    <section class="about-centered-section about-teal">
         <div class="container">
-            <div class="about-grid">
-                <div class="about-text slide-up">
-                    <h2>Who We Are</h2>
-                    <p>Musk Engineering Ltd provides high-quality, precision-driven solutions for complex industrial projects. We work with industry leaders to develop custom solutions, from design and fabrication to on-site installation.</p>
-                    <p>From concept to completion, we provide end-to-end engineering solutions tailored to industrial needs. From design to installation, we deliver trusted engineering services for industry leaders across the United Kingdom.</p>
-                    <p>Our team brings together decades of hands-on experience with the latest engineering techniques, ensuring every project meets the highest standards of quality, safety, and efficiency.</p>
-                </div>
-                <div class="about-image slide-up">
-                    <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=768,h=583,fit=crop/Yanqkw6EPbi7qy6G/industry-2147404_1920-m5KMgbOLn9iGgLze.jpg" alt="Industrial engineering">
-                </div>
+            <h3 class="about-heading about-heading-white">Our Story</h3>
+            <p class="about-body-white">Steve Musk Engineering has its roots in <strong>Musk Engineering</strong>, originally founded in <strong>1978 by Terry Musk</strong>. After completing his apprenticeship, <strong>Steve Musk</strong> gained hands-on experience in the family business, developing expertise in mechanical process engineering.</p>
+            <p class="about-body-white">Following the sale of the original company, Steve launched <strong>Steve Musk Engineering in 2010</strong>, continuing the family name with a <strong>commitment to innovation, safety, and quality</strong>. Today, we work with leading companies across multiple industries, delivering reliable and precision-driven engineering solutions.</p>
+        </div>
+    </section>
+
+    <!-- What Sets Us Apart -->
+    <section class="about-centered-section about-white">
+        <div class="container">
+            <h3 class="about-heading">What Sets Us Apart</h3>
+            <div class="about-checklist">
+                <p>&check; <strong>Over 50 Years of Engineering Expertise</strong></p>
+                <p>&check; <strong>Trusted by Industry Leaders</strong></p>
+                <p>&check; <strong>End-to-End Engineering Solutions</strong></p>
+                <p>&check; <strong>Commitment to Safety &amp; Precision</strong></p>
             </div>
         </div>
     </section>
 
-    <section class="values-section">
+    <!-- Our Approach -->
+    <section class="about-centered-section about-teal">
         <div class="container">
-            <div class="section-header">
-                <span class="section-label">Our Values</span>
-                <h2>What Drives Us</h2>
-            </div>
-            <div class="values-grid">
-                <div class="value-card">
-                    <div class="value-number">01</div>
-                    <h3>Precision</h3>
-                    <p>Every project demands exacting standards. We deliver precision-driven solutions that meet and exceed the most rigorous specifications.</p>
-                </div>
-                <div class="value-card">
-                    <div class="value-number">02</div>
-                    <h3>Innovation</h3>
-                    <p>We continuously invest in the latest engineering techniques and technologies to provide cutting-edge solutions for our clients.</p>
-                </div>
-                <div class="value-card">
-                    <div class="value-number">03</div>
-                    <h3>Reliability</h3>
-                    <p>With over five decades of experience, our clients trust us to deliver on time, on budget, and to the highest quality standards.</p>
-                </div>
-                <div class="value-card">
-                    <div class="value-number">04</div>
-                    <h3>Safety</h3>
-                    <p>Safety is embedded in everything we do. We maintain the highest health and safety standards across all our operations and projects.</p>
-                </div>
-            </div>
+            <h3 class="about-heading about-heading-white">Our Approach</h3>
+            <p class="about-body-white">At Steve Musk Engineering, we focus on <strong>precision, efficiency, and safety</strong> in every project. Whether designing complex mechanical systems or executing full-scale installations, our team ensures seamless project execution with a commitment to <strong>excellence and innovation</strong>.</p>
         </div>
     </section>
 
-    <section class="experience-section">
+    <!-- Get In Touch -->
+    <section class="about-centered-section about-white">
         <div class="container">
-            <div class="experience-grid">
-                <div class="experience-content slide-up">
-                    <span class="section-label">Our Experience</span>
-                    <h2>Trusted by Industry Leaders</h2>
-                    <p>Our work supports some of the most demanding sectors, where precision and quality are non-negotiable. We provide precision-driven mechanical process solutions backed by over 50 years of expertise.</p>
-                    <ul class="check-list">
-                        <li>End-to-end project management</li>
-                        <li>In-house design and fabrication capabilities</li>
-                        <li>Experienced on-site installation teams</li>
-                        <li>Full compliance with industry regulations</li>
-                        <li>Ongoing maintenance and support services</li>
-                    </ul>
-                </div>
-                <div class="experience-stats slide-up">
-                    <div class="stat-block">
-                        <span class="stat-number">50+</span>
-                        <span class="stat-text">Years of Combined Experience</span>
-                    </div>
-                    <div class="stat-block">
-                        <span class="stat-number">500+</span>
-                        <span class="stat-text">Projects Delivered</span>
-                    </div>
-                    <div class="stat-block">
-                        <span class="stat-number">6+</span>
-                        <span class="stat-text">Industry Sectors Served</span>
-                    </div>
-                </div>
-            </div>
+            <h3 class="about-heading">Get In Touch</h3>
+            <a href="/contact.php" class="btn btn-black">Contact Us</a>
         </div>
     </section>
 
-    <section class="cta-section">
+    <!-- Testimonial -->
+    <section class="testimonial-section">
+        <div class="testimonial-bg" style="background-image: url('https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=1920,fit=crop/Yanqkw6EPbi7qy6G/fdrqm3hq-m5KMgbKvPRfwLlwz.jpeg');"></div>
+        <div class="testimonial-overlay"></div>
+        <div class="container testimonial-content">
+            <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+            <blockquote class="testimonial-quote">&ldquo;James Hardy has worked for Celanese at our Spondon site for the last 5 years as a contractor and in this time has become a valued member of our Engineering team. As a Lead Engineer, James has on many occasions proven to be a very safe and competent engineer. James has led from the front and managed his team safely, efficiently and with great attention to detail. I would happily recommend James Hardy and Musk Engineering for any mechanical project.&rdquo;</blockquote>
+            <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=375,h=74,fit=crop/Yanqkw6EPbi7qy6G/celogo4x-1-YNqBOEJO3rHpeQP2.png" alt="Celanese" class="testimonial-logo">
+        </div>
+    </section>
+
+    <!-- LinkedIn Embed -->
+    <section class="linkedin-section">
         <div class="container">
-            <div class="cta-content">
-                <h2>Partner with Us on Your Next Project</h2>
-                <p>Discover how our engineering expertise can support your business objectives.</p>
-                <a href="/contact.php" class="btn btn-hero-outline">Get in Touch</a>
+            <div class="linkedin-embed">
+                <script src="https://static.elfsight.com/platform/platform.js" async></script>
+                <div class="elfsight-app-ed47d4bb-db49-49ba-b1a2-43d92924d75b" data-elfsight-app-lazy></div>
             </div>
         </div>
     </section>
