@@ -514,6 +514,7 @@ h1, h2, h3, h4, h5, h6 {
     max-width: 800px;
     margin: 0 auto;
     text-align: center;
+    min-height: 400px;
 }
 
 /* ============================================
@@ -1793,6 +1794,92 @@ h1, h2, h3, h4, h5, h6 {
     display: block;
     aspect-ratio: 1 / 1;
     object-fit: cover;
+}
+
+/* ============================================
+   ADDITIONAL ANIMATIONS
+   ============================================ */
+
+/* Fade-in on scroll */
+.js-ready .fade-in {
+    opacity: 0;
+    transition: opacity 0.8s ease;
+}
+.js-ready .fade-in.visible {
+    opacity: 1;
+}
+
+/* Staggered card animations */
+.js-ready .stagger-1 { transition-delay: 0.1s; }
+.js-ready .stagger-2 { transition-delay: 0.2s; }
+.js-ready .stagger-3 { transition-delay: 0.3s; }
+.js-ready .stagger-4 { transition-delay: 0.4s; }
+.js-ready .stagger-5 { transition-delay: 0.5s; }
+.js-ready .stagger-6 { transition-delay: 0.6s; }
+.js-ready .stagger-7 { transition-delay: 0.7s; }
+
+/* Scale-up animation for images */
+.js-ready .scale-in {
+    opacity: 0;
+    transform: scale(0.95);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.js-ready .scale-in.visible {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Smooth hover effects on cards and images */
+.service-card-link:hover .service-card-img {
+    transform: scale(1.05);
+}
+.service-card-img {
+    transition: transform 0.4s ease;
+}
+
+.project-category-card:hover .project-category-img {
+    transform: scale(1.05);
+}
+.project-category-img {
+    transition: transform 0.4s ease;
+}
+
+.industry-cell:hover .industry-img {
+    transform: scale(1.05);
+}
+.industry-img {
+    transition: transform 0.4s ease;
+}
+
+.gallery-img {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.gallery-img:hover {
+    transform: scale(1.03);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+
+/* Button hover animations */
+.btn {
+    transition: all 0.2s ease;
+}
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* Header nav link underline animation */
+.main-nav a::after {
+    content: '';
+    display: block;
+    width: 0;
+    height: 2px;
+    background: rgb(78, 193, 180);
+    transition: width 0.3s ease;
+}
+.main-nav a:hover::after,
+.main-nav a.active::after {
+    width: 100%;
 }
 
 /* ============================================

@@ -7,16 +7,16 @@ include __DIR__.'/../includes/header.php';
 
     <section class="service-sub-hero">
         <div class="container">
-            <h3 class="service-sub-title">Design, Management and Planning</h3>
+            <h3 class="service-sub-title slide-up">Design, Management and Planning</h3>
         </div>
     </section>
 
     <section class="about-centered-section about-white">
         <div class="container">
-            <p class="about-body-gray">With a wealth of experience within the industry and engineering, the team at Musk appreciate that accurate and thought-out designs and planning are key to the success of any project or fabrication, irrelevant of size, from an early stage in the life-cycle of your project.</p>
+            <p class="about-body-gray fade-in">With a wealth of experience within the industry and engineering, the team at Musk appreciate that accurate and thought-out designs and planning are key to the success of any project or fabrication, irrelevant of size, from an early stage in the life-cycle of your project.</p>
             <p class="about-body-gray" style="margin-top: 1rem;">We ensure that we support you with the appropriate up front planning, design and management to identify a clear path to a successful project by supporting a number of key areas:</p>
 
-            <ul class="service-bullet-list">
+            <ul class="service-bullet-list slide-up">
                 <li><strong>Outline planning</strong> &ndash; to identify all key deliverables and their appropriate timings to ensure efficient delivery</li>
                 <li><strong>Conceptual design</strong> &ndash; to ensure that all needs are identified at an early stage of the project</li>
                 <li><strong>P&amp;IDs</strong> &ndash; creating the process flow diagram that is bespoke to your process requirement, ensuring that all aspects are covered, along with integration into existing systems where required</li>
@@ -29,7 +29,7 @@ include __DIR__.'/../includes/header.php';
             <p class="about-body-gray" style="margin-top: 2rem;">Our support in these areas can be part of a wider project, that Musk are undertaking, or can be provided to your own project needs where the Musk fabrication and installation team are not part of. Please contact us for more information on how we can support your design or management needs.</p>
 
             <div class="service-sub-images" style="margin-top: 2rem;">
-                <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=768,h=538,fit=crop/Yanqkw6EPbi7qy6G/avicad-piping-project-1024x650-AoPWPR55L8CK2wrE.jpg" alt="Design, Management and Planning" class="service-sub-img">
+                <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=768,h=538,fit=crop/Yanqkw6EPbi7qy6G/avicad-piping-project-1024x650-AoPWPR55L8CK2wrE.jpg" alt="Design, Management and Planning" class="service-sub-img scale-in">
             </div>
         </div>
     </section>

@@ -39,10 +39,10 @@ include 'includes/header.php';
         <div class="container">
             <div class="contact-hero-grid">
                 <div class="contact-hero-text">
-                    <h1 class="contact-hero-h1">Get in Touch</h1>
-                    <p class="contact-hero-subtitle">We value your enquiries. Reach out to discuss your engineering needs and discover our innovative solutions.</p>
+                    <h1 class="contact-hero-h1 slide-up">Get in Touch</h1>
+                    <p class="contact-hero-subtitle fade-in">We value your enquiries. Reach out to discuss your engineering needs and discover our innovative solutions.</p>
                 </div>
-                <div class="contact-form-card">
+                <div class="contact-form-card scale-in">
                     <?php if ($formSubmitted): ?>
                         <div class="form-success">
                             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>

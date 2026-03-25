@@ -7,16 +7,16 @@ include __DIR__.'/../includes/header.php';
 
     <section class="service-sub-hero">
         <div class="container">
-            <h3 class="service-sub-title">Process Vessels</h3>
+            <h3 class="service-sub-title slide-up">Process Vessels</h3>
         </div>
     </section>
 
     <section class="about-centered-section about-white">
         <div class="container">
-            <p class="about-body-gray">Vessel fabrication has been at the heart of the Musk family business for 50 years, and Musk Engineering continue to provide the same high-quality fabrications that the Family business was founded on.</p>
+            <p class="about-body-gray fade-in">Vessel fabrication has been at the heart of the Musk family business for 50 years, and Musk Engineering continue to provide the same high-quality fabrications that the Family business was founded on.</p>
             <p class="about-body-gray" style="margin-top: 1rem;">The Musk team take your conceptual requirements, develop these using the latest tools to produce the required design details for fabrication. Our design team can carry out all elements of the vessel design:</p>
 
-            <ul class="service-bullet-list">
+            <ul class="service-bullet-list slide-up">
                 <li>Detailed Fabrication Drawings</li>
                 <li>Pressure Equipment Safety Regulation Assessments</li>
                 <li>Finite Element Analysis</li>
@@ -29,8 +29,8 @@ include __DIR__.'/../includes/header.php';
             <p class="about-body-gray" style="margin-top: 1rem;">Our vessels are fabricated to meet all your requirements: from atmospheric storage vessels, to pressure heating or cooling vessels, we have the skills and capabilities to deliver them with the internal and external finishes as required.</p>
 
             <div class="service-sub-images service-sub-images-grid" style="margin-top: 2rem;">
-                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_0066.jpg" alt="Process Vessel" class="service-sub-img">
-                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/95340377-5628-478c-b70d-6cc6646e4707.jpg" alt="Process Vessel" class="service-sub-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_0066.jpg" alt="Process Vessel" class="service-sub-img scale-in stagger-1">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/95340377-5628-478c-b70d-6cc6646e4707.jpg" alt="Process Vessel" class="service-sub-img scale-in stagger-2">
             </div>
         </div>
     </section>

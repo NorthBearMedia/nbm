@@ -8,7 +8,7 @@ include 'includes/header.php';
         <div class="hero-bg"></div>
         <div class="hero-overlay"></div>
         <div class="container">
-            <div class="hero-content">
+            <div class="hero-content slide-up">
                 <h1>Precision Engineering. Proven Expertise.</h1>
                 <p class="hero-subtitle">Delivering high-quality mechanical process solutions since 1978</p>
                 <div class="hero-buttons">
@@ -30,7 +30,7 @@ include 'includes/header.php';
                     <p class="who-body">We work with industry leaders to develop custom solutions, from <span class="teal-highlight"><strong>design and fabrication to on-site installation.</strong></span> Whether optimising efficiency or delivering full-scale mechanical process systems, our team is trusted to get the job done.</p>
                     <a href="/about.php" class="btn btn-outline-teal">Learn More...</a>
                 </div>
-                <div class="who-image slide-up">
+                <div class="who-image scale-in">
                     <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=768,h=583,fit=crop/Yanqkw6EPbi7qy6G/industry-2147404_1920-m5KMgbOLn9iGgLze.jpg" alt="Industrial engineering" class="who-img-main">
                 </div>
             </div>
@@ -62,25 +62,25 @@ include 'includes/header.php';
                 <p>Our work supports some of the most demanding sectors, where precision and quality are non-negotiable. We specialise in delivering solutions for:</p>
             </div>
             <div class="industry-grid">
-                <div class="industry-cell slide-up">
+                <div class="industry-cell slide-up stagger-1">
                     <img src="https://images.unsplash.com/photo-1621954938124-02e637ba3584?auto=format&fit=crop&w=600&h=456" alt="Complex Manufacturing" class="industry-img">
                     <div class="industry-label-card">
                         <strong>Complex Manufacturing &amp; Industrial Processes</strong>
                     </div>
                 </div>
-                <div class="industry-cell slide-up">
+                <div class="industry-cell slide-up stagger-2">
                     <img src="https://images.unsplash.com/photo-1577759037353-b093315403c1?auto=format&fit=crop&w=600&h=456" alt="Energy & Utilities" class="industry-img">
                     <div class="industry-label-card">
                         <strong>Energy, Utilities &amp; Infrastructure</strong>
                     </div>
                 </div>
-                <div class="industry-cell slide-up">
+                <div class="industry-cell slide-up stagger-3">
                     <img src="https://images.unsplash.com/photo-1581092163144-b7ae3c00adbc?auto=format&fit=crop&w=600&h=456" alt="Chemical & Pharmaceutical" class="industry-img">
                     <div class="industry-label-card">
                         <strong>Chemical &amp; Pharmaceutical Engineering</strong>
                     </div>
                 </div>
-                <div class="industry-cell slide-up">
+                <div class="industry-cell slide-up stagger-4">
                     <img src="https://images.unsplash.com/photo-1561986810-4f3ba2f46ceb?auto=format&fit=crop&w=600&h=456" alt="Food & Beverage" class="industry-img">
                     <div class="industry-label-card">
                         <strong>Food &amp; Beverage Production</strong>

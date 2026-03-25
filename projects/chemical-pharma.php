@@ -7,16 +7,16 @@ include __DIR__.'/../includes/header.php';
 
     <section class="service-sub-hero">
         <div class="container">
-            <h3 class="service-sub-title">Chemical &amp; Pharmaceutical</h3>
+            <h3 class="service-sub-title slide-up">Chemical &amp; Pharmaceutical</h3>
         </div>
     </section>
 
     <section class="about-centered-section about-white">
         <div class="container">
-            <p class="about-body-gray">Our chemical and pharmaceutical work includes stainless schedule pipework pre-fabricated in house and installed on site for acetone supply lines, and installation of third party packaged chemical dilution systems including the design and fabrication of 1,500L water storage vessels, skid fabrication, and process components all integrated on site around existing production.</p>
+            <p class="about-body-gray fade-in">Our chemical and pharmaceutical work includes stainless schedule pipework pre-fabricated in house and installed on site for acetone supply lines, and installation of third party packaged chemical dilution systems including the design and fabrication of 1,500L water storage vessels, skid fabrication, and process components all integrated on site around existing production.</p>
 
             <div class="photo-gallery" style="margin-top: 2rem;">
-                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_4134.JPG" alt="Chemical & Pharmaceutical" class="gallery-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_4134.JPG" alt="Chemical & Pharmaceutical" class="gallery-img scale-in stagger-1">
             </div>
         </div>
     </section>

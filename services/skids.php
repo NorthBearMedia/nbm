@@ -7,15 +7,15 @@ include __DIR__.'/../includes/header.php';
 
     <section class="service-sub-hero">
         <div class="container">
-            <h3 class="service-sub-title">Pre-fabricated Skids and Process Packages</h3>
+            <h3 class="service-sub-title slide-up">Pre-fabricated Skids and Process Packages</h3>
         </div>
     </section>
 
     <section class="about-centered-section about-white">
         <div class="container">
-            <p class="about-body-gray">With our in-house engineering team, we can design and fabricate a number of process packages:</p>
+            <p class="about-body-gray fade-in">With our in-house engineering team, we can design and fabricate a number of process packages:</p>
 
-            <ul class="service-bullet-list">
+            <ul class="service-bullet-list slide-up">
                 <li>Heating and Cooling Skids</li>
                 <li>CIP Systems</li>
                 <li>Valve routing manifolds</li>
@@ -25,7 +25,7 @@ include __DIR__.'/../includes/header.php';
             <p class="about-body-gray" style="margin-top: 2rem;">Are just a few of the areas in which we have supported clients with Design for Manufacture [DfMA] packages.</p>
 
             <div class="service-sub-images" style="margin-top: 2rem;">
-                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/hot-water-skid.png" alt="Pre-fabricated Skids" class="service-sub-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/hot-water-skid.png" alt="Pre-fabricated Skids" class="service-sub-img scale-in">
             </div>
         </div>
     </section>

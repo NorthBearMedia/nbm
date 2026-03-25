@@ -7,21 +7,21 @@ include __DIR__.'/../includes/header.php';
 
     <section class="service-sub-hero">
         <div class="container">
-            <h3 class="service-sub-title">Food &amp; Beverage</h3>
+            <h3 class="service-sub-title slide-up">Food &amp; Beverage</h3>
         </div>
     </section>
 
     <section class="about-centered-section about-white">
         <div class="container">
-            <p class="about-body-gray">Our food and beverage projects include cleaning soap baths with integrated pumps for recirculation, process heating skids with integrated controls and heat exchangers, and raw ingredients mixing and storage vessels designed, fabricated, delivered and installed on site.</p>
+            <p class="about-body-gray fade-in">Our food and beverage projects include cleaning soap baths with integrated pumps for recirculation, process heating skids with integrated controls and heat exchangers, and raw ingredients mixing and storage vessels designed, fabricated, delivered and installed on site.</p>
 
             <div class="photo-gallery" style="margin-top: 2rem;">
-                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_0144.jpg" alt="Food & Beverage" class="gallery-img">
-                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_0157.jpg" alt="Food & Beverage" class="gallery-img">
-                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_0169.jpg" alt="Food & Beverage" class="gallery-img">
-                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/hot-water-skid.png" alt="Food & Beverage" class="gallery-img">
-                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_0066.jpg" alt="Food & Beverage" class="gallery-img">
-                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/95340377-5628-478c-b70d-6cc6646e4707.jpg" alt="Food & Beverage" class="gallery-img">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_0144.jpg" alt="Food & Beverage" class="gallery-img scale-in stagger-1">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_0157.jpg" alt="Food & Beverage" class="gallery-img scale-in stagger-2">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_0169.jpg" alt="Food & Beverage" class="gallery-img scale-in stagger-3">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/hot-water-skid.png" alt="Food & Beverage" class="gallery-img scale-in stagger-4">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/IMG_0066.jpg" alt="Food & Beverage" class="gallery-img scale-in stagger-5">
+                <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/95340377-5628-478c-b70d-6cc6646e4707.jpg" alt="Food & Beverage" class="gallery-img scale-in stagger-6">
             </div>
         </div>
     </section>

@@ -59,10 +59,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Scroll animations (slide-up elements)
-    var slideElements = document.querySelectorAll('.slide-up');
+    // Scroll animations (slide-up, fade-in, scale-in elements)
+    var animElements = document.querySelectorAll('.slide-up, .fade-in, .scale-in');
 
-    if ('IntersectionObserver' in window && slideElements.length > 0) {
+    if ('IntersectionObserver' in window && animElements.length > 0) {
         var slideObserver = new IntersectionObserver(function(entries) {
             entries.forEach(function(entry) {
                 if (entry.isIntersecting) {
@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
 
-        slideElements.forEach(function(el) {
+        animElements.forEach(function(el) {
             slideObserver.observe(el);
         });
     }
