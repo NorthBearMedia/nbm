@@ -94,7 +94,7 @@ include 'includes/header.php';
     <section class="linkedin-section">
         <div class="container">
             <div class="linkedin-embed">
-                <script src="https://static.elfsight.com/platform/platform.js" async></script>
+                <script src="https://elfsightcdn.com/platform.js" async></script>
                 <div class="elfsight-app-ed47d4bb-db49-49ba-b1a2-43d92924d75b" data-elfsight-app-lazy></div>
             </div>
         </div>
