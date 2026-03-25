@@ -29,8 +29,8 @@ include 'includes/header.php';
                 </a>
             </div>
 
-            <div class="projects-video-embed" style="margin-top: 3rem;">
-                <iframe src="https://drive.google.com/file/d/1ut1KRR9l22cR5Z7c8mxxaoSg_7KsO4J3/preview" width="100%" height="600px" allow="autoplay"></iframe>
+            <div class="pdf-embed-wrapper">
+                <iframe src="https://drive.google.com/file/d/1ut1KRR9l22cR5Z7c8mxxaoSg_7KsO4J3/preview" allow="autoplay" class="pdf-embed-iframe"></iframe>
             </div>
         </div>
     </section>

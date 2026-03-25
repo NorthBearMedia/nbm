@@ -1531,13 +1531,21 @@ h1, h2, h3, h4, h5, h6 {
     margin-right: auto;
 }
 
-.projects-video-embed {
-    max-width: 100%;
+.pdf-embed-wrapper {
+    margin-top: 3rem;
+    width: 100%;
+    aspect-ratio: 8.5 / 11;
+    max-height: 85vh;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
 }
 
-.projects-video-embed iframe {
+.pdf-embed-iframe {
+    width: 100%;
+    height: 100%;
     border: none;
-    border-radius: 12px;
+    display: block;
 }
 
 /* ============================================
@@ -1610,8 +1618,8 @@ h1, h2, h3, h4, h5, h6 {
         padding: 130px 0 60px;
     }
 
-    .projects-video-embed iframe {
-        height: 350px;
+    .pdf-embed-wrapper {
+        max-height: 70vh;
     }
 }
 
