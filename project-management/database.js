@@ -6,11 +6,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const dbPath = process.env.DB_PATH || join(__dirname, 'nbm-projects.db');
 const db = new Database(dbPath);
 
-// Enable WAL mode for better concurrent read performance
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
-// Create tables
 db.exec(`
   CREATE TABLE IF NOT EXISTS clients (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,7 +27,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id INTEGER NOT NULL,
     name TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'completed', 'on-hold')),
+    status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'completed', 'on-hold', 'ready-to-invoice', 'invoiced')),
     notes TEXT DEFAULT '',
     archived INTEGER NOT NULL DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
@@ -43,7 +41,9 @@ db.exec(`
     title TEXT NOT NULL,
     assignee TEXT DEFAULT '',
     deadline TEXT DEFAULT '',
-    progress TEXT NOT NULL DEFAULT 'not-started' CHECK(progress IN ('not-started', 'in-progress', 'completed', 'blocked')),
+    planned_date TEXT DEFAULT '',
+    estimated_hours REAL DEFAULT 0,
+    progress TEXT NOT NULL DEFAULT 'not-started' CHECK(progress IN ('not-started', 'in-progress', 'completed', 'blocked', 'ready-to-invoice', 'invoiced')),
     references_text TEXT DEFAULT '',
     notes TEXT DEFAULT '',
     archived INTEGER NOT NULL DEFAULT 0,

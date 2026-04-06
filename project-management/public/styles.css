@@ -1114,6 +1114,223 @@ body {
 }
 .btn-archive:hover { background: var(--warning); color: white; }
 
+/* ─── View Tabs ─────────────────────────────────────── */
+.view-tabs {
+  display: flex;
+  background: rgba(255,255,255,0.1);
+  border-radius: var(--radius);
+  padding: 3px;
+  gap: 2px;
+}
+
+.view-tab {
+  padding: 6px 14px;
+  border: none;
+  background: transparent;
+  color: rgba(255,255,255,0.5);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.view-tab:hover { color: rgba(255,255,255,0.8); }
+.view-tab.active { background: white; color: var(--text); }
+
+/* ─── Today View ────────────────────────────────────── */
+.today-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.today-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.today-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.today-content {
+  background: white;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.today-group-header {
+  padding: 10px 16px;
+  background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+  border-bottom: 2px solid var(--border);
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.today-task {
+  display: grid;
+  grid-template-columns: 2fr 150px 100px 100px 120px;
+  padding: 12px 16px;
+  align-items: center;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.today-task:hover { background: var(--bg-hover); }
+.today-task:nth-child(even) { background: #fafbfc; }
+
+.today-task-title {
+  font-weight: 600;
+}
+
+.today-task-context {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.today-total-hours {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--primary-light);
+  color: var(--primary);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ─── Calendar View ─────────────────────────────────── */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.calendar-day-header {
+  background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+  padding: 8px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.calendar-day {
+  background: white;
+  min-height: 100px;
+  padding: 6px;
+  vertical-align: top;
+}
+
+.calendar-day.other-month { background: #f8fafc; opacity: 0.5; }
+.calendar-day.today { background: var(--primary-light); }
+
+.calendar-day-number {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.calendar-day.today .calendar-day-number { color: var(--primary); }
+
+.calendar-task {
+  display: block;
+  padding: 2px 6px;
+  margin: 2px 0;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: opacity 0.1s;
+}
+.calendar-task:hover { opacity: 0.8; }
+.calendar-task.planned { background: var(--blue-bg); color: var(--blue); border-left: 2px solid var(--blue); }
+.calendar-task.deadline { background: var(--warning-bg); color: var(--warning); border-left: 2px solid var(--warning); }
+.calendar-task.overdue { background: var(--danger-bg); color: var(--danger); border-left: 2px solid var(--danger); }
+
+/* ─── New status badges ─────────────────────────────── */
+.badge-ready-to-invoice { background: #fae8ff; color: #a21caf; }
+.badge-invoiced { background: #ecfdf5; color: #059669; }
+.progress-ready-to-invoice { background: #fae8ff; color: #a21caf; }
+.progress-invoiced { background: #ecfdf5; color: #059669; }
+.progress-ready-to-invoice .progress-dot { background: #a21caf; }
+.progress-invoiced .progress-dot { background: #059669; }
+
+/* ─── Task table extended columns ───────────────────── */
+.task-table-header-ext {
+  display: grid;
+  grid-template-columns: 1.8fr 100px 90px 90px 70px 90px 1fr 60px;
+  padding: 8px 14px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+  border-bottom: 2px solid var(--border);
+}
+
+.task-row-ext {
+  display: grid;
+  grid-template-columns: 1.8fr 100px 90px 90px 70px 90px 1fr 60px;
+  padding: 10px 14px;
+  align-items: center;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 13px;
+  transition: background 0.15s;
+}
+.task-row-ext:hover { background: #f8fafc; }
+.task-row-ext:nth-child(even) { background: #fafbfc; }
+.task-row-ext:nth-child(even):hover { background: #f0f4f8; }
+
+.task-est {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.task-created {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* ─── Drag & Drop ───────────────────────────────────── */
+.client-row.dragging {
+  opacity: 0.4;
+}
+.client-row.drag-over {
+  border-top: 3px solid var(--primary);
+}
+
+.drag-handle {
+  cursor: grab;
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 0 4px;
+  user-select: none;
+}
+.drag-handle:active { cursor: grabbing; }
+
 /* ─── Responsive ────────────────────────────────────── */
 @media (max-width: 1000px) {
   .header { flex-direction: column; gap: 12px; padding: 12px 16px; }
@@ -1123,5 +1340,8 @@ body {
   .stat-card { min-width: 140px; }
   .table-header { display: none; }
   .client-summary { grid-template-columns: 1fr; gap: 8px; }
-  .task-table-header, .task-row { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .task-table-header-ext, .task-row-ext { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .today-task { grid-template-columns: 1fr 1fr; }
+  .calendar-grid { grid-template-columns: repeat(7, 1fr); }
+  .calendar-day { min-height: 60px; }
 }
