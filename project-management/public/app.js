@@ -1,6 +1,7 @@
 // ─── State ──────────────────────────────────────────────
 let clients = [];
 let teamMembers = [];
+let appUsers = [];
 let currentUser = null;
 let currentFilter = 'all';
 let currentView = 'clients';
@@ -53,6 +54,7 @@ async function loadClients() {
 
 async function loadTeam() {
   teamMembers = await api('/api/team');
+  appUsers = await api('/api/users');
   updateUserSelector();
   updatePersonDropdowns();
 }
@@ -69,7 +71,7 @@ function updatePersonDropdowns() {
     const sel = document.getElementById(id);
     if (!sel) return;
     const cur = sel.value;
-    sel.innerHTML = '<option value="">Everyone</option>' + teamMembers.map(m => `<option value="${esc(m.name)}" ${m.name===cur?'selected':''}>${esc(m.name)}</option>`).join('');
+    sel.innerHTML = '<option value="">Everyone</option>' + appUsers.map(u => `<option value="${esc(u.display_name)}" ${u.display_name===cur?'selected':''}>${esc(u.display_name)}</option>`).join('');
   });
 }
 
@@ -251,7 +253,7 @@ function renderProject(p, cid) {
 
 function renderTask(t, isDone) {
   const dc=getDeadlineClass(t.deadline,t.progress);
-  const mem=teamMembers.find(m=>m.name===t.assignee);
+  const mem=appUsers.find(u=>u.display_name===t.assignee)||teamMembers.find(m=>m.name===t.assignee);
   const cc=t.comments?t.comments.length:0;
   const ac=t.attachments?t.attachments.length:0;
   const sc=expandedComments.has(t.id);
@@ -440,7 +442,7 @@ function editTask(id){
 }
 
 function populateAssigneeDropdown(cur){
-  document.getElementById('taskAssignee').innerHTML='<option value="">Unassigned</option>'+teamMembers.map(m=>`<option value="${esc(m.name)}" ${m.name===cur?'selected':''}>${esc(m.name)}</option>`).join('');
+  document.getElementById('taskAssignee').innerHTML='<option value="">Unassigned</option>'+appUsers.map(u=>`<option value="${esc(u.display_name)}" ${u.display_name===cur?'selected':''}>${esc(u.display_name)}</option>`).join('');
 }
 
 // Recurring toggle
@@ -546,7 +548,7 @@ async function loadTodayView(){
   for(const t of tasks){const a=t.assignee||'Unassigned';if(!groups[a])groups[a]=[];groups[a].push(t);}
   let html='';
   for(const [assignee,gTasks] of Object.entries(groups)){
-    const mem=teamMembers.find(m=>m.name===assignee);
+    const mem=appUsers.find(u=>u.display_name===assignee)||teamMembers.find(m=>m.name===assignee);
     const totalH=gTasks.reduce((s,t)=>s+(t.estimated_hours||0),0);
     html+=`<div class="today-group"><div class="today-group-header">${mem?`<span style="width:28px;height:28px;border-radius:50%;background:${mem.avatar_color};display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px">${mem.name[0]}</span>`:''}<span style="font-weight:600">${esc(assignee)}</span><span style="font-size:12px;color:var(--text-secondary);margin-left:auto">${totalH}h planned</span></div>`;
     html+=gTasks.map(t=>`<div class="today-task" onclick="editTask(${t.id})" style="cursor:pointer">

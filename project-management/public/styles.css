@@ -973,6 +973,15 @@ a:hover { color: #c4b5fd; }
   padding: 32px 36px;
 }
 
+.modal form,
+.modal .team-list,
+.modal .team-form,
+.modal .history-panel,
+.modal #archiveContent,
+.modal #statsModalContent {
+  padding: 28px 36px;
+}
+
 /* ─── PREMIUM FORMS ──────────────────────────────────── */
 .form-group {
   margin-bottom: 24px;
