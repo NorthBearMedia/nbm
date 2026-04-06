@@ -549,7 +549,14 @@ a:hover { color: var(--primary-hover); }
 }
 
 .project-tasks {
+  display: none;
   padding: 4px 0;
+}
+
+.project-section.expanded .project-tasks,
+.project-tasks[style*="display: block"],
+.project-tasks[style*="display:block"] {
+  display: block;
 }
 
 /* ─── Task Row ───────────────────────────────────── */
@@ -910,6 +917,19 @@ a:hover { color: var(--primary-hover); }
   background: var(--bg-hover);
 }
 
+.cal-task.planned {
+  border-left-color: var(--blue);
+}
+
+.cal-task.deadline {
+  border-left-color: var(--warning);
+}
+
+.cal-task.overdue {
+  border-left-color: var(--danger);
+  background: var(--danger-bg);
+}
+
 .cal-task-client {
   display: inline-flex;
   align-items: center;
@@ -939,10 +959,14 @@ a:hover { color: var(--primary-hover); }
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   padding: 24px;
+}
+
+.modal-backdrop.active {
+  display: flex;
   animation: fadeInBackdrop 0.2s ease;
 }
 
@@ -952,14 +976,27 @@ a:hover { color: var(--primary-hover); }
 }
 
 .modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.98);
+  z-index: 600;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
-  width: 100%;
+  width: calc(100% - 48px);
   max-width: 540px;
   max-height: calc(100vh - 48px);
   overflow-y: auto;
+  display: none;
+  opacity: 0;
+}
+
+.modal.active {
+  display: block;
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
   animation: modalSlideIn 0.25s ease;
 }
 
@@ -1459,6 +1496,98 @@ a:hover { color: var(--primary-hover); }
   text-overflow: ellipsis;
 }
 
+
+/* ─── Quick Status Select ───────────────────────── */
+.quick-status {
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  min-width: 110px;
+}
+.quick-status:focus {
+  border-color: var(--primary);
+}
+
+/* ─── Deadline Colors ───────────────────────────── */
+.overdue { color: var(--danger) !important; font-weight: 600; }
+.due-soon { color: var(--warning) !important; }
+
+/* ─── Task Highlight (navigated to) ─────────────── */
+.task-row.highlight {
+  background: var(--primary-bg) !important;
+  transition: background 0.3s ease;
+}
+
+/* ─── Attachment Items ──────────────────────────── */
+.attachment-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+/* ─── Comment Section ───────────────────────────── */
+.comment-section {
+  padding: 8px 16px 12px 40px;
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+.comment {
+  display: flex;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.comment:last-of-type {
+  border-bottom: none;
+}
+.comment-form {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.comment-form input {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text);
+  outline: none;
+}
+.comment-form input:focus {
+  border-color: var(--primary);
+}
+
+/* ─── Client Link Icons ─────────────────────────── */
+.client-link {
+  font-size: 14px;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+.client-link:hover {
+  opacity: 1;
+}
+
+/* ─── Cal Task Title ────────────────────────────── */
+.cal-task-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ─── Responsive ─────────────────────────────────── */
 @media (max-width: 1100px) {
