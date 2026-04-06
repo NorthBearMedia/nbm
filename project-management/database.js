@@ -13,6 +13,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS clients (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
+    code TEXT DEFAULT '',
     logo_url TEXT DEFAULT '',
     agreement_type TEXT NOT NULL DEFAULT 'recurring' CHECK(agreement_type IN ('recurring', 'ad-hoc')),
     notes TEXT DEFAULT '',
@@ -43,13 +44,29 @@ db.exec(`
     deadline TEXT DEFAULT '',
     planned_date TEXT DEFAULT '',
     estimated_hours REAL DEFAULT 0,
-    progress TEXT NOT NULL DEFAULT 'not-started' CHECK(progress IN ('not-started', 'in-progress', 'completed', 'blocked', 'ready-to-invoice', 'invoiced')),
+    progress TEXT NOT NULL DEFAULT 'not-started' CHECK(progress IN ('not-started', 'in-progress', 'completed', 'stuck', 'awaiting-client', 'awaiting-manager', 'ready-to-invoice', 'invoiced')),
+    priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('critical', 'high', 'medium', 'low')),
     references_text TEXT DEFAULT '',
     notes TEXT DEFAULT '',
+    is_recurring INTEGER NOT NULL DEFAULT 0,
+    recur_interval INTEGER DEFAULT 0,
+    recur_unit TEXT DEFAULT '' CHECK(recur_unit IN ('', 'days', 'weeks', 'months', 'years')),
     archived INTEGER NOT NULL DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
     sort_order INTEGER DEFAULT 0,
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS task_attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id INTEGER NOT NULL,
+    filename TEXT NOT NULL,
+    original_name TEXT NOT NULL,
+    file_type TEXT DEFAULT '',
+    file_size INTEGER DEFAULT 0,
+    uploaded_by TEXT DEFAULT 'System',
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
   );
 
   CREATE TABLE IF NOT EXISTS team_members (

@@ -53,16 +53,15 @@ function updatePersonDropdowns() {
 }
 
 // ─── View Switching ─────────────────────────────────────
-document.querySelectorAll('.view-tab').forEach(tab => {
+document.querySelectorAll('.nav-tab').forEach(tab => {
   tab.addEventListener('click', () => {
-    document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
     currentView = tab.dataset.view;
     document.getElementById('clientsView').style.display = currentView === 'clients' ? '' : 'none';
     document.getElementById('todayView').style.display = currentView === 'today' ? '' : 'none';
     document.getElementById('calendarView').style.display = currentView === 'calendar' ? '' : 'none';
-    document.getElementById('clientFilters').style.display = currentView === 'clients' ? '' : 'none';
-    document.getElementById('addClientBtn').style.display = currentView === 'clients' ? '' : 'none';
+    document.getElementById('clientSubBar').style.display = currentView === 'clients' ? '' : 'none';
     if (currentView === 'today') loadTodayView();
     if (currentView === 'calendar') loadCalendarView();
   });
@@ -70,18 +69,24 @@ document.querySelectorAll('.view-tab').forEach(tab => {
 
 // ─── Stats ──────────────────────────────────────────────
 function renderStats() {
-  const t = { clients: clients.length, outstanding: 0, inProgress: 0, overdue: 0, completed: 0 };
-  for (const c of clients) { t.outstanding += c.stats.outstandingTasks; t.inProgress += c.stats.inProgressTasks; t.overdue += c.stats.overdueTasks; t.completed += c.stats.completedTasks; }
+  const t = { total: 0, outstanding: 0, inProgress: 0, overdue: 0, stuck: 0, completed: 0 };
+  for (const c of clients) {
+    t.total += c.stats.totalTasks;
+    t.outstanding += c.stats.outstandingTasks;
+    t.inProgress += c.stats.inProgressTasks;
+    t.overdue += c.stats.overdueTasks;
+    t.stuck += c.stats.blockedTasks;
+    t.completed += c.stats.completedTasks;
+  }
   document.getElementById('statsBar').innerHTML = `
-    <div class="stat-card"><div class="stat-value">${t.clients}</div><div class="stat-label">Clients</div></div>
-    <div class="stat-card warning clickable" onclick="showStatPopup('outstanding')"><div class="stat-value">${t.outstanding}</div><div class="stat-label">Outstanding</div></div>
-    <div class="stat-card blue clickable" onclick="showStatPopup('in-progress')"><div class="stat-value">${t.inProgress}</div><div class="stat-label">In Progress</div></div>
-    <div class="stat-card danger clickable" onclick="showStatPopup('overdue')"><div class="stat-value">${t.overdue}</div><div class="stat-label">Overdue</div></div>
-    <div class="stat-card success clickable" onclick="showStatPopup('completed')"><div class="stat-value">${t.completed}</div><div class="stat-label">Completed</div></div>`;
+    <div class="stat-card" onclick="showStatPopup('outstanding')"><div class="stat-number">${t.outstanding}</div><div class="stat-label">Outstanding</div></div>
+    <div class="stat-card" onclick="showStatPopup('in-progress')"><div class="stat-number">${t.inProgress}</div><div class="stat-label">In Progress</div></div>
+    <div class="stat-card" onclick="showStatPopup('overdue')"><div class="stat-number">${t.overdue}</div><div class="stat-label">Overdue</div></div>
+    <div class="stat-card" onclick="showStatPopup('stuck')"><div class="stat-number">${t.stuck}</div><div class="stat-label">Stuck</div></div>`;
 }
 
 function showStatPopup(type) {
-  const titles = {'outstanding':'Outstanding Tasks','in-progress':'In Progress','overdue':'Overdue Tasks','completed':'Completed Tasks'};
+  const titles = {'outstanding':'Outstanding Tasks','in-progress':'In Progress','overdue':'Overdue Tasks','stuck':'Stuck Tasks','completed':'Completed Tasks'};
   document.getElementById('statsModalTitle').textContent = titles[type]||'Tasks';
   const now = new Date().toISOString().split('T')[0];
   const items = [];
@@ -91,19 +96,20 @@ function showStatPopup(type) {
     if (type==='in-progress' && task.progress==='in-progress') m=true;
     if (type==='completed' && (task.progress==='completed'||task.progress==='invoiced')) m=true;
     if (type==='overdue' && task.deadline && task.deadline<now && task.progress!=='completed' && task.progress!=='invoiced') m=true;
+    if (type==='stuck' && task.progress==='stuck') m=true;
     if (m) items.push({task,project:p,client:c});
   }
   const ct = document.getElementById('statsModalContent');
-  ct.innerHTML = items.length===0 ? '<div style="padding:24px;text-align:center;color:var(--text-muted)">None</div>' :
+  ct.innerHTML = items.length===0 ? '<div style="padding:24px;text-align:center;color:var(--text-secondary)">None</div>' :
     items.map(({task,project,client})=>`
-      <div class="popup-task-item" onclick="navigateToTask(${client.id},${project.id},${task.id})">
-        <div class="popup-task-left">
-          <div class="popup-task-title">${esc(task.title)}</div>
-          <div class="popup-task-context">${esc(client.name)} → ${esc(project.name)}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer" onclick="navigateToTask(${client.id},${project.id},${task.id})">
+        <div>
+          <div style="font-weight:600;font-size:13px">${esc(task.title)}</div>
+          <div style="font-size:11px;color:var(--text-secondary)">${esc(client.name)} &rarr; ${esc(project.name)}</div>
         </div>
-        <div class="popup-task-right">
-          <span class="task-deadline ${getDeadlineClass(task.deadline,task.progress)}">${fmtDate(task.deadline)}</span>
-          <span class="progress-badge progress-${task.progress}"><span class="progress-dot"></span>${progressLabel(task.progress)}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="status-badge status-${task.progress}">${progressLabel(task.progress)}</span>
+          ${task.deadline?`<span style="font-size:11px" class="${getDeadlineClass(task.deadline,task.progress)}">${fmtDate(task.deadline)}</span>`:''}
         </div>
       </div>`).join('');
   openModal('statsModal');
@@ -113,16 +119,18 @@ function navigateToTask(cid,pid,tid) {
   closeModal('statsModal');
   if (currentView!=='clients') { document.querySelector('[data-view="clients"]').click(); }
   expandedClients.add(cid); expandedProjects.add(pid); renderClients();
-  setTimeout(()=>{ const el=document.querySelector(`[data-task-id="${tid}"]`); if(el){el.scrollIntoView({behavior:'smooth',block:'center'}); el.style.background='#eef2ff'; setTimeout(()=>{el.style.background='';},2000);} },100);
+  setTimeout(()=>{ const el=document.querySelector(`[data-task-id="${tid}"]`); if(el){el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('highlight'); setTimeout(()=>{el.classList.remove('highlight');},2000);} },100);
 }
 
 // ─── Helpers ────────────────────────────────────────────
 function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
-function fmtDate(d){if(!d)return'—';return new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}
-function fmtDateShort(d){if(!d)return'—';return new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
-function getDeadlineClass(dl,prog){if(!dl||prog==='completed'||prog==='invoiced')return'';const now=new Date();now.setHours(0,0,0,0);const diff=(new Date(dl+'T00:00:00')-now)/864e5;return diff<0?'overdue':diff<=3?'soon':'';}
-function progressLabel(p){return{'not-started':'Not Started','in-progress':'In Progress','completed':'Completed','blocked':'Blocked','ready-to-invoice':'Ready to Invoice','invoiced':'Invoiced'}[p]||p;}
+function fmtDate(d){if(!d)return'';return new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}
+function fmtDateShort(d){if(!d)return'';return new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
+function getDeadlineClass(dl,prog){if(!dl||prog==='completed'||prog==='invoiced')return'';const now=new Date();now.setHours(0,0,0,0);const diff=(new Date(dl+'T00:00:00')-now)/864e5;return diff<0?'overdue':diff<=3?'due-soon':'';}
+function progressLabel(p){return{'not-started':'Not Started','in-progress':'In Progress','completed':'Completed','stuck':'Stuck','awaiting-client':'Awaiting Client','awaiting-manager':'Awaiting Manager','ready-to-invoice':'Ready to Invoice','invoiced':'Invoiced'}[p]||p;}
+function priorityLabel(p){return{'critical':'Critical','high':'High','medium':'Medium','low':'Low'}[p]||p;}
 function timeAgo(ds){if(!ds)return'';const now=new Date(),d=new Date(ds+(ds.includes('T')?'':'T00:00:00')),m=Math.floor((now-d)/6e4);if(m<1)return'just now';if(m<60)return m+'m ago';const h=Math.floor(m/60);if(h<24)return h+'h ago';const dd=Math.floor(h/24);if(dd<7)return dd+'d ago';return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
+function fmtFileSize(bytes){if(bytes<1024)return bytes+'B';if(bytes<1048576)return(bytes/1024).toFixed(1)+'KB';return(bytes/1048576).toFixed(1)+'MB';}
 
 // ─── Toggles ────────────────────────────────────────────
 function toggleClient(id){expandedClients.has(id)?expandedClients.delete(id):expandedClients.add(id);renderClients();}
@@ -141,50 +149,42 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelec
 // ─── Render Clients ─────────────────────────────────────
 function renderClients() {
   const ct = document.getElementById('clientList');
-  if (!clients.length) { ct.innerHTML='<div class="empty-state"><p>No clients yet.</p></div>'; return; }
+  if (!clients.length) { ct.innerHTML='<div class="empty-state"><p>No clients yet. Click + to add one.</p></div>'; return; }
   ct.innerHTML = clients.map(c => {
     const ex = expandedClients.has(c.id);
-    const ini = c.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
     const s = c.stats;
-    let pill='all-done',pillT='All done';
-    if(s.overdueTasks>0){pill='has-overdue';pillT=s.outstandingTasks+' outstanding';}
-    else if(s.outstandingTasks>0){pill='has-tasks';pillT=s.outstandingTasks+' outstanding';}
+    const pct = s.totalTasks ? Math.round(s.completedTasks/s.totalTasks*100) : 0;
     const links=[];
-    if(c.gmail_link)links.push(`<a href="${esc(c.gmail_link)}" target="_blank" class="client-link" onclick="event.stopPropagation()">&#9993; Gmail</a>`);
-    if(c.drive_link)links.push(`<a href="${esc(c.drive_link)}" target="_blank" class="client-link" onclick="event.stopPropagation()">&#128193; Drive</a>`);
-    return `<div class="client-row ${ex?'expanded':''}" data-client-id="${c.id}" data-type="${c.agreement_type}" draggable="true" ondragstart="onDragStart(event,${c.id})" ondragover="onDragOver(event)" ondrop="onDrop(event,${c.id})" ondragend="onDragEnd(event)" ondragleave="onDragLeave(event)">
+    if(c.gmail_link)links.push(`<a href="${esc(c.gmail_link)}" target="_blank" class="client-link" onclick="event.stopPropagation()" title="Gmail">&#9993;</a>`);
+    if(c.drive_link)links.push(`<a href="${esc(c.drive_link)}" target="_blank" class="client-link" onclick="event.stopPropagation()" title="Drive">&#128193;</a>`);
+    return `<div class="client-row ${ex?'expanded':''}" data-client-id="${c.id}" draggable="true" ondragstart="onDragStart(event,${c.id})" ondragover="onDragOver(event)" ondrop="onDrop(event,${c.id})" ondragend="onDragEnd(event)" ondragleave="onDragLeave(event)">
       <div class="client-summary" onclick="toggleClient(${c.id})">
         <div class="client-info">
           <span class="drag-handle" onclick="event.stopPropagation()">&#9776;</span>
-          <span class="chevron">&#9654;</span>
-          <div class="client-logo">${c.logo_url?`<img src="${esc(c.logo_url)}" alt="">`:ini}</div>
+          <div class="client-logo">${c.logo_url?`<img src="${esc(c.logo_url)}" alt="">`:esc(c.code||c.name.substring(0,3).toUpperCase())}</div>
           <div>
-            <div class="client-name">${esc(c.name)}</div>
-            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:2px">
-              ${c.notes?`<span class="client-notes-preview">${esc(c.notes)}</span>`:''}
-              ${links.join(' ')}
-            </div>
+            <div class="client-name">${esc(c.name)} <span class="client-code">${esc(c.code||'')}</span></div>
+            <div style="display:flex;gap:6px;align-items:center">${links.join('')}</div>
           </div>
         </div>
-        <div><span class="badge badge-${c.agreement_type}">${c.agreement_type==='recurring'?'Recurring':'Ad Hoc'}</span></div>
-        <div class="project-count">${c.projects.length} project${c.projects.length!==1?'s':''}</div>
-        <div><span class="outstanding-pill ${pill}">${pillT}</span>${s.overdueTasks>0?`<span class="overdue-count">&#9888; ${s.overdueTasks} overdue</span>`:''}</div>
-        <div style="font-size:12px;color:var(--text-secondary)">${s.completedTasks}/${s.totalTasks} done</div>
+        <div><span class="client-type-badge type-${c.agreement_type}">${c.agreement_type==='recurring'?'Recurring':'Ad Hoc'}</span></div>
+        <div>${c.projects.length}</div>
+        <div><span class="${s.outstandingTasks>0?(s.overdueTasks>0?'overdue':''):'completed'}" style="font-weight:600">${s.outstandingTasks}</span></div>
+        <div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+          <div style="font-size:10px;color:var(--text-secondary);margin-top:2px">${s.completedTasks}/${s.totalTasks}</div>
+        </div>
         <div class="client-actions" onclick="event.stopPropagation()">
-          <button class="btn-icon" onclick="showClientHistory(${c.id},'${esc(c.name)}')" title="History">&#128337;</button>
           <button class="btn-icon" onclick="editClient(${c.id})" title="Edit">&#9998;</button>
-          <button class="btn-icon" onclick="archiveClient(${c.id})" title="Archive" style="color:var(--warning)">&#128230;</button>
+          <button class="btn-icon" onclick="openProjectModal(${c.id})" title="Add Project">+</button>
+          <button class="btn-icon" onclick="showClientHistory(${c.id},'${esc(c.name)}')" title="History">&#128337;</button>
+          <button class="btn-icon" onclick="archiveClient(${c.id})" title="Archive">&#128230;</button>
         </div>
       </div>
-      <div class="client-expanded">
-        <div class="client-detail-bar">
-          <div><strong>Agreement:</strong> ${c.agreement_type==='recurring'?'Recurring':'Ad Hoc'}</div>
-          ${c.notes?`<div><strong>Notes:</strong> ${esc(c.notes)}</div>`:''}
-          ${links.length?`<div style="display:flex;gap:6px">${links.join('')}</div>`:'<div style="color:var(--text-muted);font-size:12px">No Gmail/Drive links — edit to add</div>'}
-        </div>
+      <div class="client-projects" ${ex?'style="display:block"':''}>
         ${c.projects.map(p=>renderProject(p,c.id)).join('')}
         ${renderArchivedProjects(c)}
-        <button class="btn btn-ghost btn-sm add-project-btn" onclick="openProjectModal(${c.id})">+ Add Project</button>
+        <div style="padding:8px 16px"><button class="btn btn-ghost btn-sm" onclick="openProjectModal(${c.id})">+ Add Project</button></div>
       </div>
     </div>`;
   }).join('');
@@ -193,9 +193,9 @@ function renderClients() {
 function renderArchivedProjects(c) {
   if(!c.archivedProjects||!c.archivedProjects.length)return'';
   const show=showArchivedProjects.has(c.id);
-  return `<div style="margin-left:16px;margin-top:8px">
-    <button class="history-toggle" onclick="toggleArchivedProjects(${c.id})"><span style="font-size:10px">${show?'&#9660;':'&#9654;'}</span> &#128230; ${c.archivedProjects.length} archived</button>
-    ${show?c.archivedProjects.map(p=>`<div class="archive-item" style="margin-left:16px;opacity:0.7"><div class="archive-item-info"><div class="archive-item-name">${esc(p.name)}</div></div><button class="btn-restore" onclick="restoreProject(${p.id})">Restore</button></div>`).join(''):''}
+  return `<div style="padding:4px 16px">
+    <button class="btn btn-ghost btn-sm" onclick="toggleArchivedProjects(${c.id})">${show?'&#9660;':'&#9654;'} ${c.archivedProjects.length} archived project${c.archivedProjects.length!==1?'s':''}</button>
+    ${show?c.archivedProjects.map(p=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;opacity:0.6"><span>${esc(p.name)}</span><button class="btn btn-ghost btn-sm" onclick="restoreProject(${p.id})">Restore</button></div>`).join(''):''}
   </div>`;
 }
 
@@ -205,50 +205,69 @@ function renderProject(p, cid) {
   const done=p.tasks.filter(t=>t.progress==='completed'||t.progress==='invoiced');
   const arch=p.archivedTasks||[];
   const showDone=showCompletedTasks.has(p.id), showArch=showArchivedTasks.has(p.id);
-  return `<div class="project-section ${ex?'expanded':''}" data-project-id="${p.id}" data-status="${p.status}">
+  return `<div class="project-section ${ex?'expanded':''}" data-project-id="${p.id}">
     <div class="project-header" onclick="toggleProject(${p.id})">
-      <div class="project-title"><span class="chevron">&#9654;</span>${esc(p.name)}<span class="badge badge-${p.status}">${p.status}</span></div>
-      <div class="project-meta" onclick="event.stopPropagation()">
-        <span style="font-size:12px;color:var(--text-muted)">${active.length} active${done.length?`, ${done.length} done`:''}</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:10px;transition:transform 0.2s;transform:rotate(${ex?'90':'0'}deg)">&#9654;</span>
+        <span style="font-weight:600">${esc(p.name)}</span>
+        <span class="status-badge status-${p.status}">${p.status}</span>
+        <span style="font-size:11px;color:var(--text-secondary)">${active.length} active${done.length?', '+done.length+' done':''}</span>
+      </div>
+      <div onclick="event.stopPropagation()" style="display:flex;gap:4px">
         <button class="btn-icon" onclick="editProject(${p.id},${cid})" title="Edit">&#9998;</button>
-        <button class="btn-icon" onclick="archiveProject(${p.id})" title="Archive" style="color:var(--warning)">&#128230;</button>
+        <button class="btn-icon" onclick="archiveProject(${p.id})" title="Archive">&#128230;</button>
       </div>
     </div>
-    <div class="project-tasks">
-      <div class="task-table">
-        <div class="task-table-header-ext"><div>Task</div><div>Assignee</div><div>Deadline</div><div>Planned</div><div>Est Hrs</div><div>Progress</div><div>Refs / Created</div><div></div></div>
-        ${active.map(t=>renderTask(t)).join('')}
-        ${!active.length?'<div style="padding:12px 14px;color:var(--text-muted);font-size:13px">No active tasks</div>':''}
-        <div class="add-task-row"><button class="add-task-btn" onclick="openTaskModal(${p.id})">+ Add task...</button></div>
-      </div>
-      ${done.length?`<div style="margin-top:6px"><button class="history-toggle" onclick="toggleCompletedTasks(${p.id})" style="margin-left:4px"><span style="font-size:10px">${showDone?'&#9660;':'&#9654;'}</span> &#9989; ${done.length} completed</button>${showDone?`<div class="task-table" style="opacity:0.7;margin-top:4px"><div class="task-table-header-ext"><div>Task</div><div>Assignee</div><div>Deadline</div><div>Planned</div><div>Est Hrs</div><div>Progress</div><div>Refs / Created</div><div></div></div>${done.map(t=>renderTask(t)).join('')}</div>`:''}</div>`:''}
-      ${arch.length?`<div style="margin-top:4px"><button class="history-toggle" onclick="toggleArchivedTasks(${p.id})" style="margin-left:4px"><span style="font-size:10px">${showArch?'&#9660;':'&#9654;'}</span> &#128230; ${arch.length} archived</button>${showArch?`<div style="margin-top:4px;opacity:0.6">${arch.map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 14px;border-bottom:1px solid var(--border-light);font-size:13px"><span>${esc(t.title)}</span><button class="btn-restore" onclick="restoreTask(${t.id})">Restore</button></div>`).join('')}</div>`:''}</div>`:''}
+    <div class="project-tasks" ${ex?'style="display:block"':''}>
+      ${active.map(t=>renderTask(t)).join('')}
+      ${!active.length?'<div style="padding:12px 16px;color:var(--text-secondary);font-size:13px">No active tasks</div>':''}
+      <div style="padding:6px 16px"><button class="btn btn-ghost btn-sm" onclick="openTaskModal(${p.id})">+ Add Task</button></div>
+      ${done.length?`<div style="padding:4px 16px"><button class="btn btn-ghost btn-sm" onclick="toggleCompletedTasks(${p.id})">${showDone?'&#9660;':'&#9654;'} ${done.length} completed</button>${showDone?done.map(t=>renderTask(t,true)).join(''):''}</div>`:''}
+      ${arch.length?`<div style="padding:4px 16px"><button class="btn btn-ghost btn-sm" onclick="toggleArchivedTasks(${p.id})">${showArch?'&#9660;':'&#9654;'} ${arch.length} archived</button>${showArch?arch.map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;opacity:0.5;font-size:13px"><span>${esc(t.title)}</span><button class="btn btn-ghost btn-sm" onclick="restoreTask(${t.id})">Restore</button></div>`).join(''):''}</div>`:''}
     </div>
   </div>`;
 }
 
-function renderTask(t) {
+function renderTask(t, isDone) {
   const dc=getDeadlineClass(t.deadline,t.progress);
   const mem=teamMembers.find(m=>m.name===t.assignee);
   const cc=t.comments?t.comments.length:0;
+  const ac=t.attachments?t.attachments.length:0;
   const sc=expandedComments.has(t.id);
-  return `<div class="task-row-ext" data-task-id="${t.id}">
-    <div class="task-title-cell"><span class="task-title" onclick="editTask(${t.id})">${esc(t.title)}</span>${cc?`<span class="comment-count" onclick="toggleComments(${t.id})">&#128172; ${cc}</span>`:''}</div>
-    <div class="task-assignee">${mem?`<span class="assignee-dot" style="background:${mem.avatar_color}">${mem.name[0]}</span>`:''}${esc(t.assignee||'—')}</div>
-    <div class="task-deadline ${dc}">${fmtDateShort(t.deadline)}</div>
-    <div class="task-deadline">${fmtDateShort(t.planned_date)}</div>
-    <div class="task-est">${t.estimated_hours?t.estimated_hours+'h':'—'}</div>
-    <div><span class="progress-badge progress-${t.progress}"><span class="progress-dot"></span>${progressLabel(t.progress)}</span></div>
-    <div><div class="task-refs" title="${esc(t.references_text||'')}">${esc(t.references_text||'')}</div><div class="task-created">${fmtDateShort(t.created_at?t.created_at.split(' ')[0]:'')} created</div></div>
-    <div class="task-actions"><button class="btn-icon" onclick="toggleComments(${t.id})" title="Comments">&#128172;</button><button class="btn-icon" onclick="archiveTask(${t.id})" title="Archive" style="color:var(--warning)">&#128230;</button></div>
+  return `<div class="task-row ${isDone?'completed':''}" data-task-id="${t.id}">
+    <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">
+      <span class="priority-badge priority-${t.priority}" title="${priorityLabel(t.priority)}"></span>
+      <span class="task-title" onclick="editTask(${t.id})" style="cursor:pointer">${esc(t.title)}</span>
+      ${t.is_recurring?'<span class="recurring-badge" title="Recurring">&#8635;</span>':''}
+      ${cc?`<span style="font-size:11px;color:var(--text-secondary);cursor:pointer" onclick="toggleComments(${t.id})">&#128172;${cc}</span>`:''}
+      ${ac?`<span style="font-size:11px;color:var(--text-secondary)">&#128206;${ac}</span>`:''}
+    </div>
+    <div style="display:flex;align-items:center;gap:4px;min-width:80px">
+      ${mem?`<span style="width:20px;height:20px;border-radius:50%;background:${mem.avatar_color};display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:600">${mem.name[0]}</span>`:''}<span style="font-size:12px">${esc(t.assignee||'')}</span>
+    </div>
+    <div style="font-size:12px;min-width:70px" class="${dc}">${fmtDateShort(t.deadline)}</div>
+    <div style="font-size:12px;min-width:70px;color:var(--text-secondary)">${fmtDateShort(t.planned_date)}</div>
+    <div style="font-size:12px;color:var(--text-secondary);min-width:40px">${t.estimated_hours?t.estimated_hours+'h':''}</div>
+    <div><select class="quick-status" onchange="quickStatusChange(${t.id},this.value)" onclick="event.stopPropagation()">
+      ${['not-started','in-progress','completed','stuck','awaiting-client','awaiting-manager','ready-to-invoice','invoiced'].map(s=>`<option value="${s}" ${t.progress===s?'selected':''}>${progressLabel(s)}</option>`).join('')}
+    </select></div>
+    <div class="task-actions">
+      <button class="btn-icon" onclick="editTask(${t.id})" title="Edit">&#9998;</button>
+      <button class="btn-icon" onclick="archiveTask(${t.id})" title="Archive">&#128230;</button>
+    </div>
   </div>${sc?renderCommentThread(t):''}`;
+}
+
+async function quickStatusChange(taskId, newStatus) {
+  await api(`/api/tasks/${taskId}`, {method:'PUT', body:{progress:newStatus, author:getCurrentUser()}});
+  await loadClients();
 }
 
 function renderCommentThread(t) {
   const cs=t.comments||[];
-  return `<div class="comment-thread">
-    ${!cs.length?'<div style="font-size:12px;color:var(--text-muted);padding:4px 0">No comments yet</div>':''}
-    ${cs.map(c=>{const m=teamMembers.find(x=>x.name===c.author);return`<div class="comment-item"><div class="comment-avatar" style="background:${m?m.avatar_color:'#94a3b8'}">${(c.author||'?')[0].toUpperCase()}</div><div class="comment-body"><span class="comment-author">${esc(c.author)}<span class="comment-time">${timeAgo(c.created_at)}</span></span><div class="comment-text">${esc(c.content)}</div></div></div>`;}).join('')}
+  return `<div class="comment-section">
+    ${!cs.length?'<div style="font-size:12px;color:var(--text-secondary);padding:4px 0">No comments yet</div>':''}
+    ${cs.map(c=>{const m=teamMembers.find(x=>x.name===c.author);return`<div class="comment"><div style="width:24px;height:24px;border-radius:50%;background:${m?m.avatar_color:'#64748b'};display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:600;flex-shrink:0">${(c.author||'?')[0].toUpperCase()}</div><div style="flex:1;min-width:0"><div style="font-size:11px"><strong>${esc(c.author)}</strong> <span style="color:var(--text-secondary)">${timeAgo(c.created_at)}</span></div><div style="font-size:13px;margin-top:2px">${esc(c.content)}</div></div></div>`;}).join('')}
     <form class="comment-form" onsubmit="addComment(event,${t.id})"><input type="text" placeholder="Write a comment..." required><button type="submit" class="btn btn-primary btn-sm">Post</button></form>
   </div>`;
 }
@@ -283,15 +302,15 @@ async function permanentDeleteClient(id){if(!confirm('Permanently delete? Cannot
 document.getElementById('viewArchiveBtn').addEventListener('click',showArchiveModal);
 async function showArchiveModal(){
   const archived=await api('/api/archived/clients');
-  document.getElementById('archiveContent').innerHTML=!archived.length?'<div style="padding:24px;text-align:center;color:var(--text-muted)">No archived items</div>':
-    `<div class="archive-section-title">Archived Clients</div>${archived.map(c=>`<div class="archive-item"><div class="archive-item-info"><div class="archive-item-name">${esc(c.name)}</div><div class="archive-item-type">${c.agreement_type}</div></div><div style="display:flex;gap:6px"><button class="btn-restore" onclick="restoreClient(${c.id})">Restore</button><button class="btn-icon danger" onclick="permanentDeleteClient(${c.id})">&#128465;</button></div></div>`).join('')}`;
+  document.getElementById('archiveContent').innerHTML=!archived.length?'<div style="padding:24px;text-align:center;color:var(--text-secondary)">No archived items</div>':
+    archived.map(c=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border)"><div><div style="font-weight:600">${esc(c.name)}</div><div style="font-size:11px;color:var(--text-secondary)">${c.agreement_type}</div></div><div style="display:flex;gap:6px"><button class="btn btn-ghost btn-sm" onclick="restoreClient(${c.id})">Restore</button><button class="btn btn-danger btn-sm" onclick="permanentDeleteClient(${c.id})">Delete</button></div></div>`).join('');
   openModal('archiveModal');
 }
 
 // ─── Client CRUD ────────────────────────────────────────
 document.getElementById('addClientBtn').addEventListener('click',()=>{
   document.getElementById('clientModalTitle').textContent='New Client';
-  ['clientId','clientName','clientNotes','clientGmail','clientDrive'].forEach(id=>document.getElementById(id).value='');
+  ['clientId','clientName','clientCode','clientNotes','clientGmail','clientDrive'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('clientType').value='recurring';
   document.getElementById('clientLogo').value='';
   openModal('clientModal');
@@ -301,6 +320,7 @@ function editClient(id){
   document.getElementById('clientModalTitle').textContent='Edit Client';
   document.getElementById('clientId').value=c.id;
   document.getElementById('clientName').value=c.name;
+  document.getElementById('clientCode').value=c.code||'';
   document.getElementById('clientType').value=c.agreement_type;
   document.getElementById('clientNotes').value=c.notes||'';
   document.getElementById('clientGmail').value=c.gmail_link||'';
@@ -311,7 +331,7 @@ function editClient(id){
 document.getElementById('clientForm').addEventListener('submit',async e=>{
   e.preventDefault();
   const id=document.getElementById('clientId').value;
-  const data={name:document.getElementById('clientName').value,agreement_type:document.getElementById('clientType').value,notes:document.getElementById('clientNotes').value,gmail_link:document.getElementById('clientGmail').value,drive_link:document.getElementById('clientDrive').value,author:getCurrentUser()};
+  const data={name:document.getElementById('clientName').value,code:document.getElementById('clientCode').value,agreement_type:document.getElementById('clientType').value,notes:document.getElementById('clientNotes').value,gmail_link:document.getElementById('clientGmail').value,drive_link:document.getElementById('clientDrive').value,author:getCurrentUser()};
   let r;if(id){r=await api(`/api/clients/${id}`,{method:'PUT',body:data});}else{r=await api('/api/clients',{method:'POST',body:data});}
   const li=document.getElementById('clientLogo');
   if(li.files.length>0){const fd=new FormData();fd.append('logo',li.files[0]);await fetch(`/api/clients/${r.id}/logo`,{method:'POST',body:fd});}
@@ -352,12 +372,28 @@ function openTaskModal(pid){
   ['taskId','taskTitle','taskDeadline','taskPlannedDate','taskEstHours','taskReferences','taskNotes'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('taskProjectId').value=pid;
   document.getElementById('taskProgress').value='not-started';
+  document.getElementById('taskPriority').value='medium';
+  document.getElementById('taskRecurring').checked=false;
+  document.getElementById('recurOptions').style.display='none';
+  document.getElementById('taskRecurInterval').value='1';
+  document.getElementById('taskRecurUnit').value='months';
+  document.getElementById('taskAttachmentsList').innerHTML='';
+  document.getElementById('taskFiles').value='';
   populateAssigneeDropdown('');
   openModal('taskModal');
 }
+
+function findTaskById(id) {
+  for(const c of clients) for(const p of c.projects) {
+    let t = p.tasks.find(x=>x.id===id);
+    if(t) return t;
+    if(p.archivedTasks) { t = p.archivedTasks.find(x=>x.id===id); if(t) return t; }
+  }
+  return null;
+}
+
 function editTask(id){
-  let t=null;
-  for(const c of clients)for(const p of c.projects){t=p.tasks.find(x=>x.id===id);if(t)break;if(t)break;}
+  const t=findTaskById(id);
   if(!t)return;
   document.getElementById('taskModalTitle').textContent='Edit Task';
   document.getElementById('taskId').value=t.id;
@@ -367,31 +403,85 @@ function editTask(id){
   document.getElementById('taskPlannedDate').value=t.planned_date||'';
   document.getElementById('taskEstHours').value=t.estimated_hours||'';
   document.getElementById('taskProgress').value=t.progress;
+  document.getElementById('taskPriority').value=t.priority||'medium';
   document.getElementById('taskReferences').value=t.references_text||'';
   document.getElementById('taskNotes').value=t.notes||'';
+  document.getElementById('taskRecurring').checked=!!t.is_recurring;
+  document.getElementById('recurOptions').style.display=t.is_recurring?'block':'none';
+  document.getElementById('taskRecurInterval').value=t.recur_interval||1;
+  document.getElementById('taskRecurUnit').value=t.recur_unit||'months';
+  document.getElementById('taskFiles').value='';
+  // Show existing attachments
+  const al=document.getElementById('taskAttachmentsList');
+  al.innerHTML=(t.attachments||[]).map(a=>`<div class="attachment-item"><span>&#128206; ${esc(a.original_name)} (${fmtFileSize(a.file_size)})</span><button type="button" class="btn-icon" onclick="deleteAttachment(${a.id})" title="Remove">&times;</button></div>`).join('');
   populateAssigneeDropdown(t.assignee||'');
   openModal('taskModal');
 }
+
 function populateAssigneeDropdown(cur){
   document.getElementById('taskAssignee').innerHTML='<option value="">Unassigned</option>'+teamMembers.map(m=>`<option value="${esc(m.name)}" ${m.name===cur?'selected':''}>${esc(m.name)}</option>`).join('');
 }
+
+// Recurring toggle
+document.getElementById('taskRecurring').addEventListener('change',function(){
+  document.getElementById('recurOptions').style.display=this.checked?'block':'none';
+});
+
 document.getElementById('taskForm').addEventListener('submit',async e=>{
   e.preventDefault();
   const id=document.getElementById('taskId').value;
-  const data={project_id:+document.getElementById('taskProjectId').value,title:document.getElementById('taskTitle').value,assignee:document.getElementById('taskAssignee').value,deadline:document.getElementById('taskDeadline').value,planned_date:document.getElementById('taskPlannedDate').value,estimated_hours:parseFloat(document.getElementById('taskEstHours').value)||0,progress:document.getElementById('taskProgress').value,references_text:document.getElementById('taskReferences').value,notes:document.getElementById('taskNotes').value,author:getCurrentUser()};
-  if(id)await api(`/api/tasks/${id}`,{method:'PUT',body:data});else await api('/api/tasks',{method:'POST',body:data});
+  const isRecurring=document.getElementById('taskRecurring').checked;
+  const data={
+    project_id:+document.getElementById('taskProjectId').value,
+    title:document.getElementById('taskTitle').value,
+    assignee:document.getElementById('taskAssignee').value,
+    deadline:document.getElementById('taskDeadline').value,
+    planned_date:document.getElementById('taskPlannedDate').value,
+    estimated_hours:parseFloat(document.getElementById('taskEstHours').value)||0,
+    progress:document.getElementById('taskProgress').value,
+    priority:document.getElementById('taskPriority').value,
+    references_text:document.getElementById('taskReferences').value,
+    notes:document.getElementById('taskNotes').value,
+    is_recurring:isRecurring,
+    recur_interval:isRecurring?parseInt(document.getElementById('taskRecurInterval').value)||1:0,
+    recur_unit:isRecurring?document.getElementById('taskRecurUnit').value:'',
+    author:getCurrentUser()
+  };
+  let taskId;
+  if(id){
+    const r=await api(`/api/tasks/${id}`,{method:'PUT',body:data});
+    taskId=id;
+  }else{
+    const r=await api('/api/tasks',{method:'POST',body:data});
+    taskId=r.id;
+  }
+  // Upload files
+  const files=document.getElementById('taskFiles').files;
+  if(files.length>0 && taskId){
+    const fd=new FormData();
+    for(let i=0;i<files.length;i++) fd.append('files',files[i]);
+    fd.append('author',getCurrentUser());
+    await fetch(`/api/tasks/${taskId}/attachments`,{method:'POST',body:fd});
+  }
   closeModal('taskModal');await loadClients();
 });
+
+async function deleteAttachment(aid){
+  await api(`/api/attachments/${aid}`,{method:'DELETE'});
+  // Re-open current task to refresh
+  const tid=document.getElementById('taskId').value;
+  if(tid){await loadClients();editTask(parseInt(tid));}
+}
 
 // ─── Comments ───────────────────────────────────────────
 async function addComment(e,tid){e.preventDefault();const inp=e.target.querySelector('input');const c=inp.value.trim();if(!c)return;await api(`/api/tasks/${tid}/comments`,{method:'POST',body:{author:getCurrentUser(),content:c}});inp.value='';await loadClients();}
 
 // ─── Client History ─────────────────────────────────────
 async function showClientHistory(cid,name){
-  document.getElementById('historyModalTitle').textContent='History — '+name;
+  document.getElementById('historyModalTitle').textContent='History \u2014 '+name;
   const logs=await api(`/api/clients/${cid}/history?limit=100`);
-  document.getElementById('historyContent').innerHTML=!logs.length?'<div style="padding:12px;color:var(--text-muted)">No activity yet.</div>':
-    logs.map(l=>`<div class="history-item"><div class="history-dot ${l.action}"></div><div class="history-content"><div><span class="history-author">${esc(l.author)}</span> <span class="history-action">${l.action}</span> <span class="history-entity-badge ${l.entity_type}">${l.entity_type}</span> <span class="history-time">${timeAgo(l.created_at)}</span></div>${l.details?`<div class="history-details">${esc(l.details)}</div>`:''}</div></div>`).join('');
+  document.getElementById('historyContent').innerHTML=!logs.length?'<div style="padding:12px;color:var(--text-secondary)">No activity yet.</div>':
+    logs.map(l=>`<div class="history-item"><div style="width:8px;height:8px;border-radius:50%;background:${l.action==='created'?'var(--success)':l.action==='archived'?'var(--warning)':'var(--primary)'};margin-top:6px;flex-shrink:0"></div><div style="flex:1"><div style="font-size:12px"><strong>${esc(l.author)}</strong> ${l.action} <span style="color:var(--text-secondary)">${l.entity_type}</span> <span style="color:var(--text-secondary);font-size:11px">${timeAgo(l.created_at)}</span></div>${l.details?`<div style="font-size:11px;color:var(--text-secondary);margin-top:2px">${esc(l.details)}</div>`:''}</div></div>`).join('');
   openModal('historyModal');
 }
 
@@ -400,7 +490,7 @@ document.getElementById('manageTeamBtn').addEventListener('click',()=>{renderTea
 function renderTeamList(){
   const ct=document.getElementById('teamList');
   ct.innerHTML=!teamMembers.length?'<div class="empty-state"><p>No team members.</p></div>':
-    teamMembers.map(m=>`<div class="team-member"><div class="team-member-info"><div class="team-avatar" style="background:${m.avatar_color}">${m.name[0].toUpperCase()}</div><div><div style="font-size:13px;font-weight:600">${esc(m.name)}</div>${m.role?`<div style="font-size:11px;color:var(--text-muted)">${esc(m.role)}</div>`:''}</div></div><button class="btn-icon danger" onclick="deleteTeamMember(${m.id})">&#128465;</button></div>`).join('');
+    teamMembers.map(m=>`<div class="team-member"><div style="display:flex;align-items:center;gap:10px"><div style="width:32px;height:32px;border-radius:50%;background:${m.avatar_color};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px">${m.name[0].toUpperCase()}</div><div><div style="font-weight:600;font-size:13px">${esc(m.name)}</div>${m.role?`<div style="font-size:11px;color:var(--text-secondary)">${esc(m.role)}</div>`:''}</div></div><button class="btn-icon" onclick="deleteTeamMember(${m.id})" style="color:var(--danger)" title="Remove">&#128465;</button></div>`).join('');
 }
 document.getElementById('teamForm').addEventListener('submit',async e=>{
   e.preventDefault();const n=document.getElementById('teamMemberName').value.trim();if(!n)return;
@@ -430,22 +520,26 @@ async function loadTodayView(){
   const d=new Date(date+'T00:00:00');
   document.getElementById('todayTitle').textContent=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   const ct=document.getElementById('todayContent');
-  if(!tasks.length){ct.innerHTML='<div style="padding:32px;text-align:center;color:var(--text-muted)">No tasks planned for this date</div>';return;}
-  // Group by assignee
+  if(!tasks.length){ct.innerHTML='<div class="empty-state"><p>No tasks planned for this date</p></div>';return;}
   const groups={};
   for(const t of tasks){const a=t.assignee||'Unassigned';if(!groups[a])groups[a]=[];groups[a].push(t);}
   let html='';
   for(const [assignee,gTasks] of Object.entries(groups)){
     const mem=teamMembers.find(m=>m.name===assignee);
     const totalH=gTasks.reduce((s,t)=>s+(t.estimated_hours||0),0);
-    html+=`<div class="today-group-header">${mem?`<span class="assignee-dot" style="background:${mem.avatar_color}">${mem.name[0]}</span>`:''}${esc(assignee)}<span class="today-total-hours">${totalH}h planned</span></div>`;
-    html+=gTasks.map(t=>`<div class="today-task" onclick="editTask(${t.id})">
-      <div><div class="today-task-title">${esc(t.title)}</div><div class="today-task-context">${esc(t.client_name)} → ${esc(t.project_name)}</div></div>
-      <div class="task-deadline ${getDeadlineClass(t.deadline,t.progress)}">${fmtDateShort(t.deadline)}</div>
-      <div class="task-est">${t.estimated_hours?t.estimated_hours+'h':'—'}</div>
-      <div><span class="progress-badge progress-${t.progress}"><span class="progress-dot"></span>${progressLabel(t.progress)}</span></div>
-      <div style="font-size:12px;color:var(--text-muted)">${esc(t.notes||'').substring(0,40)}</div>
+    html+=`<div class="today-group"><div class="today-group-header">${mem?`<span style="width:28px;height:28px;border-radius:50%;background:${mem.avatar_color};display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px">${mem.name[0]}</span>`:''}<span style="font-weight:600">${esc(assignee)}</span><span style="font-size:12px;color:var(--text-secondary);margin-left:auto">${totalH}h planned</span></div>`;
+    html+=gTasks.map(t=>`<div class="today-task" onclick="editTask(${t.id})" style="cursor:pointer">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:13px">${esc(t.title)}</div>
+        <div style="font-size:11px;color:var(--text-secondary)">${t.client_code?'['+esc(t.client_code)+'] ':''}${esc(t.client_name)} &rarr; ${esc(t.project_name)}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <span class="priority-badge priority-${t.priority}"></span>
+        <span style="font-size:12px;min-width:40px">${t.estimated_hours?t.estimated_hours+'h':''}</span>
+        <span class="status-badge status-${t.progress}">${progressLabel(t.progress)}</span>
+      </div>
     </div>`).join('');
+    html+='</div>';
   }
   ct.innerHTML=html;
 }
@@ -455,12 +549,13 @@ document.getElementById('todayPerson').addEventListener('change',loadTodayView);
 // ─── Calendar View ──────────────────────────────────────
 function calendarPrev(){calendarDate.setMonth(calendarDate.getMonth()-1);loadCalendarView();}
 function calendarNext(){calendarDate.setMonth(calendarDate.getMonth()+1);loadCalendarView();}
+
 async function loadCalendarView(){
   const y=calendarDate.getFullYear(),m=calendarDate.getMonth();
   document.getElementById('calendarTitle').textContent=calendarDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
   const firstDay=new Date(y,m,1);
   const lastDay=new Date(y,m+1,0);
-  const startDow=(firstDay.getDay()+6)%7; // Mon=0
+  const startDow=(firstDay.getDay()+6)%7;
   const startDate=new Date(firstDay);startDate.setDate(startDate.getDate()-startDow);
   const endDate=new Date(lastDay);const endDow=(lastDay.getDay()+6)%7;endDate.setDate(endDate.getDate()+(6-endDow));
   const fmt=d=>d.toISOString().split('T')[0];
@@ -471,24 +566,27 @@ async function loadCalendarView(){
   const byDate={};
   const todayStr=new Date().toISOString().split('T')[0];
   for(const t of tasks){
-    if(t.planned_date){if(!byDate[t.planned_date])byDate[t.planned_date]=[];byDate[t.planned_date].push({...t,type:'planned'});}
-    if(t.deadline&&t.deadline!==t.planned_date){if(!byDate[t.deadline])byDate[t.deadline]=[];byDate[t.deadline].push({...t,type:'deadline'});}
+    if(t.planned_date){if(!byDate[t.planned_date])byDate[t.planned_date]=[];byDate[t.planned_date].push({...t,dateType:'planned'});}
+    if(t.deadline&&t.deadline!==t.planned_date){if(!byDate[t.deadline])byDate[t.deadline]=[];byDate[t.deadline].push({...t,dateType:'deadline'});}
   }
   let html='';
-  ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(d=>{html+=`<div class="calendar-day-header">${d}</div>`;});
+  ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(d=>{html+=`<div class="cal-header">${d}</div>`;});
   const cur=new Date(startDate);
   while(cur<=endDate){
     const ds=fmt(cur);
     const isOther=cur.getMonth()!==m;
     const isToday=ds===todayStr;
     const dayTasks=byDate[ds]||[];
-    html+=`<div class="calendar-day ${isOther?'other-month':''} ${isToday?'today':''}">
-      <div class="calendar-day-number">${cur.getDate()}</div>
-      ${dayTasks.slice(0,4).map(t=>{
-        const cls=t.type==='deadline'&&getDeadlineClass(t.deadline,t.progress)==='overdue'?'overdue':t.type;
-        return`<div class="calendar-task ${cls}" onclick="editTask(${t.id})" title="${esc(t.title)} (${esc(t.client_name)})">${esc(t.title)}</div>`;
+    html+=`<div class="cal-day ${isOther?'other-month':''} ${isToday?'today':''}">
+      <div class="cal-day-number">${cur.getDate()}</div>
+      ${dayTasks.slice(0,3).map(t=>{
+        const isOverdue=t.dateType==='deadline'&&getDeadlineClass(t.deadline,t.progress)==='overdue';
+        return`<div class="cal-task ${isOverdue?'overdue':t.dateType}" onclick="editTask(${t.id})" title="${esc(t.title)} (${esc(t.client_name)})">
+          <div class="cal-task-client">${t.client_logo?`<img src="${esc(t.client_logo)}" style="width:14px;height:14px;border-radius:50%;object-fit:cover">`:''}${esc(t.client_code||'')}</div>
+          <span class="cal-task-title">${esc(t.title)}</span>
+        </div>`;
       }).join('')}
-      ${dayTasks.length>4?`<div style="font-size:10px;color:var(--text-muted);padding:0 6px">+${dayTasks.length-4} more</div>`:''}
+      ${dayTasks.length>3?`<div style="font-size:10px;color:var(--text-secondary);padding:1px 4px">+${dayTasks.length-3} more</div>`:''}
     </div>`;
     cur.setDate(cur.getDate()+1);
   }
@@ -497,4 +595,9 @@ async function loadCalendarView(){
 document.getElementById('calendarPerson').addEventListener('change',loadCalendarView);
 
 // ─── Init ───────────────────────────────────────────────
-(async function(){await loadTeam();await loadClients();})();
+(async function(){
+  await loadTeam();
+  await loadClients();
+  // Set today's date
+  document.getElementById('todayDate').value=new Date().toISOString().split('T')[0];
+})();

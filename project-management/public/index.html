@@ -9,66 +9,58 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-  <header class="header">
-    <div class="header-left">
+  <!-- Clean navigation bar -->
+  <nav class="navbar">
+    <div class="nav-brand">
       <div class="logo-mark">NBM</div>
       <div>
         <h1>NorthBear Media</h1>
         <p class="subtitle">Project Management</p>
       </div>
     </div>
-    <div class="header-right">
+    <div class="nav-center">
+      <button class="nav-tab active" data-view="clients"><span class="nav-icon">&#9783;</span> Clients</button>
+      <button class="nav-tab" data-view="today"><span class="nav-icon">&#9788;</span> Today</button>
+      <button class="nav-tab" data-view="calendar"><span class="nav-icon">&#128197;</span> Calendar</button>
+    </div>
+    <div class="nav-right">
       <div class="user-selector">
-        <span>Logged in as:</span>
         <select id="currentUser"><option value="Norton">Norton</option></select>
       </div>
-      <!-- View tabs -->
-      <div class="view-tabs">
-        <button class="view-tab active" data-view="clients">Clients</button>
-        <button class="view-tab" data-view="today">Today</button>
-        <button class="view-tab" data-view="calendar">Calendar</button>
-      </div>
-      <div class="filter-group" id="clientFilters">
-        <button class="filter-btn active" data-filter="all">All</button>
-        <button class="filter-btn" data-filter="recurring">Recurring</button>
-        <button class="filter-btn" data-filter="ad-hoc">Ad Hoc</button>
-      </div>
-      <button class="btn btn-primary" id="addClientBtn">+ New Client</button>
-      <button class="btn btn-ghost" id="manageTeamBtn">Team</button>
-      <button class="btn btn-ghost" id="viewArchiveBtn">Archive</button>
+      <button class="nav-action" id="addClientBtn" title="New Client">+</button>
+      <button class="nav-action" id="manageTeamBtn" title="Team">&#128101;</button>
+      <button class="nav-action" id="viewArchiveBtn" title="Archive">&#128230;</button>
     </div>
-  </header>
+  </nav>
+
+  <!-- Sub-bar for filters (clients view only) -->
+  <div class="sub-bar" id="clientSubBar">
+    <div class="filter-group">
+      <button class="filter-btn active" data-filter="all">All Clients</button>
+      <button class="filter-btn" data-filter="recurring">Recurring</button>
+      <button class="filter-btn" data-filter="ad-hoc">Ad Hoc</button>
+    </div>
+    <div class="stats-bar" id="statsBar"></div>
+  </div>
 
   <main class="main">
-    <div class="stats-bar" id="statsBar"></div>
-
     <!-- Clients View -->
     <div id="clientsView">
       <div class="table-container">
         <div class="table-header">
-          <div>Client</div>
-          <div>Type</div>
-          <div>Projects</div>
-          <div>Outstanding</div>
-          <div>Status</div>
-          <div></div>
+          <div>Client</div><div>Type</div><div>Projects</div><div>Outstanding</div><div>Progress</div><div></div>
         </div>
-        <div id="clientList" class="client-list">
-          <div class="empty-state"><p>Loading...</p></div>
-        </div>
+        <div id="clientList" class="client-list"><div class="empty-state"><p>Loading...</p></div></div>
       </div>
     </div>
 
     <!-- Today View -->
     <div id="todayView" style="display:none">
-      <div class="today-header">
+      <div class="view-header">
         <h2 id="todayTitle">Today's Tasks</h2>
-        <div class="today-controls">
-          <label style="font-size:12px;color:var(--text-secondary)">Filter by person:</label>
-          <select id="todayPerson" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit">
-            <option value="">Everyone</option>
-          </select>
-          <input type="date" id="todayDate" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit">
+        <div class="view-controls">
+          <select id="todayPerson"><option value="">Everyone</option></select>
+          <input type="date" id="todayDate">
         </div>
       </div>
       <div id="todayContent" class="today-content"></div>
@@ -76,17 +68,14 @@
 
     <!-- Calendar View -->
     <div id="calendarView" style="display:none">
-      <div class="today-header">
+      <div class="view-header">
         <div style="display:flex;align-items:center;gap:12px">
           <button class="btn btn-ghost btn-sm" onclick="calendarPrev()">&#9664;</button>
           <h2 id="calendarTitle">April 2026</h2>
           <button class="btn btn-ghost btn-sm" onclick="calendarNext()">&#9654;</button>
         </div>
-        <div class="today-controls">
-          <label style="font-size:12px;color:var(--text-secondary)">Filter by person:</label>
-          <select id="calendarPerson" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit">
-            <option value="">Everyone</option>
-          </select>
+        <div class="view-controls">
+          <select id="calendarPerson"><option value="">Everyone</option></select>
         </div>
       </div>
       <div id="calendarGrid" class="calendar-grid"></div>
@@ -97,78 +86,65 @@
 
   <!-- Client Modal -->
   <div class="modal" id="clientModal">
-    <div class="modal-header">
-      <h2 id="clientModalTitle">New Client</h2>
-      <button class="modal-close" onclick="closeModal('clientModal')">&times;</button>
-    </div>
+    <div class="modal-header"><h2 id="clientModalTitle">New Client</h2><button class="modal-close" onclick="closeModal('clientModal')">&times;</button></div>
     <form id="clientForm">
       <input type="hidden" id="clientId">
-      <div class="form-group"><label>Client Name</label><input type="text" id="clientName" required></div>
+      <div class="form-row"><div class="form-group"><label>Client Name</label><input type="text" id="clientName" required></div><div class="form-group"><label>Code (3 letters)</label><input type="text" id="clientCode" maxlength="5" placeholder="e.g. NBM"></div></div>
       <div class="form-group"><label>Agreement Type</label><select id="clientType"><option value="recurring">Recurring</option><option value="ad-hoc">Ad Hoc / One-off</option></select></div>
-      <div class="form-group"><label>Notes</label><textarea id="clientNotes" rows="3"></textarea></div>
-      <div class="form-group"><label>Gmail Folder / Label Link</label><input type="url" id="clientGmail" placeholder="https://mail.google.com/mail/u/0/#label/..."></div>
-      <div class="form-group"><label>Google Drive Folder Link</label><input type="url" id="clientDrive" placeholder="https://drive.google.com/drive/folders/..."></div>
+      <div class="form-group"><label>Notes</label><textarea id="clientNotes" rows="2"></textarea></div>
+      <div class="form-row"><div class="form-group"><label>Gmail Link</label><input type="url" id="clientGmail" placeholder="https://mail.google.com/..."></div><div class="form-group"><label>Google Drive Link</label><input type="url" id="clientDrive" placeholder="https://drive.google.com/..."></div></div>
       <div class="form-group"><label>Logo</label><input type="file" id="clientLogo" accept="image/*"></div>
-      <div class="form-actions">
-        <button type="button" class="btn btn-ghost" onclick="closeModal('clientModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary">Save Client</button>
-      </div>
+      <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="closeModal('clientModal')">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
     </form>
   </div>
 
   <!-- Project Modal -->
   <div class="modal" id="projectModal">
-    <div class="modal-header">
-      <h2 id="projectModalTitle">New Project</h2>
-      <button class="modal-close" onclick="closeModal('projectModal')">&times;</button>
-    </div>
+    <div class="modal-header"><h2 id="projectModalTitle">New Project</h2><button class="modal-close" onclick="closeModal('projectModal')">&times;</button></div>
     <form id="projectForm">
-      <input type="hidden" id="projectId">
-      <input type="hidden" id="projectClientId">
+      <input type="hidden" id="projectId"><input type="hidden" id="projectClientId">
       <div class="form-group"><label>Project Name</label><input type="text" id="projectName" required></div>
       <div class="form-group"><label>Status</label><select id="projectStatus"><option value="active">Active</option><option value="on-hold">On Hold</option><option value="completed">Completed</option><option value="ready-to-invoice">Ready to Invoice</option><option value="invoiced">Invoiced</option></select></div>
-      <div class="form-group"><label>Notes</label><textarea id="projectNotes" rows="3"></textarea></div>
-      <div class="form-actions">
-        <button type="button" class="btn btn-ghost" onclick="closeModal('projectModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary">Save Project</button>
-      </div>
+      <div class="form-group"><label>Notes</label><textarea id="projectNotes" rows="2"></textarea></div>
+      <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="closeModal('projectModal')">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
     </form>
   </div>
 
   <!-- Task Modal -->
-  <div class="modal" id="taskModal">
-    <div class="modal-header">
-      <h2 id="taskModalTitle">New Task</h2>
-      <button class="modal-close" onclick="closeModal('taskModal')">&times;</button>
-    </div>
+  <div class="modal modal-lg" id="taskModal">
+    <div class="modal-header"><h2 id="taskModalTitle">New Task</h2><button class="modal-close" onclick="closeModal('taskModal')">&times;</button></div>
     <form id="taskForm">
-      <input type="hidden" id="taskId">
-      <input type="hidden" id="taskProjectId">
+      <input type="hidden" id="taskId"><input type="hidden" id="taskProjectId">
       <div class="form-group"><label>Task Title</label><input type="text" id="taskTitle" required></div>
-      <div class="form-row">
+      <div class="form-row form-row-3">
         <div class="form-group"><label>Assigned To</label><select id="taskAssignee"><option value="">Unassigned</option></select></div>
+        <div class="form-group"><label>Priority</label><select id="taskPriority"><option value="critical">&#128308; Critical</option><option value="high">&#128992; High</option><option value="medium" selected>&#128993; Medium</option><option value="low">&#128994; Low</option></select></div>
+        <div class="form-group"><label>Progress</label><select id="taskProgress"><option value="not-started">Not Started</option><option value="in-progress">In Progress</option><option value="completed">Completed</option><option value="stuck">Stuck</option><option value="awaiting-client">Awaiting Client</option><option value="awaiting-manager">Awaiting Manager</option><option value="ready-to-invoice">Ready to Invoice</option><option value="invoiced">Invoiced</option></select></div>
+      </div>
+      <div class="form-row form-row-3">
         <div class="form-group"><label>Deadline</label><input type="date" id="taskDeadline"></div>
-      </div>
-      <div class="form-row">
         <div class="form-group"><label>Planned Date</label><input type="date" id="taskPlannedDate"></div>
-        <div class="form-group"><label>Estimated Hours</label><input type="number" id="taskEstHours" min="0" step="0.5" placeholder="e.g. 2.5"></div>
-      </div>
-      <div class="form-group"><label>Progress</label>
-        <select id="taskProgress">
-          <option value="not-started">Not Started</option>
-          <option value="in-progress">In Progress</option>
-          <option value="completed">Completed</option>
-          <option value="blocked">Blocked</option>
-          <option value="ready-to-invoice">Ready to Invoice</option>
-          <option value="invoiced">Invoiced</option>
-        </select>
+        <div class="form-group"><label>Est. Hours</label><input type="number" id="taskEstHours" min="0" step="0.5"></div>
       </div>
       <div class="form-group"><label>References / Links</label><input type="text" id="taskReferences"></div>
-      <div class="form-group"><label>Notes</label><textarea id="taskNotes" rows="3"></textarea></div>
-      <div class="form-actions">
-        <button type="button" class="btn btn-ghost" onclick="closeModal('taskModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary">Save Task</button>
+      <div class="form-group"><label>Notes</label><textarea id="taskNotes" rows="2"></textarea></div>
+      <!-- Recurring -->
+      <div class="form-group">
+        <label><input type="checkbox" id="taskRecurring"> Recurring task</label>
+        <div id="recurOptions" style="display:none;margin-top:8px">
+          <div class="form-row" style="max-width:300px">
+            <div class="form-group"><label>Every</label><input type="number" id="taskRecurInterval" min="1" value="1" style="width:70px"></div>
+            <div class="form-group"><label>Period</label><select id="taskRecurUnit"><option value="days">Days</option><option value="weeks">Weeks</option><option value="months" selected>Months</option><option value="years">Years</option></select></div>
+          </div>
+        </div>
       </div>
+      <!-- Attachments -->
+      <div class="form-group">
+        <label>Attachments</label>
+        <div id="taskAttachmentsList"></div>
+        <input type="file" id="taskFiles" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip" style="margin-top:6px">
+      </div>
+      <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="closeModal('taskModal')">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
     </form>
   </div>
 
@@ -176,21 +152,16 @@
   <div class="modal" id="teamModal">
     <div class="modal-header"><h2>Team Members</h2><button class="modal-close" onclick="closeModal('teamModal')">&times;</button></div>
     <div id="teamList" class="team-list"></div>
-    <form id="teamForm" class="team-form">
-      <input type="text" id="teamMemberName" placeholder="Name" required>
-      <input type="text" id="teamMemberRole" placeholder="Role">
-      <input type="color" id="teamMemberColor" value="#6366f1">
-      <button type="submit" class="btn btn-primary btn-sm">Add</button>
-    </form>
+    <form id="teamForm" class="team-form"><input type="text" id="teamMemberName" placeholder="Name" required><input type="text" id="teamMemberRole" placeholder="Role"><input type="color" id="teamMemberColor" value="#6366f1"><button type="submit" class="btn btn-primary btn-sm">Add</button></form>
   </div>
 
   <!-- History Modal -->
   <div class="modal" id="historyModal" style="max-width:620px">
-    <div class="modal-header"><h2 id="historyModalTitle">Activity History</h2><button class="modal-close" onclick="closeModal('historyModal')">&times;</button></div>
+    <div class="modal-header"><h2 id="historyModalTitle">History</h2><button class="modal-close" onclick="closeModal('historyModal')">&times;</button></div>
     <div id="historyContent" class="history-panel" style="max-height:450px"></div>
   </div>
 
-  <!-- Stats Popup Modal -->
+  <!-- Stats Popup -->
   <div class="modal" id="statsModal" style="max-width:750px">
     <div class="modal-header"><h2 id="statsModalTitle">Tasks</h2><button class="modal-close" onclick="closeModal('statsModal')">&times;</button></div>
     <div id="statsModalContent" style="max-height:450px;overflow-y:auto"></div>
