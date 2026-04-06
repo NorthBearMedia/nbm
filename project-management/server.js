@@ -87,8 +87,8 @@ app.get('/', (req, res) => {
   res.sendFile(join(__dirname, 'public', 'index.html'));
 });
 
-// Static files
-app.use(express.static(join(__dirname, 'public')));
+// Static files — no caching to ensure updates are seen immediately
+app.use(express.static(join(__dirname, 'public'), { maxAge: 0, etag: false }));
 
 // Protect all API routes (except auth)
 app.use('/api', (req, res, next) => {
