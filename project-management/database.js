@@ -20,6 +20,7 @@ db.exec(`
     notes TEXT DEFAULT '',
     gmail_link TEXT DEFAULT '',
     drive_link TEXT DEFAULT '',
+    archived INTEGER NOT NULL DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
     sort_order INTEGER DEFAULT 0
   );
@@ -30,6 +31,7 @@ db.exec(`
     name TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'completed', 'on-hold')),
     notes TEXT DEFAULT '',
+    archived INTEGER NOT NULL DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
     sort_order INTEGER DEFAULT 0,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
@@ -44,6 +46,7 @@ db.exec(`
     progress TEXT NOT NULL DEFAULT 'not-started' CHECK(progress IN ('not-started', 'in-progress', 'completed', 'blocked')),
     references_text TEXT DEFAULT '',
     notes TEXT DEFAULT '',
+    archived INTEGER NOT NULL DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
     sort_order INTEGER DEFAULT 0,
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE

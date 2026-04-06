@@ -4,8 +4,10 @@ let teamMembers = [];
 let currentFilter = 'all';
 let expandedClients = new Set();
 let expandedProjects = new Set();
-let expandedComments = new Set(); // task IDs with open comments
-let showCompletedTasks = new Set(); // project IDs showing completed tasks
+let expandedComments = new Set();
+let showCompletedTasks = new Set();
+let showArchivedProjects = new Set();
+let showArchivedTasks = new Set();
 
 // ─── Current User ───────────────────────────────────────
 function getCurrentUser() {
@@ -44,7 +46,7 @@ function updateUserSelector() {
   if (!current && teamMembers.length) sel.value = teamMembers[0].name;
 }
 
-// ─── Stats Bar ──────────────────────────────────────────
+// ─── Stats Bar (clickable) ─────────────────────────────
 function renderStats() {
   const totals = { clients: clients.length, outstanding: 0, inProgress: 0, overdue: 0, completed: 0, blocked: 0 };
   for (const c of clients) {
@@ -60,22 +62,96 @@ function renderStats() {
       <div class="stat-value">${totals.clients}</div>
       <div class="stat-label">Active Clients</div>
     </div>
-    <div class="stat-card warning">
+    <div class="stat-card warning clickable" onclick="showStatPopup('outstanding')">
       <div class="stat-value">${totals.outstanding}</div>
       <div class="stat-label">Outstanding Tasks</div>
     </div>
-    <div class="stat-card blue">
+    <div class="stat-card blue clickable" onclick="showStatPopup('in-progress')">
       <div class="stat-value">${totals.inProgress}</div>
       <div class="stat-label">In Progress</div>
     </div>
-    <div class="stat-card danger">
+    <div class="stat-card danger clickable" onclick="showStatPopup('overdue')">
       <div class="stat-value">${totals.overdue}</div>
       <div class="stat-label">Overdue</div>
     </div>
-    <div class="stat-card success">
+    <div class="stat-card success clickable" onclick="showStatPopup('completed')">
       <div class="stat-value">${totals.completed}</div>
       <div class="stat-label">Completed</div>
     </div>`;
+}
+
+// ─── Stats Popup ────────────────────────────────────────
+function showStatPopup(type) {
+  const titles = {
+    'outstanding': 'Outstanding Tasks',
+    'in-progress': 'In Progress Tasks',
+    'overdue': 'Overdue Tasks',
+    'completed': 'Completed Tasks',
+    'blocked': 'Blocked Tasks'
+  };
+  document.getElementById('statsModalTitle').textContent = titles[type] || 'Tasks';
+
+  const now = new Date().toISOString().split('T')[0];
+  const matchingTasks = [];
+
+  for (const client of clients) {
+    for (const project of client.projects) {
+      for (const task of project.tasks) {
+        let match = false;
+        if (type === 'outstanding' && task.progress !== 'completed') match = true;
+        if (type === 'in-progress' && task.progress === 'in-progress') match = true;
+        if (type === 'completed' && task.progress === 'completed') match = true;
+        if (type === 'blocked' && task.progress === 'blocked') match = true;
+        if (type === 'overdue' && task.deadline && task.deadline < now && task.progress !== 'completed') match = true;
+
+        if (match) {
+          matchingTasks.push({ task, project, client });
+        }
+      }
+    }
+  }
+
+  const container = document.getElementById('statsModalContent');
+  if (matchingTasks.length === 0) {
+    container.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted)">No tasks found</div>';
+  } else {
+    container.innerHTML = matchingTasks.map(({ task, project, client }) => {
+      const member = teamMembers.find(m => m.name === task.assignee);
+      const deadlineClass = getDeadlineClass(task.deadline, task.progress);
+      const progressLabel = { 'not-started': 'Not Started', 'in-progress': 'In Progress', 'completed': 'Completed', 'blocked': 'Blocked' }[task.progress];
+
+      return `
+        <div class="popup-task-item" onclick="navigateToTask(${client.id}, ${project.id}, ${task.id})">
+          <div class="popup-task-left">
+            <div class="popup-task-title">${escapeHtml(task.title)}</div>
+            <div class="popup-task-context">${escapeHtml(client.name)} &rarr; ${escapeHtml(project.name)}</div>
+          </div>
+          <div class="popup-task-right">
+            ${task.assignee ? `<span class="task-assignee">${member ? `<span class="assignee-dot" style="background:${member.avatar_color}">${member.name[0]}</span>` : ''}${escapeHtml(task.assignee)}</span>` : ''}
+            <span class="task-deadline ${deadlineClass}">${formatDeadline(task.deadline)}</span>
+            <span class="progress-badge progress-${task.progress}"><span class="progress-dot"></span>${progressLabel}</span>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  openModal('statsModal');
+}
+
+function navigateToTask(clientId, projectId, taskId) {
+  closeModal('statsModal');
+  expandedClients.add(clientId);
+  expandedProjects.add(projectId);
+  renderClients();
+  // Scroll to and flash the task
+  setTimeout(() => {
+    const el = document.querySelector(`[data-task-id="${taskId}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.style.background = '#eef2ff';
+      setTimeout(() => { el.style.background = ''; }, 2000);
+    }
+  }, 100);
 }
 
 // ─── Rendering ──────────────────────────────────────────
@@ -92,7 +168,6 @@ function renderClients() {
     const initials = client.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
     const s = client.stats;
 
-    // Outstanding pill styling
     let pillClass = 'all-done';
     let pillText = 'All done';
     if (s.overdueTasks > 0) { pillClass = 'has-overdue'; pillText = `${s.outstandingTasks} outstanding`; }
@@ -100,8 +175,8 @@ function renderClients() {
 
     // Links
     const links = [];
-    if (client.gmail_link) links.push(`<a href="${escapeHtml(client.gmail_link)}" target="_blank" class="client-link" title="Gmail" onclick="event.stopPropagation()">&#9993; Gmail</a>`);
-    if (client.drive_link) links.push(`<a href="${escapeHtml(client.drive_link)}" target="_blank" class="client-link" title="Google Drive" onclick="event.stopPropagation()">&#128193; Drive</a>`);
+    if (client.gmail_link) links.push(`<a href="${escapeHtml(client.gmail_link)}" target="_blank" class="client-link" title="Open Gmail label" onclick="event.stopPropagation()">&#9993; Gmail</a>`);
+    if (client.drive_link) links.push(`<a href="${escapeHtml(client.drive_link)}" target="_blank" class="client-link" title="Open Google Drive folder" onclick="event.stopPropagation()">&#128193; Drive</a>`);
 
     return `
       <div class="client-row ${isExpanded ? 'expanded' : ''}" data-client-id="${client.id}" data-type="${client.agreement_type}">
@@ -113,8 +188,9 @@ function renderClients() {
             </div>
             <div>
               <div class="client-name">${escapeHtml(client.name)}</div>
-              <div style="display:flex;gap:8px;align-items:center">
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:2px">
                 ${client.notes ? `<span class="client-notes-preview">${escapeHtml(client.notes)}</span>` : ''}
+                ${links.join(' ')}
               </div>
             </div>
           </div>
@@ -128,29 +204,52 @@ function renderClients() {
           </div>
           <div style="font-size:12px;color:var(--text-secondary)">${s.completedTasks}/${s.totalTasks} done</div>
           <div class="client-actions" onclick="event.stopPropagation()">
-            <button class="btn-icon" onclick="showHistory('client', ${client.id}, '${escapeHtml(client.name)}')" title="History">&#128337;</button>
+            <button class="btn-icon" onclick="showClientHistory(${client.id}, '${escapeHtml(client.name)}')" title="History">&#128337;</button>
             <button class="btn-icon" onclick="editClient(${client.id})" title="Edit">&#9998;</button>
-            <button class="btn-icon danger" onclick="deleteClient(${client.id})" title="Delete">&#128465;</button>
+            <button class="btn-icon" onclick="archiveClient(${client.id})" title="Archive" style="color:var(--warning)">&#128230;</button>
           </div>
         </div>
         <div class="client-expanded">
           <div class="client-detail-bar">
             <div><strong>Agreement:</strong> ${client.agreement_type === 'recurring' ? 'Recurring' : 'One-off / Ad Hoc'}</div>
             ${client.notes ? `<div><strong>Notes:</strong> ${escapeHtml(client.notes)}</div>` : ''}
-            ${links.length ? `<div>${links.join(' ')}</div>` : ''}
+            ${links.length > 0 ? `<div style="display:flex;gap:6px">${links.join('')}</div>` : '<div style="color:var(--text-muted);font-size:12px">No Gmail or Drive links set — edit client to add them</div>'}
           </div>
           ${client.projects.map(project => renderProject(project, client.id)).join('')}
+          ${renderArchivedProjects(client)}
           <button class="btn btn-ghost btn-sm add-project-btn" onclick="openProjectModal(${client.id})">+ Add Project</button>
         </div>
       </div>`;
   }).join('');
 }
 
+function renderArchivedProjects(client) {
+  if (!client.archivedProjects || client.archivedProjects.length === 0) return '';
+  const show = showArchivedProjects.has(client.id);
+  return `
+    <div style="margin-left:16px;margin-top:8px">
+      <button class="history-toggle" onclick="toggleArchivedProjects(${client.id})">
+        <span style="font-size:10px">${show ? '&#9660;' : '&#9654;'}</span>
+        &#128230; ${client.archivedProjects.length} archived project${client.archivedProjects.length !== 1 ? 's' : ''}
+      </button>
+      ${show ? client.archivedProjects.map(p => `
+        <div class="archive-item" style="margin-left:16px;opacity:0.7">
+          <div class="archive-item-info">
+            <div class="archive-item-name">${escapeHtml(p.name)}</div>
+            <div class="archive-item-type">${p.tasks.length} tasks</div>
+          </div>
+          <button class="btn-restore" onclick="restoreProject(${p.id})">Restore</button>
+        </div>`).join('') : ''}
+    </div>`;
+}
+
 function renderProject(project, clientId) {
   const isExpanded = expandedProjects.has(project.id);
   const activeTasks = project.tasks.filter(t => t.progress !== 'completed');
   const completedTasks = project.tasks.filter(t => t.progress === 'completed');
+  const archivedTasks = project.archivedTasks || [];
   const showCompleted = showCompletedTasks.has(project.id);
+  const showArchived = showArchivedTasks.has(project.id);
 
   return `
     <div class="project-section ${isExpanded ? 'expanded' : ''}" data-project-id="${project.id}" data-status="${project.status}">
@@ -162,9 +261,8 @@ function renderProject(project, clientId) {
         </div>
         <div class="project-meta" onclick="event.stopPropagation()">
           <span style="font-size:12px;color:var(--text-muted)">${activeTasks.length} active${completedTasks.length > 0 ? `, ${completedTasks.length} done` : ''}</span>
-          <button class="btn-icon" onclick="showHistory('project', ${project.id}, '${escapeHtml(project.name)}')" title="History">&#128337;</button>
           <button class="btn-icon" onclick="editProject(${project.id}, ${clientId})" title="Edit">&#9998;</button>
-          <button class="btn-icon danger" onclick="deleteProject(${project.id})" title="Delete">&#128465;</button>
+          <button class="btn-icon" onclick="archiveProject(${project.id})" title="Archive" style="color:var(--warning)">&#128230;</button>
         </div>
       </div>
       <div class="project-tasks">
@@ -192,6 +290,23 @@ function renderProject(project, clientId) {
             ${showCompleted ? `
               <div class="task-table" style="opacity:0.75;margin-top:4px">
                 ${completedTasks.map(task => renderTask(task)).join('')}
+              </div>
+            ` : ''}
+          </div>
+        ` : ''}
+        ${archivedTasks.length > 0 ? `
+          <div style="margin-top:4px">
+            <button class="history-toggle" onclick="toggleArchivedTasks(${project.id})" style="margin-left:4px">
+              <span style="font-size:10px">${showArchived ? '&#9660;' : '&#9654;'}</span>
+              &#128230; ${archivedTasks.length} archived task${archivedTasks.length !== 1 ? 's' : ''}
+            </button>
+            ${showArchived ? `
+              <div style="margin-top:4px;opacity:0.6">
+                ${archivedTasks.map(task => `
+                  <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 14px;border-bottom:1px solid var(--border-light);font-size:13px">
+                    <span>${escapeHtml(task.title)}</span>
+                    <button class="btn-restore" onclick="restoreTask(${task.id})">Restore</button>
+                  </div>`).join('')}
               </div>
             ` : ''}
           </div>
@@ -227,7 +342,7 @@ function renderTask(task) {
       <div class="task-refs" title="${escapeHtml(task.references_text || '')}">${escapeHtml(task.references_text || '—')}</div>
       <div class="task-actions">
         <button class="btn-icon" onclick="toggleComments(${task.id})" title="Comments">&#128172;</button>
-        <button class="btn-icon danger" onclick="deleteTask(${task.id})" title="Delete">&#128465;</button>
+        <button class="btn-icon" onclick="archiveTask(${task.id})" title="Archive" style="color:var(--warning)">&#128230;</button>
       </div>
     </div>
     ${showComments ? renderCommentThread(task) : ''}`;
@@ -318,6 +433,16 @@ function toggleCompletedTasks(projectId) {
   renderClients();
 }
 
+function toggleArchivedProjects(clientId) {
+  showArchivedProjects.has(clientId) ? showArchivedProjects.delete(clientId) : showArchivedProjects.add(clientId);
+  renderClients();
+}
+
+function toggleArchivedTasks(projectId) {
+  showArchivedTasks.has(projectId) ? showArchivedTasks.delete(projectId) : showArchivedTasks.add(projectId);
+  renderClients();
+}
+
 // ─── Modal Management ───────────────────────────────────
 function openModal(id) {
   document.getElementById(id).classList.add('active');
@@ -333,6 +458,77 @@ document.getElementById('modalBackdrop').addEventListener('click', () => {
   document.querySelectorAll('.modal.active').forEach(m => m.classList.remove('active'));
   document.getElementById('modalBackdrop').classList.remove('active');
 });
+
+// ─── Archive Functions ──────────────────────────────────
+async function archiveClient(id) {
+  const client = clients.find(c => c.id === id);
+  if (!confirm(`Archive "${client?.name}"? It can be restored later.`)) return;
+  await api(`/api/clients/${id}/archive`, { method: 'PUT', body: { author: getCurrentUser() } });
+  expandedClients.delete(id);
+  await loadClients();
+}
+
+async function archiveProject(id) {
+  if (!confirm('Archive this project? It can be restored later.')) return;
+  await api(`/api/projects/${id}/archive`, { method: 'PUT', body: { author: getCurrentUser() } });
+  expandedProjects.delete(id);
+  await loadClients();
+}
+
+async function archiveTask(id) {
+  await api(`/api/tasks/${id}/archive`, { method: 'PUT', body: { author: getCurrentUser() } });
+  await loadClients();
+}
+
+async function restoreProject(id) {
+  await api(`/api/projects/${id}/archive`, { method: 'PUT', body: { author: getCurrentUser() } });
+  await loadClients();
+}
+
+async function restoreTask(id) {
+  await api(`/api/tasks/${id}/archive`, { method: 'PUT', body: { author: getCurrentUser() } });
+  await loadClients();
+}
+
+async function restoreClient(id) {
+  await api(`/api/clients/${id}/archive`, { method: 'PUT', body: { author: getCurrentUser() } });
+  await loadClients();
+  await showArchiveModal();
+}
+
+// ─── Archive Modal ──────────────────────────────────────
+document.getElementById('viewArchiveBtn').addEventListener('click', showArchiveModal);
+
+async function showArchiveModal() {
+  const archived = await api('/api/archived/clients');
+  const container = document.getElementById('archiveContent');
+
+  if (archived.length === 0) {
+    container.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted)">No archived items</div>';
+  } else {
+    container.innerHTML = `
+      <div class="archive-section-title">Archived Clients</div>
+      ${archived.map(c => `
+        <div class="archive-item">
+          <div class="archive-item-info">
+            <div class="archive-item-name">${escapeHtml(c.name)}</div>
+            <div class="archive-item-type">${c.agreement_type === 'recurring' ? 'Recurring' : 'Ad Hoc'}</div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn-restore" onclick="restoreClient(${c.id})">Restore</button>
+            <button class="btn-icon danger" onclick="permanentDeleteClient(${c.id})" title="Permanently delete">&#128465;</button>
+          </div>
+        </div>`).join('')}`;
+  }
+  openModal('archiveModal');
+}
+
+async function permanentDeleteClient(id) {
+  if (!confirm('Permanently delete this client? This cannot be undone.')) return;
+  await api(`/api/clients/${id}`, { method: 'DELETE', body: { author: getCurrentUser() } });
+  await loadClients();
+  await showArchiveModal();
+}
 
 // ─── Client CRUD ────────────────────────────────────────
 document.getElementById('addClientBtn').addEventListener('click', () => {
@@ -391,14 +587,6 @@ document.getElementById('clientForm').addEventListener('submit', async (e) => {
   await loadClients();
 });
 
-async function deleteClient(id) {
-  const client = clients.find(c => c.id === id);
-  if (!confirm(`Delete "${client?.name}" and all its projects/tasks?`)) return;
-  await api(`/api/clients/${id}`, { method: 'DELETE', body: { author: getCurrentUser() } });
-  expandedClients.delete(id);
-  await loadClients();
-}
-
 // ─── Project CRUD ───────────────────────────────────────
 function openProjectModal(clientId) {
   document.getElementById('projectModalTitle').textContent = 'New Project';
@@ -443,13 +631,6 @@ document.getElementById('projectForm').addEventListener('submit', async (e) => {
   closeModal('projectModal');
   await loadClients();
 });
-
-async function deleteProject(id) {
-  if (!confirm('Delete this project and all its tasks?')) return;
-  await api(`/api/projects/${id}`, { method: 'DELETE', body: { author: getCurrentUser() } });
-  expandedProjects.delete(id);
-  await loadClients();
-}
 
 // ─── Task CRUD ──────────────────────────────────────────
 function openTaskModal(projectId) {
@@ -518,12 +699,6 @@ document.getElementById('taskForm').addEventListener('submit', async (e) => {
   await loadClients();
 });
 
-async function deleteTask(id) {
-  if (!confirm('Delete this task?')) return;
-  await api(`/api/tasks/${id}`, { method: 'DELETE', body: { author: getCurrentUser() } });
-  await loadClients();
-}
-
 // ─── Comments ───────────────────────────────────────────
 async function addComment(e, taskId) {
   e.preventDefault();
@@ -540,10 +715,10 @@ async function addComment(e, taskId) {
   await loadClients();
 }
 
-// ─── Activity History ───────────────────────────────────
-async function showHistory(entityType, entityId, name) {
-  document.getElementById('historyModalTitle').textContent = `History — ${name}`;
-  const logs = await api(`/api/activity?entity_type=${entityType}&entity_id=${entityId}&limit=30`);
+// ─── Client-Level History ───────────────────────────────
+async function showClientHistory(clientId, clientName) {
+  document.getElementById('historyModalTitle').textContent = `History — ${clientName}`;
+  const logs = await api(`/api/clients/${clientId}/history?limit=100`);
 
   const container = document.getElementById('historyContent');
   if (logs.length === 0) {
@@ -556,6 +731,7 @@ async function showHistory(entityType, entityId, name) {
           <div>
             <span class="history-author">${escapeHtml(log.author)}</span>
             <span class="history-action">${log.action}</span>
+            <span class="history-entity-badge ${log.entity_type}">${log.entity_type}</span>
             <span class="history-time">${timeAgo(log.created_at)}</span>
           </div>
           ${log.details ? `<div class="history-details">${escapeHtml(log.details)}</div>` : ''}

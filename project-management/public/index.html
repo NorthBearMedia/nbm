@@ -32,6 +32,7 @@
       </div>
       <button class="btn btn-primary" id="addClientBtn">+ New Client</button>
       <button class="btn btn-ghost" id="manageTeamBtn">Team</button>
+      <button class="btn btn-ghost" id="viewArchiveBtn">Archive</button>
     </div>
   </header>
 
@@ -197,12 +198,30 @@
   </div>
 
   <!-- History Modal -->
-  <div class="modal" id="historyModal" style="max-width:560px">
+  <div class="modal" id="historyModal" style="max-width:620px">
     <div class="modal-header">
       <h2 id="historyModalTitle">Activity History</h2>
       <button class="modal-close" onclick="closeModal('historyModal')">&times;</button>
     </div>
-    <div id="historyContent" class="history-panel" style="max-height:400px"></div>
+    <div id="historyContent" class="history-panel" style="max-height:450px"></div>
+  </div>
+
+  <!-- Stats Popup Modal -->
+  <div class="modal" id="statsModal" style="max-width:700px">
+    <div class="modal-header">
+      <h2 id="statsModalTitle">Tasks</h2>
+      <button class="modal-close" onclick="closeModal('statsModal')">&times;</button>
+    </div>
+    <div id="statsModalContent" style="max-height:450px;overflow-y:auto"></div>
+  </div>
+
+  <!-- Archive Modal -->
+  <div class="modal" id="archiveModal" style="max-width:600px">
+    <div class="modal-header">
+      <h2>Archived Items</h2>
+      <button class="modal-close" onclick="closeModal('archiveModal')">&times;</button>
+    </div>
+    <div id="archiveContent" style="max-height:450px;overflow-y:auto"></div>
   </div>
 
   <script src="app.js"></script>

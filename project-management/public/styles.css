@@ -265,6 +265,9 @@ body {
   margin-top: 4px;
 }
 
+.stat-card.clickable { cursor: pointer; transition: all 0.15s; }
+.stat-card.clickable:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+
 /* ─── Table Container ───────────────────────────────── */
 .table-container {
   background: white;
@@ -781,6 +784,21 @@ body {
 .history-dot.updated { background: var(--blue); }
 .history-dot.deleted { background: var(--danger); }
 .history-dot.commented { background: var(--pink); }
+.history-dot.archived { background: var(--warning); }
+.history-dot.restored { background: var(--teal); }
+
+.history-entity-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  margin-left: 4px;
+  text-transform: uppercase;
+}
+.history-entity-badge.client { background: var(--primary-bg); color: var(--primary); }
+.history-entity-badge.project { background: var(--blue-bg); color: var(--blue); }
+.history-entity-badge.task { background: var(--teal-bg); color: var(--teal); }
 
 .history-content {
   flex: 1;
@@ -993,6 +1011,108 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ─── Stats Popup Task List ─────────────────────────── */
+.popup-task-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.popup-task-item:hover { background: var(--bg-hover); }
+.popup-task-item:last-child { border-bottom: none; }
+
+.popup-task-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.popup-task-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.popup-task-context {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.popup-task-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ─── Archive Items ─────────────────────────────────── */
+.archive-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-light);
+}
+.archive-item:last-child { border-bottom: none; }
+
+.archive-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.archive-item-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.archive-item-type {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.archive-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  padding: 10px 14px 6px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+}
+
+.btn-restore {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--teal);
+  background: var(--teal-bg);
+  color: var(--teal);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-restore:hover { background: var(--teal); color: white; }
+
+.btn-archive {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--warning);
+  background: var(--warning-bg);
+  color: var(--warning);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-archive:hover { background: var(--warning); color: white; }
 
 /* ─── Responsive ────────────────────────────────────── */
 @media (max-width: 1000px) {

@@ -35,20 +35,24 @@ function logActivity(entityType, entityId, action, author, details) {
 // ─── CLIENTS ───────────────────────────────────────────
 
 app.get('/api/clients', (req, res) => {
-  const { filter } = req.query;
+  const { filter, include_archived } = req.query;
+  const archivedClause = include_archived === '1' ? '' : 'AND archived = 0';
   let clients;
   if (filter && ['recurring', 'ad-hoc'].includes(filter)) {
-    clients = db.prepare('SELECT * FROM clients WHERE agreement_type = ? ORDER BY sort_order, name').all(filter);
+    clients = db.prepare(`SELECT * FROM clients WHERE agreement_type = ? ${archivedClause} ORDER BY sort_order, name`).all(filter);
   } else {
-    clients = db.prepare('SELECT * FROM clients ORDER BY sort_order, name').all();
+    clients = db.prepare(`SELECT * FROM clients WHERE 1=1 ${archivedClause} ORDER BY sort_order, name`).all();
   }
 
-  const projectsStmt = db.prepare('SELECT * FROM projects WHERE client_id = ? ORDER BY sort_order, name');
-  const tasksStmt = db.prepare('SELECT * FROM tasks WHERE project_id = ? ORDER BY sort_order, created_at');
+  const projectsStmt = db.prepare('SELECT * FROM projects WHERE client_id = ? AND archived = 0 ORDER BY sort_order, name');
+  const archivedProjectsStmt = db.prepare('SELECT * FROM projects WHERE client_id = ? AND archived = 1 ORDER BY sort_order, name');
+  const tasksStmt = db.prepare('SELECT * FROM tasks WHERE project_id = ? AND archived = 0 ORDER BY sort_order, created_at');
+  const archivedTasksStmt = db.prepare('SELECT * FROM tasks WHERE project_id = ? AND archived = 1 ORDER BY sort_order, created_at');
   const commentsStmt = db.prepare('SELECT * FROM comments WHERE task_id = ? ORDER BY created_at DESC');
 
   for (const client of clients) {
     client.projects = projectsStmt.all(client.id);
+    client.archivedProjects = archivedProjectsStmt.all(client.id);
     let totalTasks = 0;
     let completedTasks = 0;
     let overdueTasks = 0;
@@ -56,15 +60,22 @@ app.get('/api/clients', (req, res) => {
     let blockedTasks = 0;
     const now = new Date().toISOString().split('T')[0];
 
-    for (const project of client.projects) {
+    const allProjects = [...client.projects, ...client.archivedProjects];
+    for (const project of allProjects) {
       project.tasks = tasksStmt.all(project.id);
-      for (const task of project.tasks) {
+      project.archivedTasks = archivedTasksStmt.all(project.id);
+      for (const task of [...project.tasks, ...project.archivedTasks]) {
         task.comments = commentsStmt.all(task.id);
-        totalTasks++;
-        if (task.progress === 'completed') completedTasks++;
-        if (task.progress === 'in-progress') inProgressTasks++;
-        if (task.progress === 'blocked') blockedTasks++;
-        if (task.deadline && task.deadline < now && task.progress !== 'completed') overdueTasks++;
+      }
+      // Only count active project tasks for stats
+      if (!project.archived) {
+        for (const task of project.tasks) {
+          totalTasks++;
+          if (task.progress === 'completed') completedTasks++;
+          if (task.progress === 'in-progress') inProgressTasks++;
+          if (task.progress === 'blocked') blockedTasks++;
+          if (task.deadline && task.deadline < now && task.progress !== 'completed') overdueTasks++;
+        }
       }
     }
     client.stats = { totalTasks, completedTasks, overdueTasks, inProgressTasks, blockedTasks, outstandingTasks: totalTasks - completedTasks };
@@ -92,6 +103,8 @@ app.put('/api/clients/:id', (req, res) => {
   if (name && name !== old.name) changes.push(`name: "${old.name}" → "${name}"`);
   if (agreement_type && agreement_type !== old.agreement_type) changes.push(`type: ${old.agreement_type} → ${agreement_type}`);
   if (notes !== undefined && notes !== old.notes) changes.push('updated notes');
+  if (gmail_link !== undefined && gmail_link !== old.gmail_link) changes.push('updated Gmail link');
+  if (drive_link !== undefined && drive_link !== old.drive_link) changes.push('updated Drive link');
   if (changes.length) logActivity('client', req.params.id, 'updated', author, changes.join(', '));
   res.json(db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id));
 });
@@ -99,8 +112,18 @@ app.put('/api/clients/:id', (req, res) => {
 app.delete('/api/clients/:id', (req, res) => {
   const client = db.prepare('SELECT name FROM clients WHERE id = ?').get(req.params.id);
   db.prepare('DELETE FROM clients WHERE id = ?').run(req.params.id);
-  logActivity('client', req.params.id, 'deleted', req.body.author, `Deleted client "${client?.name}"`);
+  logActivity('client', req.params.id, 'deleted', req.body.author, `Permanently deleted client "${client?.name}"`);
   res.json({ success: true });
+});
+
+// Archive client
+app.put('/api/clients/:id/archive', (req, res) => {
+  const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
+  const newState = client.archived ? 0 : 1;
+  db.prepare('UPDATE clients SET archived = ? WHERE id = ?').run(newState, req.params.id);
+  const action = newState ? 'archived' : 'restored';
+  logActivity('client', req.params.id, action, req.body.author, `${action} client "${client.name}"`);
+  res.json({ success: true, archived: newState });
 });
 
 app.post('/api/clients/:id/logo', upload.single('logo'), (req, res) => {
@@ -122,6 +145,7 @@ app.post('/api/projects', (req, res) => {
   logActivity('project', result.lastInsertRowid, 'created', author, `Created project "${name}"`);
   const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(result.lastInsertRowid);
   project.tasks = [];
+  project.archivedTasks = [];
   res.json(project);
 });
 
@@ -136,15 +160,26 @@ app.put('/api/projects/:id', (req, res) => {
   if (notes !== undefined && notes !== old.notes) changes.push('updated notes');
   if (changes.length) logActivity('project', req.params.id, 'updated', author, changes.join(', '));
   const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
-  project.tasks = db.prepare('SELECT * FROM tasks WHERE project_id = ? ORDER BY sort_order, created_at').all(project.id);
+  project.tasks = db.prepare('SELECT * FROM tasks WHERE project_id = ? AND archived = 0 ORDER BY sort_order, created_at').all(project.id);
+  project.archivedTasks = db.prepare('SELECT * FROM tasks WHERE project_id = ? AND archived = 1 ORDER BY sort_order, created_at').all(project.id);
   res.json(project);
 });
 
 app.delete('/api/projects/:id', (req, res) => {
   const project = db.prepare('SELECT name FROM projects WHERE id = ?').get(req.params.id);
   db.prepare('DELETE FROM projects WHERE id = ?').run(req.params.id);
-  logActivity('project', req.params.id, 'deleted', req.body.author, `Deleted project "${project?.name}"`);
+  logActivity('project', req.params.id, 'deleted', req.body.author, `Permanently deleted project "${project?.name}"`);
   res.json({ success: true });
+});
+
+// Archive project
+app.put('/api/projects/:id/archive', (req, res) => {
+  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
+  const newState = project.archived ? 0 : 1;
+  db.prepare('UPDATE projects SET archived = ? WHERE id = ?').run(newState, req.params.id);
+  const action = newState ? 'archived' : 'restored';
+  logActivity('project', req.params.id, action, req.body.author, `${action} project "${project.name}"`);
+  res.json({ success: true, archived: newState });
 });
 
 // ─── TASKS ─────────────────────────────────────────────
@@ -180,8 +215,18 @@ app.put('/api/tasks/:id', (req, res) => {
 app.delete('/api/tasks/:id', (req, res) => {
   const task = db.prepare('SELECT title FROM tasks WHERE id = ?').get(req.params.id);
   db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);
-  logActivity('task', req.params.id, 'deleted', req.body.author, `Deleted task "${task?.title}"`);
+  logActivity('task', req.params.id, 'deleted', req.body.author, `Permanently deleted task "${task?.title}"`);
   res.json({ success: true });
+});
+
+// Archive task
+app.put('/api/tasks/:id/archive', (req, res) => {
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+  const newState = task.archived ? 0 : 1;
+  db.prepare('UPDATE tasks SET archived = ? WHERE id = ?').run(newState, req.params.id);
+  const action = newState ? 'archived' : 'restored';
+  logActivity('task', req.params.id, action, req.body.author, `${action} task "${task.title}"`);
+  res.json({ success: true, archived: newState });
 });
 
 // ─── COMMENTS ──────────────────────────────────────────
@@ -218,6 +263,49 @@ app.get('/api/activity', (req, res) => {
   res.json(db.prepare(query).all(...params));
 });
 
+// Client-level history: all activity for the client AND its projects AND its tasks
+app.get('/api/clients/:id/history', (req, res) => {
+  const clientId = req.params.id;
+  const limit = parseInt(req.query.limit) || 100;
+
+  // Get project IDs for this client
+  const projectIds = db.prepare('SELECT id FROM projects WHERE client_id = ?').all(clientId).map(p => p.id);
+
+  // Get task IDs for those projects
+  let taskIds = [];
+  if (projectIds.length > 0) {
+    const placeholders = projectIds.map(() => '?').join(',');
+    taskIds = db.prepare(`SELECT id FROM tasks WHERE project_id IN (${placeholders})`).all(...projectIds).map(t => t.id);
+  }
+
+  // Build query to get all activity for client + projects + tasks
+  const conditions = [];
+  const params = [];
+
+  // Client activity
+  conditions.push("(entity_type = 'client' AND entity_id = ?)");
+  params.push(clientId);
+
+  // Project activity
+  if (projectIds.length > 0) {
+    const pp = projectIds.map(() => '?').join(',');
+    conditions.push(`(entity_type = 'project' AND entity_id IN (${pp}))`);
+    params.push(...projectIds);
+  }
+
+  // Task activity
+  if (taskIds.length > 0) {
+    const tp = taskIds.map(() => '?').join(',');
+    conditions.push(`(entity_type = 'task' AND entity_id IN (${tp}))`);
+    params.push(...taskIds);
+  }
+
+  const query = `SELECT * FROM activity_log WHERE ${conditions.join(' OR ')} ORDER BY created_at DESC LIMIT ?`;
+  params.push(limit);
+
+  res.json(db.prepare(query).all(...params));
+});
+
 // ─── TEAM MEMBERS ──────────────────────────────────────
 
 app.get('/api/team', (req, res) => {
@@ -238,6 +326,12 @@ app.delete('/api/team/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// ─── ARCHIVED CLIENTS ──────────────────────────────────
+
+app.get('/api/archived/clients', (req, res) => {
+  res.json(db.prepare('SELECT * FROM clients WHERE archived = 1 ORDER BY name').all());
+});
+
 // ─── SEED DATA ─────────────────────────────────────────
 
 function seedIfEmpty() {
@@ -245,13 +339,13 @@ function seedIfEmpty() {
   if (count > 0) return;
 
   // Team members
-  const norton = db.prepare("INSERT INTO team_members (name, role, avatar_color) VALUES ('Norton', 'Director', '#6366f1')").run();
+  db.prepare("INSERT INTO team_members (name, role, avatar_color) VALUES ('Norton', 'Director', '#6366f1')").run();
   db.prepare("INSERT INTO team_members (name, role, avatar_color) VALUES ('Sarah', 'Content Manager', '#ec4899')").run();
   db.prepare("INSERT INTO team_members (name, role, avatar_color) VALUES ('James', 'Designer', '#f59e0b')").run();
   db.prepare("INSERT INTO team_members (name, role, avatar_color) VALUES ('Lucy', 'Social Media', '#22c55e')").run();
 
   // ─── NorthBear Media (Internal) ────────────────────
-  const nbm = db.prepare("INSERT INTO clients (name, agreement_type, notes, sort_order) VALUES ('NorthBear Media', 'recurring', 'Internal business operations — general tasks, admin, strategy, and growth.', 0)").run();
+  const nbm = db.prepare("INSERT INTO clients (name, agreement_type, notes, gmail_link, drive_link, sort_order) VALUES ('NorthBear Media', 'recurring', 'Internal business operations — general tasks, admin, strategy, and growth.', 'https://mail.google.com/mail/u/0/#label/NorthBear+Media', 'https://drive.google.com/drive/folders/northbearmedia', 0)").run();
 
   const nbmOps = db.prepare("INSERT INTO projects (client_id, name, notes, status) VALUES (?, 'General Operations', 'Day-to-day business tasks and admin', 'active')").run(nbm.lastInsertRowid);
   db.prepare("INSERT INTO tasks (project_id, title, assignee, deadline, progress, notes) VALUES (?, 'Set up project management system', 'Norton', '2026-04-06', 'completed', 'Get the team organized with a central tracker')").run(nbmOps.lastInsertRowid);
@@ -263,7 +357,7 @@ function seedIfEmpty() {
   db.prepare("INSERT INTO tasks (project_id, title, assignee, deadline, progress, notes) VALUES (?, 'Record behind-the-scenes reels', 'Sarah', '2026-04-12', 'not-started', 'Day-in-the-life content for Instagram')").run(nbmSocial.lastInsertRowid);
 
   // ─── RMS Fire Blankets ────────────────────────────
-  const rms = db.prepare("INSERT INTO clients (name, agreement_type, notes, sort_order) VALUES ('RMS Fire Blankets', 'recurring', 'Fire safety product company. Monthly social media management, content creation, and ad campaigns. Retainer agreement.', 1)").run();
+  const rms = db.prepare("INSERT INTO clients (name, agreement_type, notes, gmail_link, drive_link, sort_order) VALUES ('RMS Fire Blankets', 'recurring', 'Fire safety product company. Monthly social media management, content creation, and ad campaigns. Retainer agreement.', 'https://mail.google.com/mail/u/0/#label/RMS+Fire+Blankets', 'https://drive.google.com/drive/folders/rms-fire-blankets', 1)").run();
 
   const rmsSocial = db.prepare("INSERT INTO projects (client_id, name, notes, status) VALUES (?, 'Social Media Management', 'Monthly social media content and community management', 'active')").run(rms.lastInsertRowid);
   db.prepare("INSERT INTO tasks (project_id, title, assignee, deadline, progress, notes) VALUES (?, 'April social media content batch', 'Lucy', '2026-04-10', 'in-progress', 'Create 12 posts for Facebook and Instagram')").run(rmsSocial.lastInsertRowid);
@@ -307,7 +401,7 @@ function seedIfEmpty() {
   db.prepare("INSERT INTO comments (task_id, author, content) VALUES (20, 'Sarah', 'Chased the client twice now — still waiting on the email list.')").run();
   db.prepare("INSERT INTO comments (task_id, author, content) VALUES (20, 'Norton', 'Will call them directly on Monday if no response.')").run();
 
-  // Add some activity log entries
+  // Add activity log entries
   logActivity('client', nbm.lastInsertRowid, 'created', 'Norton', 'Created client "NorthBear Media"');
   logActivity('client', rms.lastInsertRowid, 'created', 'Norton', 'Created client "RMS Fire Blankets"');
   logActivity('client', spotted.lastInsertRowid, 'created', 'Norton', 'Created client "Spotted Community Pages"');
