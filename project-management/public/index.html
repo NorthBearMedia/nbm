@@ -6,7 +6,7 @@
   <title>NorthBear Media — Project Management</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
   <!-- Header -->
@@ -19,8 +19,14 @@
       </div>
     </div>
     <div class="header-right">
+      <div class="user-selector">
+        <span>Logged in as:</span>
+        <select id="currentUser">
+          <option value="Norton">Norton</option>
+        </select>
+      </div>
       <div class="filter-group">
-        <button class="filter-btn active" data-filter="all">All Clients</button>
+        <button class="filter-btn active" data-filter="all">All</button>
         <button class="filter-btn" data-filter="recurring">Recurring</button>
         <button class="filter-btn" data-filter="ad-hoc">Ad Hoc</button>
       </div>
@@ -31,21 +37,20 @@
 
   <!-- Main Content -->
   <main class="main">
-    <div class="table-container">
-      <!-- Table Header -->
-      <div class="table-header">
-        <div class="col-client">Client</div>
-        <div class="col-type">Type</div>
-        <div class="col-projects">Projects</div>
-        <div class="col-status">Status</div>
-        <div class="col-actions"></div>
-      </div>
+    <!-- Stats Overview -->
+    <div class="stats-bar" id="statsBar"></div>
 
-      <!-- Client rows rendered here -->
+    <div class="table-container">
+      <div class="table-header">
+        <div>Client</div>
+        <div>Type</div>
+        <div>Projects</div>
+        <div>Outstanding</div>
+        <div>Status</div>
+        <div></div>
+      </div>
       <div id="clientList" class="client-list">
-        <div class="empty-state">
-          <p>Loading...</p>
-        </div>
+        <div class="empty-state"><p>Loading...</p></div>
       </div>
     </div>
   </main>
@@ -53,7 +58,7 @@
   <!-- Modal Backdrop -->
   <div class="modal-backdrop" id="modalBackdrop"></div>
 
-  <!-- Add/Edit Client Modal -->
+  <!-- Client Modal -->
   <div class="modal" id="clientModal">
     <div class="modal-header">
       <h2 id="clientModalTitle">New Client</h2>
@@ -77,6 +82,14 @@
         <textarea id="clientNotes" rows="3" placeholder="Agreement details, contact info, etc."></textarea>
       </div>
       <div class="form-group">
+        <label>Gmail Folder / Label Link</label>
+        <input type="url" id="clientGmail" placeholder="https://mail.google.com/mail/u/0/#label/...">
+      </div>
+      <div class="form-group">
+        <label>Google Drive Folder Link</label>
+        <input type="url" id="clientDrive" placeholder="https://drive.google.com/drive/folders/...">
+      </div>
+      <div class="form-group">
         <label>Logo</label>
         <input type="file" id="clientLogo" accept="image/*">
       </div>
@@ -87,7 +100,7 @@
     </form>
   </div>
 
-  <!-- Add/Edit Project Modal -->
+  <!-- Project Modal -->
   <div class="modal" id="projectModal">
     <div class="modal-header">
       <h2 id="projectModalTitle">New Project</h2>
@@ -119,7 +132,7 @@
     </form>
   </div>
 
-  <!-- Add/Edit Task Modal -->
+  <!-- Task Modal -->
   <div class="modal" id="taskModal">
     <div class="modal-header">
       <h2 id="taskModalTitle">New Task</h2>
@@ -168,7 +181,7 @@
     </form>
   </div>
 
-  <!-- Team Management Modal -->
+  <!-- Team Modal -->
   <div class="modal" id="teamModal">
     <div class="modal-header">
       <h2>Team Members</h2>
@@ -181,6 +194,15 @@
       <input type="color" id="teamMemberColor" value="#6366f1">
       <button type="submit" class="btn btn-primary btn-sm">Add</button>
     </form>
+  </div>
+
+  <!-- History Modal -->
+  <div class="modal" id="historyModal" style="max-width:560px">
+    <div class="modal-header">
+      <h2 id="historyModalTitle">Activity History</h2>
+      <button class="modal-close" onclick="closeModal('historyModal')">&times;</button>
+    </div>
+    <div id="historyContent" class="history-panel" style="max-height:400px"></div>
   </div>
 
   <script src="app.js"></script>

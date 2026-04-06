@@ -18,6 +18,8 @@ db.exec(`
     logo_url TEXT DEFAULT '',
     agreement_type TEXT NOT NULL DEFAULT 'recurring' CHECK(agreement_type IN ('recurring', 'ad-hoc')),
     notes TEXT DEFAULT '',
+    gmail_link TEXT DEFAULT '',
+    drive_link TEXT DEFAULT '',
     created_at TEXT DEFAULT (datetime('now')),
     sort_order INTEGER DEFAULT 0
   );
@@ -52,6 +54,25 @@ db.exec(`
     name TEXT NOT NULL,
     role TEXT DEFAULT '',
     avatar_color TEXT DEFAULT '#6366f1'
+  );
+
+  CREATE TABLE IF NOT EXISTS comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id INTEGER NOT NULL,
+    author TEXT NOT NULL DEFAULT 'System',
+    content TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS activity_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_type TEXT NOT NULL CHECK(entity_type IN ('client', 'project', 'task')),
+    entity_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    author TEXT NOT NULL DEFAULT 'System',
+    details TEXT DEFAULT '',
+    created_at TEXT DEFAULT (datetime('now'))
   );
 `);
 
