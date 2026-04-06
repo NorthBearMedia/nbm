@@ -1,6 +1,7 @@
 // ─── State ──────────────────────────────────────────────
 let clients = [];
 let teamMembers = [];
+let currentUser = null;
 let currentFilter = 'all';
 let currentView = 'clients';
 let expandedClients = new Set();
@@ -12,7 +13,27 @@ let showArchivedTasks = new Set();
 let calendarDate = new Date();
 let draggedClientId = null;
 
-function getCurrentUser() { return document.getElementById('currentUser').value || 'System'; }
+function getCurrentUser() { return currentUser?.display_name || 'System'; }
+
+async function loadCurrentUser() {
+  try {
+    const res = await fetch('/api/auth/me');
+    if (res.ok) {
+      currentUser = await res.json();
+      const sel = document.getElementById('currentUser');
+      if (sel) sel.innerHTML = `<option selected>${esc(currentUser.display_name)}</option>`;
+    } else {
+      window.location.href = '/login';
+    }
+  } catch (e) {
+    window.location.href = '/login';
+  }
+}
+
+async function logout() {
+  await fetch('/api/auth/logout', { method: 'POST' });
+  window.location.href = '/login';
+}
 
 async function api(url, options = {}) {
   const res = await fetch(url, {
@@ -596,8 +617,8 @@ document.getElementById('calendarPerson').addEventListener('change',loadCalendar
 
 // ─── Init ───────────────────────────────────────────────
 (async function(){
+  await loadCurrentUser();
   await loadTeam();
   await loadClients();
-  // Set today's date
   document.getElementById('todayDate').value=new Date().toISOString().split('T')[0];
 })();

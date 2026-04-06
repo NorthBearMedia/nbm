@@ -2,6 +2,8 @@ import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import multer from 'multer';
+import { createHash, randomBytes } from 'crypto';
+import cookieParser from 'cookie-parser';
 import db from './database.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -9,7 +11,93 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(express.json());
+app.use(cookieParser());
+
+// ─── AUTH HELPERS ─────────────────────────────────────
+function hashPassword(pw) {
+  return createHash('sha256').update(pw + 'nbm-salt-2026').digest('hex');
+}
+
+function createSession(userId) {
+  const token = randomBytes(32).toString('hex');
+  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
+  db.prepare('INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, ?)').run(userId, token, expires);
+  return token;
+}
+
+function getSessionUser(req) {
+  const token = req.cookies?.nbm_session;
+  if (!token) return null;
+  const session = db.prepare('SELECT * FROM sessions WHERE token = ? AND expires_at > datetime(\'now\')').get(token);
+  if (!session) return null;
+  return db.prepare('SELECT id, username, email, display_name, role, avatar_url, avatar_color FROM users WHERE id = ?').get(session.user_id);
+}
+
+// ─── AUTH ROUTES (public) ─────────────────────────────
+app.get('/login', (req, res) => {
+  res.sendFile(join(__dirname, 'public', 'login.html'));
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase().trim());
+  if (!user || user.password_hash !== hashPassword(password)) {
+    return res.status(401).json({ error: 'Invalid email or password' });
+  }
+  const token = createSession(user.id);
+  res.cookie('nbm_session', token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
+  res.json({ user: { id: user.id, username: user.username, display_name: user.display_name, role: user.role, avatar_url: user.avatar_url } });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  const token = req.cookies?.nbm_session;
+  if (token) db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+  res.clearCookie('nbm_session');
+  res.json({ success: true });
+});
+
+app.get('/api/auth/me', (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) return res.status(401).json({ error: 'Not authenticated' });
+  res.json(user);
+});
+
+// ─── AUTH MIDDLEWARE ───────────────────────────────────
+function requireAuth(req, res, next) {
+  const user = getSessionUser(req);
+  if (!user) return res.status(401).json({ error: 'Not authenticated' });
+  req.user = user;
+  next();
+}
+
+function requireRole(...roles) {
+  return (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+    next();
+  };
+}
+
+// Serve login page for unauthenticated users at root
+app.get('/', (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) return res.redirect('/login');
+  res.sendFile(join(__dirname, 'public', 'index.html'));
+});
+
+// Static files
 app.use(express.static(join(__dirname, 'public')));
+
+// Protect all API routes (except auth)
+app.use('/api', (req, res, next) => {
+  if (req.path.startsWith('/auth/')) return next();
+  const user = getSessionUser(req);
+  if (!user) return res.status(401).json({ error: 'Not authenticated' });
+  req.user = user;
+  next();
+});
 
 // File uploads — logos
 const logoStorage = multer.diskStorage({
@@ -316,10 +404,81 @@ app.delete('/api/team/:id', (req, res) => { db.prepare('DELETE FROM team_members
 
 app.get('/api/archived/clients', (req, res) => { res.json(db.prepare('SELECT * FROM clients WHERE archived = 1 ORDER BY name').all()); });
 
+// ─── USER MANAGEMENT ─────────────────────────────────
+
+// Avatar upload
+const avatarStorage = multer.diskStorage({
+  destination: join(__dirname, 'public', 'uploads'),
+  filename: (req, file, cb) => cb(null, `avatar-${Date.now()}.${file.originalname.split('.').pop()}`)
+});
+const avatarUpload = multer({ storage: avatarStorage, limits: { fileSize: 2 * 1024 * 1024 } });
+
+app.get('/api/users', (req, res) => {
+  const users = db.prepare('SELECT id, username, email, display_name, role, avatar_url, avatar_color FROM users ORDER BY display_name').all();
+  res.json(users);
+});
+
+app.put('/api/users/:id', requireAuth, requireRole('owner'), (req, res) => {
+  const { display_name, role, email } = req.body;
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  db.prepare('UPDATE users SET display_name = COALESCE(?, display_name), role = COALESCE(?, role), email = COALESCE(?, email) WHERE id = ?')
+    .run(display_name, role, email, req.params.id);
+  res.json(db.prepare('SELECT id, username, email, display_name, role, avatar_url, avatar_color FROM users WHERE id = ?').get(req.params.id));
+});
+
+app.put('/api/users/:id/password', requireAuth, (req, res) => {
+  // Users can change own password, owners can change anyone's
+  if (req.user.id !== parseInt(req.params.id) && req.user.role !== 'owner') {
+    return res.status(403).json({ error: 'Cannot change other users\' passwords' });
+  }
+  const { password } = req.body;
+  if (!password || password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(password), req.params.id);
+  res.json({ success: true });
+});
+
+app.post('/api/users/:id/avatar', requireAuth, avatarUpload.single('avatar'), (req, res) => {
+  // Users can upload own avatar, owners can do anyone's
+  if (req.user.id !== parseInt(req.params.id) && req.user.role !== 'owner') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  if (!req.file) return res.status(400).json({ error: 'No file' });
+  const url = `/uploads/${req.file.filename}`;
+  db.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').run(url, req.params.id);
+  res.json({ avatar_url: url });
+});
+
+app.post('/api/users', requireAuth, requireRole('owner'), (req, res) => {
+  const { username, email, password, display_name, role } = req.body;
+  if (!username || !email || !password || !display_name) return res.status(400).json({ error: 'All fields required' });
+  try {
+    const r = db.prepare('INSERT INTO users (username, email, password_hash, display_name, role) VALUES (?, ?, ?, ?, ?)')
+      .run(username, email.toLowerCase().trim(), hashPassword(password), display_name, role || 'editor');
+    res.json(db.prepare('SELECT id, username, email, display_name, role, avatar_url, avatar_color FROM users WHERE id = ?').get(r.lastInsertRowid));
+  } catch (e) {
+    res.status(400).json({ error: 'Username or email already exists' });
+  }
+});
+
+app.delete('/api/users/:id', requireAuth, requireRole('owner'), (req, res) => {
+  if (req.user.id === parseInt(req.params.id)) return res.status(400).json({ error: 'Cannot delete yourself' });
+  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
 // ─── SEED ──────────────────────────────────────────────
 
 function seedIfEmpty() {
   if (db.prepare('SELECT COUNT(*) as c FROM clients').get().c > 0) return;
+
+  // Seed users
+  if (db.prepare('SELECT COUNT(*) as c FROM users').get().c === 0) {
+    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('norton', 'norton@northbearmedia.co.uk', ?, 'Norton', 'owner', '#8b5cf6')").run(hashPassword('nbm2026'));
+    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('cally', 'cally@northbearmedia.co.uk', ?, 'Cally', 'editor', '#f97066')").run(hashPassword('nbm2026'));
+    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('haley', 'haley@northbearmedia.co.uk', ?, 'Haley', 'editor', '#34d399')").run(hashPassword('nbm2026'));
+  }
 
   db.prepare("INSERT INTO team_members (name, role, avatar_color) VALUES ('Norton', 'Director', '#6366f1')").run();
   db.prepare("INSERT INTO team_members (name, role, avatar_color) VALUES ('Sarah', 'Content Manager', '#ec4899')").run();
@@ -380,5 +539,16 @@ function seedIfEmpty() {
   logActivity('client', build.lastInsertRowid, 'created', 'Norton', 'Created "Hartlepool Builders Ltd"');
 }
 
+// Always ensure users exist
+function seedUsers() {
+  if (db.prepare('SELECT COUNT(*) as c FROM users').get().c === 0) {
+    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('norton', 'norton@northbearmedia.co.uk', ?, 'Norton', 'owner', '#8b5cf6')").run(hashPassword('nbm2026'));
+    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('cally', 'cally@northbearmedia.co.uk', ?, 'Cally', 'editor', '#f97066')").run(hashPassword('nbm2026'));
+    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('haley', 'haley@northbearmedia.co.uk', ?, 'Haley', 'editor', '#34d399')").run(hashPassword('nbm2026'));
+    console.log('Default users created (password: nbm2026)');
+  }
+}
+
+seedUsers();
 seedIfEmpty();
 app.listen(PORT, () => { console.log(`NorthBear Media Project Management running at http://localhost:${PORT}`); });
