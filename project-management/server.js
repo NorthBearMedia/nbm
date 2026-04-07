@@ -3,7 +3,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { mkdirSync, copyFileSync, readdirSync, unlinkSync, existsSync } from 'fs';
 import multer from 'multer';
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 import cookieParser from 'cookie-parser';
 import db from './database.js';
 
@@ -40,17 +40,67 @@ function backupDatabase() {
 backupDatabase();
 setInterval(backupDatabase, 60 * 60 * 1000);
 
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
+// ─── SECURITY HEADERS ────────────────────────────────
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (process.env.RAILWAY_ENVIRONMENT) {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
+
+// ─── RATE LIMITING ───────────────────────────────────
+const loginAttempts = new Map(); // ip -> { count, resetAt }
+function checkLoginRateLimit(ip) {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    loginAttempts.set(ip, { count: 1, resetAt: now + 15 * 60 * 1000 }); // 15 min window
+    return true;
+  }
+  entry.count++;
+  if (entry.count > 10) return false; // Max 10 attempts per 15 minutes
+  return true;
+}
+// Clean up old entries every 30 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of loginAttempts) {
+    if (now > entry.resetAt) loginAttempts.delete(ip);
+  }
+}, 30 * 60 * 1000);
+
 // ─── AUTH HELPERS ─────────────────────────────────────
-function hashPassword(pw) {
+// Legacy hash — only used for migration check
+function legacyHash(pw) {
   return createHash('sha256').update(pw + 'nbm-salt-2026').digest('hex');
+}
+
+// Secure password hashing with scrypt + per-user salt
+function hashPassword(pw, salt) {
+  if (!salt) salt = randomBytes(16).toString('hex');
+  const hash = scryptSync(pw, salt, 64).toString('hex');
+  return { hash, salt };
+}
+
+function verifyPassword(pw, storedHash, salt) {
+  if (!salt) return false;
+  const derived = scryptSync(pw, salt, 64);
+  const stored = Buffer.from(storedHash, 'hex');
+  if (derived.length !== stored.length) return false;
+  return timingSafeEqual(derived, stored);
 }
 
 function createSession(userId) {
   const token = randomBytes(32).toString('hex');
-  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
+  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
   db.prepare('INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, ?)').run(userId, token, expires);
   return token;
 }
@@ -69,14 +119,32 @@ app.get('/login', (req, res) => {
 });
 
 app.post('/api/auth/login', (req, res) => {
+  const ip = req.ip || req.connection.remoteAddress;
+  if (!checkLoginRateLimit(ip)) {
+    return res.status(429).json({ error: 'Too many login attempts. Please try again in 15 minutes.' });
+  }
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
   const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase().trim());
-  if (!user || user.password_hash !== hashPassword(password)) {
-    return res.status(401).json({ error: 'Invalid email or password' });
+  if (!user) return res.status(401).json({ error: 'Invalid email or password' });
+
+  let authenticated = false;
+  if (user.password_salt) {
+    // New scrypt-based auth
+    authenticated = verifyPassword(password, user.password_hash, user.password_salt);
+  } else {
+    // Legacy SHA256 auth — migrate on success
+    authenticated = user.password_hash === legacyHash(password);
+    if (authenticated) {
+      const { hash, salt } = hashPassword(password);
+      db.prepare('UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?').run(hash, salt, user.id);
+    }
   }
+  if (!authenticated) return res.status(401).json({ error: 'Invalid email or password' });
+
   const token = createSession(user.id);
-  res.cookie('nbm_session', token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
+  const isProduction = !!process.env.RAILWAY_ENVIRONMENT;
+  res.cookie('nbm_session', token, { httpOnly: true, maxAge: 24 * 60 * 60 * 1000, sameSite: 'lax', secure: isProduction });
   res.json({ user: { id: user.id, username: user.username, display_name: user.display_name, role: user.role, avatar_url: user.avatar_url } });
 });
 
@@ -137,29 +205,52 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
+// Allowed MIME types for image uploads
+const allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+const allowedAttachTypes = [...allowedImageTypes, 'application/pdf', 'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'video/mp4', 'video/quicktime', 'video/webm', 'text/plain', 'text/csv'];
+
+function imageFilter(req, file, cb) {
+  if (allowedImageTypes.includes(file.mimetype)) cb(null, true);
+  else cb(new Error('Only image files (JPEG, PNG, GIF, WebP, SVG) are allowed'), false);
+}
+function attachFilter(req, file, cb) {
+  if (allowedAttachTypes.includes(file.mimetype)) cb(null, true);
+  else cb(new Error('File type not allowed'), false);
+}
+
 // File uploads — logos (stored on persistent volume)
 const logoStorage = multer.diskStorage({
   destination: uploadsDir,
-  filename: (req, file, cb) => cb(null, `logo-${Date.now()}.${file.originalname.split('.').pop()}`)
+  filename: (req, file, cb) => {
+    const ext = file.originalname.split('.').pop().replace(/[^a-zA-Z0-9]/g, '').substring(0, 5);
+    cb(null, `logo-${Date.now()}.${ext}`);
+  }
 });
-const logoUpload = multer({ storage: logoStorage, limits: { fileSize: 2 * 1024 * 1024 } });
+const logoUpload = multer({ storage: logoStorage, limits: { fileSize: 2 * 1024 * 1024 }, fileFilter: imageFilter });
 
 // File uploads — task attachments (images, videos, docs up to 50MB)
 const attachStorage = multer.diskStorage({
   destination: attachmentsDir,
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`)
+  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 100)}`)
 });
-const attachUpload = multer({ storage: attachStorage, limits: { fileSize: 50 * 1024 * 1024 } });
+const attachUpload = multer({ storage: attachStorage, limits: { fileSize: 50 * 1024 * 1024 }, fileFilter: attachFilter });
 
 function logActivity(entityType, entityId, action, author, details) {
-  db.prepare('INSERT INTO activity_log (entity_type, entity_id, action, author, details) VALUES (?, ?, ?, ?, ?)').run(entityType, entityId, action, author || 'System', details || '');
-  // Touch client updated_at for sorting by recently changed
-  if (entityType === 'client') {
-    db.prepare("UPDATE clients SET updated_at = datetime('now') WHERE id = ?").run(entityId);
-  } else if (entityType === 'project') {
-    db.prepare("UPDATE clients SET updated_at = datetime('now') WHERE id = (SELECT client_id FROM projects WHERE id = ?)").run(entityId);
-  } else if (entityType === 'task') {
-    db.prepare("UPDATE clients SET updated_at = datetime('now') WHERE id = (SELECT c.id FROM clients c JOIN projects p ON p.client_id = c.id JOIN tasks t ON t.project_id = p.id WHERE t.id = ?)").run(entityId);
+  try {
+    db.prepare('INSERT INTO activity_log (entity_type, entity_id, action, author, details) VALUES (?, ?, ?, ?, ?)').run(entityType, entityId, action, author || 'System', details || '');
+    // Touch client updated_at for sorting by recently changed
+    if (entityType === 'client') {
+      db.prepare("UPDATE clients SET updated_at = datetime('now') WHERE id = ?").run(entityId);
+    } else if (entityType === 'project') {
+      db.prepare("UPDATE clients SET updated_at = datetime('now') WHERE id = (SELECT client_id FROM projects WHERE id = ?)").run(entityId);
+    } else if (entityType === 'task') {
+      db.prepare("UPDATE clients SET updated_at = datetime('now') WHERE id = (SELECT c.id FROM clients c JOIN projects p ON p.client_id = c.id JOIN tasks t ON t.project_id = p.id WHERE t.id = ?)").run(entityId);
+    }
+  } catch (err) {
+    console.error('logActivity error:', err);
   }
 }
 
@@ -240,14 +331,14 @@ app.put('/api/clients/:id', requireAuth, (req, res) => {
   res.json(db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id));
 });
 
-app.delete('/api/clients/:id', (req, res) => {
+app.delete('/api/clients/:id', requireAuth, requireRole('owner'), (req, res) => {
   const client = db.prepare('SELECT name FROM clients WHERE id = ?').get(req.params.id);
   db.prepare('DELETE FROM clients WHERE id = ?').run(req.params.id);
-  logActivity('client', req.params.id, 'deleted', req.body.author, `Permanently deleted "${client?.name}"`);
+  logActivity('client', req.params.id, 'deleted', req.user.display_name, `Permanently deleted "${client?.name}"`);
   res.json({ success: true });
 });
 
-app.put('/api/clients/:id/archive', (req, res) => {
+app.put('/api/clients/:id/archive', requireAuth, (req, res) => {
   const c = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
   const ns = c.archived ? 0 : 1;
   db.prepare('UPDATE clients SET archived = ? WHERE id = ?').run(ns, req.params.id);
@@ -255,14 +346,14 @@ app.put('/api/clients/:id/archive', (req, res) => {
   res.json({ success: true, archived: ns });
 });
 
-app.post('/api/clients/:id/logo', logoUpload.single('logo'), (req, res) => {
+app.post('/api/clients/:id/logo', requireAuth, logoUpload.single('logo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file' });
   const url = `/uploads/${req.file.filename}`;
   db.prepare('UPDATE clients SET logo_url = ? WHERE id = ?').run(url, req.params.id);
   res.json({ logo_url: url });
 });
 
-app.put('/api/clients/reorder', (req, res) => {
+app.put('/api/clients/reorder', requireAuth, (req, res) => {
   const { order } = req.body;
   const stmt = db.prepare('UPDATE clients SET sort_order = ? WHERE id = ?');
   db.transaction((ids) => { ids.forEach((id, i) => stmt.run(i, id)); })(order);
@@ -271,7 +362,7 @@ app.put('/api/clients/reorder', (req, res) => {
 
 // ─── PROJECTS ──────────────────────────────────────────
 
-app.post('/api/projects', (req, res) => {
+app.post('/api/projects', requireAuth, (req, res) => {
   const { client_id, name, notes, author } = req.body;
   if (!client_id || !name) return res.status(400).json({ error: 'client_id and name required' });
   const result = db.prepare('INSERT INTO projects (client_id, name, notes) VALUES (?, ?, ?)').run(client_id, name, notes || '');
@@ -281,7 +372,7 @@ app.post('/api/projects', (req, res) => {
   res.json(p);
 });
 
-app.put('/api/projects/:id', (req, res) => {
+app.put('/api/projects/:id', requireAuth, (req, res) => {
   const { name, status, notes, author } = req.body;
   const old = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
   db.prepare('UPDATE projects SET name = COALESCE(?, name), status = COALESCE(?, status), notes = COALESCE(?, notes) WHERE id = ?').run(name, status, notes, req.params.id);
@@ -292,12 +383,14 @@ app.put('/api/projects/:id', (req, res) => {
   res.json(db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id));
 });
 
-app.delete('/api/projects/:id', (req, res) => {
+app.delete('/api/projects/:id', requireAuth, requireRole('owner'), (req, res) => {
+  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
   db.prepare('DELETE FROM projects WHERE id = ?').run(req.params.id);
+  logActivity('project', req.params.id, 'deleted', req.user.display_name, `Permanently deleted "${project?.name}"`);
   res.json({ success: true });
 });
 
-app.put('/api/projects/:id/archive', (req, res) => {
+app.put('/api/projects/:id/archive', requireAuth, (req, res) => {
   const p = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
   const ns = p.archived ? 0 : 1;
   db.prepare('UPDATE projects SET archived = ? WHERE id = ?').run(ns, req.params.id);
@@ -307,7 +400,7 @@ app.put('/api/projects/:id/archive', (req, res) => {
 
 // ─── TASKS ─────────────────────────────────────────────
 
-app.post('/api/tasks', (req, res) => {
+app.post('/api/tasks', requireAuth, (req, res) => {
   const { project_id, title, assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit, author } = req.body;
   if (!project_id || !title) return res.status(400).json({ error: 'project_id and title required' });
   const result = db.prepare('INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
@@ -319,7 +412,7 @@ app.post('/api/tasks', (req, res) => {
   res.json(task);
 });
 
-app.put('/api/tasks/:id', (req, res) => {
+app.put('/api/tasks/:id', requireAuth, (req, res) => {
   const { title, assignee, deadline, planned_date, estimated_hours, progress, priority, references_text, notes, is_recurring, recur_interval, recur_unit, author } = req.body;
   const old = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   db.prepare('UPDATE tasks SET title=COALESCE(?,title), assignee=COALESCE(?,assignee), deadline=COALESCE(?,deadline), planned_date=COALESCE(?,planned_date), estimated_hours=COALESCE(?,estimated_hours), progress=COALESCE(?,progress), priority=COALESCE(?,priority), references_text=COALESCE(?,references_text), notes=COALESCE(?,notes), is_recurring=COALESCE(?,is_recurring), recur_interval=COALESCE(?,recur_interval), recur_unit=COALESCE(?,recur_unit) WHERE id=?')
@@ -359,12 +452,14 @@ function calculateNextDate(fromDate, interval, unit) {
   return d.toISOString().split('T')[0];
 }
 
-app.delete('/api/tasks/:id', (req, res) => {
+app.delete('/api/tasks/:id', requireAuth, requireRole('owner'), (req, res) => {
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);
+  logActivity('task', req.params.id, 'deleted', req.user.display_name, `Permanently deleted "${task?.title}"`);
   res.json({ success: true });
 });
 
-app.put('/api/tasks/:id/archive', (req, res) => {
+app.put('/api/tasks/:id/archive', requireAuth, (req, res) => {
   const t = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   const ns = t.archived ? 0 : 1;
   db.prepare('UPDATE tasks SET archived = ? WHERE id = ?').run(ns, req.params.id);
@@ -374,7 +469,7 @@ app.put('/api/tasks/:id/archive', (req, res) => {
 
 // ─── TASK ATTACHMENTS ──────────────────────────────────
 
-app.post('/api/tasks/:id/attachments', attachUpload.array('files', 10), (req, res) => {
+app.post('/api/tasks/:id/attachments', requireAuth, attachUpload.array('files', 10), (req, res) => {
   if (!req.files || !req.files.length) return res.status(400).json({ error: 'No files' });
   const stmt = db.prepare('INSERT INTO task_attachments (task_id, filename, original_name, file_type, file_size, uploaded_by) VALUES (?, ?, ?, ?, ?, ?)');
   const results = [];
@@ -386,14 +481,14 @@ app.post('/api/tasks/:id/attachments', attachUpload.array('files', 10), (req, re
   res.json(results);
 });
 
-app.delete('/api/attachments/:id', (req, res) => {
+app.delete('/api/attachments/:id', requireAuth, requireRole('owner'), (req, res) => {
   db.prepare('DELETE FROM task_attachments WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
 
 // ─── TODAY / CALENDAR ──────────────────────────────────
 
-app.get('/api/tasks/by-date', (req, res) => {
+app.get('/api/tasks/by-date', requireAuth, (req, res) => {
   const { date, assignee } = req.query;
   const d = date || new Date().toISOString().split('T')[0];
   const q = assignee
@@ -402,7 +497,7 @@ app.get('/api/tasks/by-date', (req, res) => {
   res.json(assignee ? q.all(d, assignee) : q.all(d));
 });
 
-app.get('/api/tasks/calendar', (req, res) => {
+app.get('/api/tasks/calendar', requireAuth, (req, res) => {
   const { start, end, assignee } = req.query;
   if (!start || !end) return res.status(400).json({ error: 'start and end required' });
   const q = assignee
@@ -413,7 +508,7 @@ app.get('/api/tasks/calendar', (req, res) => {
 
 // ─── COMMENTS ──────────────────────────────────────────
 
-app.post('/api/tasks/:id/comments', (req, res) => {
+app.post('/api/tasks/:id/comments', requireAuth, (req, res) => {
   const { author, content } = req.body;
   if (!content) return res.status(400).json({ error: 'Content required' });
   const r = db.prepare('INSERT INTO comments (task_id, author, content) VALUES (?, ?, ?)').run(req.params.id, author || 'System', content);
@@ -423,7 +518,7 @@ app.post('/api/tasks/:id/comments', (req, res) => {
 
 // ─── ACTIVITY ──────────────────────────────────────────
 
-app.get('/api/clients/:id/history', (req, res) => {
+app.get('/api/clients/:id/history', requireAuth, (req, res) => {
   const cid = req.params.id;
   const limit = parseInt(req.query.limit) || 100;
   const pids = db.prepare('SELECT id FROM projects WHERE client_id = ?').all(cid).map(p => p.id);
@@ -445,29 +540,32 @@ app.get('/api/history', requireAuth, (req, res) => {
 
 // ─── TEAM ──────────────────────────────────────────────
 
-app.get('/api/team', (req, res) => { res.json(db.prepare('SELECT * FROM team_members ORDER BY name').all()); });
-app.post('/api/team', (req, res) => {
+app.get('/api/team', requireAuth, (req, res) => { res.json(db.prepare('SELECT * FROM team_members ORDER BY name').all()); });
+app.post('/api/team', requireAuth, requireRole('owner'), (req, res) => {
   const { name, role, avatar_color } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });
   const r = db.prepare('INSERT INTO team_members (name, role, avatar_color) VALUES (?, ?, ?)').run(name, role || '', avatar_color || '#6366f1');
   res.json(db.prepare('SELECT * FROM team_members WHERE id = ?').get(r.lastInsertRowid));
 });
-app.delete('/api/team/:id', (req, res) => { db.prepare('DELETE FROM team_members WHERE id = ?').run(req.params.id); res.json({ success: true }); });
+app.delete('/api/team/:id', requireAuth, requireRole('owner'), (req, res) => { db.prepare('DELETE FROM team_members WHERE id = ?').run(req.params.id); res.json({ success: true }); });
 
 // ─── ARCHIVED ──────────────────────────────────────────
 
-app.get('/api/archived/clients', (req, res) => { res.json(db.prepare('SELECT * FROM clients WHERE archived = 1 ORDER BY name').all()); });
+app.get('/api/archived/clients', requireAuth, (req, res) => { res.json(db.prepare('SELECT * FROM clients WHERE archived = 1 ORDER BY name').all()); });
 
 // ─── USER MANAGEMENT ─────────────────────────────────
 
 // Avatar upload (stored on persistent volume)
 const avatarStorage = multer.diskStorage({
   destination: uploadsDir,
-  filename: (req, file, cb) => cb(null, `avatar-${Date.now()}.${file.originalname.split('.').pop()}`)
+  filename: (req, file, cb) => {
+    const ext = file.originalname.split('.').pop().replace(/[^a-zA-Z0-9]/g, '').substring(0, 5);
+    cb(null, `avatar-${Date.now()}.${ext}`);
+  }
 });
-const avatarUpload = multer({ storage: avatarStorage, limits: { fileSize: 2 * 1024 * 1024 } });
+const avatarUpload = multer({ storage: avatarStorage, limits: { fileSize: 2 * 1024 * 1024 }, fileFilter: imageFilter });
 
-app.get('/api/users', (req, res) => {
+app.get('/api/users', requireAuth, (req, res) => {
   const users = db.prepare('SELECT id, username, email, display_name, role, avatar_url, avatar_color FROM users ORDER BY display_name').all();
   res.json(users);
 });
@@ -487,8 +585,19 @@ app.put('/api/users/:id/password', requireAuth, (req, res) => {
     return res.status(403).json({ error: 'Cannot change other users\' passwords' });
   }
   const { password } = req.body;
-  if (!password || password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
-  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(password), req.params.id);
+  if (!password || password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+    return res.status(400).json({ error: 'Password must include uppercase, lowercase, and a number' });
+  }
+  const { hash, salt } = hashPassword(password);
+  db.prepare('UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?').run(hash, salt, req.params.id);
+  // Invalidate all existing sessions for this user (except current)
+  const currentToken = req.cookies?.nbm_session;
+  if (currentToken) {
+    db.prepare('DELETE FROM sessions WHERE user_id = ? AND token != ?').run(req.params.id, currentToken);
+  } else {
+    db.prepare('DELETE FROM sessions WHERE user_id = ?').run(req.params.id);
+  }
   res.json({ success: true });
 });
 
@@ -506,9 +615,14 @@ app.post('/api/users/:id/avatar', requireAuth, avatarUpload.single('avatar'), (r
 app.post('/api/users', requireAuth, requireRole('owner'), (req, res) => {
   const { username, email, password, display_name, role } = req.body;
   if (!username || !email || !password || !display_name) return res.status(400).json({ error: 'All fields required' });
+  if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+    return res.status(400).json({ error: 'Password must include uppercase, lowercase, and a number' });
+  }
   try {
-    const r = db.prepare('INSERT INTO users (username, email, password_hash, display_name, role) VALUES (?, ?, ?, ?, ?)')
-      .run(username, email.toLowerCase().trim(), hashPassword(password), display_name, role || 'editor');
+    const { hash, salt } = hashPassword(password);
+    const r = db.prepare('INSERT INTO users (username, email, password_hash, password_salt, display_name, role) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(username, email.toLowerCase().trim(), hash, salt, display_name, role || 'editor');
     res.json(db.prepare('SELECT id, username, email, display_name, role, avatar_url, avatar_color FROM users WHERE id = ?').get(r.lastInsertRowid));
   } catch (e) {
     res.status(400).json({ error: 'Username or email already exists' });
@@ -523,7 +637,7 @@ app.delete('/api/users/:id', requireAuth, requireRole('owner'), (req, res) => {
 });
 
 // ─── TASK SEARCH ────────────────────────────────────
-app.get('/api/tasks/search', (req, res) => {
+app.get('/api/tasks/search', requireAuth, (req, res) => {
   const { q } = req.query;
   if (!q || q.length < 1) return res.json([]);
 
@@ -576,12 +690,26 @@ app.post('/api/backups', requireAuth, (req, res) => {
 // Only seed default users if none exist (so you can always log in)
 function seedUsers() {
   if (db.prepare('SELECT COUNT(*) as c FROM users').get().c === 0) {
-    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('norton', 'norton@northbearmedia.co.uk', ?, 'Norton', 'owner', '#3eaf84')").run(hashPassword('nbm2026'));
-    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('cally', 'cally@northbearmedia.co.uk', ?, 'Cally', 'editor', '#60a5fa')").run(hashPassword('nbm2026'));
-    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('haley', 'haley@northbearmedia.co.uk', ?, 'Haley', 'editor', '#f59e0b')").run(hashPassword('nbm2026'));
+    const pw1 = hashPassword('nbm2026');
+    const pw2 = hashPassword('nbm2026');
+    const pw3 = hashPassword('nbm2026');
+    db.prepare("INSERT INTO users (username, email, password_hash, password_salt, display_name, role, avatar_color) VALUES ('norton', 'norton@northbearmedia.co.uk', ?, ?, 'Norton', 'owner', '#3eaf84')").run(pw1.hash, pw1.salt);
+    db.prepare("INSERT INTO users (username, email, password_hash, password_salt, display_name, role, avatar_color) VALUES ('cally', 'cally@northbearmedia.co.uk', ?, ?, 'Cally', 'editor', '#60a5fa')").run(pw2.hash, pw2.salt);
+    db.prepare("INSERT INTO users (username, email, password_hash, password_salt, display_name, role, avatar_color) VALUES ('haley', 'haley@northbearmedia.co.uk', ?, ?, 'Haley', 'editor', '#f59e0b')").run(pw3.hash, pw3.salt);
     console.log('Default users created (password: nbm2026)');
   }
 }
 
 seedUsers();
+
+// ─── GLOBAL ERROR HANDLER ─────────────────────────────
+// Catches unhandled errors (including multer) and returns JSON instead of HTML
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err.message);
+  if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'File too large' });
+  if (err.message && err.message.includes('Only image files')) return res.status(400).json({ error: err.message });
+  if (err.message && err.message.includes('File type not allowed')) return res.status(400).json({ error: err.message });
+  res.status(500).json({ error: err.message || 'Internal server error' });
+});
+
 app.listen(PORT, () => { console.log(`NorthBear Media Project Management running at http://localhost:${PORT}`); });
