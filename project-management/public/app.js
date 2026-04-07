@@ -105,9 +105,11 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     document.getElementById('clientsView').style.display = currentView === 'clients' ? '' : 'none';
     document.getElementById('todayView').style.display = currentView === 'today' ? '' : 'none';
     document.getElementById('calendarView').style.display = currentView === 'calendar' ? '' : 'none';
+    document.getElementById('focusView').style.display = currentView === 'focus' ? '' : 'none';
     document.getElementById('clientSubBar').style.display = currentView === 'clients' ? '' : 'none';
     if (currentView === 'today') loadTodayView();
     if (currentView === 'calendar') loadCalendarView();
+    if (currentView === 'focus') loadFocusView();
   });
 });
 
@@ -193,8 +195,9 @@ function fmtDateTime(ds){if(!ds)return'';const d=new Date(ds.replace(' ','T')+(d
 function fmtFileSize(bytes){if(bytes<1024)return bytes+'B';if(bytes<1048576)return(bytes/1024).toFixed(1)+'KB';return(bytes/1048576).toFixed(1)+'MB';}
 
 // ─── Toggles ────────────────────────────────────────────
-function toggleClient(id){expandedClients.has(id)?expandedClients.delete(id):expandedClients.add(id);renderClients();}
-function toggleProject(id){expandedProjects.has(id)?expandedProjects.delete(id):expandedProjects.add(id);renderClients();}
+function toggleClient(id){expandedClients.has(id)?expandedClients.delete(id):expandedClients.add(id);saveExpandedState();renderClients();}
+function toggleProject(id){expandedProjects.has(id)?expandedProjects.delete(id):expandedProjects.add(id);saveExpandedState();renderClients();}
+function saveExpandedState(){try{localStorage.setItem('nbm_expandedClients',JSON.stringify([...expandedClients]));localStorage.setItem('nbm_expandedProjects',JSON.stringify([...expandedProjects]));}catch{}}
 function toggleComments(tid){expandedComments.has(tid)?expandedComments.delete(tid):expandedComments.add(tid);renderClients();}
 function toggleCompletedTasks(pid){showCompletedTasks.has(pid)?showCompletedTasks.delete(pid):showCompletedTasks.add(pid);renderClients();}
 function toggleArchivedProjects(cid){showArchivedProjects.has(cid)?showArchivedProjects.delete(cid):showArchivedProjects.add(cid);renderClients();}
@@ -256,7 +259,9 @@ function renderClients() {
         <div class="client-actions" onclick="event.stopPropagation()">
           <button class="btn-icon" onclick="editClient(${c.id})" title="Edit">&#9998;</button>
           <button class="btn-icon" onclick="openProjectModal(${c.id})" title="Add Project">+</button>
+          <button class="btn-icon" onclick="showClientTimeline(${c.id},'${esc(c.name)}')" title="Timeline">&#128200;</button>
           <button class="btn-icon" onclick="showClientHistory(${c.id},'${esc(c.name)}')" title="History">&#128337;</button>
+          <button class="pin-btn ${isPinned('client',c.id)?'pinned':''}" onclick="togglePin('client',${c.id},event)" title="${isPinned('client',c.id)?'Unpin':'Pin'}">${isPinned('client',c.id)?'&#9733;':'&#9734;'}</button>
           <button class="btn-icon" onclick="archiveClient(${c.id})" title="Archive">&#128230;</button>
           ${currentUser?.role==='owner'?`<button class="btn-icon" onclick="deleteClient(${c.id})" title="Delete" style="color:var(--danger)">&#128465;</button>`:''}
         </div>
@@ -285,7 +290,7 @@ function renderProject(p, cid) {
   const ex=expandedProjects.has(p.id);
   const myName=currentUser?.display_name||'';
   const allTasks=myTasksFilter?p.tasks.filter(t=>t.assignee===myName):p.tasks;
-  const active=allTasks.filter(t=>t.progress!=='completed'&&t.progress!=='invoiced');
+  const active=allTasks.filter(t=>t.progress!=='completed'&&t.progress!=='invoiced').sort((a,b)=>(b.is_pinned||0)-(a.is_pinned||0));
   const done=allTasks.filter(t=>t.progress==='completed'||t.progress==='invoiced');
   const arch=p.archivedTasks||[];
   const showDone=showCompletedTasks.has(p.id), showArch=showArchivedTasks.has(p.id);
@@ -299,6 +304,7 @@ function renderProject(p, cid) {
       </div>
       <div onclick="event.stopPropagation()" style="display:flex;gap:4px">
         <button class="btn-icon" onclick="editProject(${p.id},${cid})" title="Edit">&#9998;</button>
+        <button class="btn-icon" onclick="duplicateProject(${p.id})" title="Duplicate">&#128203;</button>
         <button class="btn-icon" onclick="completeProject(${p.id})" title="Mark Completed">&#10003;</button>
         <button class="btn-icon" onclick="archiveProject(${p.id})" title="Archive">&#128230;</button>
         ${currentUser?.role==='owner'?`<button class="btn-icon" onclick="deleteProject(${p.id})" title="Delete" style="color:var(--danger)">&#128465;</button>`:''}
@@ -341,7 +347,9 @@ function renderTask(t, isDone) {
       ${['not-started','in-progress','completed','stuck','awaiting-client','awaiting-manager','ready-to-invoice','invoiced'].map(s=>`<option value="${s}" ${t.progress===s?'selected':''}>${progressLabel(s)}</option>`).join('')}
     </select></div>
     <div class="task-actions">
-      <button class="btn-icon" onclick="editTask(${t.id})" title="Edit">&#9998;</button>
+      <button class="btn-icon" onclick="event.stopPropagation();showInlineEdit(${t.id})" title="Quick edit">&#9998;</button>
+      <button class="btn-icon" onclick="editTask(${t.id})" title="Full edit">&#128196;</button>
+      <button class="pin-btn ${t.is_pinned?'pinned':''}" onclick="toggleTaskPin(${t.id},event)" title="${t.is_pinned?'Unpin':'Pin'}">${t.is_pinned?'&#9733;':'&#9734;'}</button>
       <button class="btn-icon" onclick="archiveTask(${t.id})" title="Archive">&#128230;</button>
       ${currentUser?.role==='owner'?`<button class="btn-icon" onclick="deleteTask(${t.id})" title="Delete" style="color:var(--danger)">&#128465;</button>`:''}
     </div>
@@ -349,8 +357,12 @@ function renderTask(t, isDone) {
 }
 
 async function quickStatusChange(taskId, newStatus) {
+  const oldTask = findTaskById(taskId);
+  const wasComplete = oldTask && (oldTask.progress === 'completed' || oldTask.progress === 'invoiced');
   await api(`/api/tasks/${taskId}`, {method:'PUT', body:{progress:newStatus}});
   await loadClients();
+  // Celebrate when completing a task
+  if (!wasComplete && (newStatus === 'completed' || newStatus === 'invoiced')) celebrate();
 }
 
 function renderCommentThread(t) {
@@ -502,6 +514,8 @@ function openTaskModal(pid){
   document.getElementById('taskRecurUnit').value='months';
   document.getElementById('taskAttachmentsList').innerHTML='';
   document.getElementById('taskFiles').value='';
+  currentChecklist = [];
+  renderChecklist();
   populateAssigneeDropdown('');
   openModal('taskModal');
 }
@@ -539,6 +553,7 @@ function editTask(id){
   const al=document.getElementById('taskAttachmentsList');
   al.innerHTML=(t.attachments||[]).map(a=>`<div class="attachment-item"><span>&#128206; ${esc(a.original_name)} (${fmtFileSize(a.file_size)})</span><button type="button" class="btn-icon" onclick="deleteAttachment(${a.id})" title="Remove">&times;</button></div>`).join('');
   populateAssigneeDropdown(t.assignee||'');
+  loadChecklist(t.id);
   openModal('taskModal');
 }
 
@@ -576,6 +591,7 @@ document.getElementById('taskForm').addEventListener('submit',async e=>{
   };
   const btn=e.target.querySelector('[type="submit"]');
   setSaving(btn, true);
+  const oldTask = id ? findTaskById(parseInt(id)) : null;
   try {
     let taskId;
     if(id){
@@ -595,6 +611,9 @@ document.getElementById('taskForm').addEventListener('submit',async e=>{
       await fetch(`/api/tasks/${taskId}/attachments`,{method:'POST',body:fd});
     }
     closeModal('taskModal');await loadClients();
+    // Celebrate if task was just completed
+    const wasComplete = oldTask && (oldTask.progress === 'completed' || oldTask.progress === 'invoiced');
+    if (!wasComplete && (data.progress === 'completed' || data.progress === 'invoiced')) celebrate();
   } catch(err) { errEl.textContent=err.message; errEl.style.display='block'; }
   finally { setSaving(btn, false); }
 });
@@ -813,6 +832,19 @@ async function loadTodayView(){
     </div>`).join('');
     html+='</div>';
   }
+  // Build project options for quick-add
+  const projOpts = [];
+  for (const c of clients) for (const p of c.projects) if (!p.archived) projOpts.push({ id: p.id, label: `${c.code || c.name.substring(0,3)} / ${p.name}` });
+
+  html += `<form class="today-quick-add" onsubmit="todayQuickAdd(event);return false;">
+    <input type="text" id="todayQuickTitle" placeholder="Quick add task for this day..." required>
+    <select id="todayQuickProject" required style="min-width:160px">
+      <option value="">Project...</option>
+      ${projOpts.map(p => `<option value="${p.id}">${esc(p.label)}</option>`).join('')}
+    </select>
+    <button type="submit" class="btn btn-primary btn-sm">+ Add</button>
+  </form>`;
+
   ct.innerHTML=html;
 }
 document.getElementById('todayDate').addEventListener('change',loadTodayView);
@@ -1024,12 +1056,330 @@ document.getElementById('clientLogo').addEventListener('change', function(e) {
   this.value = '';
 });
 
+// ─── Celebration ───────────────────────────────────────
+const celebMessages = [
+  'Done!', 'Nailed it!', 'Smashed it!', 'Another one down!',
+  'Boom!', 'Nice one!', 'Crushed it!', 'On fire!',
+];
+function celebrate() {
+  const overlay = document.getElementById('celebrationOverlay');
+  const colors = ['#3eaf84','#4fc494','#fbbf24','#60a5fa','#a855f7','#f87171','#2dd4bf','#fb923c'];
+  // Confetti
+  for (let i = 0; i < 30; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.left = (15 + Math.random() * 70) + '%';
+    c.style.top = (5 + Math.random() * 20) + '%';
+    c.style.background = colors[Math.floor(Math.random() * colors.length)];
+    c.style.animationDelay = (Math.random() * 0.4) + 's';
+    c.style.animationDuration = (1 + Math.random() * 1) + 's';
+    c.style.width = (6 + Math.random() * 6) + 'px';
+    c.style.height = (6 + Math.random() * 6) + 'px';
+    overlay.appendChild(c);
+  }
+  // Text
+  const msg = celebMessages[Math.floor(Math.random() * celebMessages.length)];
+  const txt = document.createElement('div');
+  txt.className = 'celebration-text';
+  txt.textContent = msg;
+  overlay.appendChild(txt);
+  setTimeout(() => { overlay.innerHTML = ''; }, 1800);
+}
+
+// ─── Focus Mode ────────────────────────────────────────
+async function loadFocusView() {
+  const myName = currentUser?.display_name || '';
+  const today = localDateStr(new Date());
+  // Get all tasks across clients
+  const allTasks = [];
+  for (const c of clients) {
+    for (const p of c.projects) {
+      for (const t of p.tasks) {
+        allTasks.push({ ...t, project_name: p.name, client_name: c.name, client_code: c.code });
+      }
+    }
+  }
+  const mine = myName ? allTasks.filter(t => t.assignee === myName) : allTasks;
+
+  const now = mine.filter(t => t.progress === 'in-progress');
+  const blocked = mine.filter(t => t.progress === 'stuck' || t.progress === 'awaiting-client' || t.progress === 'awaiting-manager');
+  const next = mine.filter(t => t.progress === 'not-started')
+    .sort((a, b) => {
+      const pa = { critical: 0, high: 1, medium: 2, low: 3 };
+      return (pa[a.priority] || 2) - (pa[b.priority] || 2);
+    }).slice(0, 8);
+
+  function focusCard(t) {
+    return `<div class="focus-card" onclick="editTask(${t.id})">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="priority-badge priority-${t.priority}"></span>
+          <span style="font-weight:600;font-size:14px">${esc(t.title)}</span>
+        </div>
+        <div class="focus-meta">${esc(t.client_code || '')} ${esc(t.client_name)} &rarr; ${esc(t.project_name)}${t.deadline ? ' &middot; Due ' + fmtDateShort(t.deadline) : ''}</div>
+      </div>
+      <div class="focus-actions">
+        <select class="quick-status" onchange="quickStatusChange(${t.id},this.value);loadFocusView()" onclick="event.stopPropagation()">
+          ${['not-started','in-progress','completed','stuck','awaiting-client','awaiting-manager','ready-to-invoice','invoiced'].map(s => `<option value="${s}" ${t.progress === s ? 'selected' : ''}>${progressLabel(s)}</option>`).join('')}
+        </select>
+        <button class="btn-icon" onclick="event.stopPropagation();toggleInlineComment(${t.id})" title="Quick comment">&#128172;</button>
+      </div>
+    </div><div id="focusComment${t.id}" style="display:none" class="inline-edit-row">
+      <input type="text" placeholder="Quick note..." onkeydown="if(event.key==='Enter'){addQuickComment(${t.id},this);event.preventDefault();}">
+      <button class="btn btn-primary btn-sm" onclick="addQuickComment(${t.id},this.previousElementSibling)">Post</button>
+    </div>`;
+  }
+
+  document.getElementById('focusNow').innerHTML = now.length ? now.map(focusCard).join('') : '<div style="color:var(--text-muted);font-size:13px;padding:8px">Nothing in progress. Pick something from "Up Next"!</div>';
+  document.getElementById('focusNext').innerHTML = next.length ? next.map(focusCard).join('') : '<div style="color:var(--text-muted);font-size:13px;padding:8px">Queue is empty.</div>';
+  document.getElementById('focusBlocked').innerHTML = blocked.length ? blocked.map(focusCard).join('') : '<div style="color:var(--text-muted);font-size:13px;padding:8px">Nothing blocked. Smooth sailing!</div>';
+}
+
+function toggleInlineComment(tid) {
+  const el = document.getElementById('focusComment' + tid);
+  if (el) { el.style.display = el.style.display === 'none' ? 'flex' : 'none'; if (el.style.display === 'flex') el.querySelector('input').focus(); }
+}
+
+async function addQuickComment(tid, input) {
+  const content = input.value.trim();
+  if (!content) return;
+  await api(`/api/tasks/${tid}/comments`, { method: 'POST', body: { content } });
+  input.value = '';
+  const el = input.closest('.inline-edit-row');
+  if (el) el.style.display = 'none';
+}
+
+// ─── Inline Quick Updates ──────────────────────────────
+function showInlineEdit(taskId) {
+  const existing = document.getElementById('inlineEdit' + taskId);
+  if (existing) { existing.remove(); return; }
+  const row = document.querySelector(`[data-task-id="${taskId}"]`);
+  if (!row) return;
+  const t = findTaskById(taskId);
+  if (!t) return;
+  const div = document.createElement('div');
+  div.id = 'inlineEdit' + taskId;
+  div.className = 'inline-edit-row';
+  div.innerHTML = `
+    <input type="text" placeholder="Quick note..." onkeydown="if(event.key==='Enter'){submitInlineNote(${taskId},this);event.preventDefault();}">
+    <input type="date" value="${t.planned_date || ''}" onchange="inlineDateChange(${taskId},this.value)" style="width:130px" title="Planned date">
+    <select onchange="inlineAssigneeChange(${taskId},this.value)" style="width:110px">
+      <option value="">Unassigned</option>
+      ${appUsers.map(u => `<option value="${esc(u.display_name)}" ${u.display_name === t.assignee ? 'selected' : ''}>${esc(u.display_name)}</option>`).join('')}
+    </select>
+    <button class="btn btn-ghost btn-sm" onclick="quickStatusChange(${taskId},'stuck')" title="Mark blocked" style="color:var(--danger)">&#9888;</button>
+    <button class="btn btn-ghost btn-sm" onclick="this.closest('.inline-edit-row').remove()">&#10005;</button>
+  `;
+  div.onclick = (e) => e.stopPropagation();
+  row.after(div);
+  div.querySelector('input').focus();
+}
+
+async function submitInlineNote(taskId, input) {
+  const content = input.value.trim();
+  if (!content) return;
+  await api(`/api/tasks/${taskId}/comments`, { method: 'POST', body: { content } });
+  input.value = '';
+  input.placeholder = 'Posted!';
+  setTimeout(() => { const el = document.getElementById('inlineEdit' + taskId); if (el) el.remove(); }, 800);
+}
+
+async function inlineDateChange(taskId, date) {
+  await api(`/api/tasks/${taskId}`, { method: 'PUT', body: { planned_date: date } });
+  await loadClients();
+}
+
+async function inlineAssigneeChange(taskId, assignee) {
+  await api(`/api/tasks/${taskId}`, { method: 'PUT', body: { assignee } });
+  await loadClients();
+}
+
+// ─── Checklists ────────────────────────────────────────
+let currentChecklist = [];
+
+async function loadChecklist(taskId) {
+  if (!taskId) { currentChecklist = []; renderChecklist(); return; }
+  try { currentChecklist = await api(`/api/tasks/${taskId}/checklist`); } catch { currentChecklist = []; }
+  renderChecklist();
+}
+
+function renderChecklist() {
+  const ct = document.getElementById('taskChecklist');
+  if (!ct) return;
+  const total = currentChecklist.length;
+  const done = currentChecklist.filter(i => i.checked).length;
+  ct.innerHTML = (total ? `<div class="checklist-progress"><div class="checklist-progress-fill" style="width:${Math.round(done / total * 100)}%"></div></div>` : '') +
+    currentChecklist.map(item => `
+      <div class="checklist-item ${item.checked ? 'checked' : ''}">
+        <input type="checkbox" ${item.checked ? 'checked' : ''} onchange="toggleChecklistItem(${item.id}, ${item.task_id}, this.checked)">
+        <span class="checklist-label">${esc(item.label)}</span>
+        <button class="checklist-delete" onclick="deleteChecklistItem(${item.id}, ${item.task_id})">&times;</button>
+      </div>
+    `).join('');
+}
+
+async function addChecklistItem() {
+  const input = document.getElementById('checklistNewItem');
+  const label = input.value.trim();
+  if (!label) return;
+  const taskId = document.getElementById('taskId').value;
+  if (!taskId) return;
+  await api(`/api/tasks/${taskId}/checklist`, { method: 'POST', body: { label } });
+  input.value = '';
+  await loadChecklist(taskId);
+}
+
+async function toggleChecklistItem(itemId, taskId, checked) {
+  await api(`/api/tasks/${taskId}/checklist/${itemId}`, { method: 'PUT', body: { checked } });
+  await loadChecklist(taskId);
+}
+
+async function deleteChecklistItem(itemId, taskId) {
+  await api(`/api/tasks/${taskId}/checklist/${itemId}`, { method: 'DELETE' });
+  await loadChecklist(taskId);
+}
+
+// Enter key on checklist input
+document.getElementById('checklistNewItem')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); addChecklistItem(); }
+});
+
+// ─── Pins ──────────────────────────────────────────────
+let userPins = [];
+
+async function loadPins() {
+  try { userPins = await api('/api/pins'); } catch { userPins = []; }
+  renderPinnedDashboard();
+}
+
+function isPinned(type, id) {
+  return userPins.some(p => p.entity_type === type && p.entity_id === id);
+}
+
+async function togglePin(type, id, event) {
+  if (event) event.stopPropagation();
+  if (isPinned(type, id)) {
+    await api(`/api/pins/${type}/${id}`, { method: 'DELETE' });
+  } else {
+    await api('/api/pins', { method: 'POST', body: { entity_type: type, entity_id: id } });
+  }
+  await loadPins();
+}
+
+function renderPinnedDashboard() {
+  const ct = document.getElementById('pinnedDashboard');
+  if (!ct || !userPins.length) { if (ct) ct.style.display = 'none'; return; }
+
+  const cards = userPins.map(pin => {
+    let label = '', icon = '', onclick = '';
+    if (pin.entity_type === 'client') {
+      const c = clients.find(x => x.id === pin.entity_id);
+      if (!c) return '';
+      label = c.name;
+      icon = c.logo_url ? `<img src="${esc(c.logo_url)}" style="width:18px;height:18px;border-radius:4px;object-fit:cover">` : '';
+      onclick = `toggleClient(${c.id});expandedClients.add(${c.id});renderClients();`;
+    } else if (pin.entity_type === 'project') {
+      for (const c of clients) { const p = c.projects.find(x => x.id === pin.entity_id); if (p) { label = p.name; onclick = `expandedClients.add(${c.id});expandedProjects.add(${p.id});renderClients();`; break; } }
+      if (!label) return '';
+    } else if (pin.entity_type === 'task') {
+      const t = findTaskById(pin.entity_id);
+      if (!t) return '';
+      label = t.title;
+      onclick = `editTask(${t.id})`;
+    }
+    if (!label) return '';
+    return `<div class="pinned-card" onclick="${onclick}">
+      ${icon}<span>${esc(label)}</span>
+      <span class="pinned-type">${pin.entity_type}</span>
+      <button class="pin-btn pinned" onclick="event.stopPropagation();togglePin('${pin.entity_type}',${pin.entity_id})" title="Unpin">&#9733;</button>
+    </div>`;
+  }).filter(Boolean);
+
+  if (!cards.length) { ct.style.display = 'none'; return; }
+  ct.style.display = 'block';
+  ct.innerHTML = `<div class="pinned-grid">${cards.join('')}</div>`;
+}
+
+// ─── Client Timeline ───────────────────────────────────
+async function showClientTimeline(clientId, clientName) {
+  document.getElementById('timelineModalTitle').textContent = 'Timeline \u2014 ' + clientName;
+  const logs = await api(`/api/clients/${clientId}/timeline?limit=50`);
+  const ct = document.getElementById('timelineContent');
+  if (!logs.length) { ct.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted)">No activity yet</div>'; openModal('timelineModal'); return; }
+
+  const actionColors = { created: 'var(--success)', completed: 'var(--green)', updated: 'var(--blue)', archived: 'var(--warning)', restored: 'var(--teal)', commented: 'var(--purple)', deleted: 'var(--danger)' };
+  const actionIcons = { created: '+', completed: '\u2713', updated: '\u270E', archived: '\u25BC', restored: '\u25B2', commented: '\u270D', deleted: '\u2717' };
+
+  // Group by date
+  const groups = {};
+  for (const l of logs) {
+    const d = l.created_at ? l.created_at.split(' ')[0] || l.created_at.split('T')[0] : 'Unknown';
+    if (!groups[d]) groups[d] = [];
+    groups[d].push(l);
+  }
+
+  let html = '';
+  for (const [date, items] of Object.entries(groups)) {
+    html += `<div class="timeline-group-date">${fmtDate(date)}</div>`;
+    for (const l of items) {
+      const color = actionColors[l.action] || 'var(--text-muted)';
+      html += `<div class="timeline-item">
+        <div class="timeline-dot" style="background:${color}"></div>
+        <div class="timeline-content">
+          <div class="timeline-action">${esc(l.author)} ${esc(l.action)} ${esc(l.entity_type)}${l.entity_name ? ': ' + esc(l.entity_name) : ''}</div>
+          ${l.details ? `<div class="timeline-detail">${esc(l.details)}</div>` : ''}
+          <div class="timeline-time">${timeAgo(l.created_at)}</div>
+        </div>
+      </div>`;
+    }
+  }
+  ct.innerHTML = html;
+  openModal('timelineModal');
+}
+
+// ─── Duplicate Project ─────────────────────────────────
+async function duplicateProject(pid) {
+  if (!confirm('Duplicate this project with all its tasks?')) return;
+  await api(`/api/projects/${pid}/duplicate`, { method: 'POST' });
+  await loadClients();
+}
+
+// ─── Quick Add from Today View ─────────────────────────
+async function todayQuickAdd(e) {
+  e.preventDefault();
+  const title = document.getElementById('todayQuickTitle')?.value.trim();
+  const projectId = document.getElementById('todayQuickProject')?.value;
+  if (!title || !projectId) return;
+  const date = document.getElementById('todayDate').value || localDateStr(new Date());
+  const person = document.getElementById('todayPerson').value;
+  await api('/api/tasks', { method: 'POST', body: { project_id: +projectId, title, planned_date: date, assignee: person || '' } });
+  document.getElementById('todayQuickTitle').value = '';
+  await loadClients();
+  await loadTodayView();
+}
+
+// ─── Pin Star Tasks ────────────────────────────────────
+async function toggleTaskPin(taskId, event) {
+  if (event) event.stopPropagation();
+  await api(`/api/tasks/${taskId}/pin`, { method: 'PUT' });
+  await loadClients();
+}
+
 // ─── Init ───────────────────────────────────────────────
 (async function(){
   try {
     await loadCurrentUser();
     await loadTeam();
     await loadClients();
+    await loadPins();
+    // Restore expanded state from localStorage
+    try {
+      const ec = JSON.parse(localStorage.getItem('nbm_expandedClients') || '[]');
+      const ep = JSON.parse(localStorage.getItem('nbm_expandedProjects') || '[]');
+      ec.forEach(id => expandedClients.add(id));
+      ep.forEach(id => expandedProjects.add(id));
+      if (ec.length || ep.length) renderClients();
+    } catch {}
     document.getElementById('todayDate').value=localDateStr(new Date());
   } catch(e) {
     console.error('Init error:', e);

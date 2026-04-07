@@ -42,6 +42,38 @@ router.delete('/:id', requireAuth, requireRole('owner'), (req, res) => {
   res.json({ success: true });
 });
 
+router.post('/:id/duplicate', requireAuth, requireWrite, (req, res) => {
+  const orig = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
+  if (!orig) return res.status(404).json({ error: 'Project not found' });
+  const client = db.prepare('SELECT is_private FROM clients WHERE id = ?').get(orig.client_id);
+  if (client?.is_private && req.user.role !== 'owner') return res.status(403).json({ error: 'Access denied' });
+
+  const newName = orig.name + ' (copy)';
+  const r = db.prepare('INSERT INTO projects (client_id, name, notes) VALUES (?, ?, ?)').run(orig.client_id, newName, orig.notes || '');
+  const newPid = r.lastInsertRowid;
+
+  // Copy tasks (reset statuses, dates, archived)
+  const tasks = db.prepare('SELECT * FROM tasks WHERE project_id = ? AND archived = 0').all(req.params.id);
+  const insertTask = db.prepare('INSERT INTO tasks (project_id, title, assignee, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  const insertChecklist = db.prepare('INSERT INTO checklist_items (task_id, label, sort_order) VALUES (?, ?, ?)');
+
+  for (const t of tasks) {
+    const tr = insertTask.run(newPid, t.title, t.assignee, t.estimated_hours, t.priority, t.references_text, t.notes, t.is_recurring, t.recur_interval, t.recur_unit, t.sort_order);
+    // Copy checklist items
+    const items = db.prepare('SELECT * FROM checklist_items WHERE task_id = ? ORDER BY sort_order').all(t.id);
+    for (const item of items) {
+      insertChecklist.run(tr.lastInsertRowid, item.label, item.sort_order);
+    }
+  }
+
+  logActivity('project', newPid, 'created', req.user.display_name, `Duplicated from "${orig.name}" with ${tasks.length} tasks`);
+  const p = db.prepare('SELECT * FROM projects WHERE id = ?').get(newPid);
+  p.tasks = db.prepare('SELECT * FROM tasks WHERE project_id = ? ORDER BY sort_order').all(newPid);
+  p.tasks.forEach(t => { t.comments = []; t.attachments = []; });
+  p.archivedTasks = [];
+  res.json(p);
+});
+
 router.put('/:id/archive', requireAuth, requireWrite, (req, res) => {
   const p = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
   if (!p) return res.status(404).json({ error: 'Project not found' });

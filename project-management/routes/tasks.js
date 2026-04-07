@@ -138,6 +138,47 @@ router.post('/:id/comments', requireAuth, requireWrite, (req, res) => {
   res.json(db.prepare('SELECT * FROM comments WHERE id = ?').get(r.lastInsertRowid));
 });
 
+// ─── Checklists ──────────────────────────────────────
+
+router.get('/:id/checklist', requireAuth, (req, res) => {
+  res.json(db.prepare('SELECT * FROM checklist_items WHERE task_id = ? ORDER BY sort_order, id').all(req.params.id));
+});
+
+router.post('/:id/checklist', requireAuth, requireWrite, (req, res) => {
+  const { label } = req.body;
+  if (!label) return res.status(400).json({ error: 'Label required' });
+  const t = db.prepare('SELECT project_id FROM tasks WHERE id = ?').get(req.params.id);
+  if (!t) return res.status(404).json({ error: 'Task not found' });
+  if (!checkPrivateClient(req, res, t.project_id)) return;
+  const maxOrder = db.prepare('SELECT MAX(sort_order) as m FROM checklist_items WHERE task_id = ?').get(req.params.id)?.m || 0;
+  const r = db.prepare('INSERT INTO checklist_items (task_id, label, sort_order) VALUES (?, ?, ?)').run(req.params.id, label, maxOrder + 1);
+  res.json(db.prepare('SELECT * FROM checklist_items WHERE id = ?').get(r.lastInsertRowid));
+});
+
+router.put('/:id/checklist/:itemId', requireAuth, requireWrite, (req, res) => {
+  const { checked, label } = req.body;
+  const item = db.prepare('SELECT * FROM checklist_items WHERE id = ? AND task_id = ?').get(req.params.itemId, req.params.id);
+  if (!item) return res.status(404).json({ error: 'Item not found' });
+  if (checked !== undefined) db.prepare('UPDATE checklist_items SET checked = ? WHERE id = ?').run(checked ? 1 : 0, req.params.itemId);
+  if (label !== undefined) db.prepare('UPDATE checklist_items SET label = ? WHERE id = ?').run(label, req.params.itemId);
+  res.json(db.prepare('SELECT * FROM checklist_items WHERE id = ?').get(req.params.itemId));
+});
+
+router.delete('/:id/checklist/:itemId', requireAuth, requireWrite, (req, res) => {
+  db.prepare('DELETE FROM checklist_items WHERE id = ? AND task_id = ?').run(req.params.itemId, req.params.id);
+  res.json({ success: true });
+});
+
+// ─── Pin/Star ────────────────────────────────────────
+
+router.put('/:id/pin', requireAuth, (req, res) => {
+  const t = db.prepare('SELECT is_pinned FROM tasks WHERE id = ?').get(req.params.id);
+  if (!t) return res.status(404).json({ error: 'Task not found' });
+  const newVal = t.is_pinned ? 0 : 1;
+  db.prepare('UPDATE tasks SET is_pinned = ? WHERE id = ?').run(newVal, req.params.id);
+  res.json({ is_pinned: newVal });
+});
+
 // ─── Calendar / By-date ───────────────────────────────
 
 router.get('/by-date', requireAuth, (req, res) => {

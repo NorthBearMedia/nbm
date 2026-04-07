@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>North Bear Console</title>
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=30">
+  <link rel="stylesheet" href="styles.css?v=31">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -22,6 +22,7 @@
       <button class="nav-tab active" data-view="clients"><span class="nav-icon">&#9783;</span> Home</button>
       <button class="nav-tab" data-view="today"><span class="nav-icon">&#9788;</span> Today</button>
       <button class="nav-tab" data-view="calendar"><span class="nav-icon">&#128197;</span> Calendar</button>
+      <button class="nav-tab" data-view="focus"><span class="nav-icon">&#9889;</span> Focus</button>
     </div>
     <div class="nav-right">
       <div class="search-container" style="position:relative">
@@ -91,7 +92,30 @@
       </div>
       <div id="calendarGrid" class="calendar-grid"></div>
     </div>
+
+    <div id="focusView" style="display:none">
+      <div class="focus-container">
+        <div class="focus-section">
+          <h3 class="focus-heading">Working On Now</h3>
+          <div id="focusNow" class="focus-list"></div>
+        </div>
+        <div class="focus-section">
+          <h3 class="focus-heading">Up Next</h3>
+          <div id="focusNext" class="focus-list"></div>
+        </div>
+        <div class="focus-section">
+          <h3 class="focus-heading">Blocked</h3>
+          <div id="focusBlocked" class="focus-list"></div>
+        </div>
+      </div>
+    </div>
   </main>
+
+  <!-- Pinned Dashboard -->
+  <div id="pinnedDashboard" style="display:none"></div>
+
+  <!-- Celebration overlay -->
+  <div id="celebrationOverlay" class="celebration-overlay"></div>
 
   <div class="modal-backdrop" id="modalBackdrop"></div>
 
@@ -153,6 +177,14 @@
         </div>
       </div>
       <div class="form-group">
+        <label>Checklist</label>
+        <div id="taskChecklist" class="checklist-container"></div>
+        <div class="checklist-add">
+          <input type="text" id="checklistNewItem" placeholder="Add checklist item..." style="flex:1">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="addChecklistItem()">+ Add</button>
+        </div>
+      </div>
+      <div class="form-group">
         <label>Attachments</label>
         <div id="taskAttachmentsList"></div>
         <input type="file" id="taskFiles" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip" style="margin-top:6px">
@@ -206,10 +238,16 @@
     <div id="archiveContent" style="max-height:450px;overflow-y:auto"></div>
   </div>
 
+  <!-- Timeline Modal -->
+  <div class="modal modal-lg" id="timelineModal" style="max-width:700px">
+    <div class="modal-header"><h2 id="timelineModalTitle">Timeline</h2><button class="modal-close" onclick="closeModal('timelineModal')">&times;</button></div>
+    <div id="timelineContent" style="max-height:500px;overflow-y:auto;padding:20px 28px"></div>
+  </div>
+
   <footer class="app-footer">
     <img src="/NBM%20Logo%20No%20NG%20Light%20Lines.png" alt="" style="width:28px;opacity:0.4">
     <span>&copy; 2026 North Bear Media. All rights reserved.</span>
-    <span class="app-version">v3.0</span>
+    <span class="app-version">v4.0</span>
   </footer>
 
   <!-- Crop Modal -->
@@ -234,6 +272,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=30"></script>
+  <script src="app.js?v=31"></script>
 </body>
 </html>
