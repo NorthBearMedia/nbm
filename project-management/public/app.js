@@ -190,9 +190,11 @@ function renderClients() {
   // Filter notice
   const fn = document.getElementById('filterNotice');
   if (fn) {
-    if (myTasksFilter) {
-      const quip = filterQuips[Math.floor(Math.random() * filterQuips.length)];
-      fn.innerHTML = `<div style="text-align:center;padding:12px 20px;font-size:12px;color:var(--text-secondary);font-style:italic;border-top:1px solid var(--border)">${quip} <a href="#" onclick="toggleMyTasks();return false" style="color:var(--primary);text-decoration:underline;font-style:normal">Show all tasks</a></div>`;
+    const activeFilter = myTasksFilter ? 'myTasks' : currentFilter !== 'all' ? currentFilter : null;
+    if (activeFilter && filterQuips[activeFilter]) {
+      const quips = filterQuips[activeFilter];
+      const quip = quips[Math.floor(Math.random() * quips.length)];
+      fn.innerHTML = `<div style="text-align:center;padding:12px 20px;font-size:12px;color:var(--text-secondary);font-style:italic;border-top:1px solid var(--border)">${quip} <a href="#" onclick="clearAllFilters();return false" style="color:var(--primary);text-decoration:underline;font-style:normal">Show everything</a></div>`;
       fn.style.display = 'block';
     } else { fn.style.display = 'none'; }
   }
@@ -571,10 +573,12 @@ function renderTeamList(){
 }
 
 // ─── Filters ────────────────────────────────────────────
-document.querySelectorAll('.filter-btn').forEach(btn=>{
+document.querySelectorAll('.filter-btn[data-filter]').forEach(btn=>{
   btn.addEventListener('click',()=>{
-    document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');currentFilter=btn.dataset.filter;loadClients();
+    document.querySelectorAll('.filter-btn[data-filter]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    if (myTasksFilter) document.getElementById('myTasksBtn')?.classList.add('active');
+    currentFilter=btn.dataset.filter;loadClients();
   });
 });
 
@@ -586,16 +590,42 @@ function toggleMyTasks() {
   renderClients();
 }
 
-const filterQuips = [
-  "Psst... you're only seeing your own tasks. The rest of the team is probably fine. Probably.",
-  "Filtered to just your tasks. Out of sight, out of mind, right?",
-  "Showing only your tasks. Everyone else's problems are blissfully hidden.",
-  "My Tasks mode: because ignorance is bliss (until the deadline).",
-  "You're in your own little task bubble. It's nice here.",
-  "Only showing your tasks. What the others are up to is none of your business.",
-  "Filtered view active. The tasks you can't see can't hurt you... yet.",
-  "Just your tasks. The chaos of everyone else's workload has been conveniently swept under the rug.",
-];
+function clearAllFilters() {
+  myTasksFilter = false;
+  currentFilter = 'all';
+  document.getElementById('myTasksBtn')?.classList.remove('active');
+  document.querySelectorAll('.filter-btn[data-filter]').forEach(b => {
+    b.classList.toggle('active', b.dataset.filter === 'all');
+  });
+  loadClients();
+}
+
+const filterQuips = {
+  myTasks: [
+    "Psst... you're only seeing your own tasks. The rest of the team is probably fine. Probably.",
+    "Filtered to just your tasks. Out of sight, out of mind, right?",
+    "Showing only your tasks. Everyone else's problems are blissfully hidden.",
+    "My Tasks mode: because ignorance is bliss (until the deadline).",
+    "You're in your own little task bubble. It's nice here.",
+    "Only showing your tasks. What the others are up to is none of your business.",
+    "Filtered view active. The tasks you can't see can't hurt you... yet.",
+    "Just your tasks. The chaos of everyone else's workload has been conveniently swept under the rug.",
+  ],
+  recurring: [
+    "Showing recurring clients only. The ad-hoc lot are off having a break somewhere.",
+    "Recurring clients — the ones who keep coming back for more. Can't blame them.",
+    "Just the regulars. Like your favourite pub, but with more invoices.",
+    "Only recurring clients. The rest are playing hard to get.",
+    "Filtered to retainers only. The ad-hoc ones will be back... probably.",
+  ],
+  'ad-hoc': [
+    "Ad-hoc clients only. The one-night stands of the business world.",
+    "Showing one-off projects. Commitment issues? We don't judge.",
+    "Just the ad-hoc clients. Here today, invoiced tomorrow.",
+    "Ad-hoc only. No strings attached... except the contract.",
+    "The non-regulars. They'll be back when they need us. They always come back.",
+  ],
+};
 
 // ─── Search ────────────────────────────────────────────
 const searchInput = document.getElementById('taskSearch');
