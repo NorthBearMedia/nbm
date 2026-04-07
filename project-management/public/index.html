@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>North Bear Console</title>
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=28">
+  <link rel="stylesheet" href="styles.css?v=30">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -180,7 +180,7 @@
         </div>
         <div class="form-row form-row-3">
           <div class="form-group"><label>Email</label><input type="email" id="newUserEmail" required></div>
-          <div class="form-group"><label>Password</label><input type="password" id="newUserPassword" required minlength="4"></div>
+          <div class="form-group"><label>Password</label><input type="password" id="newUserPassword" required minlength="8"></div>
           <div class="form-group"><label>Role</label><select id="newUserRole"><option value="editor">Editor</option><option value="viewer">Viewer</option><option value="owner">Owner</option></select></div>
         </div>
         <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="document.getElementById('addUserSection').style.display='none'">Cancel</button><button type="submit" class="btn btn-primary">Create User</button></div>
@@ -209,7 +209,7 @@
   <footer class="app-footer">
     <img src="/NBM%20Logo%20No%20NG%20Light%20Lines.png" alt="" style="width:28px;opacity:0.4">
     <span>&copy; 2026 North Bear Media. All rights reserved.</span>
-    <span class="app-version">v2.7</span>
+    <span class="app-version">v3.0</span>
   </footer>
 
   <!-- Crop Modal -->
@@ -234,6 +234,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=28"></script>
+  <script src="app.js?v=30"></script>
 </body>
 </html>

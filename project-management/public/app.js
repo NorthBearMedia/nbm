@@ -16,8 +16,6 @@ let draggedClientId = null;
 let myTasksFilter = false;
 let clientSortMode = 'manual';
 
-function getCurrentUser() { return currentUser?.display_name || 'System'; }
-
 async function loadCurrentUser() {
   try {
     const res = await fetch('/api/auth/me');
@@ -204,9 +202,10 @@ function toggleArchivedTasks(pid){showArchivedTasks.has(pid)?showArchivedTasks.d
 
 // ─── Modal ──────────────────────────────────────────────
 function openModal(id){document.getElementById(id).classList.add('active');document.getElementById('modalBackdrop').classList.add('active');}
-function closeModal(id){document.getElementById(id).classList.remove('active');document.getElementById('modalBackdrop').classList.remove('active');}
-document.getElementById('modalBackdrop').addEventListener('click',()=>{document.querySelectorAll('.modal.active').forEach(m=>m.classList.remove('active'));document.getElementById('modalBackdrop').classList.remove('active');});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelectorAll('.modal.active').forEach(m=>m.classList.remove('active'));document.getElementById('modalBackdrop').classList.remove('active');}});
+function closeModal(id){document.getElementById(id).classList.remove('active');if(!document.querySelector('.modal.active'))document.getElementById('modalBackdrop').classList.remove('active');}
+function closeAllModals(){document.querySelectorAll('.modal.active').forEach(m=>m.classList.remove('active'));document.getElementById('modalBackdrop').classList.remove('active');}
+document.getElementById('modalBackdrop').addEventListener('click',closeAllModals);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAllModals();});
 
 // ─── Render Clients ─────────────────────────────────────
 function renderClients() {
@@ -262,10 +261,12 @@ function renderClients() {
           ${currentUser?.role==='owner'?`<button class="btn-icon" onclick="deleteClient(${c.id})" title="Delete" style="color:var(--danger)">&#128465;</button>`:''}
         </div>
       </div>
-      <div class="client-projects" ${ex?'style="display:block"':''}>
-        ${c.projects.map(p=>renderProject(p,c.id)).join('')}
-        ${renderArchivedProjects(c)}
-        <div style="padding:8px 16px"><button class="btn btn-ghost btn-sm" onclick="openProjectModal(${c.id})">+ Add Project</button></div>
+      <div class="client-projects">
+        <div class="client-projects-inner">
+          ${c.projects.map(p=>renderProject(p,c.id)).join('')}
+          ${renderArchivedProjects(c)}
+          <div style="padding:8px 16px"><button class="btn btn-ghost btn-sm" onclick="openProjectModal(${c.id})">+ Add Project</button></div>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -303,12 +304,14 @@ function renderProject(p, cid) {
         ${currentUser?.role==='owner'?`<button class="btn-icon" onclick="deleteProject(${p.id})" title="Delete" style="color:var(--danger)">&#128465;</button>`:''}
       </div>
     </div>
-    <div class="project-tasks" ${ex?'style="display:block"':''}>
-      ${active.map(t=>renderTask(t)).join('')}
-      ${!active.length?'<div style="padding:12px 16px;color:var(--text-secondary);font-size:13px">No active tasks</div>':''}
-      <div style="padding:6px 16px"><button class="btn btn-ghost btn-sm" onclick="openTaskModal(${p.id})">+ Add Task</button></div>
-      ${done.length?`<div style="padding:4px 16px"><button class="btn btn-ghost btn-sm" onclick="toggleCompletedTasks(${p.id})">${showDone?'&#9660;':'&#9654;'} ${done.length} completed</button>${showDone?done.map(t=>renderTask(t,true)).join(''):''}</div>`:''}
-      ${arch.length?`<div style="padding:4px 16px"><button class="btn btn-ghost btn-sm" onclick="toggleArchivedTasks(${p.id})">${showArch?'&#9660;':'&#9654;'} ${arch.length} archived</button>${showArch?arch.map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;opacity:0.5;font-size:13px"><span>${esc(t.title)}</span><button class="btn btn-ghost btn-sm" onclick="restoreTask(${t.id})">Restore</button></div>`).join(''):''}</div>`:''}
+    <div class="project-tasks">
+      <div class="project-tasks-inner">
+        ${active.map(t=>renderTask(t)).join('')}
+        ${!active.length?'<div style="padding:12px 16px;color:var(--text-secondary);font-size:13px">No active tasks</div>':''}
+        <div style="padding:6px 16px"><button class="btn btn-ghost btn-sm" onclick="openTaskModal(${p.id})">+ Add Task</button></div>
+        ${done.length?`<div style="padding:4px 16px"><button class="btn btn-ghost btn-sm" onclick="toggleCompletedTasks(${p.id})">${showDone?'&#9660;':'&#9654;'} ${done.length} completed</button>${showDone?done.map(t=>renderTask(t,true)).join(''):''}</div>`:''}
+        ${arch.length?`<div style="padding:4px 16px"><button class="btn btn-ghost btn-sm" onclick="toggleArchivedTasks(${p.id})">${showArch?'&#9660;':'&#9654;'} ${arch.length} archived</button>${showArch?arch.map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;opacity:0.5;font-size:13px"><span>${esc(t.title)}</span><button class="btn btn-ghost btn-sm" onclick="restoreTask(${t.id})">Restore</button></div>`).join(''):''}</div>`:''}
+      </div>
     </div>
   </div>`;
 }
@@ -346,7 +349,7 @@ function renderTask(t, isDone) {
 }
 
 async function quickStatusChange(taskId, newStatus) {
-  await api(`/api/tasks/${taskId}`, {method:'PUT', body:{progress:newStatus, author:getCurrentUser()}});
+  await api(`/api/tasks/${taskId}`, {method:'PUT', body:{progress:newStatus}});
   await loadClients();
 }
 
@@ -380,17 +383,17 @@ async function onDrop(e,targetId){
 }
 
 // ─── Archive ────────────────────────────────────────────
-async function archiveClient(id){const c=clients.find(x=>x.id===id);if(!confirm(`Archive "${c?.name}"?`))return;await api(`/api/clients/${id}/archive`,{method:'PUT',body:{author:getCurrentUser()}});expandedClients.delete(id);await loadClients();}
-async function deleteClient(id){const c=clients.find(x=>x.id===id);const name=c?c.name:'this client';if(!confirm(`Permanently delete "${name}" and all its projects/tasks? This cannot be undone.`))return;if(!confirm(`Are you sure? This will delete ALL data for "${name}".`))return;await api(`/api/clients/${id}`,{method:'DELETE',body:{author:getCurrentUser()}});expandedClients.delete(id);await loadClients();}
-async function archiveProject(id){if(!confirm('Archive this project?'))return;await api(`/api/projects/${id}/archive`,{method:'PUT',body:{author:getCurrentUser()}});expandedProjects.delete(id);await loadClients();}
-async function completeProject(id){if(!confirm('Mark this project as completed?'))return;await api(`/api/projects/${id}`,{method:'PUT',body:{status:'completed',author:getCurrentUser()}});await loadClients();}
-async function deleteProject(id){let name='this project';for(const c of clients)for(const p of c.projects)if(p.id===id){name=p.name;break;}if(!confirm(`Permanently delete "${name}" and all its tasks? This cannot be undone.`))return;if(!confirm(`Are you sure? All tasks in "${name}" will be lost forever.`))return;await api(`/api/projects/${id}`,{method:'DELETE',body:{author:getCurrentUser()}});expandedProjects.delete(id);await loadClients();}
-async function archiveTask(id){await api(`/api/tasks/${id}/archive`,{method:'PUT',body:{author:getCurrentUser()}});await loadClients();}
+async function archiveClient(id){const c=clients.find(x=>x.id===id);if(!confirm(`Archive "${c?.name}"?`))return;await api(`/api/clients/${id}/archive`,{method:'PUT'});expandedClients.delete(id);await loadClients();}
+async function deleteClient(id){const c=clients.find(x=>x.id===id);const name=c?c.name:'this client';if(!confirm(`Permanently delete "${name}" and all its projects/tasks? This cannot be undone.`))return;if(!confirm(`Are you sure? This will delete ALL data for "${name}".`))return;await api(`/api/clients/${id}`,{method:'DELETE'});expandedClients.delete(id);await loadClients();}
+async function archiveProject(id){if(!confirm('Archive this project?'))return;await api(`/api/projects/${id}/archive`,{method:'PUT'});expandedProjects.delete(id);await loadClients();}
+async function completeProject(id){if(!confirm('Mark this project as completed?'))return;await api(`/api/projects/${id}`,{method:'PUT',body:{status:'completed'}});await loadClients();}
+async function deleteProject(id){let name='this project';for(const c of clients)for(const p of c.projects)if(p.id===id){name=p.name;break;}if(!confirm(`Permanently delete "${name}" and all its tasks? This cannot be undone.`))return;if(!confirm(`Are you sure? All tasks in "${name}" will be lost forever.`))return;await api(`/api/projects/${id}`,{method:'DELETE'});expandedProjects.delete(id);await loadClients();}
+async function archiveTask(id){await api(`/api/tasks/${id}/archive`,{method:'PUT'});await loadClients();}
 async function deleteTask(id){const t=findTaskById(id);const title=t?t.title:'this task';if(!confirm(`Permanently delete "${title}"? This cannot be undone.`))return;await api(`/api/tasks/${id}`,{method:'DELETE'});await loadClients();}
-async function restoreProject(id){await api(`/api/projects/${id}/archive`,{method:'PUT',body:{author:getCurrentUser()}});await loadClients();}
-async function restoreTask(id){await api(`/api/tasks/${id}/archive`,{method:'PUT',body:{author:getCurrentUser()}});await loadClients();}
-async function restoreClient(id){await api(`/api/clients/${id}/archive`,{method:'PUT',body:{author:getCurrentUser()}});await loadClients();await showArchiveModal();}
-async function permanentDeleteClient(id){if(!confirm('Permanently delete? Cannot be undone.'))return;await api(`/api/clients/${id}`,{method:'DELETE',body:{author:getCurrentUser()}});await loadClients();await showArchiveModal();}
+async function restoreProject(id){await api(`/api/projects/${id}/archive`,{method:'PUT'});await loadClients();}
+async function restoreTask(id){await api(`/api/tasks/${id}/archive`,{method:'PUT'});await loadClients();}
+async function restoreClient(id){await api(`/api/clients/${id}/archive`,{method:'PUT'});await loadClients();await showArchiveModal();}
+async function permanentDeleteClient(id){if(!confirm('Permanently delete? Cannot be undone.'))return;await api(`/api/clients/${id}`,{method:'DELETE'});await loadClients();await showArchiveModal();}
 
 document.getElementById('viewArchiveBtn').addEventListener('click',showArchiveModal);
 async function showArchiveModal(){
@@ -433,7 +436,7 @@ document.getElementById('clientForm').addEventListener('submit',async e=>{
   const errEl=document.getElementById('clientFormError');
   errEl.style.display='none';
   const id=document.getElementById('clientId').value;
-  const data={name:document.getElementById('clientName').value,code:document.getElementById('clientCode').value,agreement_type:document.getElementById('clientType').value,notes:document.getElementById('clientNotes').value,gmail_link:document.getElementById('clientGmail').value,drive_link:document.getElementById('clientDrive').value,is_private:document.getElementById('clientPrivate').checked,author:getCurrentUser()};
+  const data={name:document.getElementById('clientName').value,code:document.getElementById('clientCode').value,agreement_type:document.getElementById('clientType').value,notes:document.getElementById('clientNotes').value,gmail_link:document.getElementById('clientGmail').value,drive_link:document.getElementById('clientDrive').value,is_private:document.getElementById('clientPrivate').checked};
   if (!data.name.trim()) { errEl.textContent='Client name is required.'; errEl.style.display='block'; return; }
   if (!data.code || data.code.length !== 3) { errEl.textContent='Client code must be exactly 3 letters.'; errEl.style.display='block'; return; }
   data.code = data.code.toUpperCase();
@@ -474,7 +477,7 @@ document.getElementById('projectForm').addEventListener('submit',async e=>{
   const errEl=document.getElementById('projectFormError');
   errEl.style.display='none';
   const id=document.getElementById('projectId').value;
-  const data={client_id:+document.getElementById('projectClientId').value,name:document.getElementById('projectName').value,status:document.getElementById('projectStatus').value,notes:document.getElementById('projectNotes').value,author:getCurrentUser()};
+  const data={client_id:+document.getElementById('projectClientId').value,name:document.getElementById('projectName').value,status:document.getElementById('projectStatus').value,notes:document.getElementById('projectNotes').value};
   if (!data.name.trim()) { errEl.textContent='Project name is required.'; errEl.style.display='block'; return; }
   const btn=e.target.querySelector('[type="submit"]');
   setSaving(btn, true);
@@ -570,7 +573,6 @@ document.getElementById('taskForm').addEventListener('submit',async e=>{
     is_recurring:isRecurring,
     recur_interval:isRecurring?parseInt(document.getElementById('taskRecurInterval').value)||1:0,
     recur_unit:isRecurring?document.getElementById('taskRecurUnit').value:'',
-    author:getCurrentUser()
   };
   const btn=e.target.querySelector('[type="submit"]');
   setSaving(btn, true);
@@ -590,7 +592,6 @@ document.getElementById('taskForm').addEventListener('submit',async e=>{
     if(files.length>0 && taskId){
       const fd=new FormData();
       for(let i=0;i<files.length;i++) fd.append('files',files[i]);
-      fd.append('author',getCurrentUser());
       await fetch(`/api/tasks/${taskId}/attachments`,{method:'POST',body:fd});
     }
     closeModal('taskModal');await loadClients();
@@ -606,7 +607,7 @@ async function deleteAttachment(aid){
 }
 
 // ─── Comments ───────────────────────────────────────────
-async function addComment(e,tid){e.preventDefault();const inp=e.target.querySelector('input');const c=inp.value.trim();if(!c)return;await api(`/api/tasks/${tid}/comments`,{method:'POST',body:{author:getCurrentUser(),content:c}});inp.value='';await loadClients();}
+async function addComment(e,tid){e.preventDefault();const inp=e.target.querySelector('input');const c=inp.value.trim();if(!c)return;await api(`/api/tasks/${tid}/comments`,{method:'POST',body:{content:c}});inp.value='';await loadClients();}
 
 // ─── Client History ─────────────────────────────────────
 function renderHistoryLogs(logs) {
@@ -926,7 +927,7 @@ async function updateUserRole(userId, newRole) {
 async function changeUserPassword(userId, name) {
   const pw = prompt(`New password for ${name}:`);
   if (!pw) return;
-  if (pw.length < 4) { alert('Password must be at least 4 characters'); return; }
+  if (pw.length < 8) { alert('Password must be at least 8 characters with uppercase, lowercase, and a number'); return; }
   await api(`/api/users/${userId}/password`, { method: 'PUT', body: { password: pw } });
   alert('Password updated');
 }

@@ -1,0 +1,152 @@
+import { Router } from 'express';
+import db from '../database.js';
+import { requireAuth, requireRole, attachUpload } from '../middleware.js';
+import { logActivity } from '../lib/activity.js';
+
+const router = Router();
+
+// ─── Task CRUD ────────────────────────────────────────
+
+router.post('/', requireAuth, (req, res) => {
+  const { project_id, title, assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit } = req.body;
+  if (!project_id || !title) return res.status(400).json({ error: 'project_id and title required' });
+
+  const result = db.prepare(
+    'INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(project_id, title, assignee || '', deadline || '', planned_date || '', estimated_hours || 0, priority || 'medium', references_text || '', notes || '', is_recurring ? 1 : 0, recur_interval || 0, recur_unit || '');
+
+  logActivity('task', result.lastInsertRowid, 'created', req.user.display_name, `Created task "${title}"`);
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid);
+  task.comments = []; task.attachments = [];
+  res.json(task);
+});
+
+router.put('/:id', requireAuth, (req, res) => {
+  const { title, assignee, deadline, planned_date, estimated_hours, progress, priority, references_text, notes, is_recurring, recur_interval, recur_unit } = req.body;
+  const old = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+  if (!old) return res.status(404).json({ error: 'Task not found' });
+
+  db.prepare(
+    'UPDATE tasks SET title=COALESCE(?,title), assignee=COALESCE(?,assignee), deadline=COALESCE(?,deadline), planned_date=COALESCE(?,planned_date), estimated_hours=COALESCE(?,estimated_hours), progress=COALESCE(?,progress), priority=COALESCE(?,priority), references_text=COALESCE(?,references_text), notes=COALESCE(?,notes), is_recurring=COALESCE(?,is_recurring), recur_interval=COALESCE(?,recur_interval), recur_unit=COALESCE(?,recur_unit) WHERE id=?'
+  ).run(title, assignee, deadline, planned_date, estimated_hours, progress, priority, references_text, notes, is_recurring !== undefined ? (is_recurring ? 1 : 0) : null, recur_interval, recur_unit, req.params.id);
+
+  const changes = [];
+  if (title && title !== old.title) changes.push('title changed');
+  if (assignee !== undefined && assignee !== old.assignee) changes.push(`assignee: "${old.assignee || 'none'}" → "${assignee || 'none'}"`);
+  if (progress && progress !== old.progress) changes.push(`progress: ${old.progress} → ${progress}`);
+  if (priority && priority !== old.priority) changes.push(`priority: ${old.priority} → ${priority}`);
+  if (deadline !== undefined && deadline !== old.deadline) changes.push('deadline changed');
+  if (changes.length) logActivity('task', req.params.id, 'updated', req.user.display_name, changes.join(', '));
+
+  // Recurring: if completed and is recurring, create next occurrence
+  if (progress === 'completed' && old.progress !== 'completed' && old.is_recurring && old.recur_interval > 0) {
+    const nextDate = calculateNextDate(old.deadline || old.planned_date || new Date().toISOString().split('T')[0], old.recur_interval, old.recur_unit);
+    const newTask = db.prepare(
+      'INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(old.project_id, old.title, old.assignee, nextDate, nextDate, old.estimated_hours, old.priority, old.references_text, old.notes, 1, old.recur_interval, old.recur_unit);
+    logActivity('task', newTask.lastInsertRowid, 'created', 'System', `Auto-created recurring task "${old.title}" (next: ${nextDate})`);
+  }
+
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+  task.comments = db.prepare('SELECT * FROM comments WHERE task_id = ? ORDER BY created_at DESC').all(task.id);
+  task.attachments = db.prepare('SELECT * FROM task_attachments WHERE task_id = ? ORDER BY created_at DESC').all(task.id);
+  res.json(task);
+});
+
+function calculateNextDate(fromDate, interval, unit) {
+  const d = new Date(fromDate + 'T00:00:00');
+  switch (unit) {
+    case 'days': d.setDate(d.getDate() + interval); break;
+    case 'weeks': d.setDate(d.getDate() + interval * 7); break;
+    case 'months': d.setMonth(d.getMonth() + interval); break;
+    case 'years': d.setFullYear(d.getFullYear() + interval); break;
+  }
+  return d.toISOString().split('T')[0];
+}
+
+router.delete('/:id', requireAuth, requireRole('owner'), (req, res) => {
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+  db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);
+  logActivity('task', req.params.id, 'deleted', req.user.display_name, `Permanently deleted "${task?.title}"`);
+  res.json({ success: true });
+});
+
+router.put('/:id/archive', requireAuth, (req, res) => {
+  const t = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+  if (!t) return res.status(404).json({ error: 'Task not found' });
+  const ns = t.archived ? 0 : 1;
+  db.prepare('UPDATE tasks SET archived = ? WHERE id = ?').run(ns, req.params.id);
+  logActivity('task', req.params.id, ns ? 'archived' : 'restored', req.user.display_name, `${ns ? 'Archived' : 'Restored'} "${t.title}"`);
+  res.json({ success: true, archived: ns });
+});
+
+// ─── Attachments ──────────────────────────────────────
+
+router.post('/:id/attachments', requireAuth, attachUpload.array('files', 10), (req, res) => {
+  if (!req.files || !req.files.length) return res.status(400).json({ error: 'No files' });
+  const stmt = db.prepare('INSERT INTO task_attachments (task_id, filename, original_name, file_type, file_size, uploaded_by) VALUES (?, ?, ?, ?, ?, ?)');
+  const results = [];
+  for (const file of req.files) {
+    const r = stmt.run(req.params.id, file.filename, file.originalname, file.mimetype, file.size, req.user.display_name);
+    results.push(db.prepare('SELECT * FROM task_attachments WHERE id = ?').get(r.lastInsertRowid));
+  }
+  logActivity('task', req.params.id, 'updated', req.user.display_name, `Uploaded ${req.files.length} file(s)`);
+  res.json(results);
+});
+
+// Mounted at /api/attachments/:id via server.js
+export function deleteAttachmentHandler(req, res) {
+  db.prepare('DELETE FROM task_attachments WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+}
+
+// ─── Comments ─────────────────────────────────────────
+
+router.post('/:id/comments', requireAuth, (req, res) => {
+  const { content } = req.body;
+  if (!content) return res.status(400).json({ error: 'Content required' });
+  // Author derived from authenticated session, not client
+  const author = req.user.display_name;
+  const r = db.prepare('INSERT INTO comments (task_id, author, content) VALUES (?, ?, ?)').run(req.params.id, author, content);
+  logActivity('task', req.params.id, 'commented', author, content.substring(0, 100));
+  res.json(db.prepare('SELECT * FROM comments WHERE id = ?').get(r.lastInsertRowid));
+});
+
+// ─── Calendar / By-date ───────────────────────────────
+
+router.get('/by-date', requireAuth, (req, res) => {
+  const { date, assignee } = req.query;
+  const d = date || new Date().toISOString().split('T')[0];
+  const q = assignee
+    ? db.prepare('SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.planned_date=? AND t.assignee=? AND t.archived=0 ORDER BY t.priority, t.sort_order')
+    : db.prepare('SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.planned_date=? AND t.archived=0 ORDER BY t.assignee, t.priority, t.sort_order');
+  res.json(assignee ? q.all(d, assignee) : q.all(d));
+});
+
+router.get('/calendar', requireAuth, (req, res) => {
+  const { start, end, assignee } = req.query;
+  if (!start || !end) return res.status(400).json({ error: 'start and end required' });
+  const q = assignee
+    ? db.prepare('SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.archived=0 AND t.assignee=? AND (t.planned_date BETWEEN ? AND ? OR t.deadline BETWEEN ? AND ?) ORDER BY t.planned_date, t.deadline')
+    : db.prepare('SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.archived=0 AND (t.planned_date BETWEEN ? AND ? OR t.deadline BETWEEN ? AND ?) ORDER BY t.planned_date, t.deadline');
+  res.json(assignee ? q.all(assignee, start, end, start, end) : q.all(start, end, start, end));
+});
+
+// ─── Search ───────────────────────────────────────────
+
+router.get('/search', requireAuth, (req, res) => {
+  const { q } = req.query;
+  if (!q || q.length < 1) return res.json([]);
+
+  const refMatch = q.match(/^(?:NB)?(\d+)$/i);
+  let tasks;
+  if (refMatch) {
+    const taskId = parseInt(refMatch[1]);
+    tasks = db.prepare('SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.id=?').all(taskId);
+  } else {
+    tasks = db.prepare('SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.title LIKE ? OR t.notes LIKE ? OR t.assignee LIKE ? ORDER BY t.archived ASC, t.created_at DESC LIMIT 20').all(`%${q}%`, `%${q}%`, `%${q}%`);
+  }
+  res.json(tasks);
+});
+
+export default router;

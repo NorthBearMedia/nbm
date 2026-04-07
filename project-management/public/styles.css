@@ -483,19 +483,26 @@ a:hover { color: #6dd4a8; }
   transition: width 0.4s ease;
 }
 
-/* ─── Client Projects (collapsible) ──────────────────── */
+/* ─── Client Projects (collapsible with smooth animation) ── */
 .client-projects {
-  display: none;
-  padding: 8px 32px 28px 32px;
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
+  opacity: 0;
   background: rgba(30, 27, 28, 0.4);
   border-top: 1px solid var(--border);
 }
+.client-projects > .client-projects-inner {
+  overflow: hidden;
+  padding: 0 32px;
+}
 
-.client-projects.expanded,
-.client-projects[style*="display: block"],
-.client-projects[style*="display:block"],
 .client-row.expanded .client-projects {
-  display: block;
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.client-row.expanded .client-projects > .client-projects-inner {
+  padding: 8px 32px 28px 32px;
 }
 
 /* ─── Project Section ────────────────────────────────── */
@@ -523,15 +530,22 @@ a:hover { color: #6dd4a8; }
 }
 
 .project-tasks {
-  display: none;
-  padding: 16px 0 8px 0;
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+  opacity: 0;
   margin-left: 20px;
 }
+.project-tasks > .project-tasks-inner {
+  overflow: hidden;
+}
 
-.project-section.expanded .project-tasks,
-.project-tasks[style*="display: block"],
-.project-tasks[style*="display:block"] {
-  display: block;
+.project-section.expanded .project-tasks {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.project-section.expanded .project-tasks > .project-tasks-inner {
+  padding: 16px 0 8px 0;
 }
 
 /* ─── Task Row ───────────────────────────────────────── */
@@ -900,15 +914,20 @@ a:hover { color: #6dd4a8; }
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  display: none;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
 }
-.modal-backdrop.active { display: block; }
+.modal-backdrop.active {
+  opacity: 1;
+  pointer-events: auto;
+}
 
 .modal {
   position: fixed;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%) scale(0.95);
+  transform: translate(-50%, -46%) scale(0.94);
   z-index: 600;
   background: linear-gradient(170deg, rgba(45, 41, 42, 0.95), rgba(35, 31, 32, 0.97));
   border: 1px solid rgba(62, 175, 132, 0.15);
@@ -921,25 +940,20 @@ a:hover { color: #6dd4a8; }
   max-width: 640px;
   max-height: calc(100vh - 48px);
   overflow-y: auto;
-  display: none;
   opacity: 0;
+  pointer-events: none;
   backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
 }
 
 .modal.active {
-  display: block;
   opacity: 1;
+  pointer-events: auto;
   transform: translate(-50%, -50%) scale(1);
-  animation: modalReveal 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .modal-lg { max-width: 780px; }
-
-@keyframes modalReveal {
-  from { opacity: 0; transform: translate(-50%, -46%) scale(0.92); }
-  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-}
 
 .modal-header {
   display: flex;
@@ -1279,6 +1293,106 @@ a:hover { color: #6dd4a8; }
   }
 }
 
+/* ─── PREMIUM POLISH ─────────────────────────────────── */
+
+/* Smooth task row entrance */
+.task-row {
+  animation: fadeSlideIn 0.2s ease both;
+}
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Highlight animation for navigated-to tasks */
+.task-row.highlight {
+  animation: highlightPulse 2s ease;
+}
+@keyframes highlightPulse {
+  0%, 100% { background: transparent; }
+  15%, 50% { background: rgba(62, 175, 132, 0.12); box-shadow: inset 3px 0 0 var(--primary); }
+}
+
+/* Drag states */
+.client-row.dragging {
+  opacity: 0.5;
+  transform: scale(0.98);
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.client-row.drag-over {
+  box-shadow: inset 0 -2px 0 var(--primary);
+  background: rgba(62, 175, 132, 0.04);
+}
+
+/* Smoother buttons */
+.btn, .btn-icon, .nav-action, .filter-btn, .nav-tab {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn:active, .btn-icon:active, .nav-action:active {
+  transform: scale(0.95);
+}
+
+/* Card hover lift */
+.project-header:hover {
+  transform: translateY(-1px);
+}
+
+/* Today task card hover */
+.today-task {
+  transition: all 0.2s ease;
+}
+.today-task:hover {
+  transform: translateX(3px);
+  border-left-color: var(--primary);
+}
+
+/* Calendar day hover */
+.cal-day:not(.other-month):hover {
+  background: rgba(62, 175, 132, 0.04);
+  border-color: rgba(62, 175, 132, 0.15);
+}
+
+/* Stat card hover */
+.stat-card {
+  transition: all 0.2s ease;
+}
+.stat-card:hover {
+  background: rgba(62, 175, 132, 0.08);
+  transform: translateY(-1px);
+}
+
+/* Empty state fade */
+.empty-state {
+  animation: fadeIn 0.4s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Search results entrance */
+.search-result-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s ease;
+}
+.search-result-item:hover {
+  background: rgba(62, 175, 132, 0.06);
+}
+.search-result-item:last-child { border-bottom: none; }
+
+/* Comment entrance */
+.comment {
+  animation: fadeSlideIn 0.2s ease both;
+}
+
+/* Focus ring for accessibility */
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
+  outline: 2px solid rgba(62, 175, 132, 0.5);
+  outline-offset: 2px;
+}
+
+/* ─── RESPONSIVE ─────────────────────────────────────── */
 @media (max-width: 900px) {
   .navbar { padding: 0 16px; gap: 10px; }
   .nav-brand h1 { display: none; }
