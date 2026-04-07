@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>North Bear Console</title>
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=21">
+  <link rel="stylesheet" href="styles.css?v=22">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -44,6 +44,14 @@
       <button class="filter-btn" data-filter="ad-hoc">Ad Hoc</button>
       <span style="width:1px;height:20px;background:var(--border);margin:0 4px"></span>
       <button class="filter-btn" id="myTasksBtn" onclick="toggleMyTasks()">My Tasks</button>
+      <span style="width:1px;height:20px;background:var(--border);margin:0 4px"></span>
+      <select id="clientSort" style="background:var(--bg-glass);border:1px solid var(--border);border-radius:var(--radius);padding:5px 10px;font-size:12px;color:var(--text);cursor:pointer;font-family:inherit">
+        <option value="manual">Manual Order</option>
+        <option value="alpha">A &rarr; Z</option>
+        <option value="alpha-desc">Z &rarr; A</option>
+        <option value="recent">Recently Changed</option>
+        <option value="outstanding">Most Outstanding</option>
+      </select>
     </div>
     <div class="stats-bar" id="statsBar"></div>
   </div>
@@ -198,7 +206,7 @@
   <footer class="app-footer">
     <img src="/NBM%20Logo%20No%20NG%20Light%20Lines.png" alt="" style="width:28px;opacity:0.4">
     <span>&copy; 2026 North Bear Media. All rights reserved.</span>
-    <span class="app-version">v2.0</span>
+    <span class="app-version">v2.1</span>
   </footer>
 
   <!-- Crop Modal -->
@@ -223,6 +231,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=21"></script>
+  <script src="app.js?v=22"></script>
 </body>
 </html>

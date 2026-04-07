@@ -14,6 +14,7 @@ let showArchivedTasks = new Set();
 let calendarDate = new Date();
 let draggedClientId = null;
 let myTasksFilter = false;
+let clientSortMode = 'manual';
 
 function getCurrentUser() { return currentUser?.display_name || 'System'; }
 
@@ -192,6 +193,13 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelec
 function renderClients() {
   const ct = document.getElementById('clientList');
   if (!clients.length) { ct.innerHTML='<div class="empty-state"><img src="/NBM%20Logo%20No%20NG%20Light%20Lines.png" alt="" style="width:80px;opacity:0.3;margin-bottom:16px"><p>No clients yet. Click + to add one.</p></div>'; return; }
+  // Sort clients
+  const sorted = [...clients];
+  if (clientSortMode === 'alpha') sorted.sort((a,b) => a.name.localeCompare(b.name));
+  else if (clientSortMode === 'alpha-desc') sorted.sort((a,b) => b.name.localeCompare(a.name));
+  else if (clientSortMode === 'recent') sorted.sort((a,b) => (b.updated_at||b.created_at||'').localeCompare(a.updated_at||a.created_at||''));
+  else if (clientSortMode === 'outstanding') sorted.sort((a,b) => b.stats.outstandingTasks - a.stats.outstandingTasks);
+  const canDrag = clientSortMode === 'manual';
   // Filter notice
   const fn = document.getElementById('filterNotice');
   if (fn) {
@@ -203,17 +211,17 @@ function renderClients() {
       fn.style.display = 'block';
     } else { fn.style.display = 'none'; }
   }
-  ct.innerHTML = clients.map(c => {
+  ct.innerHTML = sorted.map(c => {
     const ex = expandedClients.has(c.id);
     const s = c.stats;
     const pct = s.totalTasks ? Math.round(s.completedTasks/s.totalTasks*100) : 0;
     const links=[];
     if(c.gmail_link)links.push(`<a href="${esc(c.gmail_link)}" target="_blank" class="client-link" onclick="event.stopPropagation()" title="Gmail">&#9993;</a>`);
     if(c.drive_link)links.push(`<a href="${esc(c.drive_link)}" target="_blank" class="client-link" onclick="event.stopPropagation()" title="Drive">&#128193;</a>`);
-    return `<div class="client-row ${ex?'expanded':''}" data-client-id="${c.id}" draggable="true" ondragstart="onDragStart(event,${c.id})" ondragover="onDragOver(event)" ondrop="onDrop(event,${c.id})" ondragend="onDragEnd(event)" ondragleave="onDragLeave(event)">
+    return `<div class="client-row ${ex?'expanded':''}" data-client-id="${c.id}" ${canDrag?`draggable="true" ondragstart="onDragStart(event,${c.id})" ondragover="onDragOver(event)" ondrop="onDrop(event,${c.id})" ondragend="onDragEnd(event)" ondragleave="onDragLeave(event)"`:''}>
       <div class="client-summary" onclick="toggleClient(${c.id})">
         <div class="client-info">
-          <span class="drag-handle" onclick="event.stopPropagation()">&#9776;</span>
+          ${canDrag?'<span class="drag-handle" onclick="event.stopPropagation()">&#9776;</span>':''}
           <div class="client-logo">${c.logo_url?`<img src="${esc(c.logo_url)}" alt="">`:esc(c.code||c.name.substring(0,3).toUpperCase())}</div>
           <div>
             <div class="client-name">${c.is_private?'<span title="Private — only visible to you" style="font-size:12px;margin-right:4px">&#128274;</span>':''}${esc(c.name)} <span class="client-code">${esc(c.code||'')}</span></div>
@@ -600,6 +608,12 @@ document.querySelectorAll('.filter-btn[data-filter]').forEach(btn=>{
     if (myTasksFilter) document.getElementById('myTasksBtn')?.classList.add('active');
     currentFilter=btn.dataset.filter;loadClients();
   });
+});
+
+// ─── Sort ─────────────────────────────────────────────
+document.getElementById('clientSort').addEventListener('change', function() {
+  clientSortMode = this.value;
+  renderClients();
 });
 
 // ─── My Tasks Filter ──────────────────────────────────

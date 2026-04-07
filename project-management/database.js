@@ -123,5 +123,6 @@ db.exec(`
 
 // Migrations — add columns if they don't exist
 try { db.exec('ALTER TABLE clients ADD COLUMN is_private INTEGER NOT NULL DEFAULT 0'); } catch {}
+try { db.exec("ALTER TABLE clients ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))"); } catch {}
 
 export default db;

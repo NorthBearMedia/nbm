@@ -153,6 +153,14 @@ const attachUpload = multer({ storage: attachStorage, limits: { fileSize: 50 * 1
 
 function logActivity(entityType, entityId, action, author, details) {
   db.prepare('INSERT INTO activity_log (entity_type, entity_id, action, author, details) VALUES (?, ?, ?, ?, ?)').run(entityType, entityId, action, author || 'System', details || '');
+  // Touch client updated_at for sorting by recently changed
+  if (entityType === 'client') {
+    db.prepare("UPDATE clients SET updated_at = datetime('now') WHERE id = ?").run(entityId);
+  } else if (entityType === 'project') {
+    db.prepare("UPDATE clients SET updated_at = datetime('now') WHERE id = (SELECT client_id FROM projects WHERE id = ?)").run(entityId);
+  } else if (entityType === 'task') {
+    db.prepare("UPDATE clients SET updated_at = datetime('now') WHERE id = (SELECT c.id FROM clients c JOIN projects p ON p.client_id = c.id JOIN tasks t ON t.project_id = p.id WHERE t.id = ?)").run(entityId);
+  }
 }
 
 // ─── CLIENTS ───────────────────────────────────────────
