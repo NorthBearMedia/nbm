@@ -133,7 +133,7 @@ function renderStats() {
 function showStatPopup(type) {
   const titles = {'outstanding':'Outstanding Tasks','in-progress':'In Progress','overdue':'Overdue Tasks','stuck':'Stuck Tasks','completed':'Completed Tasks','awaiting-manager':'Awaiting Your Sign-off'};
   document.getElementById('statsModalTitle').textContent = titles[type]||'Tasks';
-  const now = new Date().toISOString().split('T')[0];
+  const now = localDateStr(new Date());
   const items = [];
   for (const c of clients) for (const p of c.projects) for (const task of p.tasks) {
     let m = false;
@@ -170,6 +170,7 @@ function navigateToTask(cid,pid,tid) {
 
 // ─── Helpers ────────────────────────────────────────────
 function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function localDateStr(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function taskRef(id) { return 'NB' + String(id).padStart(3, '0'); }
 function userAvatar(user, size) {
   const s = size || 20;
@@ -778,7 +779,7 @@ function navigateToTaskFromSearch(taskId) {
 // ─── Today View ─────────────────────────────────────────
 async function loadTodayView(){
   const dateEl=document.getElementById('todayDate');
-  if(!dateEl.value)dateEl.value=new Date().toISOString().split('T')[0];
+  if(!dateEl.value)dateEl.value=localDateStr(new Date());
   const date=dateEl.value;
   const person=document.getElementById('todayPerson').value;
   const params=new URLSearchParams({date});
@@ -825,13 +826,13 @@ async function loadCalendarView(){
   const startDow=(firstDay.getDay()+6)%7;
   const startDate=new Date(firstDay);startDate.setDate(startDate.getDate()-startDow);
   const endDate=new Date(lastDay);const endDow=(lastDay.getDay()+6)%7;endDate.setDate(endDate.getDate()+(6-endDow));
-  const fmt=d=>d.toISOString().split('T')[0];
+  const fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const person=document.getElementById('calendarPerson').value;
   const params=new URLSearchParams({start:fmt(startDate),end:fmt(endDate)});
   if(person)params.set('assignee',person);
   const tasks=await api(`/api/tasks/calendar?${params}`);
   const byDate={};
-  const todayStr=new Date().toISOString().split('T')[0];
+  const todayStr=localDateStr(new Date());
   for(const t of tasks){
     const displayDate = t.planned_date || t.deadline;
     if(displayDate){if(!byDate[displayDate])byDate[displayDate]=[];byDate[displayDate].push({...t,dateType:t.planned_date?'planned':'deadline'});}
@@ -1025,7 +1026,7 @@ document.getElementById('clientLogo').addEventListener('change', function(e) {
     await loadCurrentUser();
     await loadTeam();
     await loadClients();
-    document.getElementById('todayDate').value=new Date().toISOString().split('T')[0];
+    document.getElementById('todayDate').value=localDateStr(new Date());
   } catch(e) {
     console.error('Init error:', e);
     document.getElementById('clientList').innerHTML='<div class="empty-state"><p>Error loading data. Please refresh.</p></div>';
