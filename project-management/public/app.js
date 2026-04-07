@@ -377,6 +377,7 @@ document.getElementById('addClientBtn').addEventListener('click',()=>{
   document.getElementById('clientLogo').value='';
   document.getElementById('clientPrivate').checked=false;
   document.getElementById('privateClientGroup').style.display=currentUser?.role==='owner'?'':'none';
+  window._croppedLogo=null;
   openModal('clientModal');
 });
 function editClient(id){
@@ -401,8 +402,7 @@ document.getElementById('clientForm').addEventListener('submit',async e=>{
   if (!data.code || data.code.length !== 3) { alert('Client code must be exactly 3 characters'); return; }
   data.code = data.code.toUpperCase();
   let r;if(id){r=await api(`/api/clients/${id}`,{method:'PUT',body:data});}else{r=await api('/api/clients',{method:'POST',body:data});}
-  const li=document.getElementById('clientLogo');
-  if(li.files.length>0){const fd=new FormData();fd.append('logo',li.files[0]);await fetch(`/api/clients/${r.id}/logo`,{method:'POST',body:fd});}
+  if(window._croppedLogo){const fd=new FormData();fd.append('logo',window._croppedLogo,'logo.jpg');await fetch(`/api/clients/${r.id}/logo`,{method:'POST',body:fd});window._croppedLogo=null;}
   closeModal('clientModal');await loadClients();
 });
 
@@ -827,11 +827,15 @@ async function renderUsersList() {
 
 async function uploadUserAvatar(userId, input) {
   if (!input.files.length) return;
-  const fd = new FormData();
-  fd.append('avatar', input.files[0]);
-  await fetch(`/api/users/${userId}/avatar`, { method: 'POST', body: fd });
-  await renderUsersList();
-  if (userId === currentUser.id) await loadCurrentUser();
+  const file = input.files[0];
+  input.value = '';
+  openCropModal(file, 'Crop Avatar', 1, async (blob) => {
+    const fd = new FormData();
+    fd.append('avatar', blob, 'avatar.jpg');
+    await fetch(`/api/users/${userId}/avatar`, { method: 'POST', body: fd });
+    await renderUsersList();
+    if (userId === currentUser.id) await loadCurrentUser();
+  });
 }
 
 async function updateUserRole(userId, newRole) {
@@ -875,6 +879,67 @@ document.getElementById('addUserForm').addEventListener('submit', async (e) => {
     const err = await res.json();
     alert(err.error || 'Failed to create user');
   }
+});
+
+// ─── Image Cropper ─────────────────────────────────────
+let _cropCallback = null;
+window._cropper = null;
+
+function openCropModal(file, title, aspectRatio, callback) {
+  _cropCallback = callback;
+  document.getElementById('cropModalTitle').textContent = title || 'Crop Image';
+  const img = document.getElementById('cropImage');
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    img.src = e.target.result;
+    document.getElementById('cropModalBackdrop').style.display = 'flex';
+    document.getElementById('cropZoom').value = 1;
+    // Small delay to let the image render before initializing cropper
+    setTimeout(() => {
+      if (window._cropper) window._cropper.destroy();
+      window._cropper = new Cropper(img, {
+        aspectRatio: aspectRatio || 1,
+        viewMode: 1,
+        autoCropArea: 0.85,
+        responsive: true,
+        guides: true,
+        center: true,
+        background: false,
+        dragMode: 'move',
+        zoom: (e) => {
+          document.getElementById('cropZoom').value = e.detail.ratio;
+        }
+      });
+    }, 100);
+  };
+  reader.readAsDataURL(file);
+}
+
+function closeCropModal() {
+  document.getElementById('cropModalBackdrop').style.display = 'none';
+  if (window._cropper) { window._cropper.destroy(); window._cropper = null; }
+  _cropCallback = null;
+}
+
+function applyCrop() {
+  if (!window._cropper || !_cropCallback) return;
+  const canvas = window._cropper.getCroppedCanvas({ width: 400, height: 400, imageSmoothingQuality: 'high' });
+  canvas.toBlob((blob) => {
+    if (blob && _cropCallback) _cropCallback(blob);
+    closeCropModal();
+  }, 'image/jpeg', 0.9);
+}
+
+// Intercept client logo file input
+document.getElementById('clientLogo').addEventListener('change', function(e) {
+  if (!this.files.length) return;
+  const file = this.files[0];
+  openCropModal(file, 'Crop Client Logo', 1, (blob) => {
+    // Store the cropped blob for form submission
+    window._croppedLogo = blob;
+  });
+  // Clear the input so the raw file isn't used
+  this.value = '';
 });
 
 // ─── Init ───────────────────────────────────────────────
