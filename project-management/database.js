@@ -177,7 +177,6 @@ try {
           bdb.close();
           console.log(`[DB] Backup ${f}: ${tc} tasks`);
           if (tc > bestTasks) { bestTasks = tc; bestBackup = f; }
-          if (tc > 10) break; // good enough, use this one
         } catch (e) { console.log(`[DB] Backup ${f}: unreadable (${e.message})`); }
       }
     } catch (e) { console.log('[DB] No backup directory found:', e.message); }
@@ -250,6 +249,76 @@ try {
   }
 } catch (err) {
   console.error('[DB] Restoration error:', err.message, err.stack);
+}
+
+// ─── Fill missing tasks from activity log ─────────────────────────────────────
+// The activity_log survived the cascade. Reconstruct any tasks that exist in the
+// log but not in the tasks table.
+try {
+  const createdTasks = db.prepare(
+    "SELECT * FROM activity_log WHERE entity_type='task' AND action='created' ORDER BY created_at ASC"
+  ).all();
+  const createdProjects = db.prepare(
+    "SELECT * FROM activity_log WHERE entity_type='project' AND action='created' ORDER BY created_at ASC"
+  ).all();
+
+  let recovered = 0;
+  for (const entry of createdTasks) {
+    const exists = db.prepare('SELECT id FROM tasks WHERE id = ?').get(entry.entity_id);
+    if (exists) continue;
+
+    // Extract title from details like: Created task "Some Title"
+    const titleMatch = entry.details.match(/Created task "(.+)"/);
+    if (!titleMatch) continue;
+    const title = titleMatch[1];
+
+    // Find the most recent project creation event before this task
+    let projectId = null;
+    for (let i = createdProjects.length - 1; i >= 0; i--) {
+      if (createdProjects[i].created_at <= entry.created_at) {
+        // Check this project actually exists
+        const proj = db.prepare('SELECT id FROM projects WHERE id = ?').get(createdProjects[i].entity_id);
+        if (proj) { projectId = proj.id; break; }
+      }
+    }
+
+    if (!projectId) {
+      // Fallback: use the first active project
+      const fallback = db.prepare('SELECT id FROM projects WHERE archived=0 ORDER BY id LIMIT 1').get();
+      if (fallback) projectId = fallback.id;
+    }
+
+    if (projectId) {
+      try {
+        db.prepare(
+          'INSERT OR IGNORE INTO tasks (id, project_id, title, assignee, progress, priority, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        ).run(entry.entity_id, projectId, title, entry.author, 'not-started', 'medium', entry.created_at);
+        recovered++;
+        console.log(`[DB] Recovered task #${entry.entity_id}: "${title}" -> project ${projectId}`);
+      } catch (e) { console.log(`[DB] Could not recover task #${entry.entity_id}: ${e.message}`); }
+    }
+  }
+
+  // Also replay status updates from activity log for recovered tasks
+  if (recovered > 0) {
+    const updates = db.prepare(
+      "SELECT * FROM activity_log WHERE entity_type='task' AND action='updated' AND details LIKE 'progress:%' ORDER BY created_at ASC"
+    ).all();
+    for (const u of updates) {
+      const progressMatch = u.details.match(/progress: \S+ → (\S+)/);
+      if (progressMatch) {
+        try {
+          db.prepare('UPDATE tasks SET progress = ? WHERE id = ?').run(progressMatch[1], u.entity_id);
+        } catch {}
+      }
+    }
+    console.log(`[DB] Recovered ${recovered} missing tasks from activity log`);
+  }
+
+  const finalCount = db.prepare('SELECT count(*) as c FROM tasks').get().c;
+  console.log(`[DB] Final task count: ${finalCount}`);
+} catch (err) {
+  console.error('[DB] Activity log recovery error:', err.message);
 }
 
 export default db;
