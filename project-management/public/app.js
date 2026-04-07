@@ -165,7 +165,8 @@ function fmtDateShort(d){if(!d)return'';return new Date(d+'T00:00:00').toLocaleD
 function getDeadlineClass(dl,prog){if(!dl||prog==='completed'||prog==='invoiced')return'';const now=new Date();now.setHours(0,0,0,0);const diff=(new Date(dl+'T00:00:00')-now)/864e5;return diff<0?'overdue':diff<=3?'due-soon':'';}
 function progressLabel(p){return{'not-started':'Not Started','in-progress':'In Progress','completed':'Completed','stuck':'Stuck','awaiting-client':'Awaiting Client','awaiting-manager':'Awaiting Manager','ready-to-invoice':'Ready to Invoice','invoiced':'Invoiced'}[p]||p;}
 function priorityLabel(p){return{'critical':'Critical','high':'High','medium':'Medium','low':'Low'}[p]||p;}
-function timeAgo(ds){if(!ds)return'';const now=new Date(),d=new Date(ds+(ds.includes('T')?'':'T00:00:00')),m=Math.floor((now-d)/6e4);if(m<1)return'just now';if(m<60)return m+'m ago';const h=Math.floor(m/60);if(h<24)return h+'h ago';const dd=Math.floor(h/24);if(dd<7)return dd+'d ago';return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
+function timeAgo(ds){if(!ds)return'';const now=new Date(),d=new Date(ds.replace(' ','T')+(ds.includes('T')||ds.includes(' ')?'Z':'T00:00:00Z')),m=Math.floor((now-d)/6e4);if(isNaN(m))return'';if(m<1)return'just now';if(m<60)return m+'m ago';const h=Math.floor(m/60);if(h<24)return h+'h ago';const dd=Math.floor(h/24);if(dd<7)return dd+'d ago';return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
+function fmtDateTime(ds){if(!ds)return'';const d=new Date(ds.replace(' ','T')+(ds.includes('T')||ds.includes(' ')?'Z':'T00:00:00Z'));if(isNaN(d))return'';return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})+' at '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}
 function fmtFileSize(bytes){if(bytes<1024)return bytes+'B';if(bytes<1048576)return(bytes/1024).toFixed(1)+'KB';return(bytes/1048576).toFixed(1)+'MB';}
 
 // ─── Toggles ────────────────────────────────────────────
@@ -539,7 +540,25 @@ async function showClientHistory(cid,name){
   document.getElementById('historyModalTitle').textContent='History \u2014 '+name;
   const logs=await api(`/api/clients/${cid}/history?limit=100`);
   document.getElementById('historyContent').innerHTML=!logs.length?'<div style="padding:12px;color:var(--text-secondary)">No activity yet.</div>':
-    logs.map(l=>`<div class="history-item"><div style="width:8px;height:8px;border-radius:50%;background:${l.action==='created'?'var(--success)':l.action==='archived'?'var(--warning)':'var(--primary)'};margin-top:6px;flex-shrink:0"></div><div style="flex:1"><div style="font-size:12px"><strong>${esc(l.author)}</strong> ${l.action} <span style="color:var(--text-secondary)">${l.entity_type}</span> <span style="color:var(--text-secondary);font-size:11px">${timeAgo(l.created_at)}</span></div>${l.details?`<div style="font-size:11px;color:var(--text-secondary);margin-top:2px">${esc(l.details)}</div>`:''}</div></div>`).join('');
+    logs.map(l=>{
+      const actionColor=l.action==='created'?'var(--success)':l.action==='archived'?'var(--warning)':l.action==='deleted'?'var(--danger)':'var(--primary)';
+      const user=findUser(l.author);
+      return`<div class="history-item" style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:36px;padding-top:2px">
+          <div style="width:8px;height:8px;border-radius:50%;background:${actionColor};flex-shrink:0"></div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            ${userAvatar(user,18)}
+            <strong style="font-size:13px">${esc(l.author)}</strong>
+            <span style="font-size:12px">${esc(l.action)}</span>
+            <span style="font-size:12px;color:var(--text-secondary)">${esc(l.entity_type)}</span>
+          </div>
+          ${l.details?`<div style="font-size:12px;color:var(--text-secondary);margin-top:3px">${esc(l.details)}</div>`:''}
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">${fmtDateTime(l.created_at)} (${timeAgo(l.created_at)})</div>
+        </div>
+      </div>`;
+    }).join('');
   openModal('historyModal');
 }
 
