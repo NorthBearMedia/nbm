@@ -719,8 +719,8 @@ async function loadCalendarView(){
   const byDate={};
   const todayStr=new Date().toISOString().split('T')[0];
   for(const t of tasks){
-    if(t.planned_date){if(!byDate[t.planned_date])byDate[t.planned_date]=[];byDate[t.planned_date].push({...t,dateType:'planned'});}
-    if(t.deadline&&t.deadline!==t.planned_date){if(!byDate[t.deadline])byDate[t.deadline]=[];byDate[t.deadline].push({...t,dateType:'deadline'});}
+    const displayDate = t.planned_date || t.deadline;
+    if(displayDate){if(!byDate[displayDate])byDate[displayDate]=[];byDate[displayDate].push({...t,dateType:t.planned_date?'planned':'deadline'});}
   }
   let html='';
   ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(d=>{html+=`<div class="cal-header">${d}</div>`;});
