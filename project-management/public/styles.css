@@ -297,6 +297,14 @@ a:hover { color: #6dd4a8; }
   border-color: var(--border);
   transform: translateY(-1px);
 }
+.stat-awaiting {
+  border-color: rgba(239, 68, 68, 0.3);
+  animation: pulse-awaiting 2s ease-in-out infinite;
+}
+@keyframes pulse-awaiting {
+  0%, 100% { border-color: rgba(239, 68, 68, 0.3); }
+  50% { border-color: rgba(239, 68, 68, 0.7); }
+}
 
 .stat-number {
   font-family: 'Montserrat', sans-serif;

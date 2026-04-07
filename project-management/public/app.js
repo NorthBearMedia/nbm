@@ -94,7 +94,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
 
 // ─── Stats ──────────────────────────────────────────────
 function renderStats() {
-  const t = { total: 0, outstanding: 0, inProgress: 0, overdue: 0, stuck: 0, completed: 0 };
+  const t = { total: 0, outstanding: 0, inProgress: 0, overdue: 0, stuck: 0, completed: 0, awaitingManager: 0 };
   for (const c of clients) {
     t.total += c.stats.totalTasks;
     t.outstanding += c.stats.outstandingTasks;
@@ -102,16 +102,18 @@ function renderStats() {
     t.overdue += c.stats.overdueTasks;
     t.stuck += c.stats.blockedTasks;
     t.completed += c.stats.completedTasks;
+    t.awaitingManager += c.stats.awaitingManager || 0;
   }
   document.getElementById('statsBar').innerHTML = `
     <div class="stat-card" onclick="showStatPopup('outstanding')"><div class="stat-number">${t.outstanding}</div><div class="stat-label">Outstanding</div></div>
     <div class="stat-card" onclick="showStatPopup('in-progress')"><div class="stat-number">${t.inProgress}</div><div class="stat-label">In Progress</div></div>
     <div class="stat-card" onclick="showStatPopup('overdue')"><div class="stat-number">${t.overdue}</div><div class="stat-label">Overdue</div></div>
-    <div class="stat-card" onclick="showStatPopup('stuck')"><div class="stat-number">${t.stuck}</div><div class="stat-label">Stuck</div></div>`;
+    <div class="stat-card" onclick="showStatPopup('stuck')"><div class="stat-number">${t.stuck}</div><div class="stat-label">Stuck</div></div>
+    ${t.awaitingManager?`<div class="stat-card stat-awaiting" onclick="showStatPopup('awaiting-manager')"><div class="stat-number" style="color:var(--danger)">${t.awaitingManager}</div><div class="stat-label" style="color:var(--danger)">Awaiting You</div></div>`:''}`;
 }
 
 function showStatPopup(type) {
-  const titles = {'outstanding':'Outstanding Tasks','in-progress':'In Progress','overdue':'Overdue Tasks','stuck':'Stuck Tasks','completed':'Completed Tasks'};
+  const titles = {'outstanding':'Outstanding Tasks','in-progress':'In Progress','overdue':'Overdue Tasks','stuck':'Stuck Tasks','completed':'Completed Tasks','awaiting-manager':'Awaiting Your Sign-off'};
   document.getElementById('statsModalTitle').textContent = titles[type]||'Tasks';
   const now = new Date().toISOString().split('T')[0];
   const items = [];
@@ -122,6 +124,7 @@ function showStatPopup(type) {
     if (type==='completed' && (task.progress==='completed'||task.progress==='invoiced')) m=true;
     if (type==='overdue' && task.deadline && task.deadline<now && task.progress!=='completed' && task.progress!=='invoiced') m=true;
     if (type==='stuck' && task.progress==='stuck') m=true;
+    if (type==='awaiting-manager' && task.progress==='awaiting-manager') m=true;
     if (m) items.push({task,project:p,client:c});
   }
   const ct = document.getElementById('statsModalContent');
@@ -211,7 +214,7 @@ function renderClients() {
           <span class="drag-handle" onclick="event.stopPropagation()">&#9776;</span>
           <div class="client-logo">${c.logo_url?`<img src="${esc(c.logo_url)}" alt="">`:esc(c.code||c.name.substring(0,3).toUpperCase())}</div>
           <div>
-            <div class="client-name">${esc(c.name)} <span class="client-code">${esc(c.code||'')}</span></div>
+            <div class="client-name">${c.is_private?'<span title="Private — only visible to you" style="font-size:12px;margin-right:4px">&#128274;</span>':''}${esc(c.name)} <span class="client-code">${esc(c.code||'')}</span></div>
             <div style="display:flex;gap:6px;align-items:center">${links.join('')}</div>
           </div>
         </div>
@@ -372,6 +375,8 @@ document.getElementById('addClientBtn').addEventListener('click',()=>{
   ['clientId','clientName','clientCode','clientNotes','clientGmail','clientDrive'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('clientType').value='recurring';
   document.getElementById('clientLogo').value='';
+  document.getElementById('clientPrivate').checked=false;
+  document.getElementById('privateClientGroup').style.display=currentUser?.role==='owner'?'':'none';
   openModal('clientModal');
 });
 function editClient(id){
@@ -385,12 +390,14 @@ function editClient(id){
   document.getElementById('clientGmail').value=c.gmail_link||'';
   document.getElementById('clientDrive').value=c.drive_link||'';
   document.getElementById('clientLogo').value='';
+  document.getElementById('clientPrivate').checked=!!c.is_private;
+  document.getElementById('privateClientGroup').style.display=currentUser?.role==='owner'?'':'none';
   openModal('clientModal');
 }
 document.getElementById('clientForm').addEventListener('submit',async e=>{
   e.preventDefault();
   const id=document.getElementById('clientId').value;
-  const data={name:document.getElementById('clientName').value,code:document.getElementById('clientCode').value,agreement_type:document.getElementById('clientType').value,notes:document.getElementById('clientNotes').value,gmail_link:document.getElementById('clientGmail').value,drive_link:document.getElementById('clientDrive').value,author:getCurrentUser()};
+  const data={name:document.getElementById('clientName').value,code:document.getElementById('clientCode').value,agreement_type:document.getElementById('clientType').value,notes:document.getElementById('clientNotes').value,gmail_link:document.getElementById('clientGmail').value,drive_link:document.getElementById('clientDrive').value,is_private:document.getElementById('clientPrivate').checked,author:getCurrentUser()};
   if (!data.code || data.code.length !== 3) { alert('Client code must be exactly 3 characters'); return; }
   data.code = data.code.toUpperCase();
   let r;if(id){r=await api(`/api/clients/${id}`,{method:'PUT',body:data});}else{r=await api('/api/clients',{method:'POST',body:data});}

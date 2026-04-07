@@ -157,14 +157,16 @@ function logActivity(entityType, entityId, action, author, details) {
 
 // ─── CLIENTS ───────────────────────────────────────────
 
-app.get('/api/clients', (req, res) => {
+app.get('/api/clients', requireAuth, (req, res) => {
   const { filter, include_archived } = req.query;
   const arc = include_archived === '1' ? '' : 'AND archived = 0';
+  const isOwner = req.user.role === 'owner';
+  const privateFilter = isOwner ? '' : 'AND is_private = 0';
   let clients;
   if (filter && ['recurring', 'ad-hoc'].includes(filter)) {
-    clients = db.prepare(`SELECT * FROM clients WHERE agreement_type = ? ${arc} ORDER BY sort_order, name`).all(filter);
+    clients = db.prepare(`SELECT * FROM clients WHERE agreement_type = ? ${arc} ${privateFilter} ORDER BY sort_order, name`).all(filter);
   } else {
-    clients = db.prepare(`SELECT * FROM clients WHERE 1=1 ${arc} ORDER BY sort_order, name`).all();
+    clients = db.prepare(`SELECT * FROM clients WHERE 1=1 ${arc} ${privateFilter} ORDER BY sort_order, name`).all();
   }
 
   const projectsStmt = db.prepare('SELECT * FROM projects WHERE client_id = ? AND archived = 0 ORDER BY sort_order, name');
@@ -177,7 +179,7 @@ app.get('/api/clients', (req, res) => {
   for (const client of clients) {
     client.projects = projectsStmt.all(client.id);
     client.archivedProjects = archivedProjectsStmt.all(client.id);
-    let totalTasks = 0, completedTasks = 0, overdueTasks = 0, inProgressTasks = 0, blockedTasks = 0;
+    let totalTasks = 0, completedTasks = 0, overdueTasks = 0, inProgressTasks = 0, blockedTasks = 0, awaitingManager = 0;
     const now = new Date().toISOString().split('T')[0];
     const doneStatuses = ['completed', 'invoiced'];
 
@@ -194,31 +196,33 @@ app.get('/api/clients', (req, res) => {
           if (doneStatuses.includes(task.progress)) completedTasks++;
           if (task.progress === 'in-progress') inProgressTasks++;
           if (task.progress === 'stuck') blockedTasks++;
+          if (task.progress === 'awaiting-manager') awaitingManager++;
           if (task.deadline && task.deadline < now && !doneStatuses.includes(task.progress)) overdueTasks++;
         }
       }
     }
-    client.stats = { totalTasks, completedTasks, overdueTasks, inProgressTasks, blockedTasks, outstandingTasks: totalTasks - completedTasks };
+    client.stats = { totalTasks, completedTasks, overdueTasks, inProgressTasks, blockedTasks, awaitingManager, outstandingTasks: totalTasks - completedTasks };
   }
   res.json(clients);
 });
 
-app.post('/api/clients', (req, res) => {
-  const { name, code, agreement_type, notes, gmail_link, drive_link, author } = req.body;
+app.post('/api/clients', requireAuth, (req, res) => {
+  const { name, code, agreement_type, notes, gmail_link, drive_link, author, is_private } = req.body;
   if (!name) return res.status(400).json({ error: 'Client name is required' });
   if (code && code.length !== 3) return res.status(400).json({ error: 'Client code must be exactly 3 characters' });
+  if (is_private && req.user.role !== 'owner') return res.status(403).json({ error: 'Only owners can create private clients' });
   const autoCode = name.split(' ').map(w => w[0]).join('').substring(0, 3).toUpperCase().padEnd(3, 'X');
   const clientCode = code || autoCode;
-  const result = db.prepare('INSERT INTO clients (name, code, agreement_type, notes, gmail_link, drive_link) VALUES (?, ?, ?, ?, ?, ?)').run(name, clientCode, agreement_type || 'recurring', notes || '', gmail_link || '', drive_link || '');
+  const result = db.prepare('INSERT INTO clients (name, code, agreement_type, notes, gmail_link, drive_link, is_private) VALUES (?, ?, ?, ?, ?, ?, ?)').run(name, clientCode, agreement_type || 'recurring', notes || '', gmail_link || '', drive_link || '', is_private ? 1 : 0);
   logActivity('client', result.lastInsertRowid, 'created', author, `Created client "${name}"`);
   res.json(db.prepare('SELECT * FROM clients WHERE id = ?').get(result.lastInsertRowid));
 });
 
-app.put('/api/clients/:id', (req, res) => {
-  const { name, code, agreement_type, notes, logo_url, gmail_link, drive_link, author } = req.body;
+app.put('/api/clients/:id', requireAuth, (req, res) => {
+  const { name, code, agreement_type, notes, logo_url, gmail_link, drive_link, author, is_private } = req.body;
   const old = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
-  db.prepare('UPDATE clients SET name = COALESCE(?, name), code = COALESCE(?, code), agreement_type = COALESCE(?, agreement_type), notes = COALESCE(?, notes), logo_url = COALESCE(?, logo_url), gmail_link = COALESCE(?, gmail_link), drive_link = COALESCE(?, drive_link) WHERE id = ?')
-    .run(name, code, agreement_type, notes, logo_url, gmail_link, drive_link, req.params.id);
+  db.prepare('UPDATE clients SET name = COALESCE(?, name), code = COALESCE(?, code), agreement_type = COALESCE(?, agreement_type), notes = COALESCE(?, notes), logo_url = COALESCE(?, logo_url), gmail_link = COALESCE(?, gmail_link), drive_link = COALESCE(?, drive_link), is_private = COALESCE(?, is_private) WHERE id = ?')
+    .run(name, code, agreement_type, notes, logo_url, gmail_link, drive_link, is_private !== undefined ? (is_private ? 1 : 0) : null, req.params.id);
   const changes = [];
   if (name && name !== old.name) changes.push(`name: "${old.name}" → "${name}"`);
   if (code !== undefined && code !== old.code) changes.push(`code: "${old.code}" → "${code}"`);

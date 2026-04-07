@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>North Bear Console</title>
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=17">
+  <link rel="stylesheet" href="styles.css?v=18">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -95,6 +95,7 @@
       <div class="form-group"><label>Notes</label><textarea id="clientNotes" rows="2"></textarea></div>
       <div class="form-row"><div class="form-group"><label>Gmail Link</label><input type="url" id="clientGmail" placeholder="https://mail.google.com/..."></div><div class="form-group"><label>Google Drive Link</label><input type="url" id="clientDrive" placeholder="https://drive.google.com/..."></div></div>
       <div class="form-group"><label>Logo</label><input type="file" id="clientLogo" accept="image/*"></div>
+      <div class="form-group" id="privateClientGroup" style="display:none"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="clientPrivate"> <span>Private Client</span> <span style="font-size:11px;color:var(--text-secondary)">(only visible to you)</span></label></div>
       <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="closeModal('clientModal')">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
     </form>
   </div>
@@ -195,9 +196,9 @@
   <footer class="app-footer">
     <img src="/NBM%20Logo%20No%20NG%20Light%20Lines.png" alt="" style="width:28px;opacity:0.4">
     <span>&copy; 2026 North Bear Media. All rights reserved.</span>
-    <span class="app-version">v1.6</span>
+    <span class="app-version">v1.7</span>
   </footer>
 
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>
