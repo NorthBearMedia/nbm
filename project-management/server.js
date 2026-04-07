@@ -1,6 +1,7 @@
 import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { mkdirSync, copyFileSync, readdirSync, unlinkSync, existsSync } from 'fs';
 import multer from 'multer';
 import { createHash, randomBytes } from 'crypto';
 import cookieParser from 'cookie-parser';
@@ -9,6 +10,35 @@ import db from './database.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// ─── Database Backup ────────────────────────────────────
+const dataDir = process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname;
+const backupDir = join(dataDir, 'backups');
+try { mkdirSync(backupDir, { recursive: true }); } catch {}
+
+function backupDatabase() {
+  try {
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupPath = join(backupDir, `nbm-projects-${ts}.db`);
+    db.backup(backupPath).then(() => {
+      console.log(`Backup created: ${backupPath}`);
+      // Keep only last 48 backups (2 days of hourly)
+      const files = readdirSync(backupDir)
+        .filter(f => f.startsWith('nbm-projects-') && f.endsWith('.db'))
+        .sort();
+      while (files.length > 48) {
+        const old = files.shift();
+        try { unlinkSync(join(backupDir, old)); } catch {}
+      }
+    }).catch(err => console.error('Backup failed:', err));
+  } catch (err) {
+    console.error('Backup error:', err);
+  }
+}
+
+// Run backup on startup and every hour
+backupDatabase();
+setInterval(backupDatabase, 60 * 60 * 1000);
 
 app.use(express.json());
 app.use(cookieParser());
@@ -501,77 +531,27 @@ app.get('/api/tasks/search', (req, res) => {
   res.json(tasks);
 });
 
+// ─── Backup API (owner only) ────────────────────────────
+app.get('/api/backups', requireAuth, (req, res) => {
+  if (req.user.role !== 'owner') return res.status(403).json({ error: 'Owner only' });
+  try {
+    const files = readdirSync(backupDir)
+      .filter(f => f.startsWith('nbm-projects-') && f.endsWith('.db'))
+      .sort()
+      .reverse();
+    res.json(files);
+  } catch { res.json([]); }
+});
+
+app.post('/api/backups', requireAuth, (req, res) => {
+  if (req.user.role !== 'owner') return res.status(403).json({ error: 'Owner only' });
+  backupDatabase();
+  res.json({ success: true, message: 'Backup started' });
+});
+
 // ─── SEED ──────────────────────────────────────────────
 
-function seedIfEmpty() {
-  if (db.prepare('SELECT COUNT(*) as c FROM clients').get().c > 0) return;
-
-  // Seed users
-  if (db.prepare('SELECT COUNT(*) as c FROM users').get().c === 0) {
-    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('norton', 'norton@northbearmedia.co.uk', ?, 'Norton', 'owner', '#3eaf84')").run(hashPassword('nbm2026'));
-    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('cally', 'cally@northbearmedia.co.uk', ?, 'Cally', 'editor', '#60a5fa')").run(hashPassword('nbm2026'));
-    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('haley', 'haley@northbearmedia.co.uk', ?, 'Haley', 'editor', '#f59e0b')").run(hashPassword('nbm2026'));
-  }
-
-  db.prepare("INSERT INTO team_members (name, role, avatar_color) VALUES ('Norton', 'Director', '#3eaf84')").run();
-  db.prepare("INSERT INTO team_members (name, role, avatar_color) VALUES ('Cally', 'Content Manager', '#60a5fa')").run();
-  db.prepare("INSERT INTO team_members (name, role, avatar_color) VALUES ('Haley', 'Social Media', '#f59e0b')").run();
-
-  const today = new Date().toISOString().split('T')[0];
-  const tomorrow = new Date(Date.now() + 864e5).toISOString().split('T')[0];
-
-  const nbm = db.prepare("INSERT INTO clients (name, code, agreement_type, notes, gmail_link, drive_link, sort_order) VALUES ('NorthBear Media', 'NBM', 'recurring', 'Internal business operations — general tasks, admin, strategy, and growth.', 'https://mail.google.com/mail/u/0/#label/NorthBear+Media', 'https://drive.google.com/drive/folders/northbearmedia', 0)").run();
-  const nbmOps = db.prepare("INSERT INTO projects (client_id, name, notes) VALUES (?, 'General Operations', 'Day-to-day business tasks')").run(nbm.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Set up project management system', 'Norton', '2026-04-06', '2026-04-06', 2, 'completed', 'high', 'Get the team organized')`).run(nbmOps.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Quarterly strategy review', 'Norton', '2026-04-30', '${today}', 3, 'not-started', 'high', 'Review Q1 performance')`).run(nbmOps.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Update company portfolio', 'Cally', '2026-04-15', '${today}', 4, 'in-progress', 'medium', 'Add latest case studies')`).run(nbmOps.lastInsertRowid);
-  const nbmSocial = db.prepare("INSERT INTO projects (client_id, name, notes) VALUES (?, 'NBM Social Media', 'Our own social presence')").run(nbm.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes, is_recurring, recur_interval, recur_unit) VALUES (?, 'Monthly content calendar', 'Haley', '2026-04-07', '${today}', 2, 'in-progress', 'high', 'Plan posts for the month', 1, 1, 'months')`).run(nbmSocial.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Record behind-the-scenes reels', 'Cally', '2026-04-12', '${tomorrow}', 3, 'not-started', 'medium', 'Instagram content')`).run(nbmSocial.lastInsertRowid);
-
-  const rms = db.prepare("INSERT INTO clients (name, code, agreement_type, notes, gmail_link, drive_link, sort_order) VALUES ('RMS Fire Blankets', 'RMS', 'recurring', 'Fire safety company. Monthly social media, content, and ads. Retainer.', 'https://mail.google.com/mail/u/0/#label/RMS', 'https://drive.google.com/drive/folders/rms', 1)").run();
-  const rmsSocial = db.prepare("INSERT INTO projects (client_id, name, notes) VALUES (?, 'Social Media Management', 'Monthly content and community management')").run(rms.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'April social content batch', 'Haley', '2026-04-10', '${today}', 5, 'in-progress', 'high', 'Create 12 posts for FB/IG')`).run(rmsSocial.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Product photography shoot', 'Cally', '2026-04-14', '${tomorrow}', 6, 'not-started', 'medium', 'New range — lifestyle shots')`).run(rmsSocial.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Facebook ad campaign — Spring', 'Haley', '2026-04-08', '${today}', 2, 'awaiting-client', 'high', 'Awaiting creative approval from client')`).run(rmsSocial.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, estimated_hours, progress, priority, notes, is_recurring, recur_interval, recur_unit) VALUES (?, 'Monthly performance report', 'Cally', '2026-04-05', 1, 'completed', 'medium', 'Analytics summary', 1, 1, 'months')`).run(rmsSocial.lastInsertRowid);
-  const rmsWeb = db.prepare("INSERT INTO projects (client_id, name, notes) VALUES (?, 'Website Updates', 'Ongoing maintenance')").run(rms.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Add new product pages', 'Norton', '2026-04-20', '${tomorrow}', 4, 'not-started', 'medium', 'New commercial range')`).run(rmsWeb.lastInsertRowid);
-
-  const spotted = db.prepare("INSERT INTO clients (name, code, agreement_type, notes, sort_order) VALUES ('Spotted Community Pages', 'SCP', 'recurring', 'AI-powered moderation for community Facebook pages.', 2)").run();
-  const spottedMod = db.prepare("INSERT INTO projects (client_id, name, notes) VALUES (?, 'AI Moderation System', 'Automated moderation using Claude AI')").run(spotted.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Fine-tune moderation threshold', 'Norton', '2026-04-10', '${today}', 3, 'in-progress', 'critical', 'Reduce false positives')`).run(spottedMod.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, estimated_hours, progress, priority, notes) VALUES (?, 'Add Spotted Darlington', 'Norton', '2026-04-15', 2, 'awaiting-manager', 'medium', 'Awaiting approval to onboard')`).run(spottedMod.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes, is_recurring, recur_interval, recur_unit) VALUES (?, 'Weekly moderation report', 'Haley', '2026-04-07', '${today}', 1, 'not-started', 'high', 'Summary of flagged posts', 1, 1, 'weeks')`).run(spottedMod.lastInsertRowid);
-
-  const adhoc1 = db.prepare("INSERT INTO clients (name, code, agreement_type, notes, sort_order) VALUES ('The Garden Kitchen', 'TGK', 'ad-hoc', 'Local restaurant. Menu redesign and social media launch.', 3)").run();
-  const gkMenu = db.prepare("INSERT INTO projects (client_id, name, notes) VALUES (?, 'Menu Redesign & Launch', 'Brand refresh + social launch')").run(adhoc1.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Menu design — first draft', 'Cally', '2026-04-12', '${today}', 6, 'in-progress', 'high', 'A3 folded menu')`).run(gkMenu.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, estimated_hours, progress, priority, notes) VALUES (?, 'Food photography session', 'Cally', '2026-04-18', 4, 'not-started', 'medium', 'On-location shoot')`).run(gkMenu.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, estimated_hours, progress, priority, notes) VALUES (?, 'Social media launch pack', 'Haley', '2026-04-22', 5, 'not-started', 'medium', '10 launch posts')`).run(gkMenu.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, estimated_hours, progress, priority, notes) VALUES (?, 'Client sign-off meeting', 'Norton', '2026-04-25', 1, 'not-started', 'low', 'Present final designs')`).run(gkMenu.lastInsertRowid);
-
-  const build = db.prepare("INSERT INTO clients (name, code, agreement_type, notes, sort_order) VALUES ('Hartlepool Builders Ltd', 'HBL', 'recurring', 'Construction company. Monthly social and quarterly video. 12-month retainer.', 4)").run();
-  const buildSocial = db.prepare("INSERT INTO projects (client_id, name, notes) VALUES (?, 'Social Media Management', 'Monthly content creation')").run(build.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'April — before/after gallery', 'Haley', '2026-04-09', '${today}', 3, 'in-progress', 'high', 'Kitchen reno posts')`).run(buildSocial.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, estimated_hours, progress, priority, notes) VALUES (?, 'Drone footage — new build', 'Norton', '2026-04-16', 4, 'not-started', 'medium', 'Aerial progress shots')`).run(buildSocial.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Google review campaign', 'Cally', '2026-04-11', '${today}', 2, 'stuck', 'high', 'Waiting on client email list')`).run(buildSocial.lastInsertRowid);
-
-  // Comments
-  const findTask = (s) => db.prepare('SELECT id FROM tasks WHERE title LIKE ?').get(`%${s}%`);
-  const t1 = findTask('Set up project management'); if (t1) db.prepare("INSERT INTO comments (task_id, author, content) VALUES (?, 'Norton', 'System is live. Moving to completed.')").run(t1.id);
-  const t2 = findTask('Update company portfolio'); if (t2) db.prepare("INSERT INTO comments (task_id, author, content) VALUES (?, 'Cally', 'Started layouts, first draft by Wednesday.')").run(t2.id);
-  const t3 = findTask('April social content'); if (t3) db.prepare("INSERT INTO comments (task_id, author, content) VALUES (?, 'Haley', 'Got 8 of 12 done, rest tomorrow.')").run(t3.id);
-  const t4 = findTask('Google review campaign'); if (t4) { db.prepare("INSERT INTO comments (task_id, author, content) VALUES (?, 'Cally', 'Chased twice — still waiting.')").run(t4.id); db.prepare("INSERT INTO comments (task_id, author, content) VALUES (?, 'Norton', 'Will call Monday if no response.')").run(t4.id); }
-
-  logActivity('client', nbm.lastInsertRowid, 'created', 'Norton', 'Created "NorthBear Media"');
-  logActivity('client', rms.lastInsertRowid, 'created', 'Norton', 'Created "RMS Fire Blankets"');
-  logActivity('client', spotted.lastInsertRowid, 'created', 'Norton', 'Created "Spotted Community Pages"');
-  logActivity('client', adhoc1.lastInsertRowid, 'created', 'Norton', 'Created "The Garden Kitchen"');
-  logActivity('client', build.lastInsertRowid, 'created', 'Norton', 'Created "Hartlepool Builders Ltd"');
-}
-
-// Always ensure users exist
+// Only seed default users if none exist (so you can always log in)
 function seedUsers() {
   if (db.prepare('SELECT COUNT(*) as c FROM users').get().c === 0) {
     db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('norton', 'norton@northbearmedia.co.uk', ?, 'Norton', 'owner', '#3eaf84')").run(hashPassword('nbm2026'));
@@ -582,5 +562,4 @@ function seedUsers() {
 }
 
 seedUsers();
-seedIfEmpty();
 app.listen(PORT, () => { console.log(`NorthBear Media Project Management running at http://localhost:${PORT}`); });

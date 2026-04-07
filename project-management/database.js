@@ -3,7 +3,11 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const dbPath = process.env.DB_PATH || join(__dirname, 'nbm-projects.db');
+
+// Use RAILWAY_VOLUME_MOUNT_PATH if available for persistent storage
+const dataDir = process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname;
+const dbPath = process.env.DB_PATH || join(dataDir, 'nbm-projects.db');
+console.log(`Database path: ${dbPath}`);
 const db = new Database(dbPath);
 
 db.pragma('journal_mode = WAL');
