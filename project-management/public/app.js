@@ -46,7 +46,22 @@ async function api(url, options = {}) {
     ...options,
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Something went wrong');
+  return data;
+}
+
+// Save button state helper
+function setSaving(btn, saving) {
+  if (!btn) return;
+  if (saving) {
+    btn.disabled = true;
+    btn._origText = btn.textContent;
+    btn.innerHTML = '<span class="saving-spinner"></span> Saving...';
+  } else {
+    btn.disabled = false;
+    btn.textContent = btn._origText || 'Save';
+  }
 }
 
 async function loadClients() {
@@ -382,6 +397,7 @@ async function showArchiveModal(){
 // ─── Client CRUD ────────────────────────────────────────
 document.getElementById('addClientBtn').addEventListener('click',()=>{
   document.getElementById('clientModalTitle').textContent='New Client';
+  document.getElementById('clientFormError').style.display='none';
   ['clientId','clientName','clientCode','clientNotes','clientGmail','clientDrive'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('clientType').value='recurring';
   document.getElementById('clientLogo').value='';
@@ -393,6 +409,7 @@ document.getElementById('addClientBtn').addEventListener('click',()=>{
 function editClient(id){
   const c=clients.find(x=>x.id===id);if(!c)return;
   document.getElementById('clientModalTitle').textContent='Edit Client';
+  document.getElementById('clientFormError').style.display='none';
   document.getElementById('clientId').value=c.id;
   document.getElementById('clientName').value=c.name;
   document.getElementById('clientCode').value=c.code||'';
@@ -407,18 +424,27 @@ function editClient(id){
 }
 document.getElementById('clientForm').addEventListener('submit',async e=>{
   e.preventDefault();
+  const errEl=document.getElementById('clientFormError');
+  errEl.style.display='none';
   const id=document.getElementById('clientId').value;
   const data={name:document.getElementById('clientName').value,code:document.getElementById('clientCode').value,agreement_type:document.getElementById('clientType').value,notes:document.getElementById('clientNotes').value,gmail_link:document.getElementById('clientGmail').value,drive_link:document.getElementById('clientDrive').value,is_private:document.getElementById('clientPrivate').checked,author:getCurrentUser()};
-  if (!data.code || data.code.length !== 3) { alert('Client code must be exactly 3 characters'); return; }
+  if (!data.name.trim()) { errEl.textContent='Client name is required.'; errEl.style.display='block'; return; }
+  if (!data.code || data.code.length !== 3) { errEl.textContent='Client code must be exactly 3 letters.'; errEl.style.display='block'; return; }
   data.code = data.code.toUpperCase();
-  let r;if(id){r=await api(`/api/clients/${id}`,{method:'PUT',body:data});}else{r=await api('/api/clients',{method:'POST',body:data});}
-  if(window._croppedLogo){const fd=new FormData();fd.append('logo',window._croppedLogo,'logo.jpg');await fetch(`/api/clients/${r.id}/logo`,{method:'POST',body:fd});window._croppedLogo=null;}
-  closeModal('clientModal');await loadClients();
+  const btn=e.target.querySelector('[type="submit"]');
+  setSaving(btn, true);
+  try {
+    let r;if(id){r=await api(`/api/clients/${id}`,{method:'PUT',body:data});}else{r=await api('/api/clients',{method:'POST',body:data});}
+    if(window._croppedLogo){const fd=new FormData();fd.append('logo',window._croppedLogo,'logo.jpg');await fetch(`/api/clients/${r.id}/logo`,{method:'POST',body:fd});window._croppedLogo=null;}
+    closeModal('clientModal');await loadClients();
+  } catch(err) { errEl.textContent=err.message; errEl.style.display='block'; }
+  finally { setSaving(btn, false); }
 });
 
 // ─── Project CRUD ───────────────────────────────────────
 function openProjectModal(cid){
   document.getElementById('projectModalTitle').textContent='New Project';
+  document.getElementById('projectFormError').style.display='none';
   document.getElementById('projectId').value='';
   document.getElementById('projectClientId').value=cid;
   document.getElementById('projectName').value='';
@@ -429,6 +455,7 @@ function openProjectModal(cid){
 function editProject(pid,cid){
   const c=clients.find(x=>x.id===cid);const p=c?.projects.find(x=>x.id===pid);if(!p)return;
   document.getElementById('projectModalTitle').textContent='Edit Project';
+  document.getElementById('projectFormError').style.display='none';
   document.getElementById('projectId').value=p.id;
   document.getElementById('projectClientId').value=cid;
   document.getElementById('projectName').value=p.name;
@@ -438,15 +465,24 @@ function editProject(pid,cid){
 }
 document.getElementById('projectForm').addEventListener('submit',async e=>{
   e.preventDefault();
+  const errEl=document.getElementById('projectFormError');
+  errEl.style.display='none';
   const id=document.getElementById('projectId').value;
   const data={client_id:+document.getElementById('projectClientId').value,name:document.getElementById('projectName').value,status:document.getElementById('projectStatus').value,notes:document.getElementById('projectNotes').value,author:getCurrentUser()};
-  if(id)await api(`/api/projects/${id}`,{method:'PUT',body:data});else await api('/api/projects',{method:'POST',body:data});
-  closeModal('projectModal');await loadClients();
+  if (!data.name.trim()) { errEl.textContent='Project name is required.'; errEl.style.display='block'; return; }
+  const btn=e.target.querySelector('[type="submit"]');
+  setSaving(btn, true);
+  try {
+    if(id)await api(`/api/projects/${id}`,{method:'PUT',body:data});else await api('/api/projects',{method:'POST',body:data});
+    closeModal('projectModal');await loadClients();
+  } catch(err) { errEl.textContent=err.message; errEl.style.display='block'; }
+  finally { setSaving(btn, false); }
 });
 
 // ─── Task CRUD ──────────────────────────────────────────
 function openTaskModal(pid){
   document.getElementById('taskModalTitle').textContent='New Task';
+  document.getElementById('taskFormError').style.display='none';
   ['taskId','taskTitle','taskDeadline','taskPlannedDate','taskEstHours','taskReferences','taskNotes'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('taskProjectId').value=pid;
   document.getElementById('taskProgress').value='not-started';
@@ -474,6 +510,7 @@ function editTask(id){
   const t=findTaskById(id);
   if(!t)return;
   document.getElementById('taskModalTitle').textContent = 'Edit Task — ' + taskRef(t.id);
+  document.getElementById('taskFormError').style.display='none';
   document.getElementById('taskId').value=t.id;
   document.getElementById('taskProjectId').value=t.project_id;
   document.getElementById('taskTitle').value=t.title;
@@ -507,11 +544,15 @@ document.getElementById('taskRecurring').addEventListener('change',function(){
 
 document.getElementById('taskForm').addEventListener('submit',async e=>{
   e.preventDefault();
+  const errEl=document.getElementById('taskFormError');
+  errEl.style.display='none';
   const id=document.getElementById('taskId').value;
   const isRecurring=document.getElementById('taskRecurring').checked;
+  const title=document.getElementById('taskTitle').value.trim();
+  if (!title) { errEl.textContent='Task title is required.'; errEl.style.display='block'; return; }
   const data={
     project_id:+document.getElementById('taskProjectId').value,
-    title:document.getElementById('taskTitle').value,
+    title,
     assignee:document.getElementById('taskAssignee').value,
     deadline:document.getElementById('taskDeadline').value,
     planned_date:document.getElementById('taskPlannedDate').value,
@@ -525,23 +566,30 @@ document.getElementById('taskForm').addEventListener('submit',async e=>{
     recur_unit:isRecurring?document.getElementById('taskRecurUnit').value:'',
     author:getCurrentUser()
   };
-  let taskId;
-  if(id){
-    const r=await api(`/api/tasks/${id}`,{method:'PUT',body:data});
-    taskId=id;
-  }else{
-    const r=await api('/api/tasks',{method:'POST',body:data});
-    taskId=r.id;
-  }
-  // Upload files
-  const files=document.getElementById('taskFiles').files;
-  if(files.length>0 && taskId){
-    const fd=new FormData();
-    for(let i=0;i<files.length;i++) fd.append('files',files[i]);
-    fd.append('author',getCurrentUser());
-    await fetch(`/api/tasks/${taskId}/attachments`,{method:'POST',body:fd});
-  }
-  closeModal('taskModal');await loadClients();
+  const btn=e.target.querySelector('[type="submit"]');
+  setSaving(btn, true);
+  try {
+    let taskId;
+    if(id){
+      await api(`/api/tasks/${id}`,{method:'PUT',body:data});
+      taskId=id;
+    }else{
+      const r=await api('/api/tasks',{method:'POST',body:data});
+      taskId=r.id;
+      // Show the new task ref
+      document.getElementById('taskModalTitle').textContent = 'Task Created — ' + taskRef(taskId);
+    }
+    // Upload files
+    const files=document.getElementById('taskFiles').files;
+    if(files.length>0 && taskId){
+      const fd=new FormData();
+      for(let i=0;i<files.length;i++) fd.append('files',files[i]);
+      fd.append('author',getCurrentUser());
+      await fetch(`/api/tasks/${taskId}/attachments`,{method:'POST',body:fd});
+    }
+    closeModal('taskModal');await loadClients();
+  } catch(err) { errEl.textContent=err.message; errEl.style.display='block'; }
+  finally { setSaving(btn, false); }
 });
 
 async function deleteAttachment(aid){
