@@ -429,6 +429,12 @@ app.get('/api/clients/:id/history', (req, res) => {
   res.json(db.prepare(`SELECT * FROM activity_log WHERE ${conds.join(' OR ')} ORDER BY created_at DESC LIMIT ?`).all(...params));
 });
 
+app.get('/api/history', requireAuth, (req, res) => {
+  if (req.user.role !== 'owner') return res.status(403).json({ error: 'Owner only' });
+  const limit = parseInt(req.query.limit) || 200;
+  res.json(db.prepare('SELECT * FROM activity_log ORDER BY created_at DESC LIMIT ?').all(limit));
+});
+
 // ─── TEAM ──────────────────────────────────────────────
 
 app.get('/api/team', (req, res) => { res.json(db.prepare('SELECT * FROM team_members ORDER BY name').all()); });

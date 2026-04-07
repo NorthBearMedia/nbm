@@ -24,6 +24,8 @@ async function loadCurrentUser() {
       currentUser = await res.json();
       const sel = document.getElementById('currentUser');
       if (sel) sel.innerHTML = `<option selected>${esc(currentUser.display_name)}</option>`;
+      const ghb = document.getElementById('globalHistoryBtn');
+      if (ghb) ghb.style.display = currentUser.role === 'owner' ? '' : 'none';
     } else {
       window.location.href = '/login';
     }
@@ -545,14 +547,12 @@ async function deleteAttachment(aid){
 async function addComment(e,tid){e.preventDefault();const inp=e.target.querySelector('input');const c=inp.value.trim();if(!c)return;await api(`/api/tasks/${tid}/comments`,{method:'POST',body:{author:getCurrentUser(),content:c}});inp.value='';await loadClients();}
 
 // ─── Client History ─────────────────────────────────────
-async function showClientHistory(cid,name){
-  document.getElementById('historyModalTitle').textContent='History \u2014 '+name;
-  const logs=await api(`/api/clients/${cid}/history?limit=100`);
-  document.getElementById('historyContent').innerHTML=!logs.length?'<div style="padding:12px;color:var(--text-secondary)">No activity yet.</div>':
+function renderHistoryLogs(logs) {
+  return !logs.length?'<div style="padding:12px;color:var(--text-secondary)">No activity yet.</div>':
     logs.map(l=>{
       const actionColor=l.action==='created'?'var(--success)':l.action==='archived'?'var(--warning)':l.action==='deleted'?'var(--danger)':'var(--primary)';
       const user=findUser(l.author);
-      return`<div class="history-item" style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+      return`<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
         <div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:36px;padding-top:2px">
           <div style="width:8px;height:8px;border-radius:50%;background:${actionColor};flex-shrink:0"></div>
         </div>
@@ -568,6 +568,19 @@ async function showClientHistory(cid,name){
         </div>
       </div>`;
     }).join('');
+}
+
+document.getElementById('globalHistoryBtn').addEventListener('click', async () => {
+  document.getElementById('historyModalTitle').textContent='Activity Log';
+  const logs = await api('/api/history?limit=200');
+  document.getElementById('historyContent').innerHTML = renderHistoryLogs(logs);
+  openModal('historyModal');
+});
+
+async function showClientHistory(cid,name){
+  document.getElementById('historyModalTitle').textContent='History \u2014 '+name;
+  const logs=await api(`/api/clients/${cid}/history?limit=100`);
+  document.getElementById('historyContent').innerHTML=renderHistoryLogs(logs);
   openModal('historyModal');
 }
 
