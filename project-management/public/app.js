@@ -174,7 +174,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelec
 // ─── Render Clients ─────────────────────────────────────
 function renderClients() {
   const ct = document.getElementById('clientList');
-  if (!clients.length) { ct.innerHTML='<div class="empty-state"><p>No clients yet. Click + to add one.</p></div>'; return; }
+  if (!clients.length) { ct.innerHTML='<div class="empty-state"><img src="/NBM%20Logo%20No%20NG%20Light%20Lines.png" alt="" style="width:80px;opacity:0.3;margin-bottom:16px"><p>No clients yet. Click + to add one.</p></div>'; return; }
   ct.innerHTML = clients.map(c => {
     const ex = expandedClients.has(c.id);
     const s = c.stats;
@@ -614,7 +614,7 @@ async function loadTodayView(){
   const d=new Date(date+'T00:00:00');
   document.getElementById('todayTitle').textContent=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   const ct=document.getElementById('todayContent');
-  if(!tasks.length){ct.innerHTML='<div class="empty-state"><p>No tasks planned for this date</p></div>';return;}
+  if(!tasks.length){ct.innerHTML='<div class="empty-state"><img src="/NBM%20Logo%20No%20NG%20Light%20Lines.png" alt="" style="width:60px;opacity:0.25;margin-bottom:12px"><p>No tasks planned for this date</p></div>';return;}
   const groups={};
   for(const t of tasks){const a=t.assignee||'Unassigned';if(!groups[a])groups[a]=[];groups[a].push(t);}
   let html='';

@@ -1196,6 +1196,19 @@ a:hover { color: #6dd4a8; }
   color: var(--text-muted);
 }
 
+/* ─── App Footer ────────────────────────────────────── */
+.app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  margin-top: 40px;
+}
+
 /* ─── Task Ref ──────────────────────────────────────── */
 .task-ref {
   font-family: 'Montserrat', monospace;
