@@ -150,4 +150,48 @@ db.exec(`
   );
 `);
 
+// ─── Data Restoration ─────────────────────────────────────────────────────────
+// If tasks were wiped by a bad migration, restore seed data
+const taskCount = db.prepare('SELECT count(*) as c FROM tasks').get().c;
+const clientCount = db.prepare('SELECT count(*) as c FROM clients').get().c;
+if (taskCount === 0 && clientCount > 0) {
+  console.log('Restoring tasks and comments lost during migration...');
+  const insertTask = db.prepare('INSERT OR IGNORE INTO tasks (id, project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, is_recurring, recur_interval, recur_unit, archived, sort_order, is_pinned) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  const insertComment = db.prepare('INSERT OR IGNORE INTO comments (id, task_id, author, content) VALUES (?, ?, ?, ?)');
+  const tasks = [
+    [1,1,"Set up project management system","Norton","2026-04-06","2026-04-06",2,"completed","high",0,0,"",0,0,0],
+    [2,1,"Quarterly strategy review","Norton","2026-04-30","2026-04-06",3,"not-started","high",0,0,"",0,0,0],
+    [3,1,"Update company portfolio","James","2026-04-15","2026-04-06",4,"in-progress","medium",0,0,"",0,0,0],
+    [4,2,"Monthly content calendar","Lucy","2026-04-07","2026-04-06",2,"in-progress","high",1,1,"months",0,0,0],
+    [5,2,"Record behind-the-scenes reels","Sarah","2026-04-12","2026-04-07",3,"not-started","medium",0,0,"",0,0,0],
+    [6,3,"April social content batch","Lucy","2026-04-10","2026-04-06",5,"in-progress","high",0,0,"",0,0,0],
+    [7,3,"Product photography shoot","James","2026-04-14","2026-04-07",6,"not-started","medium",0,0,"",0,0,0],
+    [8,3,"Facebook ad campaign — Spring","Lucy","2026-04-08","2026-04-06",2,"awaiting-client","high",0,0,"",0,0,0],
+    [9,3,"Monthly performance report","Sarah","2026-04-05","",1,"completed","medium",1,1,"months",0,0,0],
+    [10,4,"Add new product pages","Norton","2026-04-20","2026-04-07",4,"not-started","medium",0,0,"",0,0,0],
+    [11,5,"Fine-tune moderation threshold","Norton","2026-04-10","2026-04-06",3,"in-progress","critical",0,0,"",0,0,0],
+    [12,5,"Add Spotted Darlington","Norton","2026-04-15","",2,"awaiting-manager","medium",0,0,"",0,0,0],
+    [13,5,"Weekly moderation report","Sarah","2026-04-07","2026-04-06",1,"not-started","high",1,1,"weeks",0,0,0],
+    [14,6,"Menu design — first draft","James","2026-04-12","2026-04-06",6,"in-progress","high",0,0,"",0,0,0],
+    [15,6,"Food photography session","James","2026-04-18","",4,"not-started","medium",0,0,"",0,0,0],
+    [16,6,"Social media launch pack","Lucy","2026-04-22","",5,"not-started","medium",0,0,"",0,0,0],
+    [17,6,"Client sign-off meeting","Norton","2026-04-25","",1,"not-started","low",0,0,"",0,0,0],
+    [18,7,"April — before/after gallery","Lucy","2026-04-09","2026-04-06",3,"in-progress","high",0,0,"",0,0,0],
+    [19,7,"Drone footage — new build","Norton","2026-04-16","",4,"not-started","medium",0,0,"",0,0,0],
+    [20,7,"Google review campaign","Sarah","2026-04-11","2026-04-06",2,"stuck","high",0,0,"",0,0,0],
+  ];
+  const comments = [
+    [1,1,"Norton","System is live. Moving to completed."],
+    [2,3,"James","Started layouts, first draft by Wednesday."],
+    [3,6,"Lucy","Got 8 of 12 done, rest tomorrow."],
+    [4,20,"Sarah","Chased twice — still waiting."],
+    [5,20,"Norton","Will call Monday if no response."],
+  ];
+  db.transaction(() => {
+    for (const t of tasks) insertTask.run(...t);
+    for (const c of comments) insertComment.run(...c);
+  })();
+  console.log(`Restored ${tasks.length} tasks and ${comments.length} comments.`);
+}
+
 export default db;
