@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import { readdirSync } from 'fs';
+import { readdirSync, copyFileSync, statSync } from 'fs';
 import { join } from 'path';
+import Database from 'better-sqlite3';
 import db from '../database.js';
 import { requireAuth } from '../middleware.js';
 
@@ -124,7 +125,20 @@ export function createBackupRoutes(backupDir, backupFn) {
     try {
       const files = readdirSync(backupDir)
         .filter(f => f.startsWith('nbm-projects-') && f.endsWith('.db'))
-        .sort().reverse();
+        .sort().reverse()
+        .map(f => {
+          try {
+            const s = statSync(join(backupDir, f));
+            // Peek inside to check task count
+            let taskCount = '?';
+            try {
+              const bdb = new Database(join(backupDir, f), { readonly: true });
+              taskCount = bdb.prepare('SELECT count(*) as c FROM tasks').get().c;
+              bdb.close();
+            } catch {}
+            return { file: f, size: s.size, modified: s.mtime, tasks: taskCount };
+          } catch { return { file: f }; }
+        });
       res.json(files);
     } catch { res.json([]); }
   });
@@ -133,6 +147,51 @@ export function createBackupRoutes(backupDir, backupFn) {
     if (req.user.role !== 'owner') return res.status(403).json({ error: 'Owner only' });
     backupFn();
     res.json({ success: true, message: 'Backup started' });
+  });
+
+  // Restore tasks, projects, comments etc from a backup file
+  r.post('/api/backups/restore', requireAuth, (req, res) => {
+    if (req.user.role !== 'owner') return res.status(403).json({ error: 'Owner only' });
+    const { file } = req.body;
+    if (!file || !file.endsWith('.db')) return res.status(400).json({ error: 'Invalid backup file' });
+    const backupPath = join(backupDir, file);
+    try {
+      statSync(backupPath);
+    } catch {
+      return res.status(404).json({ error: 'Backup file not found' });
+    }
+
+    try {
+      const bdb = new Database(backupPath, { readonly: true });
+      const tables = ['clients', 'projects', 'tasks', 'comments', 'task_attachments', 'checklist_items', 'team_members', 'activity_log'];
+      const counts = {};
+
+      db.pragma('foreign_keys = OFF');
+      db.transaction(() => {
+        for (const table of tables) {
+          try {
+            const rows = bdb.prepare(`SELECT * FROM ${table}`).all();
+            if (!rows.length) continue;
+            // Clear current data and restore from backup
+            db.prepare(`DELETE FROM ${table}`).run();
+            const cols = Object.keys(rows[0]);
+            const placeholders = cols.map(() => '?').join(',');
+            const ins = db.prepare(`INSERT OR REPLACE INTO ${table} (${cols.join(',')}) VALUES (${placeholders})`);
+            for (const row of rows) ins.run(...cols.map(c => row[c]));
+            counts[table] = rows.length;
+          } catch (e) {
+            counts[table] = `error: ${e.message}`;
+          }
+        }
+      })();
+      db.pragma('foreign_keys = ON');
+      bdb.close();
+
+      console.log('[DB] Restored from backup:', file, counts);
+      res.json({ success: true, restored: counts });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   return r;
