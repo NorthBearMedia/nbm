@@ -46,7 +46,10 @@ async function api(url, options = {}) {
     ...options,
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
-  const data = await res.json();
+  const text = await res.text();
+  if (res.status === 401) { window.location.href = '/login'; throw new Error('Session expired'); }
+  let data;
+  try { data = JSON.parse(text); } catch { throw new Error('Server error — please refresh and try again'); }
   if (!res.ok) throw new Error(data.error || 'Something went wrong');
   return data;
 }
@@ -438,7 +441,7 @@ document.getElementById('clientForm').addEventListener('submit',async e=>{
   setSaving(btn, true);
   try {
     let r;if(id){r=await api(`/api/clients/${id}`,{method:'PUT',body:data});}else{r=await api('/api/clients',{method:'POST',body:data});}
-    if(window._croppedLogo){const fd=new FormData();fd.append('logo',window._croppedLogo,'logo.jpg');await fetch(`/api/clients/${r.id}/logo`,{method:'POST',body:fd});window._croppedLogo=null;}
+    if(window._croppedLogo){const fd=new FormData();fd.append('logo',window._croppedLogo,'logo.jpg');const lr=await fetch(`/api/clients/${r.id}/logo`,{method:'POST',body:fd});if(!lr.ok){const le=await lr.text();console.error('Logo upload failed:',le);}window._croppedLogo=null;}
     closeModal('clientModal');await loadClients();
   } catch(err) { errEl.textContent=err.message; errEl.style.display='block'; }
   finally { setSaving(btn, false); }
