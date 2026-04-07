@@ -109,7 +109,7 @@ function renderStats() {
     <div class="stat-card" onclick="showStatPopup('in-progress')"><div class="stat-number">${t.inProgress}</div><div class="stat-label">In Progress</div></div>
     <div class="stat-card" onclick="showStatPopup('overdue')"><div class="stat-number">${t.overdue}</div><div class="stat-label">Overdue</div></div>
     <div class="stat-card" onclick="showStatPopup('stuck')"><div class="stat-number">${t.stuck}</div><div class="stat-label">Stuck</div></div>
-    ${t.awaitingManager?`<div class="stat-card stat-awaiting" onclick="showStatPopup('awaiting-manager')"><div class="stat-number" style="color:var(--danger)">${t.awaitingManager}</div><div class="stat-label" style="color:var(--danger)">Awaiting You</div></div>`:''}`;
+    <div class="stat-card ${t.awaitingManager?'stat-awaiting':''}" onclick="showStatPopup('awaiting-manager')"><div class="stat-number" style="color:${t.awaitingManager?'var(--danger)':'var(--text-secondary)'}">${t.awaitingManager}</div><div class="stat-label" style="color:${t.awaitingManager?'var(--danger)':'var(--text-secondary)'}">Awaiting You</div></div>`;
 }
 
 function showStatPopup(type) {
