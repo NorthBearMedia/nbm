@@ -5,12 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>North Bear Console</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="stylesheet" href="styles.css?v=5">
+  <link rel="stylesheet" href="styles.css?v=6">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <!-- Clean navigation bar -->
   <nav class="navbar">
     <div class="nav-brand">
       <img src="/favicon.svg" alt="NB" class="logo-mark" style="width:38px;height:38px;border-radius:12px">
@@ -24,17 +23,18 @@
       <button class="nav-tab" data-view="calendar"><span class="nav-icon">&#128197;</span> Calendar</button>
     </div>
     <div class="nav-right">
-      <div class="user-selector">
-        <select id="currentUser"><option>Loading...</option></select>
+      <div class="search-container" style="position:relative">
+        <input type="text" id="taskSearch" placeholder="Search tasks (e.g. NB001)..." style="background:var(--bg-glass);border:1px solid var(--border);border-radius:var(--radius);padding:8px 14px;font-size:12px;color:var(--text);width:200px;outline:none;font-family:inherit">
+        <div id="searchResults" style="display:none;position:absolute;top:100%;right:0;margin-top:8px;width:450px;max-height:400px;overflow-y:auto;background:rgba(45,41,42,0.97);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);z-index:999"></div>
       </div>
       <button class="nav-action" id="addClientBtn" title="New Client">+</button>
       <button class="nav-action" id="manageTeamBtn" title="Team">&#128101;</button>
+      <button class="nav-action" id="manageUsersBtn" title="Users &amp; Permissions">&#9881;</button>
       <button class="nav-action" id="viewArchiveBtn" title="Archive">&#128230;</button>
       <button class="nav-action" onclick="logout()" title="Sign Out">&#9211;</button>
     </div>
   </nav>
 
-  <!-- Sub-bar for filters (clients view only) -->
   <div class="sub-bar" id="clientSubBar">
     <div class="filter-group">
       <button class="filter-btn active" data-filter="all">All Clients</button>
@@ -45,17 +45,15 @@
   </div>
 
   <main class="main">
-    <!-- Clients View -->
     <div id="clientsView">
       <div class="table-container">
         <div class="table-header">
-          <div>Client</div><div>Type</div><div>Projects</div><div>Outstanding</div><div>Progress</div><div></div>
+          <div>Client</div><div>Type</div><div style="text-align:center">Projects</div><div style="text-align:center">Outstanding</div><div>Progress</div><div></div>
         </div>
         <div id="clientList" class="client-list"><div class="empty-state"><p>Loading...</p></div></div>
       </div>
     </div>
 
-    <!-- Today View -->
     <div id="todayView" style="display:none">
       <div class="view-header">
         <h2 id="todayTitle">Today's Tasks</h2>
@@ -67,7 +65,6 @@
       <div id="todayContent" class="today-content"></div>
     </div>
 
-    <!-- Calendar View -->
     <div id="calendarView" style="display:none">
       <div class="view-header">
         <div style="display:flex;align-items:center;gap:12px">
@@ -90,7 +87,7 @@
     <div class="modal-header"><h2 id="clientModalTitle">New Client</h2><button class="modal-close" onclick="closeModal('clientModal')">&times;</button></div>
     <form id="clientForm">
       <input type="hidden" id="clientId">
-      <div class="form-row"><div class="form-group"><label>Client Name</label><input type="text" id="clientName" required></div><div class="form-group"><label>Code (3 letters)</label><input type="text" id="clientCode" maxlength="5" placeholder="e.g. NBM"></div></div>
+      <div class="form-row"><div class="form-group"><label>Client Name</label><input type="text" id="clientName" required></div><div class="form-group"><label>Code (exactly 3 letters)</label><input type="text" id="clientCode" minlength="3" maxlength="3" pattern="[A-Za-z]{3}" placeholder="e.g. NBM" required style="text-transform:uppercase"></div></div>
       <div class="form-group"><label>Agreement Type</label><select id="clientType"><option value="recurring">Recurring</option><option value="ad-hoc">Ad Hoc / One-off</option></select></div>
       <div class="form-group"><label>Notes</label><textarea id="clientNotes" rows="2"></textarea></div>
       <div class="form-row"><div class="form-group"><label>Gmail Link</label><input type="url" id="clientGmail" placeholder="https://mail.google.com/..."></div><div class="form-group"><label>Google Drive Link</label><input type="url" id="clientDrive" placeholder="https://drive.google.com/..."></div></div>
@@ -129,7 +126,6 @@
       </div>
       <div class="form-group"><label>References / Links</label><input type="text" id="taskReferences"></div>
       <div class="form-group"><label>Notes</label><textarea id="taskNotes" rows="2"></textarea></div>
-      <!-- Recurring -->
       <div class="form-group">
         <label><input type="checkbox" id="taskRecurring"> Recurring task</label>
         <div id="recurOptions" style="display:none;margin-top:8px">
@@ -139,7 +135,6 @@
           </div>
         </div>
       </div>
-      <!-- Attachments -->
       <div class="form-group">
         <label>Attachments</label>
         <div id="taskAttachmentsList"></div>
@@ -153,7 +148,28 @@
   <div class="modal" id="teamModal">
     <div class="modal-header"><h2>Team Members</h2><button class="modal-close" onclick="closeModal('teamModal')">&times;</button></div>
     <div id="teamList" class="team-list"></div>
-    <form id="teamForm" class="team-form"><input type="text" id="teamMemberName" placeholder="Name" required><input type="text" id="teamMemberRole" placeholder="Role"><input type="color" id="teamMemberColor" value="#6366f1"><button type="submit" class="btn btn-primary btn-sm">Add</button></form>
+    <form id="teamForm" class="team-form"><input type="text" id="teamMemberName" placeholder="Name" required><input type="text" id="teamMemberRole" placeholder="Role"><input type="color" id="teamMemberColor" value="#3eaf84"><button type="submit" class="btn btn-primary btn-sm">Add</button></form>
+  </div>
+
+  <!-- Users & Permissions Modal -->
+  <div class="modal modal-lg" id="usersModal">
+    <div class="modal-header"><h2>Users &amp; Permissions</h2><button class="modal-close" onclick="closeModal('usersModal')">&times;</button></div>
+    <div id="usersList" style="padding:28px 36px"></div>
+    <div id="addUserSection" style="display:none;padding:0 36px 28px">
+      <h3 style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:16px;font-family:'Montserrat',sans-serif">Add New User</h3>
+      <form id="addUserForm">
+        <div class="form-row">
+          <div class="form-group"><label>Display Name</label><input type="text" id="newUserName" required></div>
+          <div class="form-group"><label>Username</label><input type="text" id="newUserUsername" required></div>
+        </div>
+        <div class="form-row form-row-3">
+          <div class="form-group"><label>Email</label><input type="email" id="newUserEmail" required></div>
+          <div class="form-group"><label>Password</label><input type="password" id="newUserPassword" required minlength="4"></div>
+          <div class="form-group"><label>Role</label><select id="newUserRole"><option value="editor">Editor</option><option value="viewer">Viewer</option><option value="owner">Owner</option></select></div>
+        </div>
+        <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="document.getElementById('addUserSection').style.display='none'">Cancel</button><button type="submit" class="btn btn-primary">Create User</button></div>
+      </form>
+    </div>
   </div>
 
   <!-- History Modal -->
@@ -174,6 +190,6 @@
     <div id="archiveContent" style="max-height:450px;overflow-y:auto"></div>
   </div>
 
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>

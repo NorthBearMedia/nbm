@@ -172,7 +172,9 @@ app.get('/api/clients', (req, res) => {
 app.post('/api/clients', (req, res) => {
   const { name, code, agreement_type, notes, gmail_link, drive_link, author } = req.body;
   if (!name) return res.status(400).json({ error: 'Client name is required' });
-  const clientCode = code || name.split(' ').map(w => w[0]).join('').substring(0, 3).toUpperCase();
+  if (code && code.length !== 3) return res.status(400).json({ error: 'Client code must be exactly 3 characters' });
+  const autoCode = name.split(' ').map(w => w[0]).join('').substring(0, 3).toUpperCase().padEnd(3, 'X');
+  const clientCode = code || autoCode;
   const result = db.prepare('INSERT INTO clients (name, code, agreement_type, notes, gmail_link, drive_link) VALUES (?, ?, ?, ?, ?, ?)').run(name, clientCode, agreement_type || 'recurring', notes || '', gmail_link || '', drive_link || '');
   logActivity('client', result.lastInsertRowid, 'created', author, `Created client "${name}"`);
   res.json(db.prepare('SELECT * FROM clients WHERE id = ?').get(result.lastInsertRowid));
@@ -468,6 +470,37 @@ app.delete('/api/users/:id', requireAuth, requireRole('owner'), (req, res) => {
   res.json({ success: true });
 });
 
+// ─── TASK SEARCH ────────────────────────────────────
+app.get('/api/tasks/search', (req, res) => {
+  const { q } = req.query;
+  if (!q || q.length < 1) return res.json([]);
+
+  // Check if searching by ref code (e.g., "NB001" or just "001" or "1")
+  const refMatch = q.match(/^(?:NB)?(\d+)$/i);
+  let tasks;
+  if (refMatch) {
+    const taskId = parseInt(refMatch[1]);
+    tasks = db.prepare(`
+      SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code
+      FROM tasks t
+      JOIN projects p ON t.project_id = p.id
+      JOIN clients c ON p.client_id = c.id
+      WHERE t.id = ?
+    `).all(taskId);
+  } else {
+    tasks = db.prepare(`
+      SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code
+      FROM tasks t
+      JOIN projects p ON t.project_id = p.id
+      JOIN clients c ON p.client_id = c.id
+      WHERE t.title LIKE ? OR t.notes LIKE ? OR t.assignee LIKE ?
+      ORDER BY t.archived ASC, t.created_at DESC
+      LIMIT 20
+    `).all(`%${q}%`, `%${q}%`, `%${q}%`);
+  }
+  res.json(tasks);
+});
+
 // ─── SEED ──────────────────────────────────────────────
 
 function seedIfEmpty() {
@@ -475,15 +508,14 @@ function seedIfEmpty() {
 
   // Seed users
   if (db.prepare('SELECT COUNT(*) as c FROM users').get().c === 0) {
-    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('norton', 'norton@northbearmedia.co.uk', ?, 'Norton', 'owner', '#8b5cf6')").run(hashPassword('nbm2026'));
-    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('cally', 'cally@northbearmedia.co.uk', ?, 'Cally', 'editor', '#f97066')").run(hashPassword('nbm2026'));
-    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('haley', 'haley@northbearmedia.co.uk', ?, 'Haley', 'editor', '#34d399')").run(hashPassword('nbm2026'));
+    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('norton', 'norton@northbearmedia.co.uk', ?, 'Norton', 'owner', '#3eaf84')").run(hashPassword('nbm2026'));
+    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('cally', 'cally@northbearmedia.co.uk', ?, 'Cally', 'editor', '#60a5fa')").run(hashPassword('nbm2026'));
+    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('haley', 'haley@northbearmedia.co.uk', ?, 'Haley', 'editor', '#f59e0b')").run(hashPassword('nbm2026'));
   }
 
-  db.prepare("INSERT INTO team_members (name, role, avatar_color) VALUES ('Norton', 'Director', '#6366f1')").run();
-  db.prepare("INSERT INTO team_members (name, role, avatar_color) VALUES ('Sarah', 'Content Manager', '#ec4899')").run();
-  db.prepare("INSERT INTO team_members (name, role, avatar_color) VALUES ('James', 'Designer', '#f59e0b')").run();
-  db.prepare("INSERT INTO team_members (name, role, avatar_color) VALUES ('Lucy', 'Social Media', '#22c55e')").run();
+  db.prepare("INSERT INTO team_members (name, role, avatar_color) VALUES ('Norton', 'Director', '#3eaf84')").run();
+  db.prepare("INSERT INTO team_members (name, role, avatar_color) VALUES ('Cally', 'Content Manager', '#60a5fa')").run();
+  db.prepare("INSERT INTO team_members (name, role, avatar_color) VALUES ('Haley', 'Social Media', '#f59e0b')").run();
 
   const today = new Date().toISOString().split('T')[0];
   const tomorrow = new Date(Date.now() + 864e5).toISOString().split('T')[0];
@@ -492,17 +524,17 @@ function seedIfEmpty() {
   const nbmOps = db.prepare("INSERT INTO projects (client_id, name, notes) VALUES (?, 'General Operations', 'Day-to-day business tasks')").run(nbm.lastInsertRowid);
   db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Set up project management system', 'Norton', '2026-04-06', '2026-04-06', 2, 'completed', 'high', 'Get the team organized')`).run(nbmOps.lastInsertRowid);
   db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Quarterly strategy review', 'Norton', '2026-04-30', '${today}', 3, 'not-started', 'high', 'Review Q1 performance')`).run(nbmOps.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Update company portfolio', 'James', '2026-04-15', '${today}', 4, 'in-progress', 'medium', 'Add latest case studies')`).run(nbmOps.lastInsertRowid);
+  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Update company portfolio', 'Cally', '2026-04-15', '${today}', 4, 'in-progress', 'medium', 'Add latest case studies')`).run(nbmOps.lastInsertRowid);
   const nbmSocial = db.prepare("INSERT INTO projects (client_id, name, notes) VALUES (?, 'NBM Social Media', 'Our own social presence')").run(nbm.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes, is_recurring, recur_interval, recur_unit) VALUES (?, 'Monthly content calendar', 'Lucy', '2026-04-07', '${today}', 2, 'in-progress', 'high', 'Plan posts for the month', 1, 1, 'months')`).run(nbmSocial.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Record behind-the-scenes reels', 'Sarah', '2026-04-12', '${tomorrow}', 3, 'not-started', 'medium', 'Instagram content')`).run(nbmSocial.lastInsertRowid);
+  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes, is_recurring, recur_interval, recur_unit) VALUES (?, 'Monthly content calendar', 'Haley', '2026-04-07', '${today}', 2, 'in-progress', 'high', 'Plan posts for the month', 1, 1, 'months')`).run(nbmSocial.lastInsertRowid);
+  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Record behind-the-scenes reels', 'Cally', '2026-04-12', '${tomorrow}', 3, 'not-started', 'medium', 'Instagram content')`).run(nbmSocial.lastInsertRowid);
 
   const rms = db.prepare("INSERT INTO clients (name, code, agreement_type, notes, gmail_link, drive_link, sort_order) VALUES ('RMS Fire Blankets', 'RMS', 'recurring', 'Fire safety company. Monthly social media, content, and ads. Retainer.', 'https://mail.google.com/mail/u/0/#label/RMS', 'https://drive.google.com/drive/folders/rms', 1)").run();
   const rmsSocial = db.prepare("INSERT INTO projects (client_id, name, notes) VALUES (?, 'Social Media Management', 'Monthly content and community management')").run(rms.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'April social content batch', 'Lucy', '2026-04-10', '${today}', 5, 'in-progress', 'high', 'Create 12 posts for FB/IG')`).run(rmsSocial.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Product photography shoot', 'James', '2026-04-14', '${tomorrow}', 6, 'not-started', 'medium', 'New range — lifestyle shots')`).run(rmsSocial.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Facebook ad campaign — Spring', 'Lucy', '2026-04-08', '${today}', 2, 'awaiting-client', 'high', 'Awaiting creative approval from client')`).run(rmsSocial.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, estimated_hours, progress, priority, notes, is_recurring, recur_interval, recur_unit) VALUES (?, 'Monthly performance report', 'Sarah', '2026-04-05', 1, 'completed', 'medium', 'Analytics summary', 1, 1, 'months')`).run(rmsSocial.lastInsertRowid);
+  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'April social content batch', 'Haley', '2026-04-10', '${today}', 5, 'in-progress', 'high', 'Create 12 posts for FB/IG')`).run(rmsSocial.lastInsertRowid);
+  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Product photography shoot', 'Cally', '2026-04-14', '${tomorrow}', 6, 'not-started', 'medium', 'New range — lifestyle shots')`).run(rmsSocial.lastInsertRowid);
+  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Facebook ad campaign — Spring', 'Haley', '2026-04-08', '${today}', 2, 'awaiting-client', 'high', 'Awaiting creative approval from client')`).run(rmsSocial.lastInsertRowid);
+  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, estimated_hours, progress, priority, notes, is_recurring, recur_interval, recur_unit) VALUES (?, 'Monthly performance report', 'Cally', '2026-04-05', 1, 'completed', 'medium', 'Analytics summary', 1, 1, 'months')`).run(rmsSocial.lastInsertRowid);
   const rmsWeb = db.prepare("INSERT INTO projects (client_id, name, notes) VALUES (?, 'Website Updates', 'Ongoing maintenance')").run(rms.lastInsertRowid);
   db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Add new product pages', 'Norton', '2026-04-20', '${tomorrow}', 4, 'not-started', 'medium', 'New commercial range')`).run(rmsWeb.lastInsertRowid);
 
@@ -510,27 +542,27 @@ function seedIfEmpty() {
   const spottedMod = db.prepare("INSERT INTO projects (client_id, name, notes) VALUES (?, 'AI Moderation System', 'Automated moderation using Claude AI')").run(spotted.lastInsertRowid);
   db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Fine-tune moderation threshold', 'Norton', '2026-04-10', '${today}', 3, 'in-progress', 'critical', 'Reduce false positives')`).run(spottedMod.lastInsertRowid);
   db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, estimated_hours, progress, priority, notes) VALUES (?, 'Add Spotted Darlington', 'Norton', '2026-04-15', 2, 'awaiting-manager', 'medium', 'Awaiting approval to onboard')`).run(spottedMod.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes, is_recurring, recur_interval, recur_unit) VALUES (?, 'Weekly moderation report', 'Sarah', '2026-04-07', '${today}', 1, 'not-started', 'high', 'Summary of flagged posts', 1, 1, 'weeks')`).run(spottedMod.lastInsertRowid);
+  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes, is_recurring, recur_interval, recur_unit) VALUES (?, 'Weekly moderation report', 'Haley', '2026-04-07', '${today}', 1, 'not-started', 'high', 'Summary of flagged posts', 1, 1, 'weeks')`).run(spottedMod.lastInsertRowid);
 
   const adhoc1 = db.prepare("INSERT INTO clients (name, code, agreement_type, notes, sort_order) VALUES ('The Garden Kitchen', 'TGK', 'ad-hoc', 'Local restaurant. Menu redesign and social media launch.', 3)").run();
   const gkMenu = db.prepare("INSERT INTO projects (client_id, name, notes) VALUES (?, 'Menu Redesign & Launch', 'Brand refresh + social launch')").run(adhoc1.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Menu design — first draft', 'James', '2026-04-12', '${today}', 6, 'in-progress', 'high', 'A3 folded menu')`).run(gkMenu.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, estimated_hours, progress, priority, notes) VALUES (?, 'Food photography session', 'James', '2026-04-18', 4, 'not-started', 'medium', 'On-location shoot')`).run(gkMenu.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, estimated_hours, progress, priority, notes) VALUES (?, 'Social media launch pack', 'Lucy', '2026-04-22', 5, 'not-started', 'medium', '10 launch posts')`).run(gkMenu.lastInsertRowid);
+  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Menu design — first draft', 'Cally', '2026-04-12', '${today}', 6, 'in-progress', 'high', 'A3 folded menu')`).run(gkMenu.lastInsertRowid);
+  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, estimated_hours, progress, priority, notes) VALUES (?, 'Food photography session', 'Cally', '2026-04-18', 4, 'not-started', 'medium', 'On-location shoot')`).run(gkMenu.lastInsertRowid);
+  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, estimated_hours, progress, priority, notes) VALUES (?, 'Social media launch pack', 'Haley', '2026-04-22', 5, 'not-started', 'medium', '10 launch posts')`).run(gkMenu.lastInsertRowid);
   db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, estimated_hours, progress, priority, notes) VALUES (?, 'Client sign-off meeting', 'Norton', '2026-04-25', 1, 'not-started', 'low', 'Present final designs')`).run(gkMenu.lastInsertRowid);
 
   const build = db.prepare("INSERT INTO clients (name, code, agreement_type, notes, sort_order) VALUES ('Hartlepool Builders Ltd', 'HBL', 'recurring', 'Construction company. Monthly social and quarterly video. 12-month retainer.', 4)").run();
   const buildSocial = db.prepare("INSERT INTO projects (client_id, name, notes) VALUES (?, 'Social Media Management', 'Monthly content creation')").run(build.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'April — before/after gallery', 'Lucy', '2026-04-09', '${today}', 3, 'in-progress', 'high', 'Kitchen reno posts')`).run(buildSocial.lastInsertRowid);
+  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'April — before/after gallery', 'Haley', '2026-04-09', '${today}', 3, 'in-progress', 'high', 'Kitchen reno posts')`).run(buildSocial.lastInsertRowid);
   db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, estimated_hours, progress, priority, notes) VALUES (?, 'Drone footage — new build', 'Norton', '2026-04-16', 4, 'not-started', 'medium', 'Aerial progress shots')`).run(buildSocial.lastInsertRowid);
-  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Google review campaign', 'Sarah', '2026-04-11', '${today}', 2, 'stuck', 'high', 'Waiting on client email list')`).run(buildSocial.lastInsertRowid);
+  db.prepare(`INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, notes) VALUES (?, 'Google review campaign', 'Cally', '2026-04-11', '${today}', 2, 'stuck', 'high', 'Waiting on client email list')`).run(buildSocial.lastInsertRowid);
 
   // Comments
   const findTask = (s) => db.prepare('SELECT id FROM tasks WHERE title LIKE ?').get(`%${s}%`);
   const t1 = findTask('Set up project management'); if (t1) db.prepare("INSERT INTO comments (task_id, author, content) VALUES (?, 'Norton', 'System is live. Moving to completed.')").run(t1.id);
-  const t2 = findTask('Update company portfolio'); if (t2) db.prepare("INSERT INTO comments (task_id, author, content) VALUES (?, 'James', 'Started layouts, first draft by Wednesday.')").run(t2.id);
-  const t3 = findTask('April social content'); if (t3) db.prepare("INSERT INTO comments (task_id, author, content) VALUES (?, 'Lucy', 'Got 8 of 12 done, rest tomorrow.')").run(t3.id);
-  const t4 = findTask('Google review campaign'); if (t4) { db.prepare("INSERT INTO comments (task_id, author, content) VALUES (?, 'Sarah', 'Chased twice — still waiting.')").run(t4.id); db.prepare("INSERT INTO comments (task_id, author, content) VALUES (?, 'Norton', 'Will call Monday if no response.')").run(t4.id); }
+  const t2 = findTask('Update company portfolio'); if (t2) db.prepare("INSERT INTO comments (task_id, author, content) VALUES (?, 'Cally', 'Started layouts, first draft by Wednesday.')").run(t2.id);
+  const t3 = findTask('April social content'); if (t3) db.prepare("INSERT INTO comments (task_id, author, content) VALUES (?, 'Haley', 'Got 8 of 12 done, rest tomorrow.')").run(t3.id);
+  const t4 = findTask('Google review campaign'); if (t4) { db.prepare("INSERT INTO comments (task_id, author, content) VALUES (?, 'Cally', 'Chased twice — still waiting.')").run(t4.id); db.prepare("INSERT INTO comments (task_id, author, content) VALUES (?, 'Norton', 'Will call Monday if no response.')").run(t4.id); }
 
   logActivity('client', nbm.lastInsertRowid, 'created', 'Norton', 'Created "NorthBear Media"');
   logActivity('client', rms.lastInsertRowid, 'created', 'Norton', 'Created "RMS Fire Blankets"');
@@ -542,9 +574,9 @@ function seedIfEmpty() {
 // Always ensure users exist
 function seedUsers() {
   if (db.prepare('SELECT COUNT(*) as c FROM users').get().c === 0) {
-    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('norton', 'norton@northbearmedia.co.uk', ?, 'Norton', 'owner', '#8b5cf6')").run(hashPassword('nbm2026'));
-    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('cally', 'cally@northbearmedia.co.uk', ?, 'Cally', 'editor', '#f97066')").run(hashPassword('nbm2026'));
-    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('haley', 'haley@northbearmedia.co.uk', ?, 'Haley', 'editor', '#34d399')").run(hashPassword('nbm2026'));
+    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('norton', 'norton@northbearmedia.co.uk', ?, 'Norton', 'owner', '#3eaf84')").run(hashPassword('nbm2026'));
+    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('cally', 'cally@northbearmedia.co.uk', ?, 'Cally', 'editor', '#60a5fa')").run(hashPassword('nbm2026'));
+    db.prepare("INSERT INTO users (username, email, password_hash, display_name, role, avatar_color) VALUES ('haley', 'haley@northbearmedia.co.uk', ?, 'Haley', 'editor', '#f59e0b')").run(hashPassword('nbm2026'));
     console.log('Default users created (password: nbm2026)');
   }
 }

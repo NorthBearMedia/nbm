@@ -148,6 +148,7 @@ function navigateToTask(cid,pid,tid) {
 
 // ─── Helpers ────────────────────────────────────────────
 function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function taskRef(id) { return 'NB' + String(id).padStart(3, '0'); }
 function fmtDate(d){if(!d)return'';return new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}
 function fmtDateShort(d){if(!d)return'';return new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
 function getDeadlineClass(dl,prog){if(!dl||prog==='completed'||prog==='invoiced')return'';const now=new Date();now.setHours(0,0,0,0);const diff=(new Date(dl+'T00:00:00')-now)/864e5;return diff<0?'overdue':diff<=3?'due-soon':'';}
@@ -192,8 +193,8 @@ function renderClients() {
           </div>
         </div>
         <div><span class="client-type-badge type-${c.agreement_type}">${c.agreement_type==='recurring'?'Recurring':'Ad Hoc'}</span></div>
-        <div>${c.projects.length}</div>
-        <div><span class="${s.outstandingTasks>0?(s.overdueTasks>0?'overdue':''):'completed'}" style="font-weight:600">${s.outstandingTasks}</span></div>
+        <div style="text-align:center">${c.projects.length}</div>
+        <div style="text-align:center"><span class="${s.outstandingTasks>0?(s.overdueTasks>0?'overdue':''):'completed'}" style="font-weight:600">${s.outstandingTasks}</span></div>
         <div>
           <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
           <div style="font-size:10px;color:var(--text-secondary);margin-top:2px">${s.completedTasks}/${s.totalTasks}</div>
@@ -260,6 +261,7 @@ function renderTask(t, isDone) {
   const sc=expandedComments.has(t.id);
   return `<div class="task-row ${isDone?'completed':''}" data-task-id="${t.id}">
     <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">
+      <span class="task-ref" title="Ref: ${taskRef(t.id)}">${taskRef(t.id)}</span>
       <span class="priority-badge priority-${t.priority}" title="${priorityLabel(t.priority)}"></span>
       <span class="task-title" onclick="editTask(${t.id})" style="cursor:pointer">${esc(t.title)}</span>
       ${t.is_recurring?'<span class="recurring-badge" title="Recurring">&#8635;</span>':''}
@@ -308,8 +310,10 @@ async function onDrop(e,targetId){
   const order=clients.map(c=>c.id);
   const fromIdx=order.indexOf(draggedClientId);
   const toIdx=order.indexOf(targetId);
+  if(fromIdx===-1||toIdx===-1)return;
   order.splice(fromIdx,1);
   order.splice(toIdx,0,draggedClientId);
+  draggedClientId=null;
   await api('/api/clients/reorder',{method:'PUT',body:{order}});
   await loadClients();
 }
@@ -356,6 +360,8 @@ document.getElementById('clientForm').addEventListener('submit',async e=>{
   e.preventDefault();
   const id=document.getElementById('clientId').value;
   const data={name:document.getElementById('clientName').value,code:document.getElementById('clientCode').value,agreement_type:document.getElementById('clientType').value,notes:document.getElementById('clientNotes').value,gmail_link:document.getElementById('clientGmail').value,drive_link:document.getElementById('clientDrive').value,author:getCurrentUser()};
+  if (!data.code || data.code.length !== 3) { alert('Client code must be exactly 3 characters'); return; }
+  data.code = data.code.toUpperCase();
   let r;if(id){r=await api(`/api/clients/${id}`,{method:'PUT',body:data});}else{r=await api('/api/clients',{method:'POST',body:data});}
   const li=document.getElementById('clientLogo');
   if(li.files.length>0){const fd=new FormData();fd.append('logo',li.files[0]);await fetch(`/api/clients/${r.id}/logo`,{method:'POST',body:fd});}
@@ -419,7 +425,7 @@ function findTaskById(id) {
 function editTask(id){
   const t=findTaskById(id);
   if(!t)return;
-  document.getElementById('taskModalTitle').textContent='Edit Task';
+  document.getElementById('taskModalTitle').textContent = 'Edit Task — ' + taskRef(t.id);
   document.getElementById('taskId').value=t.id;
   document.getElementById('taskProjectId').value=t.project_id;
   document.getElementById('taskTitle').value=t.title;
@@ -532,6 +538,70 @@ document.querySelectorAll('.filter-btn').forEach(btn=>{
   });
 });
 
+// ─── Search ────────────────────────────────────────────
+const searchInput = document.getElementById('taskSearch');
+let searchTimeout;
+if (searchInput) {
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(async () => {
+      const q = searchInput.value.trim();
+      if (!q) { document.getElementById('searchResults').style.display = 'none'; return; }
+      const results = await api(`/api/tasks/search?q=${encodeURIComponent(q)}`);
+      const sr = document.getElementById('searchResults');
+      if (!results.length) {
+        sr.innerHTML = '<div style="padding:16px;color:var(--text-secondary);font-size:13px">No tasks found</div>';
+      } else {
+        sr.innerHTML = results.map(t => `
+          <div class="search-result-item" onclick="navigateToTaskFromSearch(${t.id})" style="cursor:pointer">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="task-ref">${taskRef(t.id)}</span>
+              <span class="priority-badge priority-${t.priority}"></span>
+              <span style="font-weight:600;font-size:13px">${esc(t.title)}</span>
+              ${t.archived ? '<span style="font-size:10px;color:var(--text-muted)">(archived)</span>' : ''}
+            </div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">
+              ${esc(t.client_name)} → ${esc(t.project_name)} · ${esc(t.assignee || 'Unassigned')} · <span class="status-badge status-${t.progress}">${progressLabel(t.progress)}</span>
+            </div>
+          </div>
+        `).join('');
+      }
+      sr.style.display = 'block';
+    }, 300);
+  });
+
+  // Close search results when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.search-container')) {
+      document.getElementById('searchResults').style.display = 'none';
+    }
+  });
+}
+
+function navigateToTaskFromSearch(taskId) {
+  document.getElementById('searchResults').style.display = 'none';
+  document.getElementById('taskSearch').value = '';
+  // Try to find in loaded clients first
+  for (const c of clients) {
+    for (const p of c.projects) {
+      const t = p.tasks.find(x => x.id === taskId);
+      if (t) {
+        if (currentView !== 'clients') document.querySelector('[data-view="clients"]').click();
+        expandedClients.add(c.id);
+        expandedProjects.add(p.id);
+        renderClients();
+        setTimeout(() => {
+          const el = document.querySelector(`[data-task-id="${taskId}"]`);
+          if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('highlight'); setTimeout(() => el.classList.remove('highlight'), 2000); }
+        }, 100);
+        return;
+      }
+    }
+  }
+  // If not found in current view, just open the edit modal
+  editTask(taskId);
+}
+
 // ─── Today View ─────────────────────────────────────────
 async function loadTodayView(){
   const dateEl=document.getElementById('todayDate');
@@ -617,6 +687,102 @@ async function loadCalendarView(){
   document.getElementById('calendarGrid').innerHTML=html;
 }
 document.getElementById('calendarPerson').addEventListener('change',loadCalendarView);
+
+// ─── User Management ───────────────────────────────────
+document.getElementById('manageUsersBtn').addEventListener('click', () => {
+  if (currentUser?.role !== 'owner') { alert('Only the owner can manage users.'); return; }
+  renderUsersList();
+  openModal('usersModal');
+});
+
+async function renderUsersList() {
+  const users = await api('/api/users');
+  const ct = document.getElementById('usersList');
+  ct.innerHTML = users.map(u => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div style="position:relative">
+          ${u.avatar_url
+            ? `<img src="${esc(u.avatar_url)}" style="width:44px;height:44px;border-radius:50%;object-fit:cover">`
+            : `<div style="width:44px;height:44px;border-radius:50%;background:${u.avatar_color || '#3eaf84'};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px">${(u.display_name||'?')[0]}</div>`
+          }
+          <label style="position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;border-radius:50%;background:var(--bg-glass);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:10px" title="Upload photo">
+            &#128247;
+            <input type="file" accept="image/*" style="display:none" onchange="uploadUserAvatar(${u.id}, this)">
+          </label>
+        </div>
+        <div>
+          <div style="font-weight:600;font-size:14px">${esc(u.display_name)}</div>
+          <div style="font-size:12px;color:var(--text-secondary)">${esc(u.email)}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <select onchange="updateUserRole(${u.id}, this.value)" style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;color:var(--text);cursor:pointer">
+          <option value="owner" ${u.role==='owner'?'selected':''}>Owner</option>
+          <option value="editor" ${u.role==='editor'?'selected':''}>Editor</option>
+          <option value="viewer" ${u.role==='viewer'?'selected':''}>Viewer</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="changeUserPassword(${u.id}, '${esc(u.display_name)}')" title="Change Password">&#128274;</button>
+        ${u.id !== currentUser.id ? `<button class="btn-icon" onclick="deleteUser(${u.id}, '${esc(u.display_name)}')" style="color:var(--danger)" title="Delete">&#128465;</button>` : ''}
+      </div>
+    </div>
+  `).join('') + `
+    <div style="padding-top:20px">
+      <button class="btn btn-primary btn-sm" onclick="document.getElementById('addUserSection').style.display='block'">+ Add User</button>
+    </div>`;
+}
+
+async function uploadUserAvatar(userId, input) {
+  if (!input.files.length) return;
+  const fd = new FormData();
+  fd.append('avatar', input.files[0]);
+  await fetch(`/api/users/${userId}/avatar`, { method: 'POST', body: fd });
+  await renderUsersList();
+  if (userId === currentUser.id) await loadCurrentUser();
+}
+
+async function updateUserRole(userId, newRole) {
+  await api(`/api/users/${userId}`, { method: 'PUT', body: { role: newRole } });
+}
+
+async function changeUserPassword(userId, name) {
+  const pw = prompt(`New password for ${name}:`);
+  if (!pw) return;
+  if (pw.length < 4) { alert('Password must be at least 4 characters'); return; }
+  await api(`/api/users/${userId}/password`, { method: 'PUT', body: { password: pw } });
+  alert('Password updated');
+}
+
+async function deleteUser(userId, name) {
+  if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return;
+  await api(`/api/users/${userId}`, { method: 'DELETE' });
+  await renderUsersList();
+}
+
+document.getElementById('addUserForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const data = {
+    display_name: document.getElementById('newUserName').value,
+    username: document.getElementById('newUserUsername').value,
+    email: document.getElementById('newUserEmail').value,
+    password: document.getElementById('newUserPassword').value,
+    role: document.getElementById('newUserRole').value
+  };
+  const res = await fetch('/api/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (res.ok) {
+    document.getElementById('addUserSection').style.display = 'none';
+    document.getElementById('addUserForm').reset();
+    await renderUsersList();
+    await loadTeam();
+  } else {
+    const err = await res.json();
+    alert(err.error || 'Failed to create user');
+  }
+});
 
 // ─── Init ───────────────────────────────────────────────
 (async function(){
