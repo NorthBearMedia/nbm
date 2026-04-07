@@ -62,7 +62,7 @@ async function loadTeam() {
 
 function updateUserSelector() {
   const sel = document.getElementById('currentUser');
-  const cur = sel.value;
+  if (!sel) return;  const cur = sel.value;
   sel.innerHTML = teamMembers.map(m => `<option value="${esc(m.name)}" ${m.name===cur?'selected':''}>${esc(m.name)}</option>`).join('');
   if (!cur && teamMembers.length) sel.value = teamMembers[0].name;
 }
