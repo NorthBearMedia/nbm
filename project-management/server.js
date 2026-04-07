@@ -120,6 +120,14 @@ app.get('/', (req, res) => {
 // Static files — no caching to ensure updates are seen immediately
 app.use(express.static(join(__dirname, 'public'), { maxAge: 0, etag: false }));
 
+// Serve uploaded files from persistent volume (survives deploys)
+const uploadsDir = join(dataDir, 'uploads');
+const attachmentsDir = join(dataDir, 'attachments');
+mkdirSync(uploadsDir, { recursive: true });
+mkdirSync(attachmentsDir, { recursive: true });
+app.use('/uploads', express.static(uploadsDir));
+app.use('/attachments', express.static(attachmentsDir));
+
 // Protect all API routes (except auth)
 app.use('/api', (req, res, next) => {
   if (req.path.startsWith('/auth/')) return next();
@@ -129,22 +137,19 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// File uploads — logos
+// File uploads — logos (stored on persistent volume)
 const logoStorage = multer.diskStorage({
-  destination: join(__dirname, 'public', 'uploads'),
+  destination: uploadsDir,
   filename: (req, file, cb) => cb(null, `logo-${Date.now()}.${file.originalname.split('.').pop()}`)
 });
 const logoUpload = multer({ storage: logoStorage, limits: { fileSize: 2 * 1024 * 1024 } });
 
 // File uploads — task attachments (images, videos, docs up to 50MB)
 const attachStorage = multer.diskStorage({
-  destination: join(__dirname, 'public', 'attachments'),
+  destination: attachmentsDir,
   filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`)
 });
 const attachUpload = multer({ storage: attachStorage, limits: { fileSize: 50 * 1024 * 1024 } });
-
-mkdirSync(join(__dirname, 'public', 'uploads'), { recursive: true });
-mkdirSync(join(__dirname, 'public', 'attachments'), { recursive: true });
 
 function logActivity(entityType, entityId, action, author, details) {
   db.prepare('INSERT INTO activity_log (entity_type, entity_id, action, author, details) VALUES (?, ?, ?, ?, ?)').run(entityType, entityId, action, author || 'System', details || '');
@@ -437,9 +442,9 @@ app.get('/api/archived/clients', (req, res) => { res.json(db.prepare('SELECT * F
 
 // ─── USER MANAGEMENT ─────────────────────────────────
 
-// Avatar upload
+// Avatar upload (stored on persistent volume)
 const avatarStorage = multer.diskStorage({
-  destination: join(__dirname, 'public', 'uploads'),
+  destination: uploadsDir,
   filename: (req, file, cb) => cb(null, `avatar-${Date.now()}.${file.originalname.split('.').pop()}`)
 });
 const avatarUpload = multer({ storage: avatarStorage, limits: { fileSize: 2 * 1024 * 1024 } });
