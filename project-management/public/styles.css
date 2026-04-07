@@ -568,6 +568,59 @@ a:hover { color: #6dd4a8; }
 }
 
 .task-row.completed { opacity: 0.45; }
+.task-row.task-selected { background: rgba(46, 170, 123, 0.1); border-left: 3px solid var(--accent); }
+.task-checkbox { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); flex-shrink: 0; }
+
+/* ─── Batch Action Bar ──────────────────────────── */
+.batch-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-card);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-lg);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  z-index: 999;
+  font-size: 13px;
+}
+
+/* ─── Move Modal Tree ───────────────────────────── */
+.move-tree {
+  max-height: 350px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.move-client {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.move-client > strong {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 0;
+}
+.move-project-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s;
+}
+.move-project-option:hover { background: var(--bg-hover); }
+.move-project-option input[type="radio"] { accent-color: var(--accent); }
 
 .task-row.highlight {
   background: rgba(62, 175, 132, 0.1) !important;

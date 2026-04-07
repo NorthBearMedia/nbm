@@ -76,6 +76,32 @@ function calculateNextDate(fromDate, interval, unit) {
   return d.toISOString().split('T')[0];
 }
 
+// ─── Batch Move Tasks ────────────────────────────────
+router.post('/batch-move', requireAuth, requireWrite, (req, res) => {
+  const { task_ids, target_project_id } = req.body;
+  if (!Array.isArray(task_ids) || !task_ids.length || !target_project_id) {
+    return res.status(400).json({ error: 'task_ids array and target_project_id required' });
+  }
+  // Verify target project exists and check privacy
+  const targetProj = db.prepare('SELECT p.*, c.name as client_name FROM projects p JOIN clients c ON p.client_id = c.id WHERE p.id = ?').get(target_project_id);
+  if (!targetProj) return res.status(404).json({ error: 'Target project not found' });
+  if (!checkPrivateClient(req, res, target_project_id)) return;
+
+  const update = db.prepare('UPDATE tasks SET project_id = ? WHERE id = ?');
+  const moved = [];
+  db.transaction(() => {
+    for (const id of task_ids) {
+      const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+      if (!task) continue;
+      update.run(target_project_id, id);
+      moved.push(task.title);
+      logActivity('task', id, 'updated', req.user.display_name, `Moved to "${targetProj.name}" (${targetProj.client_name})`);
+    }
+  })();
+
+  res.json({ success: true, moved: moved.length });
+});
+
 router.delete('/:id', requireAuth, requireRole('owner'), (req, res) => {
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);

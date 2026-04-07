@@ -15,6 +15,7 @@ let calendarDate = new Date();
 let draggedClientId = null;
 let myTasksFilter = false;
 let clientSortMode = 'manual';
+let selectedTasks = new Set();
 
 async function loadCurrentUser() {
   try {
@@ -328,8 +329,10 @@ function renderTask(t, isDone) {
   const cc=t.comments?t.comments.length:0;
   const ac=t.attachments?t.attachments.length:0;
   const sc=expandedComments.has(t.id);
-  return `<div class="task-row ${isDone?'completed':''}" data-task-id="${t.id}">
+  const sel=selectedTasks.has(t.id);
+  return `<div class="task-row ${isDone?'completed':''} ${sel?'task-selected':''}" data-task-id="${t.id}">
     <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">
+      <input type="checkbox" class="task-checkbox" ${sel?'checked':''} onclick="event.stopPropagation();toggleTaskSelect(${t.id})" title="Select for batch actions">
       <span class="task-ref" title="Ref: ${taskRef(t.id)}">${taskRef(t.id)}</span>
       <span class="priority-badge priority-${t.priority}" title="${priorityLabel(t.priority)}"></span>
       <span class="task-title" onclick="editTask(${t.id})" style="cursor:pointer">${esc(t.title)}</span>
@@ -402,6 +405,96 @@ async function completeProject(id){if(!confirm('Mark this project as completed?'
 async function deleteProject(id){let name='this project';for(const c of clients)for(const p of c.projects)if(p.id===id){name=p.name;break;}if(!confirm(`Permanently delete "${name}" and all its tasks? This cannot be undone.`))return;if(!confirm(`Are you sure? All tasks in "${name}" will be lost forever.`))return;await api(`/api/projects/${id}`,{method:'DELETE'});expandedProjects.delete(id);await loadClients();}
 async function archiveTask(id){await api(`/api/tasks/${id}/archive`,{method:'PUT'});await loadClients();}
 async function deleteTask(id){const t=findTaskById(id);const title=t?t.title:'this task';if(!confirm(`Permanently delete "${title}"? This cannot be undone.`))return;await api(`/api/tasks/${id}`,{method:'DELETE'});await loadClients();}
+
+// ─── Batch Select & Move ──────────────────────────────
+function toggleTaskSelect(taskId) {
+  if (selectedTasks.has(taskId)) selectedTasks.delete(taskId);
+  else selectedTasks.add(taskId);
+  renderBatchBar();
+  // Update checkbox and highlight without full re-render
+  const row = document.querySelector(`[data-task-id="${taskId}"]`);
+  if (row) {
+    row.classList.toggle('task-selected', selectedTasks.has(taskId));
+    const cb = row.querySelector('.task-checkbox');
+    if (cb) cb.checked = selectedTasks.has(taskId);
+  }
+}
+
+function clearTaskSelection() {
+  selectedTasks.clear();
+  document.querySelectorAll('.task-selected').forEach(el => el.classList.remove('task-selected'));
+  document.querySelectorAll('.task-checkbox').forEach(cb => cb.checked = false);
+  renderBatchBar();
+}
+
+function renderBatchBar() {
+  let bar = document.getElementById('batchBar');
+  if (!selectedTasks.size) { if (bar) bar.style.display = 'none'; return; }
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'batchBar';
+    bar.className = 'batch-bar';
+    document.body.appendChild(bar);
+  }
+  bar.style.display = 'flex';
+  bar.innerHTML = `
+    <span><strong>${selectedTasks.size}</strong> task${selectedTasks.size > 1 ? 's' : ''} selected</span>
+    <button class="btn btn-primary btn-sm" onclick="openMoveModal()">Move to...</button>
+    <button class="btn btn-ghost btn-sm" onclick="clearTaskSelection()">Cancel</button>
+  `;
+}
+
+function openMoveModal() {
+  // Build a client → project tree for the picker
+  let html = '<div class="form-error" id="moveFormError" style="display:none"></div>';
+  html += '<div class="move-tree">';
+  for (const c of clients) {
+    html += `<div class="move-client"><strong>${esc(c.name)}</strong>`;
+    for (const p of c.projects) {
+      html += `<label class="move-project-option"><input type="radio" name="moveTarget" value="${p.id}"> ${esc(p.name)}</label>`;
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  html += `<div class="form-actions" style="margin-top:16px">
+    <button class="btn btn-ghost" onclick="closeModal('moveModal')">Cancel</button>
+    <button class="btn btn-primary" onclick="executeBatchMove()">Move ${selectedTasks.size} task${selectedTasks.size > 1 ? 's' : ''}</button>
+  </div>`;
+
+  let modal = document.getElementById('moveModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'moveModal';
+    modal.className = 'modal';
+    modal.style.maxWidth = '500px';
+    modal.innerHTML = `<div class="modal-header"><h2>Move Tasks to Project</h2><button class="modal-close" onclick="closeModal('moveModal')">&times;</button></div><div id="moveModalBody" style="padding:20px 28px"></div>`;
+    document.body.appendChild(modal);
+  }
+  document.getElementById('moveModalBody').innerHTML = html;
+  openModal('moveModal');
+}
+
+async function executeBatchMove() {
+  const selected = document.querySelector('input[name="moveTarget"]:checked');
+  if (!selected) {
+    const err = document.getElementById('moveFormError');
+    err.textContent = 'Select a destination project';
+    err.style.display = 'block';
+    return;
+  }
+  const targetId = +selected.value;
+  const ids = [...selectedTasks];
+  try {
+    const res = await api('/api/tasks/batch-move', { method: 'POST', body: { task_ids: ids, target_project_id: targetId } });
+    closeModal('moveModal');
+    clearTaskSelection();
+    await loadClients();
+  } catch (err) {
+    const errEl = document.getElementById('moveFormError');
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+  }
+}
 async function restoreProject(id){await api(`/api/projects/${id}/archive`,{method:'PUT'});await loadClients();}
 async function restoreTask(id){await api(`/api/tasks/${id}/archive`,{method:'PUT'});await loadClients();}
 async function restoreClient(id){await api(`/api/clients/${id}/archive`,{method:'PUT'});await loadClients();await showArchiveModal();}
