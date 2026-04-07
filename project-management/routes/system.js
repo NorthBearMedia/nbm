@@ -10,7 +10,12 @@ const router = Router();
 router.get('/api/health', (req, res) => {
   try {
     db.prepare('SELECT 1').get();
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    const counts = {
+      clients: db.prepare('SELECT count(*) as c FROM clients').get().c,
+      projects: db.prepare('SELECT count(*) as c FROM projects').get().c,
+      tasks: db.prepare('SELECT count(*) as c FROM tasks').get().c,
+    };
+    res.json({ status: 'ok', timestamp: new Date().toISOString(), counts });
   } catch (err) {
     res.status(500).json({ status: 'error', error: 'Database unavailable' });
   }
