@@ -317,6 +317,14 @@ app.post('/api/clients', requireAuth, (req, res) => {
   res.json(db.prepare('SELECT * FROM clients WHERE id = ?').get(result.lastInsertRowid));
 });
 
+// Must be before /:id routes so Express doesn't match "reorder" as an :id
+app.put('/api/clients/reorder', requireAuth, (req, res) => {
+  const { order } = req.body;
+  const stmt = db.prepare('UPDATE clients SET sort_order = ? WHERE id = ?');
+  db.transaction((ids) => { ids.forEach((id, i) => stmt.run(i, id)); })(order);
+  res.json({ success: true });
+});
+
 app.put('/api/clients/:id', requireAuth, (req, res) => {
   const { name, code, agreement_type, notes, logo_url, gmail_link, drive_link, author, is_private } = req.body;
   const old = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
@@ -351,13 +359,6 @@ app.post('/api/clients/:id/logo', requireAuth, logoUpload.single('logo'), (req, 
   const url = `/uploads/${req.file.filename}`;
   db.prepare('UPDATE clients SET logo_url = ? WHERE id = ?').run(url, req.params.id);
   res.json({ logo_url: url });
-});
-
-app.put('/api/clients/reorder', requireAuth, (req, res) => {
-  const { order } = req.body;
-  const stmt = db.prepare('UPDATE clients SET sort_order = ? WHERE id = ?');
-  db.transaction((ids) => { ids.forEach((id, i) => stmt.run(i, id)); })(order);
-  res.json({ success: true });
 });
 
 // ─── PROJECTS ──────────────────────────────────────────
