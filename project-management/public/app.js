@@ -267,7 +267,7 @@ function renderTask(t, isDone) {
       ${ac?`<span style="font-size:11px;color:var(--text-secondary)">&#128206;${ac}</span>`:''}
     </div>
     <div style="display:flex;align-items:center;gap:4px;min-width:80px">
-      ${mem?`<span style="width:20px;height:20px;border-radius:50%;background:${mem.avatar_color};display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:600">${mem.name[0]}</span>`:''}<span style="font-size:12px">${esc(t.assignee||'')}</span>
+      ${mem?`<span style="width:20px;height:20px;border-radius:50%;background:${mem.avatar_color};display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:600">${(mem.display_name||mem.name||'?')[0]}</span>`:''}<span style="font-size:12px">${esc(t.assignee||'')}</span>
     </div>
     <div style="font-size:12px;min-width:70px" class="${dc}">${fmtDateShort(t.deadline)}</div>
     <div style="font-size:12px;min-width:70px;color:var(--text-secondary)">${fmtDateShort(t.planned_date)}</div>
@@ -551,7 +551,7 @@ async function loadTodayView(){
   for(const [assignee,gTasks] of Object.entries(groups)){
     const mem=appUsers.find(u=>u.display_name===assignee)||teamMembers.find(m=>m.name===assignee);
     const totalH=gTasks.reduce((s,t)=>s+(t.estimated_hours||0),0);
-    html+=`<div class="today-group"><div class="today-group-header">${mem?`<span style="width:28px;height:28px;border-radius:50%;background:${mem.avatar_color};display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px">${mem.name[0]}</span>`:''}<span style="font-weight:600">${esc(assignee)}</span><span style="font-size:12px;color:var(--text-secondary);margin-left:auto">${totalH}h planned</span></div>`;
+    html+=`<div class="today-group"><div class="today-group-header">${mem?`<span style="width:28px;height:28px;border-radius:50%;background:${mem.avatar_color};display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px">${(mem.display_name||mem.name||'?')[0]}</span>`:''}<span style="font-weight:600">${esc(assignee)}</span><span style="font-size:12px;color:var(--text-secondary);margin-left:auto">${totalH}h planned</span></div>`;
     html+=gTasks.map(t=>`<div class="today-task" onclick="editTask(${t.id})" style="cursor:pointer">
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:13px">${esc(t.title)}</div>
