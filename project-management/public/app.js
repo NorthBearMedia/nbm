@@ -255,7 +255,7 @@ function renderClients() {
           <button class="btn-icon" onclick="openProjectModal(${c.id})" title="Add Project">+</button>
           <button class="btn-icon" onclick="showClientHistory(${c.id},'${esc(c.name)}')" title="History">&#128337;</button>
           <button class="btn-icon" onclick="archiveClient(${c.id})" title="Archive">&#128230;</button>
-          ${currentUser?.role==='owner'?`<button class="btn-icon" onclick="deleteClient(${c.id},'${esc(c.name)}')" title="Delete" style="color:var(--danger)">&#128465;</button>`:''}
+          ${currentUser?.role==='owner'?`<button class="btn-icon" onclick="deleteClient(${c.id})" title="Delete" style="color:var(--danger)">&#128465;</button>`:''}
         </div>
       </div>
       <div class="client-projects" ${ex?'style="display:block"':''}>
@@ -296,7 +296,7 @@ function renderProject(p, cid) {
         <button class="btn-icon" onclick="editProject(${p.id},${cid})" title="Edit">&#9998;</button>
         <button class="btn-icon" onclick="completeProject(${p.id})" title="Mark Completed">&#10003;</button>
         <button class="btn-icon" onclick="archiveProject(${p.id})" title="Archive">&#128230;</button>
-        ${currentUser?.role==='owner'?`<button class="btn-icon" onclick="deleteProject(${p.id},'${esc(p.name)}')" title="Delete" style="color:var(--danger)">&#128465;</button>`:''}
+        ${currentUser?.role==='owner'?`<button class="btn-icon" onclick="deleteProject(${p.id})" title="Delete" style="color:var(--danger)">&#128465;</button>`:''}
       </div>
     </div>
     <div class="project-tasks" ${ex?'style="display:block"':''}>
@@ -336,7 +336,7 @@ function renderTask(t, isDone) {
     <div class="task-actions">
       <button class="btn-icon" onclick="editTask(${t.id})" title="Edit">&#9998;</button>
       <button class="btn-icon" onclick="archiveTask(${t.id})" title="Archive">&#128230;</button>
-      ${currentUser?.role==='owner'?`<button class="btn-icon" onclick="deleteTask(${t.id},'${esc(t.title)}')" title="Delete" style="color:var(--danger)">&#128465;</button>`:''}
+      ${currentUser?.role==='owner'?`<button class="btn-icon" onclick="deleteTask(${t.id})" title="Delete" style="color:var(--danger)">&#128465;</button>`:''}
     </div>
   </div>${sc?renderCommentThread(t):''}`;
 }
@@ -377,12 +377,12 @@ async function onDrop(e,targetId){
 
 // ─── Archive ────────────────────────────────────────────
 async function archiveClient(id){const c=clients.find(x=>x.id===id);if(!confirm(`Archive "${c?.name}"?`))return;await api(`/api/clients/${id}/archive`,{method:'PUT',body:{author:getCurrentUser()}});expandedClients.delete(id);await loadClients();}
-async function deleteClient(id,name){if(!confirm(`Permanently delete "${name}" and all its projects/tasks? This cannot be undone.`))return;if(!confirm(`Are you sure? This will delete ALL data for "${name}".`))return;await api(`/api/clients/${id}`,{method:'DELETE',body:{author:getCurrentUser()}});expandedClients.delete(id);await loadClients();}
+async function deleteClient(id){const c=clients.find(x=>x.id===id);const name=c?c.name:'this client';if(!confirm(`Permanently delete "${name}" and all its projects/tasks? This cannot be undone.`))return;if(!confirm(`Are you sure? This will delete ALL data for "${name}".`))return;await api(`/api/clients/${id}`,{method:'DELETE',body:{author:getCurrentUser()}});expandedClients.delete(id);await loadClients();}
 async function archiveProject(id){if(!confirm('Archive this project?'))return;await api(`/api/projects/${id}/archive`,{method:'PUT',body:{author:getCurrentUser()}});expandedProjects.delete(id);await loadClients();}
 async function completeProject(id){if(!confirm('Mark this project as completed?'))return;await api(`/api/projects/${id}`,{method:'PUT',body:{status:'completed',author:getCurrentUser()}});await loadClients();}
-async function deleteProject(id,name){if(!confirm(`Permanently delete "${name}" and all its tasks? This cannot be undone.`))return;if(!confirm(`Are you sure? All tasks in "${name}" will be lost forever.`))return;await api(`/api/projects/${id}`,{method:'DELETE',body:{author:getCurrentUser()}});expandedProjects.delete(id);await loadClients();}
+async function deleteProject(id){let name='this project';for(const c of clients)for(const p of c.projects)if(p.id===id){name=p.name;break;}if(!confirm(`Permanently delete "${name}" and all its tasks? This cannot be undone.`))return;if(!confirm(`Are you sure? All tasks in "${name}" will be lost forever.`))return;await api(`/api/projects/${id}`,{method:'DELETE',body:{author:getCurrentUser()}});expandedProjects.delete(id);await loadClients();}
 async function archiveTask(id){await api(`/api/tasks/${id}/archive`,{method:'PUT',body:{author:getCurrentUser()}});await loadClients();}
-async function deleteTask(id,title){if(!confirm(`Permanently delete "${title}"? This cannot be undone.`))return;await api(`/api/tasks/${id}`,{method:'DELETE'});await loadClients();}
+async function deleteTask(id){const t=findTaskById(id);const title=t?t.title:'this task';if(!confirm(`Permanently delete "${title}"? This cannot be undone.`))return;await api(`/api/tasks/${id}`,{method:'DELETE'});await loadClients();}
 async function restoreProject(id){await api(`/api/projects/${id}/archive`,{method:'PUT',body:{author:getCurrentUser()}});await loadClients();}
 async function restoreTask(id){await api(`/api/tasks/${id}/archive`,{method:'PUT',body:{author:getCurrentUser()}});await loadClients();}
 async function restoreClient(id){await api(`/api/clients/${id}/archive`,{method:'PUT',body:{author:getCurrentUser()}});await loadClients();await showArchiveModal();}
