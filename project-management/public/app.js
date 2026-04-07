@@ -73,6 +73,7 @@ async function loadClients() {
   clients = await api(`/api/clients${fp}`);
   renderStats();
   if (currentView === 'clients') renderClients();
+  loadWorkloadSummary();
 }
 
 async function loadTeam() {
@@ -110,6 +111,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     document.getElementById('calendarView').style.display = currentView === 'calendar' ? '' : 'none';
     document.getElementById('focusView').style.display = currentView === 'focus' ? '' : 'none';
     document.getElementById('clientSubBar').style.display = currentView === 'clients' ? '' : 'none';
+    document.getElementById('workloadSummary').style.display = currentView === 'clients' ? 'flex' : 'none';
     if (currentView === 'today') loadTodayView();
     if (currentView === 'calendar') loadCalendarView();
     if (currentView === 'focus') loadFocusView();
@@ -165,6 +167,63 @@ function showStatPopup(type) {
         </div>
       </div>`).join('');
   openModal('statsModal');
+}
+
+// ─── Workload Summary ──────────────────────────────────
+async function loadWorkloadSummary() {
+  try {
+    const s = await api('/api/tasks/summary');
+    const el = document.getElementById('workloadSummary');
+    if (!el) return;
+
+    const fmt = (h) => h % 1 === 0 ? h : h.toFixed(1);
+
+    // Person breakdown (top 5 by this week hours)
+    const people = Object.entries(s.byPerson)
+      .sort((a, b) => b[1].thisWeek - a[1].thisWeek)
+      .slice(0, 5);
+    const personRows = people.map(([name, d]) =>
+      `<div class="wl-person-row">
+        <span class="wl-person-name">${esc(name)}</span>
+        <span class="wl-person-hours">${fmt(d.thisWeek)}h this wk / ${fmt(d.nextWeek)}h next</span>
+      </div>`
+    ).join('');
+
+    el.innerHTML = `
+      <div class="workload-card wl-today">
+        <div class="wl-label">Today</div>
+        <div class="wl-hours">${fmt(s.today.hours)}<span>hrs</span></div>
+        <div class="wl-tasks">${s.today.tasks} task${s.today.tasks !== 1 ? 's' : ''}</div>
+      </div>
+      <div class="workload-card">
+        <div class="wl-label">Tomorrow</div>
+        <div class="wl-hours">${fmt(s.tomorrow.hours)}<span>hrs</span></div>
+        <div class="wl-tasks">${s.tomorrow.tasks} task${s.tomorrow.tasks !== 1 ? 's' : ''}</div>
+      </div>
+      <div class="workload-card">
+        <div class="wl-label">This Week</div>
+        <div class="wl-hours">${fmt(s.thisWeek.hours)}<span>hrs</span></div>
+        <div class="wl-tasks">${s.thisWeek.tasks} task${s.thisWeek.tasks !== 1 ? 's' : ''}</div>
+      </div>
+      <div class="workload-card">
+        <div class="wl-label">Next Week</div>
+        <div class="wl-hours">${fmt(s.nextWeek.hours)}<span>hrs</span></div>
+        <div class="wl-tasks">${s.nextWeek.tasks} task${s.nextWeek.tasks !== 1 ? 's' : ''}</div>
+      </div>
+      ${s.overdue ? `<div class="workload-card wl-overdue">
+        <div class="wl-label">Overdue</div>
+        <div class="wl-hours">${s.overdue}</div>
+        <div class="wl-tasks">task${s.overdue !== 1 ? 's' : ''} past due</div>
+      </div>` : ''}
+      ${people.length ? `<div class="workload-people">
+        <div class="wl-label">Team Workload</div>
+        ${personRows}
+      </div>` : ''}
+    `;
+    el.style.display = 'flex';
+  } catch (e) {
+    console.error('Workload summary error:', e);
+  }
 }
 
 function navigateToTask(cid,pid,tid) {
@@ -1516,6 +1575,7 @@ async function toggleTaskPin(taskId, event) {
     await loadCurrentUser();
     await loadTeam();
     await loadClients();
+    await loadWorkloadSummary();
     await loadPins();
     // Restore expanded state from localStorage
     try {

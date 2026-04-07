@@ -205,6 +205,76 @@ router.put('/:id/pin', requireAuth, (req, res) => {
   res.json({ is_pinned: newVal });
 });
 
+// ─── Workload Summary ───────────────────────────────
+router.get('/summary', requireAuth, (req, res) => {
+  const isOwner = req.user.role === 'owner';
+  const priv = isOwner ? '' : 'AND c.is_private = 0';
+  const tasks = db.prepare(`
+    SELECT t.assignee, t.estimated_hours, t.planned_date, t.deadline, t.progress, t.priority
+    FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id
+    WHERE t.archived=0 AND t.progress NOT IN ('completed','invoiced') ${priv}
+  `).all();
+
+  const today = new Date().toISOString().split('T')[0];
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+
+  // Week boundaries (Mon-Sun)
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0=Sun
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() + mondayOffset);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  const wsStr = weekStart.toISOString().split('T')[0];
+  const weStr = weekEnd.toISOString().split('T')[0];
+
+  // Next week
+  const nextWeekStart = new Date(weekEnd);
+  nextWeekStart.setDate(weekEnd.getDate() + 1);
+  const nextWeekEnd = new Date(nextWeekStart);
+  nextWeekEnd.setDate(nextWeekStart.getDate() + 6);
+  const nwsStr = nextWeekStart.toISOString().split('T')[0];
+  const nweStr = nextWeekEnd.toISOString().split('T')[0];
+
+  let todayHours = 0, tomorrowHours = 0, thisWeekHours = 0, nextWeekHours = 0, totalHours = 0;
+  let todayTasks = 0, tomorrowTasks = 0, thisWeekTasks = 0, nextWeekTasks = 0, totalTasks = 0;
+  let overdue = 0;
+  const byPerson = {};
+
+  for (const t of tasks) {
+    const h = t.estimated_hours || 0;
+    const d = t.planned_date || t.deadline || '';
+    totalHours += h;
+    totalTasks++;
+
+    if (d && d < today) overdue++;
+
+    if (d === today) { todayHours += h; todayTasks++; }
+    if (d === tomorrow) { tomorrowHours += h; tomorrowTasks++; }
+    if (d >= wsStr && d <= weStr) { thisWeekHours += h; thisWeekTasks++; }
+    if (d >= nwsStr && d <= nweStr) { nextWeekHours += h; nextWeekTasks++; }
+
+    // Per-person breakdown
+    const name = t.assignee || 'Unassigned';
+    if (!byPerson[name]) byPerson[name] = { thisWeek: 0, nextWeek: 0, total: 0, tasks: 0 };
+    byPerson[name].total += h;
+    byPerson[name].tasks++;
+    if (d >= wsStr && d <= weStr) byPerson[name].thisWeek += h;
+    if (d >= nwsStr && d <= nweStr) byPerson[name].nextWeek += h;
+  }
+
+  res.json({
+    today: { hours: todayHours, tasks: todayTasks },
+    tomorrow: { hours: tomorrowHours, tasks: tomorrowTasks },
+    thisWeek: { hours: thisWeekHours, tasks: thisWeekTasks },
+    nextWeek: { hours: nextWeekHours, tasks: nextWeekTasks },
+    total: { hours: totalHours, tasks: totalTasks },
+    overdue,
+    byPerson
+  });
+});
+
 // ─── Calendar / By-date ───────────────────────────────
 
 router.get('/by-date', requireAuth, (req, res) => {

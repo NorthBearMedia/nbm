@@ -571,6 +571,71 @@ a:hover { color: #6dd4a8; }
 .task-row.task-selected { background: rgba(46, 170, 123, 0.1); border-left: 3px solid var(--accent); }
 .task-checkbox { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); flex-shrink: 0; }
 
+/* ─── Workload Summary ─────────────────────────── */
+.workload-summary {
+  display: flex;
+  gap: 12px;
+  padding: 16px 0 8px;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+.workload-card {
+  flex: 1;
+  min-width: 140px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.workload-card .wl-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+.workload-card .wl-hours {
+  font-size: 22px;
+  font-weight: 700;
+  font-family: 'Montserrat', sans-serif;
+  color: var(--text);
+}
+.workload-card .wl-hours span {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-left: 2px;
+}
+.workload-card .wl-tasks {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.workload-card.wl-overdue .wl-hours { color: var(--danger); }
+.workload-card.wl-today { border-color: var(--accent); }
+.workload-people {
+  flex: 2;
+  min-width: 240px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+}
+.workload-people .wl-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-bottom: 8px; }
+.wl-person-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 12px;
+  border-bottom: 1px solid var(--bg-glass);
+}
+.wl-person-row:last-child { border-bottom: none; }
+.wl-person-name { font-weight: 600; color: var(--text); }
+.wl-person-hours { color: var(--text-secondary); }
+
 /* ─── Batch Action Bar ──────────────────────────── */
 .batch-bar {
   position: fixed;
