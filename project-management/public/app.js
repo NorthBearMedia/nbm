@@ -53,9 +53,9 @@ async function loadClients() {
 }
 
 async function loadTeam() {
-  teamMembers = await api('/api/team');
   try { appUsers = await api('/api/users'); } catch(e) { appUsers = []; }
   if (!Array.isArray(appUsers)) appUsers = [];
+  teamMembers = appUsers.map(u => ({ id: u.id, name: u.display_name, role: u.role, avatar_color: u.avatar_color, avatar_url: u.avatar_url }));
   updateUserSelector();
   updatePersonDropdowns();
 }
@@ -149,6 +149,16 @@ function navigateToTask(cid,pid,tid) {
 // ─── Helpers ────────────────────────────────────────────
 function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 function taskRef(id) { return 'NB' + String(id).padStart(3, '0'); }
+function userAvatar(user, size) {
+  const s = size || 20;
+  if (!user) return '';
+  const color = user.avatar_color || '#3eaf84';
+  if (user.avatar_url) {
+    return `<img src="${esc(user.avatar_url)}" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;border:2px solid ${color};flex-shrink:0" alt="">`;
+  }
+  return `<span style="width:${s}px;height:${s}px;border-radius:50%;background:${color};display:inline-flex;align-items:center;justify-content:center;font-size:${Math.round(s*0.45)}px;color:#fff;font-weight:600;flex-shrink:0">${(user.display_name||user.name||'?')[0]}</span>`;
+}
+function findUser(name) { return appUsers.find(u=>u.display_name===name)||teamMembers.find(m=>m.name===name)||null; }
 function fmtDate(d){if(!d)return'';return new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}
 function fmtDateShort(d){if(!d)return'';return new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
 function getDeadlineClass(dl,prog){if(!dl||prog==='completed'||prog==='invoiced')return'';const now=new Date();now.setHours(0,0,0,0);const diff=(new Date(dl+'T00:00:00')-now)/864e5;return diff<0?'overdue':diff<=3?'due-soon':'';}
@@ -256,7 +266,7 @@ function renderProject(p, cid) {
 
 function renderTask(t, isDone) {
   const dc=getDeadlineClass(t.deadline,t.progress);
-  const mem=appUsers.find(u=>u.display_name===t.assignee)||teamMembers.find(m=>m.name===t.assignee);
+  const mem=findUser(t.assignee);
   const cc=t.comments?t.comments.length:0;
   const ac=t.attachments?t.attachments.length:0;
   const sc=expandedComments.has(t.id);
@@ -270,7 +280,7 @@ function renderTask(t, isDone) {
       ${ac?`<span style="font-size:11px;color:var(--text-secondary)">&#128206;${ac}</span>`:''}
     </div>
     <div style="display:flex;align-items:center;gap:4px;min-width:80px">
-      ${mem?`<span style="width:20px;height:20px;border-radius:50%;background:${mem.avatar_color};display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:600">${(mem.display_name||mem.name||'?')[0]}</span>`:''}<span style="font-size:12px">${esc(t.assignee||'')}</span>
+      ${userAvatar(mem, 22)}<span style="font-size:12px">${esc(t.assignee||'')}</span>
     </div>
     <div style="font-size:12px;min-width:70px" class="${dc}">${fmtDateShort(t.deadline)}</div>
     <div style="font-size:12px;min-width:70px;color:var(--text-secondary)">${fmtDateShort(t.planned_date)}</div>
@@ -294,7 +304,7 @@ function renderCommentThread(t) {
   const cs=t.comments||[];
   return `<div class="comment-section">
     ${!cs.length?'<div style="font-size:12px;color:var(--text-secondary);padding:4px 0">No comments yet</div>':''}
-    ${cs.map(c=>{const m=teamMembers.find(x=>x.name===c.author);return`<div class="comment"><div style="width:24px;height:24px;border-radius:50%;background:${m?m.avatar_color:'#64748b'};display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:600;flex-shrink:0">${(c.author||'?')[0].toUpperCase()}</div><div style="flex:1;min-width:0"><div style="font-size:11px"><strong>${esc(c.author)}</strong> <span style="color:var(--text-secondary)">${timeAgo(c.created_at)}</span></div><div style="font-size:13px;margin-top:2px">${esc(c.content)}</div></div></div>`;}).join('')}
+    ${cs.map(c=>{const m=findUser(c.author);return`<div class="comment">${userAvatar(m,24)||`<span style="width:24px;height:24px;border-radius:50%;background:#64748b;display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:600;flex-shrink:0">${(c.author||'?')[0].toUpperCase()}</span>`}<div style="flex:1;min-width:0"><div style="font-size:11px"><strong>${esc(c.author)}</strong> <span style="color:var(--text-secondary)">${timeAgo(c.created_at)}</span></div><div style="font-size:13px;margin-top:2px">${esc(c.content)}</div></div></div>`;}).join('')}
     <form class="comment-form" onsubmit="addComment(event,${t.id})"><input type="text" placeholder="Write a comment..." required><button type="submit" class="btn btn-primary btn-sm">Post</button></form>
   </div>`;
 }
@@ -521,16 +531,9 @@ async function showClientHistory(cid,name){
 document.getElementById('manageTeamBtn').addEventListener('click',()=>{renderTeamList();openModal('teamModal');});
 function renderTeamList(){
   const ct=document.getElementById('teamList');
-  ct.innerHTML=!teamMembers.length?'<div class="empty-state"><p>No team members.</p></div>':
-    teamMembers.map(m=>`<div class="team-member"><div style="display:flex;align-items:center;gap:10px"><div style="width:32px;height:32px;border-radius:50%;background:${m.avatar_color};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px">${m.name[0].toUpperCase()}</div><div><div style="font-weight:600;font-size:13px">${esc(m.name)}</div>${m.role?`<div style="font-size:11px;color:var(--text-secondary)">${esc(m.role)}</div>`:''}</div></div><button class="btn-icon" onclick="deleteTeamMember(${m.id})" style="color:var(--danger)" title="Remove">&#128465;</button></div>`).join('');
+  ct.innerHTML=!appUsers.length?'<div class="empty-state"><p>No team members.</p></div>':
+    appUsers.map(u=>`<div class="team-member"><div style="display:flex;align-items:center;gap:10px">${userAvatar(u,32)}<div><div style="font-weight:600;font-size:13px">${esc(u.display_name)}</div><div style="font-size:11px;color:var(--text-secondary)">${esc(u.role||'')}</div></div></div></div>`).join('');
 }
-document.getElementById('teamForm').addEventListener('submit',async e=>{
-  e.preventDefault();const n=document.getElementById('teamMemberName').value.trim();if(!n)return;
-  await api('/api/team',{method:'POST',body:{name:n,role:document.getElementById('teamMemberRole').value.trim(),avatar_color:document.getElementById('teamMemberColor').value}});
-  document.getElementById('teamMemberName').value='';document.getElementById('teamMemberRole').value='';
-  await loadTeam();renderTeamList();
-});
-async function deleteTeamMember(id){await api(`/api/team/${id}`,{method:'DELETE'});await loadTeam();renderTeamList();}
 
 // ─── Filters ────────────────────────────────────────────
 document.querySelectorAll('.filter-btn').forEach(btn=>{
@@ -621,9 +624,9 @@ async function loadTodayView(){
   for(const t of tasks){const a=t.assignee||'Unassigned';if(!groups[a])groups[a]=[];groups[a].push(t);}
   let html='';
   for(const [assignee,gTasks] of Object.entries(groups)){
-    const mem=appUsers.find(u=>u.display_name===assignee)||teamMembers.find(m=>m.name===assignee);
+    const mem=findUser(assignee);
     const totalH=gTasks.reduce((s,t)=>s+(t.estimated_hours||0),0);
-    html+=`<div class="today-group"><div class="today-group-header">${mem?`<span style="width:28px;height:28px;border-radius:50%;background:${mem.avatar_color};display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px">${(mem.display_name||mem.name||'?')[0]}</span>`:''}<span style="font-weight:600">${esc(assignee)}</span><span style="font-size:12px;color:var(--text-secondary);margin-left:auto">${totalH}h planned</span></div>`;
+    html+=`<div class="today-group"><div class="today-group-header">${userAvatar(mem,28)}<span style="font-weight:600">${esc(assignee)}</span><span style="font-size:12px;color:var(--text-secondary);margin-left:auto">${totalH}h planned</span></div>`;
     html+=gTasks.map(t=>`<div class="today-task" onclick="editTask(${t.id})" style="cursor:pointer">
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:13px">${esc(t.title)}</div>
@@ -704,10 +707,7 @@ async function renderUsersList() {
     <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 0;border-bottom:1px solid var(--border)">
       <div style="display:flex;align-items:center;gap:14px">
         <div style="position:relative">
-          ${u.avatar_url
-            ? `<img src="${esc(u.avatar_url)}" style="width:44px;height:44px;border-radius:50%;object-fit:cover">`
-            : `<div style="width:44px;height:44px;border-radius:50%;background:${u.avatar_color || '#3eaf84'};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px">${(u.display_name||'?')[0]}</div>`
-          }
+          ${userAvatar(u, 44)}
           <label style="position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;border-radius:50%;background:var(--bg-glass);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:10px" title="Upload photo">
             &#128247;
             <input type="file" accept="image/*" style="display:none" onchange="uploadUserAvatar(${u.id}, this)">
