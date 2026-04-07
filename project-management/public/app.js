@@ -204,6 +204,7 @@ function renderClients() {
           <button class="btn-icon" onclick="openProjectModal(${c.id})" title="Add Project">+</button>
           <button class="btn-icon" onclick="showClientHistory(${c.id},'${esc(c.name)}')" title="History">&#128337;</button>
           <button class="btn-icon" onclick="archiveClient(${c.id})" title="Archive">&#128230;</button>
+          ${currentUser?.role==='owner'?`<button class="btn-icon" onclick="deleteClient(${c.id},'${esc(c.name)}')" title="Delete" style="color:var(--danger)">&#128465;</button>`:''}
         </div>
       </div>
       <div class="client-projects" ${ex?'style="display:block"':''}>
@@ -320,6 +321,7 @@ async function onDrop(e,targetId){
 
 // ─── Archive ────────────────────────────────────────────
 async function archiveClient(id){const c=clients.find(x=>x.id===id);if(!confirm(`Archive "${c?.name}"?`))return;await api(`/api/clients/${id}/archive`,{method:'PUT',body:{author:getCurrentUser()}});expandedClients.delete(id);await loadClients();}
+async function deleteClient(id,name){if(!confirm(`Permanently delete "${name}" and all its projects/tasks? This cannot be undone.`))return;if(!confirm(`Are you sure? This will delete ALL data for "${name}".`))return;await api(`/api/clients/${id}`,{method:'DELETE',body:{author:getCurrentUser()}});expandedClients.delete(id);await loadClients();}
 async function archiveProject(id){if(!confirm('Archive this project?'))return;await api(`/api/projects/${id}/archive`,{method:'PUT',body:{author:getCurrentUser()}});expandedProjects.delete(id);await loadClients();}
 async function archiveTask(id){await api(`/api/tasks/${id}/archive`,{method:'PUT',body:{author:getCurrentUser()}});await loadClients();}
 async function restoreProject(id){await api(`/api/projects/${id}/archive`,{method:'PUT',body:{author:getCurrentUser()}});await loadClients();}
