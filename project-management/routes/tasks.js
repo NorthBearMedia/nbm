@@ -1,15 +1,26 @@
 import { Router } from 'express';
 import db from '../database.js';
-import { requireAuth, requireRole, attachUpload } from '../middleware.js';
+import { requireAuth, requireRole, requireWrite, attachUpload } from '../middleware.js';
 import { logActivity } from '../lib/activity.js';
 
 const router = Router();
 
 // ─── Task CRUD ────────────────────────────────────────
 
-router.post('/', requireAuth, (req, res) => {
+// Helper: check if a project's parent client is private and user is not owner
+function checkPrivateClient(req, res, projectId) {
+  const row = db.prepare('SELECT c.is_private FROM projects p JOIN clients c ON p.client_id = c.id WHERE p.id = ?').get(projectId);
+  if (row?.is_private && req.user.role !== 'owner') {
+    res.status(403).json({ error: 'Access denied' });
+    return false;
+  }
+  return true;
+}
+
+router.post('/', requireAuth, requireWrite, (req, res) => {
   const { project_id, title, assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit } = req.body;
   if (!project_id || !title) return res.status(400).json({ error: 'project_id and title required' });
+  if (!checkPrivateClient(req, res, project_id)) return;
 
   const result = db.prepare(
     'INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
@@ -21,10 +32,11 @@ router.post('/', requireAuth, (req, res) => {
   res.json(task);
 });
 
-router.put('/:id', requireAuth, (req, res) => {
+router.put('/:id', requireAuth, requireWrite, (req, res) => {
   const { title, assignee, deadline, planned_date, estimated_hours, progress, priority, references_text, notes, is_recurring, recur_interval, recur_unit } = req.body;
   const old = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!old) return res.status(404).json({ error: 'Task not found' });
+  if (!checkPrivateClient(req, res, old.project_id)) return;
 
   db.prepare(
     'UPDATE tasks SET title=COALESCE(?,title), assignee=COALESCE(?,assignee), deadline=COALESCE(?,deadline), planned_date=COALESCE(?,planned_date), estimated_hours=COALESCE(?,estimated_hours), progress=COALESCE(?,progress), priority=COALESCE(?,priority), references_text=COALESCE(?,references_text), notes=COALESCE(?,notes), is_recurring=COALESCE(?,is_recurring), recur_interval=COALESCE(?,recur_interval), recur_unit=COALESCE(?,recur_unit) WHERE id=?'
@@ -71,7 +83,7 @@ router.delete('/:id', requireAuth, requireRole('owner'), (req, res) => {
   res.json({ success: true });
 });
 
-router.put('/:id/archive', requireAuth, (req, res) => {
+router.put('/:id/archive', requireAuth, requireWrite, (req, res) => {
   const t = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!t) return res.status(404).json({ error: 'Task not found' });
   const ns = t.archived ? 0 : 1;
@@ -82,7 +94,7 @@ router.put('/:id/archive', requireAuth, (req, res) => {
 
 // ─── Attachments ──────────────────────────────────────
 
-router.post('/:id/attachments', requireAuth, attachUpload.array('files', 10), (req, res) => {
+router.post('/:id/attachments', requireAuth, requireWrite, attachUpload.array('files', 10), (req, res) => {
   if (!req.files || !req.files.length) return res.status(400).json({ error: 'No files' });
   const stmt = db.prepare('INSERT INTO task_attachments (task_id, filename, original_name, file_type, file_size, uploaded_by) VALUES (?, ?, ?, ?, ?, ?)');
   const results = [];
@@ -102,7 +114,7 @@ export function deleteAttachmentHandler(req, res) {
 
 // ─── Comments ─────────────────────────────────────────
 
-router.post('/:id/comments', requireAuth, (req, res) => {
+router.post('/:id/comments', requireAuth, requireWrite, (req, res) => {
   const { content } = req.body;
   if (!content) return res.status(400).json({ error: 'Content required' });
   // Author derived from authenticated session, not client
@@ -117,18 +129,22 @@ router.post('/:id/comments', requireAuth, (req, res) => {
 router.get('/by-date', requireAuth, (req, res) => {
   const { date, assignee } = req.query;
   const d = date || new Date().toISOString().split('T')[0];
+  const isOwner = req.user.role === 'owner';
+  const priv = isOwner ? '' : 'AND c.is_private = 0';
   const q = assignee
-    ? db.prepare('SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.planned_date=? AND t.assignee=? AND t.archived=0 ORDER BY t.priority, t.sort_order')
-    : db.prepare('SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.planned_date=? AND t.archived=0 ORDER BY t.assignee, t.priority, t.sort_order');
+    ? db.prepare(`SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.planned_date=? AND t.assignee=? AND t.archived=0 ${priv} ORDER BY t.priority, t.sort_order`)
+    : db.prepare(`SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.planned_date=? AND t.archived=0 ${priv} ORDER BY t.assignee, t.priority, t.sort_order`);
   res.json(assignee ? q.all(d, assignee) : q.all(d));
 });
 
 router.get('/calendar', requireAuth, (req, res) => {
   const { start, end, assignee } = req.query;
   if (!start || !end) return res.status(400).json({ error: 'start and end required' });
+  const isOwner = req.user.role === 'owner';
+  const priv = isOwner ? '' : 'AND c.is_private = 0';
   const q = assignee
-    ? db.prepare('SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.archived=0 AND t.assignee=? AND (t.planned_date BETWEEN ? AND ? OR t.deadline BETWEEN ? AND ?) ORDER BY t.planned_date, t.deadline')
-    : db.prepare('SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.archived=0 AND (t.planned_date BETWEEN ? AND ? OR t.deadline BETWEEN ? AND ?) ORDER BY t.planned_date, t.deadline');
+    ? db.prepare(`SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.archived=0 AND t.assignee=? AND (t.planned_date BETWEEN ? AND ? OR t.deadline BETWEEN ? AND ?) ${priv} ORDER BY t.planned_date, t.deadline`)
+    : db.prepare(`SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.archived=0 AND (t.planned_date BETWEEN ? AND ? OR t.deadline BETWEEN ? AND ?) ${priv} ORDER BY t.planned_date, t.deadline`);
   res.json(assignee ? q.all(assignee, start, end, start, end) : q.all(start, end, start, end));
 });
 
@@ -138,13 +154,15 @@ router.get('/search', requireAuth, (req, res) => {
   const { q } = req.query;
   if (!q || q.length < 1) return res.json([]);
 
+  const isOwner = req.user.role === 'owner';
+  const priv = isOwner ? '' : 'AND c.is_private = 0';
   const refMatch = q.match(/^(?:NB)?(\d+)$/i);
   let tasks;
   if (refMatch) {
     const taskId = parseInt(refMatch[1]);
-    tasks = db.prepare('SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.id=?').all(taskId);
+    tasks = db.prepare(`SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.id=? ${priv}`).all(taskId);
   } else {
-    tasks = db.prepare('SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.title LIKE ? OR t.notes LIKE ? OR t.assignee LIKE ? ORDER BY t.archived ASC, t.created_at DESC LIMIT 20').all(`%${q}%`, `%${q}%`, `%${q}%`);
+    tasks = db.prepare(`SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE (t.title LIKE ? OR t.notes LIKE ? OR t.assignee LIKE ?) ${priv} ORDER BY t.archived ASC, t.created_at DESC LIMIT 20`).all(`%${q}%`, `%${q}%`, `%${q}%`);
   }
   res.json(tasks);
 });

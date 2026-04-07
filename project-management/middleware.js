@@ -63,6 +63,14 @@ export function requireRole(...roles) {
   };
 }
 
+// Block viewers from write operations
+export function requireWrite(req, res, next) {
+  if (!req.user || req.user.role === 'viewer') {
+    return res.status(403).json({ error: 'Viewers have read-only access' });
+  }
+  next();
+}
+
 // Global API auth — protects all /api routes except /api/auth/*
 export function apiAuthGuard(req, res, next) {
   if (req.path.startsWith('/auth/') || req.path === '/health') return next();

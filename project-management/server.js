@@ -4,7 +4,7 @@ import { dirname, join } from 'path';
 import { mkdirSync, readdirSync, unlinkSync } from 'fs';
 import cookieParser from 'cookie-parser';
 import db from './database.js';
-import { securityHeaders, apiAuthGuard, getSessionUser, hashPassword, requireAuth, requireRole, dataDir, uploadsDir, attachmentsDir } from './middleware.js';
+import { securityHeaders, apiAuthGuard, getSessionUser, hashPassword, requireAuth, requireRole, requireWrite, dataDir, uploadsDir, attachmentsDir } from './middleware.js';
 import authRoutes from './routes/auth.js';
 import clientRoutes from './routes/clients.js';
 import projectRoutes from './routes/projects.js';

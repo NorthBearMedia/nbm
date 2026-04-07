@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import db from '../database.js';
-import { requireAuth, requireRole, logoUpload } from '../middleware.js';
+import { requireAuth, requireRole, requireWrite, logoUpload } from '../middleware.js';
 import { logActivity } from '../lib/activity.js';
 
 const router = Router();
@@ -56,7 +56,7 @@ router.get('/', requireAuth, (req, res) => {
   res.json(clients);
 });
 
-router.post('/', requireAuth, (req, res) => {
+router.post('/', requireAuth, requireWrite, (req, res) => {
   const { name, code, agreement_type, notes, gmail_link, drive_link, is_private } = req.body;
   if (!name) return res.status(400).json({ error: 'Client name is required' });
   if (code && code.length !== 3) return res.status(400).json({ error: 'Client code must be exactly 3 characters' });
@@ -72,7 +72,7 @@ router.post('/', requireAuth, (req, res) => {
 });
 
 // Must be before /:id routes
-router.put('/reorder', requireAuth, (req, res) => {
+router.put('/reorder', requireAuth, requireWrite, (req, res) => {
   const { order } = req.body;
   if (!Array.isArray(order)) return res.status(400).json({ error: 'order must be an array' });
   const stmt = db.prepare('UPDATE clients SET sort_order = ? WHERE id = ?');
@@ -80,7 +80,7 @@ router.put('/reorder', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
-router.put('/:id', requireAuth, (req, res) => {
+router.put('/:id', requireAuth, requireWrite, (req, res) => {
   const { name, code, agreement_type, notes, logo_url, gmail_link, drive_link, is_private } = req.body;
   const old = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
   if (!old) return res.status(404).json({ error: 'Client not found' });
@@ -105,7 +105,7 @@ router.delete('/:id', requireAuth, requireRole('owner'), (req, res) => {
   res.json({ success: true });
 });
 
-router.put('/:id/archive', requireAuth, (req, res) => {
+router.put('/:id/archive', requireAuth, requireWrite, (req, res) => {
   const c = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
   if (!c) return res.status(404).json({ error: 'Client not found' });
   const ns = c.archived ? 0 : 1;
@@ -114,7 +114,7 @@ router.put('/:id/archive', requireAuth, (req, res) => {
   res.json({ success: true, archived: ns });
 });
 
-router.post('/:id/logo', requireAuth, logoUpload.single('logo'), (req, res) => {
+router.post('/:id/logo', requireAuth, requireWrite, logoUpload.single('logo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file' });
   const url = `/uploads/${req.file.filename}`;
   db.prepare('UPDATE clients SET logo_url = ? WHERE id = ?').run(url, req.params.id);
@@ -123,6 +123,9 @@ router.post('/:id/logo', requireAuth, logoUpload.single('logo'), (req, res) => {
 
 router.get('/:id/history', requireAuth, (req, res) => {
   const cid = req.params.id;
+  const client = db.prepare('SELECT is_private FROM clients WHERE id = ?').get(cid);
+  if (!client) return res.status(404).json({ error: 'Client not found' });
+  if (client.is_private && req.user.role !== 'owner') return res.status(403).json({ error: 'Access denied' });
   const limit = Math.min(parseInt(req.query.limit) || 100, 500);
   const pids = db.prepare('SELECT id FROM projects WHERE client_id = ?').all(cid).map(p => p.id);
   let tids = [];

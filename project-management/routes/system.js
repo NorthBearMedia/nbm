@@ -25,7 +25,9 @@ router.get('/api/history', requireAuth, (req, res) => {
 
 // ─── Archived Clients ─────────────────────────────────
 router.get('/api/archived/clients', requireAuth, (req, res) => {
-  res.json(db.prepare('SELECT * FROM clients WHERE archived = 1 ORDER BY name').all());
+  const isOwner = req.user.role === 'owner';
+  const priv = isOwner ? '' : 'AND is_private = 0';
+  res.json(db.prepare(`SELECT * FROM clients WHERE archived = 1 ${priv} ORDER BY name`).all());
 });
 
 // ─── Team ─────────────────────────────────────────────
