@@ -156,8 +156,8 @@ try {
   const taskCount = db.prepare('SELECT count(*) as c FROM tasks').get().c;
   const projectCount = db.prepare('SELECT count(*) as c FROM projects').get().c;
   console.log(`[DB] Tasks: ${taskCount}, Projects: ${projectCount}`);
-  if (taskCount === 0 && projectCount > 0) {
-    console.log('[DB] RESTORING tasks and comments lost during migration...');
+  if (taskCount < 20 && projectCount > 0) {
+    console.log('[DB] RESTORING seed tasks and comments (INSERT OR IGNORE — safe for existing data)...');
     const insertTask = db.prepare('INSERT OR IGNORE INTO tasks (id, project_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, is_recurring, recur_interval, recur_unit, archived, sort_order, is_pinned) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
     const insertComment = db.prepare('INSERT OR IGNORE INTO comments (id, task_id, author, content) VALUES (?, ?, ?, ?)');
     const tasks = [
