@@ -13,6 +13,7 @@ let showArchivedProjects = new Set();
 let showArchivedTasks = new Set();
 let calendarDate = new Date();
 let draggedClientId = null;
+let myTasksFilter = false;
 
 function getCurrentUser() { return currentUser?.display_name || 'System'; }
 
@@ -185,6 +186,15 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelec
 function renderClients() {
   const ct = document.getElementById('clientList');
   if (!clients.length) { ct.innerHTML='<div class="empty-state"><img src="/NBM%20Logo%20No%20NG%20Light%20Lines.png" alt="" style="width:80px;opacity:0.3;margin-bottom:16px"><p>No clients yet. Click + to add one.</p></div>'; return; }
+  // Filter notice
+  const fn = document.getElementById('filterNotice');
+  if (fn) {
+    if (myTasksFilter) {
+      const quip = filterQuips[Math.floor(Math.random() * filterQuips.length)];
+      fn.innerHTML = `<div style="text-align:center;padding:12px 20px;font-size:12px;color:var(--text-secondary);font-style:italic;border-top:1px solid var(--border)">${quip} <a href="#" onclick="toggleMyTasks();return false" style="color:var(--primary);text-decoration:underline;font-style:normal">Show all tasks</a></div>`;
+      fn.style.display = 'block';
+    } else { fn.style.display = 'none'; }
+  }
   ct.innerHTML = clients.map(c => {
     const ex = expandedClients.has(c.id);
     const s = c.stats;
@@ -237,8 +247,10 @@ function renderArchivedProjects(c) {
 
 function renderProject(p, cid) {
   const ex=expandedProjects.has(p.id);
-  const active=p.tasks.filter(t=>t.progress!=='completed'&&t.progress!=='invoiced');
-  const done=p.tasks.filter(t=>t.progress==='completed'||t.progress==='invoiced');
+  const myName=currentUser?.display_name||'';
+  const allTasks=myTasksFilter?p.tasks.filter(t=>t.assignee===myName):p.tasks;
+  const active=allTasks.filter(t=>t.progress!=='completed'&&t.progress!=='invoiced');
+  const done=allTasks.filter(t=>t.progress==='completed'||t.progress==='invoiced');
   const arch=p.archivedTasks||[];
   const showDone=showCompletedTasks.has(p.id), showArch=showArchivedTasks.has(p.id);
   return `<div class="project-section ${ex?'expanded':''}" data-project-id="${p.id}">
@@ -542,6 +554,25 @@ document.querySelectorAll('.filter-btn').forEach(btn=>{
     btn.classList.add('active');currentFilter=btn.dataset.filter;loadClients();
   });
 });
+
+// ─── My Tasks Filter ──────────────────────────────────
+function toggleMyTasks() {
+  myTasksFilter = !myTasksFilter;
+  const btn = document.getElementById('myTasksBtn');
+  if (btn) btn.classList.toggle('active', myTasksFilter);
+  renderClients();
+}
+
+const filterQuips = [
+  "Psst... you're only seeing your own tasks. The rest of the team is probably fine. Probably.",
+  "Filtered to just your tasks. Out of sight, out of mind, right?",
+  "Showing only your tasks. Everyone else's problems are blissfully hidden.",
+  "My Tasks mode: because ignorance is bliss (until the deadline).",
+  "You're in your own little task bubble. It's nice here.",
+  "Only showing your tasks. What the others are up to is none of your business.",
+  "Filtered view active. The tasks you can't see can't hurt you... yet.",
+  "Just your tasks. The chaos of everyone else's workload has been conveniently swept under the rug.",
+];
 
 // ─── Search ────────────────────────────────────────────
 const searchInput = document.getElementById('taskSearch');
