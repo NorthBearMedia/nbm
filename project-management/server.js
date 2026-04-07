@@ -67,7 +67,7 @@ app.use('/api/clients', clientRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/users', userRoutes);
-app.delete('/api/attachments/:id', requireAuth, requireRole('owner'), deleteAttachmentHandler);
+app.delete('/api/attachments/:id', requireAuth, requireWrite, deleteAttachmentHandler);
 app.use(systemRoutes);
 app.use(createBackupRoutes(backupDir, backupDatabase));
 
