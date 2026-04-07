@@ -1208,6 +1208,11 @@ a:hover { color: #6dd4a8; }
   border-top: 1px solid var(--border);
   margin-top: 40px;
 }
+.app-version {
+  margin-left: auto;
+  font-size: 10px;
+  opacity: 0.5;
+}
 
 /* ─── Task Ref ──────────────────────────────────────── */
 .task-ref {
