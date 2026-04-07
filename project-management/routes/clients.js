@@ -5,6 +5,14 @@ import { logActivity } from '../lib/activity.js';
 
 const router = Router();
 
+// Helper: load client and block non-owners from private clients
+function requireClientAccess(req, res) {
+  const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
+  if (!client) { res.status(404).json({ error: 'Client not found' }); return null; }
+  if (client.is_private && req.user.role !== 'owner') { res.status(403).json({ error: 'Access denied' }); return null; }
+  return client;
+}
+
 router.get('/', requireAuth, (req, res) => {
   const { filter, include_archived } = req.query;
   const arc = include_archived === '1' ? '' : 'AND archived = 0';
@@ -82,8 +90,9 @@ router.put('/reorder', requireAuth, requireWrite, (req, res) => {
 
 router.put('/:id', requireAuth, requireWrite, (req, res) => {
   const { name, code, agreement_type, notes, logo_url, gmail_link, drive_link, is_private } = req.body;
-  const old = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
-  if (!old) return res.status(404).json({ error: 'Client not found' });
+  const old = requireClientAccess(req, res);
+  if (!old) return;
+  if (is_private && req.user.role !== 'owner') return res.status(403).json({ error: 'Only owners can make clients private' });
 
   db.prepare('UPDATE clients SET name=COALESCE(?,name), code=COALESCE(?,code), agreement_type=COALESCE(?,agreement_type), notes=COALESCE(?,notes), logo_url=COALESCE(?,logo_url), gmail_link=COALESCE(?,gmail_link), drive_link=COALESCE(?,drive_link), is_private=COALESCE(?,is_private) WHERE id=?')
     .run(name, code, agreement_type, notes, logo_url, gmail_link, drive_link, is_private !== undefined ? (is_private ? 1 : 0) : null, req.params.id);
@@ -106,15 +115,18 @@ router.delete('/:id', requireAuth, requireRole('owner'), (req, res) => {
 });
 
 router.put('/:id/archive', requireAuth, requireWrite, (req, res) => {
-  const c = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
-  if (!c) return res.status(404).json({ error: 'Client not found' });
+  const c = requireClientAccess(req, res);
+  if (!c) return;
   const ns = c.archived ? 0 : 1;
   db.prepare('UPDATE clients SET archived = ? WHERE id = ?').run(ns, req.params.id);
   logActivity('client', req.params.id, ns ? 'archived' : 'restored', req.user.display_name, `${ns ? 'Archived' : 'Restored'} "${c.name}"`);
   res.json({ success: true, archived: ns });
 });
 
-router.post('/:id/logo', requireAuth, requireWrite, logoUpload.single('logo'), (req, res) => {
+router.post('/:id/logo', requireAuth, requireWrite, (req, res, next) => {
+  if (!requireClientAccess(req, res)) return;
+  next();
+}, logoUpload.single('logo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file' });
   const url = `/uploads/${req.file.filename}`;
   db.prepare('UPDATE clients SET logo_url = ? WHERE id = ?').run(url, req.params.id);

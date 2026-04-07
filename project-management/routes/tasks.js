@@ -86,6 +86,7 @@ router.delete('/:id', requireAuth, requireRole('owner'), (req, res) => {
 router.put('/:id/archive', requireAuth, requireWrite, (req, res) => {
   const t = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!t) return res.status(404).json({ error: 'Task not found' });
+  if (!checkPrivateClient(req, res, t.project_id)) return;
   const ns = t.archived ? 0 : 1;
   db.prepare('UPDATE tasks SET archived = ? WHERE id = ?').run(ns, req.params.id);
   logActivity('task', req.params.id, ns ? 'archived' : 'restored', req.user.display_name, `${ns ? 'Archived' : 'Restored'} "${t.title}"`);
@@ -94,7 +95,12 @@ router.put('/:id/archive', requireAuth, requireWrite, (req, res) => {
 
 // ─── Attachments ──────────────────────────────────────
 
-router.post('/:id/attachments', requireAuth, requireWrite, attachUpload.array('files', 10), (req, res) => {
+router.post('/:id/attachments', requireAuth, requireWrite, (req, res, next) => {
+  const t = db.prepare('SELECT project_id FROM tasks WHERE id = ?').get(req.params.id);
+  if (!t) return res.status(404).json({ error: 'Task not found' });
+  if (!checkPrivateClient(req, res, t.project_id)) return;
+  next();
+}, attachUpload.array('files', 10), (req, res) => {
   if (!req.files || !req.files.length) return res.status(400).json({ error: 'No files' });
   const stmt = db.prepare('INSERT INTO task_attachments (task_id, filename, original_name, file_type, file_size, uploaded_by) VALUES (?, ?, ?, ?, ?, ?)');
   const results = [];
@@ -108,6 +114,11 @@ router.post('/:id/attachments', requireAuth, requireWrite, attachUpload.array('f
 
 // Mounted at /api/attachments/:id via server.js
 export function deleteAttachmentHandler(req, res) {
+  const row = db.prepare(
+    'SELECT c.is_private FROM task_attachments a JOIN tasks t ON a.task_id = t.id JOIN projects p ON t.project_id = p.id JOIN clients c ON p.client_id = c.id WHERE a.id = ?'
+  ).get(req.params.id);
+  if (!row) return res.status(404).json({ error: 'Attachment not found' });
+  if (row.is_private && req.user.role !== 'owner') return res.status(403).json({ error: 'Access denied' });
   db.prepare('DELETE FROM task_attachments WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 }
@@ -117,6 +128,9 @@ export function deleteAttachmentHandler(req, res) {
 router.post('/:id/comments', requireAuth, requireWrite, (req, res) => {
   const { content } = req.body;
   if (!content) return res.status(400).json({ error: 'Content required' });
+  const t = db.prepare('SELECT project_id FROM tasks WHERE id = ?').get(req.params.id);
+  if (!t) return res.status(404).json({ error: 'Task not found' });
+  if (!checkPrivateClient(req, res, t.project_id)) return;
   // Author derived from authenticated session, not client
   const author = req.user.display_name;
   const r = db.prepare('INSERT INTO comments (task_id, author, content) VALUES (?, ?, ?)').run(req.params.id, author, content);
