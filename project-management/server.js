@@ -143,7 +143,6 @@ const attachStorage = multer.diskStorage({
 });
 const attachUpload = multer({ storage: attachStorage, limits: { fileSize: 50 * 1024 * 1024 } });
 
-import { mkdirSync } from 'fs';
 mkdirSync(join(__dirname, 'public', 'uploads'), { recursive: true });
 mkdirSync(join(__dirname, 'public', 'attachments'), { recursive: true });
 
