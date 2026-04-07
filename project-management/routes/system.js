@@ -124,19 +124,19 @@ export function createBackupRoutes(backupDir, backupFn) {
     if (req.user.role !== 'owner') return res.status(403).json({ error: 'Owner only' });
     try {
       const files = readdirSync(backupDir)
-        .filter(f => f.startsWith('nbm-projects-') && f.endsWith('.db'))
+        .filter(f => f.endsWith('.db'))
         .sort().reverse()
         .map(f => {
           try {
             const s = statSync(join(backupDir, f));
-            // Peek inside to check task count
             let taskCount = '?';
             try {
               const bdb = new Database(join(backupDir, f), { readonly: true });
               taskCount = bdb.prepare('SELECT count(*) as c FROM tasks').get().c;
               bdb.close();
             } catch {}
-            return { file: f, size: s.size, modified: s.mtime, tasks: taskCount };
+            const type = f.startsWith('pre-migration-') ? 'pre-migration' : 'hourly';
+            return { file: f, size: s.size, modified: s.mtime, tasks: taskCount, type };
           } catch { return { file: f }; }
         });
       res.json(files);
@@ -147,6 +147,22 @@ export function createBackupRoutes(backupDir, backupFn) {
     if (req.user.role !== 'owner') return res.status(403).json({ error: 'Owner only' });
     backupFn();
     res.json({ success: true, message: 'Backup started' });
+  });
+
+  // Download a backup file (for off-site storage)
+  r.get('/api/backups/download/:file', requireAuth, (req, res) => {
+    if (req.user.role !== 'owner') return res.status(403).json({ error: 'Owner only' });
+    const file = req.params.file;
+    if (!file || !file.endsWith('.db') || file.includes('..') || file.includes('/')) {
+      return res.status(400).json({ error: 'Invalid backup file' });
+    }
+    const backupPath = join(backupDir, file);
+    try {
+      statSync(backupPath);
+    } catch {
+      return res.status(404).json({ error: 'Backup file not found' });
+    }
+    res.download(backupPath, file);
   });
 
   // Restore tasks, projects, comments etc from a backup file
@@ -172,7 +188,6 @@ export function createBackupRoutes(backupDir, backupFn) {
           try {
             const rows = bdb.prepare(`SELECT * FROM ${table}`).all();
             if (!rows.length) continue;
-            // Clear current data and restore from backup
             db.prepare(`DELETE FROM ${table}`).run();
             const cols = Object.keys(rows[0]);
             const placeholders = cols.map(() => '?').join(',');

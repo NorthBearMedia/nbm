@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { existsSync, mkdirSync, readdirSync, unlinkSync, copyFileSync } from 'fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -12,6 +13,35 @@ const db = new Database(dbPath);
 
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+
+// ─── PRE-MIGRATION BACKUP ─────────────────────────────────────────────────────
+// SYNCHRONOUS file copy BEFORE any schema changes run.
+// This guarantees we always have a snapshot of the pre-migration state,
+// because db.backup() is async and wouldn't finish before CREATE TABLE runs.
+try {
+  if (existsSync(dbPath)) {
+    const backupDir = join(dataDir, 'backups');
+    mkdirSync(backupDir, { recursive: true });
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupPath = join(backupDir, `pre-migration-${ts}.db`);
+    // Checkpoint WAL so the .db file has all data, then copy synchronously
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    copyFileSync(dbPath, backupPath);
+    console.log(`[DB] Pre-migration backup saved: ${backupPath}`);
+    // Keep only last 10 pre-migration backups
+    try {
+      const preMigFiles = readdirSync(backupDir)
+        .filter(f => f.startsWith('pre-migration-') && f.endsWith('.db'))
+        .sort();
+      while (preMigFiles.length > 10) {
+        const old = preMigFiles.shift();
+        try { unlinkSync(join(backupDir, old)); } catch {}
+      }
+    } catch {}
+  }
+} catch (err) {
+  console.error('[DB] Pre-migration backup error:', err.message);
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS clients (
@@ -121,7 +151,13 @@ db.exec(`
   );
 `);
 
-// Migrations — add columns if they don't exist
+// ─── SAFE MIGRATIONS ONLY ──────────────────────────────────────────────────────
+// RULE: NEVER use DROP TABLE, CREATE TABLE ... AS SELECT, or table recreation.
+//       These trigger ON DELETE CASCADE and WIPE referencing data.
+//       Only use: ALTER TABLE ADD COLUMN, UPDATE, INSERT, CREATE INDEX.
+//       If CHECK constraints need updating, leave old ones — they can't be altered
+//       in SQLite without table recreation, so just validate in application code.
+// ────────────────────────────────────────────────────────────────────────────────
 try { db.exec('ALTER TABLE clients ADD COLUMN is_private INTEGER NOT NULL DEFAULT 0'); } catch {}
 try { db.exec("ALTER TABLE clients ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN password_salt TEXT DEFAULT ''"); } catch {}
@@ -152,7 +188,6 @@ db.exec(`
 
 // ─── Auto-Restore from Backup ─────────────────────────────────────────────────
 // If tasks were wiped by migration bug, restore EVERYTHING from the best backup
-import { readdirSync } from 'fs';
 
 try {
   const taskCount = db.prepare('SELECT count(*) as c FROM tasks').get().c;

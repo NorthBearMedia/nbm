@@ -26,6 +26,8 @@ async function loadCurrentUser() {
       if (sel) sel.innerHTML = `<option selected>${esc(currentUser.display_name)}</option>`;
       const ghb = document.getElementById('globalHistoryBtn');
       if (ghb) ghb.style.display = currentUser.role === 'owner' ? '' : 'none';
+      const bkb = document.getElementById('manageBackupsBtn');
+      if (bkb) bkb.style.display = currentUser.role === 'owner' ? '' : 'none';
     } else {
       window.location.href = '/login';
     }
@@ -1087,6 +1089,56 @@ document.getElementById('addUserForm').addEventListener('submit', async (e) => {
     alert(err.error || 'Failed to create user');
   }
 });
+
+// ─── Backup Management ────────────────────────────────
+document.getElementById('manageBackupsBtn').addEventListener('click', () => {
+  if (currentUser?.role !== 'owner') return;
+  loadBackupsList();
+  openModal('backupsModal');
+});
+
+async function loadBackupsList() {
+  const backups = await api('/api/backups');
+  const ct = document.getElementById('backupsList');
+  if (!backups.length) { ct.innerHTML = '<p style="color:var(--text-secondary)">No backups found.</p>'; return; }
+  ct.innerHTML = backups.map(b => {
+    const size = b.size ? (b.size / 1024 / 1024).toFixed(1) + ' MB' : '?';
+    const date = b.modified ? new Date(b.modified).toLocaleString() : '?';
+    const badge = b.type === 'pre-migration' ? '<span style="background:var(--warning);color:#000;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700">PRE-MIGRATION</span>' : '';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);gap:10px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b.file)} ${badge}</div>
+        <div style="font-size:11px;color:var(--text-secondary)">${date} &middot; ${size} &middot; ${b.tasks ?? '?'} tasks</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="btn btn-ghost btn-sm" onclick="downloadBackup('${esc(b.file)}')" title="Download">&#11015;</button>
+        <button class="btn btn-ghost btn-sm" onclick="restoreBackup('${esc(b.file)}')" title="Restore" style="color:var(--warning)">&#8634;</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function downloadBackup(file) {
+  window.open(`/api/backups/download/${encodeURIComponent(file)}`, '_blank');
+}
+
+async function restoreBackup(file) {
+  if (!confirm(`RESTORE from backup "${file}"?\n\nThis will REPLACE all current data with the backup. This cannot be undone.\n\nAre you sure?`)) return;
+  if (!confirm('FINAL WARNING: All current tasks, projects, and comments will be overwritten. Continue?')) return;
+  const res = await api('/api/backups/restore', { method: 'POST', body: { file } });
+  if (res.success) {
+    alert('Backup restored successfully. Reloading...');
+    location.reload();
+  } else {
+    alert('Restore failed: ' + (res.error || 'Unknown error'));
+  }
+}
+
+async function triggerBackup() {
+  await api('/api/backups', { method: 'POST' });
+  alert('Backup started. It will appear in the list shortly.');
+  setTimeout(loadBackupsList, 2000);
+}
 
 // ─── Image Cropper ─────────────────────────────────────
 let _cropCallback = null;

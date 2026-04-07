@@ -32,6 +32,7 @@
       <button class="nav-action" id="addClientBtn" title="New Client">+</button>
       <button class="nav-action" id="manageTeamBtn" title="Team">&#128101;</button>
       <button class="nav-action" id="manageUsersBtn" title="Users &amp; Permissions">&#9881;</button>
+      <button class="nav-action" id="manageBackupsBtn" title="Backups" style="display:none">&#128190;</button>
       <button class="nav-action" id="globalHistoryBtn" title="Activity Log" style="display:none">&#128337;</button>
       <button class="nav-action" id="viewArchiveBtn" title="Archive">&#128230;</button>
       <button class="nav-action" onclick="logout()" title="Sign Out">&#9211;</button>
@@ -244,10 +245,21 @@
     <div id="timelineContent" style="max-height:500px;overflow-y:auto;padding:20px 28px"></div>
   </div>
 
+  <!-- Backups Modal -->
+  <div class="modal modal-lg" id="backupsModal" style="max-width:650px">
+    <div class="modal-header"><h2>Database Backups</h2><button class="modal-close" onclick="closeModal('backupsModal')">&times;</button></div>
+    <div style="padding:20px 28px">
+      <div style="display:flex;gap:10px;margin-bottom:16px">
+        <button class="btn btn-primary btn-sm" onclick="triggerBackup()">Create Backup Now</button>
+      </div>
+      <div id="backupsList" style="max-height:400px;overflow-y:auto"></div>
+    </div>
+  </div>
+
   <footer class="app-footer">
     <img src="/NBM%20Logo%20No%20NG%20Light%20Lines.png" alt="" style="width:28px;opacity:0.4">
     <span>&copy; 2026 North Bear Media. All rights reserved.</span>
-    <span class="app-version">v4.0</span>
+    <span class="app-version">v4.1</span>
   </footer>
 
   <!-- Crop Modal -->
