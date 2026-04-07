@@ -54,7 +54,8 @@ async function loadClients() {
 
 async function loadTeam() {
   teamMembers = await api('/api/team');
-  appUsers = await api('/api/users');
+  try { appUsers = await api('/api/users'); } catch(e) { appUsers = []; }
+  if (!Array.isArray(appUsers)) appUsers = [];
   updateUserSelector();
   updatePersonDropdowns();
 }
@@ -619,8 +620,13 @@ document.getElementById('calendarPerson').addEventListener('change',loadCalendar
 
 // ─── Init ───────────────────────────────────────────────
 (async function(){
-  await loadCurrentUser();
-  await loadTeam();
-  await loadClients();
-  document.getElementById('todayDate').value=new Date().toISOString().split('T')[0];
+  try {
+    await loadCurrentUser();
+    await loadTeam();
+    await loadClients();
+    document.getElementById('todayDate').value=new Date().toISOString().split('T')[0];
+  } catch(e) {
+    console.error('Init error:', e);
+    document.getElementById('clientList').innerHTML='<div class="empty-state"><p>Error loading data. Please refresh.</p></div>';
+  }
 })();
