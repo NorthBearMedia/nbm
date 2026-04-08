@@ -38,9 +38,17 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   if (!old) return res.status(404).json({ error: 'Task not found' });
   if (!checkPrivateClient(req, res, old.project_id)) return;
 
+  // Set completed_at when task is marked completed/invoiced, clear it if moved back
+  let completedAt = undefined;
+  if (progress && (progress === 'completed' || progress === 'invoiced') && old.progress !== 'completed' && old.progress !== 'invoiced') {
+    completedAt = new Date().toISOString().split('T')[0];
+  } else if (progress && progress !== 'completed' && progress !== 'invoiced' && (old.progress === 'completed' || old.progress === 'invoiced')) {
+    completedAt = '';
+  }
+
   db.prepare(
-    'UPDATE tasks SET title=COALESCE(?,title), assignee=COALESCE(?,assignee), deadline=COALESCE(?,deadline), planned_date=COALESCE(?,planned_date), estimated_hours=COALESCE(?,estimated_hours), progress=COALESCE(?,progress), priority=COALESCE(?,priority), references_text=COALESCE(?,references_text), notes=COALESCE(?,notes), is_recurring=COALESCE(?,is_recurring), recur_interval=COALESCE(?,recur_interval), recur_unit=COALESCE(?,recur_unit) WHERE id=?'
-  ).run(title, assignee, deadline, planned_date, estimated_hours, progress, priority, references_text, notes, is_recurring !== undefined ? (is_recurring ? 1 : 0) : null, recur_interval, recur_unit, req.params.id);
+    'UPDATE tasks SET title=COALESCE(?,title), assignee=COALESCE(?,assignee), deadline=COALESCE(?,deadline), planned_date=COALESCE(?,planned_date), estimated_hours=COALESCE(?,estimated_hours), progress=COALESCE(?,progress), priority=COALESCE(?,priority), references_text=COALESCE(?,references_text), notes=COALESCE(?,notes), is_recurring=COALESCE(?,is_recurring), recur_interval=COALESCE(?,recur_interval), recur_unit=COALESCE(?,recur_unit), completed_at=COALESCE(?,completed_at) WHERE id=?'
+  ).run(title, assignee, deadline, planned_date, estimated_hours, progress, priority, references_text, notes, is_recurring !== undefined ? (is_recurring ? 1 : 0) : null, recur_interval, recur_unit, completedAt, req.params.id);
 
   const changes = [];
   if (title && title !== old.title) changes.push('title changed');
@@ -205,6 +213,20 @@ router.put('/:id/pin', requireAuth, (req, res) => {
   res.json({ is_pinned: newVal });
 });
 
+// ─── Duplicate Task ─────────────────────────────────
+router.post('/:id/duplicate', requireAuth, requireWrite, (req, res) => {
+  const old = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+  if (!old) return res.status(404).json({ error: 'Task not found' });
+  if (!checkPrivateClient(req, res, old.project_id)) return;
+
+  const r = db.prepare(
+    'INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(old.project_id, old.title + ' (copy)', old.assignee, old.deadline, old.planned_date, old.estimated_hours, old.priority, old.references_text, old.notes, old.is_recurring, old.recur_interval, old.recur_unit);
+
+  logActivity('task', r.lastInsertRowid, 'created', req.user.display_name, `Duplicated from "${old.title}"`);
+  res.json(db.prepare('SELECT * FROM tasks WHERE id = ?').get(r.lastInsertRowid));
+});
+
 // ─── Workload Summary ───────────────────────────────
 router.get('/summary', requireAuth, (req, res) => {
   const isOwner = req.user.role === 'owner';
@@ -264,12 +286,21 @@ router.get('/summary', requireAuth, (req, res) => {
     if (d >= nwsStr && d <= nweStr) byPerson[name].nextWeek += h;
   }
 
+  // Completed today — separate query since main query filters out completed tasks
+  const completedToday = db.prepare(`
+    SELECT t.estimated_hours FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id
+    WHERE t.archived=0 AND t.progress IN ('completed','invoiced') AND t.completed_at=? ${priv}
+  `).all(today);
+  const completedTodayHours = completedToday.reduce((s, t) => s + (t.estimated_hours || 0), 0);
+  const completedTodayTasks = completedToday.length;
+
   res.json({
     today: { hours: todayHours, tasks: todayTasks },
     tomorrow: { hours: tomorrowHours, tasks: tomorrowTasks },
     thisWeek: { hours: thisWeekHours, tasks: thisWeekTasks },
     nextWeek: { hours: nextWeekHours, tasks: nextWeekTasks },
     total: { hours: totalHours, tasks: totalTasks },
+    completedToday: { hours: completedTodayHours, tasks: completedTodayTasks },
     overdue,
     byPerson
   });

@@ -615,6 +615,7 @@ a:hover { color: #6dd4a8; }
 }
 .workload-card.wl-overdue .wl-hours { color: var(--danger); }
 .workload-card.wl-today { border-color: var(--accent); }
+.workload-card.wl-completed .wl-hours { color: var(--success, #2eaa7b); }
 .workload-people {
   flex: 2;
   min-width: 240px;

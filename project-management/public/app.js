@@ -195,6 +195,11 @@ async function loadWorkloadSummary() {
         <div class="wl-hours">${fmt(s.today.hours)}<span>hrs</span></div>
         <div class="wl-tasks">${s.today.tasks} task${s.today.tasks !== 1 ? 's' : ''}</div>
       </div>
+      <div class="workload-card wl-completed">
+        <div class="wl-label">Done Today</div>
+        <div class="wl-hours">${fmt(s.completedToday.hours)}<span>hrs</span></div>
+        <div class="wl-tasks">${s.completedToday.tasks} task${s.completedToday.tasks !== 1 ? 's' : ''} completed</div>
+      </div>
       <div class="workload-card">
         <div class="wl-label">Tomorrow</div>
         <div class="wl-hours">${fmt(s.tomorrow.hours)}<span>hrs</span></div>
@@ -501,6 +506,8 @@ function renderBatchBar() {
   bar.innerHTML = `
     <span><strong>${selectedTasks.size}</strong> task${selectedTasks.size > 1 ? 's' : ''} selected</span>
     <button class="btn btn-primary btn-sm" onclick="openMoveModal()">Move to...</button>
+    <button class="btn btn-ghost btn-sm" onclick="batchDuplicate()">Duplicate</button>
+    <button class="btn btn-ghost btn-sm" onclick="batchDelete()" style="color:var(--danger)">Delete</button>
     <button class="btn btn-ghost btn-sm" onclick="clearTaskSelection()">Cancel</button>
   `;
 }
@@ -556,6 +563,27 @@ async function executeBatchMove() {
     errEl.style.display = 'block';
   }
 }
+
+async function batchDelete() {
+  const count = selectedTasks.size;
+  if (!confirm(`Delete ${count} task${count > 1 ? 's' : ''}? This cannot be undone.`)) return;
+  const ids = [...selectedTasks];
+  for (const id of ids) {
+    await api(`/api/tasks/${id}`, { method: 'DELETE' });
+  }
+  clearTaskSelection();
+  await loadClients();
+}
+
+async function batchDuplicate() {
+  const ids = [...selectedTasks];
+  for (const id of ids) {
+    await api(`/api/tasks/${id}/duplicate`, { method: 'POST' });
+  }
+  clearTaskSelection();
+  await loadClients();
+}
+
 async function restoreProject(id){await api(`/api/projects/${id}/archive`,{method:'PUT'});await loadClients();}
 async function restoreTask(id){await api(`/api/tasks/${id}/archive`,{method:'PUT'});await loadClients();}
 async function restoreClient(id){await api(`/api/clients/${id}/archive`,{method:'PUT'});await loadClients();await showArchiveModal();}

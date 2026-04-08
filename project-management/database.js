@@ -162,6 +162,7 @@ try { db.exec('ALTER TABLE clients ADD COLUMN is_private INTEGER NOT NULL DEFAUL
 try { db.exec("ALTER TABLE clients ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN password_salt TEXT DEFAULT ''"); } catch {}
 try { db.exec('ALTER TABLE tasks ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0'); } catch {}
+try { db.exec("ALTER TABLE tasks ADD COLUMN completed_at TEXT DEFAULT ''"); } catch {}
 
 // Checklists table
 db.exec(`
