@@ -765,6 +765,9 @@ document.getElementById('taskForm').addEventListener('submit',async e=>{
       await fetch(`/api/tasks/${taskId}/attachments`,{method:'POST',body:fd});
     }
     closeModal('taskModal');await loadClients();
+    // Refresh current view
+    if (currentView === 'today') loadTodayView();
+    if (currentView === 'focus') loadFocusView();
     // Celebrate if task was just completed
     const wasComplete = oldTask && (oldTask.progress === 'completed' || oldTask.progress === 'invoiced');
     if (!wasComplete && (data.progress === 'completed' || data.progress === 'invoiced')) celebrate();
@@ -981,7 +984,9 @@ async function loadTodayView(){
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
         <span class="priority-badge priority-${t.priority}"></span>
         <span style="font-size:12px;min-width:40px">${t.estimated_hours?t.estimated_hours+'h':''}</span>
-        <span class="status-badge status-${t.progress}">${progressLabel(t.progress)}</span>
+        <select class="quick-status" onchange="event.stopPropagation();quickStatusChange(${t.id},this.value).then(()=>loadTodayView())" onclick="event.stopPropagation()">
+          ${['not-started','in-progress','completed','stuck','awaiting-client','awaiting-manager','ready-to-invoice','invoiced'].map(s=>`<option value="${s}" ${t.progress===s?'selected':''}>${progressLabel(s)}</option>`).join('')}
+        </select>
       </div>
     </div>`).join('');
     html+='</div>';
@@ -1323,7 +1328,7 @@ async function loadFocusView() {
         <div class="focus-meta">${esc(t.client_code || '')} ${esc(t.client_name)} &rarr; ${esc(t.project_name)}${t.deadline ? ' &middot; Due ' + fmtDateShort(t.deadline) : ''}</div>
       </div>
       <div class="focus-actions">
-        <select class="quick-status" onchange="quickStatusChange(${t.id},this.value);loadFocusView()" onclick="event.stopPropagation()">
+        <select class="quick-status" onchange="quickStatusChange(${t.id},this.value).then(()=>loadFocusView())" onclick="event.stopPropagation()">
           ${['not-started','in-progress','completed','stuck','awaiting-client','awaiting-manager','ready-to-invoice','invoiced'].map(s => `<option value="${s}" ${t.progress === s ? 'selected' : ''}>${progressLabel(s)}</option>`).join('')}
         </select>
         <button class="btn-icon" onclick="event.stopPropagation();toggleInlineComment(${t.id})" title="Quick comment">&#128172;</button>
