@@ -18,13 +18,13 @@ function checkPrivateClient(req, res, projectId) {
 }
 
 router.post('/', requireAuth, requireWrite, (req, res) => {
-  const { project_id, title, assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit } = req.body;
+  const { project_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit } = req.body;
   if (!project_id || !title) return res.status(400).json({ error: 'project_id and title required' });
   if (!checkPrivateClient(req, res, project_id)) return;
 
   const result = db.prepare(
-    'INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(project_id, title, assignee || '', deadline || '', planned_date || '', estimated_hours || 0, priority || 'medium', references_text || '', notes || '', is_recurring ? 1 : 0, recur_interval || 0, recur_unit || '');
+    'INSERT INTO tasks (project_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(project_id, title, assignee || '', secondary_assignee || '', deadline || '', planned_date || '', estimated_hours || 0, priority || 'medium', references_text || '', notes || '', is_recurring ? 1 : 0, recur_interval || 0, recur_unit || '');
 
   logActivity('task', result.lastInsertRowid, 'created', req.user.display_name, `Created task "${title}"`);
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid);
@@ -33,7 +33,7 @@ router.post('/', requireAuth, requireWrite, (req, res) => {
 });
 
 router.put('/:id', requireAuth, requireWrite, (req, res) => {
-  const { title, assignee, deadline, planned_date, estimated_hours, progress, priority, references_text, notes, is_recurring, recur_interval, recur_unit } = req.body;
+  let { title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, progress, priority, references_text, notes, is_recurring, recur_interval, recur_unit } = req.body;
   const old = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!old) return res.status(404).json({ error: 'Task not found' });
   if (!checkPrivateClient(req, res, old.project_id)) return;
@@ -46,13 +46,30 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
     completedAt = '';
   }
 
+  // Manager sign-off: when set to awaiting-manager, auto-tag the owner
+  if (progress === 'awaiting-manager' && old.progress !== 'awaiting-manager') {
+    const owner = db.prepare("SELECT display_name FROM users WHERE role='owner' LIMIT 1").get();
+    if (owner && secondary_assignee === undefined) {
+      secondary_assignee = owner.display_name;
+    }
+  }
+  // Clear secondary when manager signs off (moves away from awaiting-manager)
+  if (progress && progress !== 'awaiting-manager' && old.progress === 'awaiting-manager' && secondary_assignee === undefined) {
+    // Only clear if the secondary was auto-set (is the owner)
+    const owner = db.prepare("SELECT display_name FROM users WHERE role='owner' LIMIT 1").get();
+    if (owner && old.secondary_assignee === owner.display_name) {
+      secondary_assignee = '';
+    }
+  }
+
   db.prepare(
-    'UPDATE tasks SET title=COALESCE(?,title), assignee=COALESCE(?,assignee), deadline=COALESCE(?,deadline), planned_date=COALESCE(?,planned_date), estimated_hours=COALESCE(?,estimated_hours), progress=COALESCE(?,progress), priority=COALESCE(?,priority), references_text=COALESCE(?,references_text), notes=COALESCE(?,notes), is_recurring=COALESCE(?,is_recurring), recur_interval=COALESCE(?,recur_interval), recur_unit=COALESCE(?,recur_unit), completed_at=COALESCE(?,completed_at) WHERE id=?'
-  ).run(title, assignee, deadline, planned_date, estimated_hours, progress, priority, references_text, notes, is_recurring !== undefined ? (is_recurring ? 1 : 0) : null, recur_interval, recur_unit, completedAt, req.params.id);
+    'UPDATE tasks SET title=COALESCE(?,title), assignee=COALESCE(?,assignee), secondary_assignee=COALESCE(?,secondary_assignee), deadline=COALESCE(?,deadline), planned_date=COALESCE(?,planned_date), estimated_hours=COALESCE(?,estimated_hours), progress=COALESCE(?,progress), priority=COALESCE(?,priority), references_text=COALESCE(?,references_text), notes=COALESCE(?,notes), is_recurring=COALESCE(?,is_recurring), recur_interval=COALESCE(?,recur_interval), recur_unit=COALESCE(?,recur_unit), completed_at=COALESCE(?,completed_at) WHERE id=?'
+  ).run(title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, progress, priority, references_text, notes, is_recurring !== undefined ? (is_recurring ? 1 : 0) : null, recur_interval, recur_unit, completedAt, req.params.id);
 
   const changes = [];
   if (title && title !== old.title) changes.push('title changed');
   if (assignee !== undefined && assignee !== old.assignee) changes.push(`assignee: "${old.assignee || 'none'}" → "${assignee || 'none'}"`);
+  if (secondary_assignee !== undefined && secondary_assignee !== old.secondary_assignee) changes.push(`also assigned: "${secondary_assignee || 'none'}"`);
   if (progress && progress !== old.progress) changes.push(`progress: ${old.progress} → ${progress}`);
   if (priority && priority !== old.priority) changes.push(`priority: ${old.priority} → ${priority}`);
   if (deadline !== undefined && deadline !== old.deadline) changes.push('deadline changed');
@@ -220,8 +237,8 @@ router.post('/:id/duplicate', requireAuth, requireWrite, (req, res) => {
   if (!checkPrivateClient(req, res, old.project_id)) return;
 
   const r = db.prepare(
-    'INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(old.project_id, old.title + ' (copy)', old.assignee, old.deadline, old.planned_date, old.estimated_hours, old.priority, old.references_text, old.notes, old.is_recurring, old.recur_interval, old.recur_unit);
+    'INSERT INTO tasks (project_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(old.project_id, old.title + ' (copy)', old.assignee, old.secondary_assignee || '', old.deadline, old.planned_date, old.estimated_hours, old.priority, old.references_text, old.notes, old.is_recurring, old.recur_interval, old.recur_unit);
 
   logActivity('task', r.lastInsertRowid, 'created', req.user.display_name, `Duplicated from "${old.title}"`);
   res.json(db.prepare('SELECT * FROM tasks WHERE id = ?').get(r.lastInsertRowid));
@@ -304,6 +321,52 @@ router.get('/summary', requireAuth, (req, res) => {
     overdue,
     byPerson
   });
+});
+
+// ─── Workload Detail ────────────────────────────────
+// Returns actual task lists for a given workload category or date
+router.get('/workload-detail', requireAuth, (req, res) => {
+  const { category, date } = req.query;
+  const isOwner = req.user.role === 'owner';
+  const priv = isOwner ? '' : 'AND c.is_private = 0';
+  const baseSelect = `SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code
+    FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id
+    WHERE t.archived=0 ${priv}`;
+
+  const today = new Date().toISOString().split('T')[0];
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const weekStart = new Date(now); weekStart.setDate(now.getDate() + mondayOffset);
+  const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
+  const wsStr = weekStart.toISOString().split('T')[0];
+  const weStr = weekEnd.toISOString().split('T')[0];
+  const nwsStr = new Date(weekEnd.getTime() + 86400000).toISOString().split('T')[0];
+  const nweStr = new Date(weekEnd.getTime() + 7 * 86400000).toISOString().split('T')[0];
+
+  let tasks;
+  if (category === 'date' && date) {
+    // Show all tasks for a specific date — both planned and completed on that day
+    const planned = db.prepare(`${baseSelect} AND t.progress NOT IN ('completed','invoiced') AND (t.planned_date=? OR t.deadline=?) ORDER BY t.assignee, t.priority`).all(date, date);
+    const completed = db.prepare(`${baseSelect} AND t.progress IN ('completed','invoiced') AND t.completed_at=? ORDER BY t.assignee`).all(date);
+    return res.json({ planned, completed });
+  } else if (category === 'today') {
+    tasks = db.prepare(`${baseSelect} AND t.progress NOT IN ('completed','invoiced') AND (t.planned_date=? OR t.deadline=?) ORDER BY t.assignee, t.priority`).all(today, today);
+  } else if (category === 'completed-today') {
+    tasks = db.prepare(`${baseSelect} AND t.progress IN ('completed','invoiced') AND t.completed_at=? ORDER BY t.assignee`).all(today);
+  } else if (category === 'tomorrow') {
+    tasks = db.prepare(`${baseSelect} AND t.progress NOT IN ('completed','invoiced') AND (t.planned_date=? OR t.deadline=?) ORDER BY t.assignee, t.priority`).all(tomorrow, tomorrow);
+  } else if (category === 'this-week') {
+    tasks = db.prepare(`${baseSelect} AND t.progress NOT IN ('completed','invoiced') AND (COALESCE(NULLIF(t.planned_date,''), t.deadline) BETWEEN ? AND ?) ORDER BY COALESCE(NULLIF(t.planned_date,''), t.deadline), t.priority`).all(wsStr, weStr);
+  } else if (category === 'next-week') {
+    tasks = db.prepare(`${baseSelect} AND t.progress NOT IN ('completed','invoiced') AND (COALESCE(NULLIF(t.planned_date,''), t.deadline) BETWEEN ? AND ?) ORDER BY COALESCE(NULLIF(t.planned_date,''), t.deadline), t.priority`).all(nwsStr, nweStr);
+  } else if (category === 'overdue') {
+    tasks = db.prepare(`${baseSelect} AND t.progress NOT IN ('completed','invoiced') AND COALESCE(NULLIF(t.planned_date,''), t.deadline) != '' AND COALESCE(NULLIF(t.planned_date,''), t.deadline) < ? ORDER BY COALESCE(NULLIF(t.planned_date,''), t.deadline), t.priority`).all(today);
+  } else {
+    return res.json([]);
+  }
+  res.json(tasks);
 });
 
 // ─── Calendar / By-date ───────────────────────────────

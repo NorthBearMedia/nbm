@@ -190,32 +190,32 @@ async function loadWorkloadSummary() {
     ).join('');
 
     el.innerHTML = `
-      <div class="workload-card wl-today">
+      <div class="workload-card wl-today" onclick="showWorkloadDetail('today','Today')" style="cursor:pointer">
         <div class="wl-label">Today</div>
         <div class="wl-hours">${fmt(s.today.hours)}<span>hrs</span></div>
         <div class="wl-tasks">${s.today.tasks} task${s.today.tasks !== 1 ? 's' : ''}</div>
       </div>
-      <div class="workload-card wl-completed">
+      <div class="workload-card wl-completed" onclick="showWorkloadDetail('completed-today','Completed Today')" style="cursor:pointer">
         <div class="wl-label">Done Today</div>
         <div class="wl-hours">${fmt(s.completedToday.hours)}<span>hrs</span></div>
         <div class="wl-tasks">${s.completedToday.tasks} task${s.completedToday.tasks !== 1 ? 's' : ''} completed</div>
       </div>
-      <div class="workload-card">
+      <div class="workload-card" onclick="showWorkloadDetail('tomorrow','Tomorrow')" style="cursor:pointer">
         <div class="wl-label">Tomorrow</div>
         <div class="wl-hours">${fmt(s.tomorrow.hours)}<span>hrs</span></div>
         <div class="wl-tasks">${s.tomorrow.tasks} task${s.tomorrow.tasks !== 1 ? 's' : ''}</div>
       </div>
-      <div class="workload-card">
+      <div class="workload-card" onclick="showWorkloadDetail('this-week','This Week')" style="cursor:pointer">
         <div class="wl-label">This Week</div>
         <div class="wl-hours">${fmt(s.thisWeek.hours)}<span>hrs</span></div>
         <div class="wl-tasks">${s.thisWeek.tasks} task${s.thisWeek.tasks !== 1 ? 's' : ''}</div>
       </div>
-      <div class="workload-card">
+      <div class="workload-card" onclick="showWorkloadDetail('next-week','Next Week')" style="cursor:pointer">
         <div class="wl-label">Next Week</div>
         <div class="wl-hours">${fmt(s.nextWeek.hours)}<span>hrs</span></div>
         <div class="wl-tasks">${s.nextWeek.tasks} task${s.nextWeek.tasks !== 1 ? 's' : ''}</div>
       </div>
-      ${s.overdue ? `<div class="workload-card wl-overdue">
+      ${s.overdue ? `<div class="workload-card wl-overdue" onclick="showWorkloadDetail('overdue','Overdue')" style="cursor:pointer">
         <div class="wl-label">Overdue</div>
         <div class="wl-hours">${s.overdue}</div>
         <div class="wl-tasks">task${s.overdue !== 1 ? 's' : ''} past due</div>
@@ -229,6 +229,78 @@ async function loadWorkloadSummary() {
   } catch (e) {
     console.error('Workload summary error:', e);
   }
+}
+
+async function showWorkloadDetail(category, title) {
+  document.getElementById('workloadDetailTitle').textContent = title;
+  const dp = document.getElementById('workloadDatePicker');
+  dp.value = '';
+  dp.style.display = category === 'date' ? '' : '';
+  const ct = document.getElementById('workloadDetailContent');
+  ct.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-secondary)">Loading...</div>';
+  openModal('workloadDetailModal');
+
+  const data = await api(`/api/tasks/workload-detail?category=${category}`);
+  renderWorkloadDetailTasks(data, ct, category);
+}
+
+document.getElementById('workloadDatePicker').addEventListener('change', async function() {
+  const date = this.value;
+  if (!date) return;
+  const d = new Date(date + 'T00:00:00');
+  document.getElementById('workloadDetailTitle').textContent = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const ct = document.getElementById('workloadDetailContent');
+  ct.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-secondary)">Loading...</div>';
+  const data = await api(`/api/tasks/workload-detail?category=date&date=${date}`);
+  renderWorkloadDetailTasks(data, ct, 'date');
+});
+
+function renderWorkloadDetailTasks(data, ct, category) {
+  const isDateView = category === 'date';
+  const tasks = isDateView ? [...(data.planned || []), ...(data.completed || [])] : (Array.isArray(data) ? data : []);
+
+  if (!tasks.length) {
+    ct.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-secondary)">No tasks</div>';
+    return;
+  }
+
+  // Group by assignee
+  const groups = {};
+  for (const t of tasks) {
+    const a = t.assignee || 'Unassigned';
+    if (!groups[a]) groups[a] = { tasks: [], hours: 0 };
+    groups[a].tasks.push(t);
+    groups[a].hours += t.estimated_hours || 0;
+  }
+  const totalHours = tasks.reduce((s, t) => s + (t.estimated_hours || 0), 0);
+  const fmt = h => h % 1 === 0 ? h : h.toFixed(1);
+
+  let html = `<div style="padding:12px 16px;font-size:12px;color:var(--text-secondary);border-bottom:1px solid var(--border)">${tasks.length} task${tasks.length !== 1 ? 's' : ''} &middot; ${fmt(totalHours)} hours total</div>`;
+
+  for (const [assignee, g] of Object.entries(groups)) {
+    const mem = findUser(assignee);
+    html += `<div style="padding:10px 16px;background:var(--bg-glass);font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)">
+      ${userAvatar(mem, 24)}<span>${esc(assignee)}</span>
+      <span style="margin-left:auto;font-weight:500;color:var(--text-secondary);font-size:12px">${fmt(g.hours)}h &middot; ${g.tasks.length} task${g.tasks.length !== 1 ? 's' : ''}</span>
+    </div>`;
+    html += g.tasks.map(t => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer" onclick="closeModal('workloadDetailModal');setTimeout(()=>editTask(${t.id}),200)">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="priority-badge priority-${t.priority}"></span>
+            <span style="font-weight:600;font-size:13px">${esc(t.title)}</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-secondary)">${t.client_code ? '[' + esc(t.client_code) + '] ' : ''}${esc(t.client_name)} &rarr; ${esc(t.project_name)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          ${t.estimated_hours ? `<span style="font-size:12px;color:var(--text-secondary)">${t.estimated_hours}h</span>` : ''}
+          <span class="status-badge status-${t.progress}">${progressLabel(t.progress)}</span>
+          ${t.deadline || t.planned_date ? `<span style="font-size:11px;color:var(--text-secondary)">${fmtDate(t.planned_date || t.deadline)}</span>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+  ct.innerHTML = html;
 }
 
 function navigateToTask(cid,pid,tid) {
@@ -408,6 +480,7 @@ function renderTask(t, isDone) {
     </div>
     <div style="display:flex;align-items:center;gap:4px;min-width:80px">
       ${userAvatar(mem, 22)}<span style="font-size:12px">${esc(t.assignee||'')}</span>
+      ${t.secondary_assignee ? `<span style="font-size:10px;color:var(--text-secondary)" title="Also: ${esc(t.secondary_assignee)}">+${userAvatar(findUser(t.secondary_assignee), 18)}</span>` : ''}
     </div>
     <div style="font-size:12px;min-width:70px" class="${dc}">${fmtDateShort(t.deadline)}</div>
     <div style="font-size:12px;min-width:70px;color:var(--text-secondary)">${fmtDateShort(t.planned_date)}</div>
@@ -698,7 +771,7 @@ function openTaskModal(pid){
   document.getElementById('taskFiles').value='';
   currentChecklist = [];
   renderChecklist();
-  populateAssigneeDropdown('');
+  populateAssigneeDropdown('', '');
   openModal('taskModal');
 }
 
@@ -734,13 +807,14 @@ function editTask(id){
   // Show existing attachments
   const al=document.getElementById('taskAttachmentsList');
   al.innerHTML=(t.attachments||[]).map(a=>`<div class="attachment-item"><span>&#128206; ${esc(a.original_name)} (${fmtFileSize(a.file_size)})</span><button type="button" class="btn-icon" onclick="deleteAttachment(${a.id})" title="Remove">&times;</button></div>`).join('');
-  populateAssigneeDropdown(t.assignee||'');
+  populateAssigneeDropdown(t.assignee||'', t.secondary_assignee||'');
   loadChecklist(t.id);
   openModal('taskModal');
 }
 
-function populateAssigneeDropdown(cur){
+function populateAssigneeDropdown(cur, secondaryCur){
   document.getElementById('taskAssignee').innerHTML='<option value="">Unassigned</option>'+appUsers.map(u=>`<option value="${esc(u.display_name)}" ${u.display_name===cur?'selected':''}>${esc(u.display_name)}</option>`).join('');
+  document.getElementById('taskSecondaryAssignee').innerHTML='<option value="">None</option>'+appUsers.map(u=>`<option value="${esc(u.display_name)}" ${u.display_name===(secondaryCur||'')?'selected':''}>${esc(u.display_name)}</option>`).join('');
 }
 
 // Recurring toggle
@@ -760,6 +834,7 @@ document.getElementById('taskForm').addEventListener('submit',async e=>{
     project_id:+document.getElementById('taskProjectId').value,
     title,
     assignee:document.getElementById('taskAssignee').value,
+    secondary_assignee:document.getElementById('taskSecondaryAssignee').value,
     deadline:document.getElementById('taskDeadline').value,
     planned_date:document.getElementById('taskPlannedDate').value,
     estimated_hours:parseFloat(document.getElementById('taskEstHours').value)||0,
@@ -1336,24 +1411,29 @@ async function loadFocusView() {
       }
     }
   }
-  const mine = myName ? allTasks.filter(t => t.assignee === myName) : allTasks;
+  // Include tasks where user is primary OR secondary assignee (sign-off tasks)
+  const mine = myName ? allTasks.filter(t => t.assignee === myName || t.secondary_assignee === myName) : allTasks;
 
   const now = mine.filter(t => t.progress === 'in-progress');
   const blocked = mine.filter(t => t.progress === 'stuck' || t.progress === 'awaiting-client' || t.progress === 'awaiting-manager');
+  // Separate sign-off tasks (where I'm secondary and status is awaiting-manager)
+  const signOff = myName ? allTasks.filter(t => t.secondary_assignee === myName && t.progress === 'awaiting-manager' && t.assignee !== myName) : [];
   const next = mine.filter(t => t.progress === 'not-started')
     .sort((a, b) => {
       const pa = { critical: 0, high: 1, medium: 2, low: 3 };
       return (pa[a.priority] || 2) - (pa[b.priority] || 2);
     }).slice(0, 8);
 
-  function focusCard(t) {
-    return `<div class="focus-card" onclick="editTask(${t.id})">
+  function focusCard(t, isSignOff) {
+    const fromLabel = isSignOff ? `<span style="font-size:11px;background:var(--warning);color:#000;padding:1px 6px;border-radius:4px;font-weight:600">Sign-off from ${esc(t.assignee)}</span>` : '';
+    return `<div class="focus-card" onclick="editTask(${t.id})" ${isSignOff ? 'style="border-left:3px solid var(--warning)"' : ''}>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:6px">
           <span class="priority-badge priority-${t.priority}"></span>
           <span style="font-weight:600;font-size:14px">${esc(t.title)}</span>
+          ${fromLabel}
         </div>
-        <div class="focus-meta">${esc(t.client_code || '')} ${esc(t.client_name)} &rarr; ${esc(t.project_name)}${t.deadline ? ' &middot; Due ' + fmtDateShort(t.deadline) : ''}</div>
+        <div class="focus-meta">${esc(t.client_code || '')} ${esc(t.client_name)} &rarr; ${esc(t.project_name)}${t.deadline ? ' &middot; Due ' + fmtDateShort(t.deadline) : ''}${t.secondary_assignee && !isSignOff ? ' &middot; +' + esc(t.secondary_assignee) : ''}</div>
       </div>
       <div class="focus-actions">
         <select class="quick-status" onchange="quickStatusChange(${t.id},this.value).then(()=>loadFocusView())" onclick="event.stopPropagation()">
@@ -1367,9 +1447,18 @@ async function loadFocusView() {
     </div>`;
   }
 
-  document.getElementById('focusNow').innerHTML = now.length ? now.map(focusCard).join('') : '<div style="color:var(--text-muted);font-size:13px;padding:8px">Nothing in progress. Pick something from "Up Next"!</div>';
-  document.getElementById('focusNext').innerHTML = next.length ? next.map(focusCard).join('') : '<div style="color:var(--text-muted);font-size:13px;padding:8px">Queue is empty.</div>';
-  document.getElementById('focusBlocked').innerHTML = blocked.length ? blocked.map(focusCard).join('') : '<div style="color:var(--text-muted);font-size:13px;padding:8px">Nothing blocked. Smooth sailing!</div>';
+  document.getElementById('focusNow').innerHTML = now.length ? now.map(t => focusCard(t, false)).join('') : '<div style="color:var(--text-muted);font-size:13px;padding:8px">Nothing in progress. Pick something from "Up Next"!</div>';
+  document.getElementById('focusNext').innerHTML = next.length ? next.map(t => focusCard(t, false)).join('') : '<div style="color:var(--text-muted);font-size:13px;padding:8px">Queue is empty.</div>';
+  document.getElementById('focusBlocked').innerHTML = blocked.length ? blocked.map(t => focusCard(t, false)).join('') : '<div style="color:var(--text-muted);font-size:13px;padding:8px">Nothing blocked. Smooth sailing!</div>';
+  // Sign-off section — only shown if there are tasks awaiting manager sign-off
+  const signOffEl = document.getElementById('focusSignOff');
+  const signOffSection = document.getElementById('focusSignOffSection');
+  if (signOff.length) {
+    if (signOffSection) signOffSection.style.display = '';
+    if (signOffEl) signOffEl.innerHTML = signOff.map(t => focusCard(t, true)).join('');
+  } else {
+    if (signOffSection) signOffSection.style.display = 'none';
+  }
 }
 
 function toggleInlineComment(tid) {
