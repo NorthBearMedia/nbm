@@ -165,6 +165,32 @@ try { db.exec('ALTER TABLE tasks ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0
 try { db.exec("ALTER TABLE tasks ADD COLUMN completed_at TEXT DEFAULT ''"); } catch {}
 try { db.exec("ALTER TABLE tasks ADD COLUMN secondary_assignee TEXT DEFAULT ''"); } catch {}
 
+// Backfill completed_at from activity log for tasks completed before the column existed
+try {
+  const missing = db.prepare("SELECT id FROM tasks WHERE progress IN ('completed','invoiced') AND (completed_at IS NULL OR completed_at = '')").all();
+  if (missing.length) {
+    const update = db.prepare("UPDATE tasks SET completed_at = ? WHERE id = ?");
+    for (const t of missing) {
+      // Find when task was marked completed in activity log
+      const log = db.prepare(
+        "SELECT created_at FROM activity_log WHERE entity_type='task' AND entity_id=? AND action='updated' AND details LIKE '%completed%' ORDER BY created_at DESC LIMIT 1"
+      ).get(t.id);
+      if (log) {
+        const dateStr = log.created_at.split('T')[0].split(' ')[0];
+        update.run(dateStr, t.id);
+      } else {
+        // Fall back to task's planned_date or today
+        const task = db.prepare("SELECT planned_date, deadline FROM tasks WHERE id = ?").get(t.id);
+        const fallback = task?.planned_date || task?.deadline || new Date().toISOString().split('T')[0];
+        update.run(fallback, t.id);
+      }
+    }
+    console.log(`[DB] Backfilled completed_at for ${missing.length} tasks`);
+  }
+} catch (err) {
+  console.error('[DB] completed_at backfill error:', err.message);
+}
+
 // Checklists table
 db.exec(`
   CREATE TABLE IF NOT EXISTS checklist_items (
