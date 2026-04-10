@@ -57,7 +57,8 @@ include 'includes/header.php';
         <div class="testimonial-overlay"></div>
         <div class="container testimonial-content">
             <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
-            <blockquote class="testimonial-quote fade-in">&ldquo;James Hardy has worked for Celanese at our Spondon site for the last 5 years as a contractor and in this time has become a valued member of our Engineering team. As a Lead Engineer, James has on many occasions proven to be a very safe and competent engineer. James has led from the front and managed his team safely, efficiently and with great attention to detail. I would happily recommend James Hardy and Musk Engineering for any mechanical project.&rdquo;</blockquote>
+            <blockquote class="testimonial-quote fade-in">I've used Musk engineering for a number of years and always had a great level of service at a reasonable price. As a result I've taken this company with me to numerous other businesses to undertake works as a trusted contractor.<br><br>Health and Safety is never a concern with quality of workmanship also top notch&hellip; Installations, Pipework, Fabrications and also Design and some small scale R&amp;D works. Would definitely recommend Steve Musk Engineering</blockquote>
+            <p class="testimonial-author"><strong>James Hardy - Celanese</strong></p>
             <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=375,h=74,fit=crop/Yanqkw6EPbi7qy6G/celogo4x-1-YNqBOEJO3rHpeQP2.png" alt="Celanese" class="testimonial-logo">
         </div>
     </section>
