@@ -72,7 +72,10 @@ async function loadClients() {
   const fp = currentFilter !== 'all' ? `?filter=${currentFilter}` : '';
   clients = await api(`/api/clients${fp}`);
   renderStats();
-  if (currentView === 'clients') renderClients();
+  if (currentView === 'clients') {
+    if (myTasksFilter) renderMyTasksView();
+    else renderClients();
+  }
   loadWorkloadSummary();
 }
 
@@ -482,20 +485,30 @@ function renderTask(t, isDone) {
       ${userAvatar(mem, 22)}<span style="font-size:12px">${esc(t.assignee||'')}</span>
       ${t.secondary_assignee ? `<span style="font-size:10px;color:var(--text-secondary)" title="Also: ${esc(t.secondary_assignee)}">+${userAvatar(findUser(t.secondary_assignee), 18)}</span>` : ''}
     </div>
-    <div style="font-size:12px;min-width:70px" class="${dc}">${fmtDateShort(t.deadline)}</div>
-    <div style="font-size:12px;min-width:70px;color:var(--text-secondary)">${fmtDateShort(t.planned_date)}</div>
-    <div style="font-size:12px;color:var(--text-secondary);min-width:40px">${t.estimated_hours?t.estimated_hours+'h':''}</div>
+    <div style="min-width:110px"><input type="date" class="inline-date ${dc}" value="${t.deadline||''}" onchange="inlineFieldChange(${t.id},'deadline',this.value)" onclick="event.stopPropagation()" title="Deadline"></div>
+    <div style="min-width:110px"><input type="date" class="inline-date" value="${t.planned_date||''}" onchange="inlineFieldChange(${t.id},'planned_date',this.value)" onclick="event.stopPropagation()" title="Planned date"></div>
+    <div style="min-width:50px"><input type="number" class="inline-hours" value="${t.estimated_hours||''}" min="0" step="0.5" onchange="inlineFieldChange(${t.id},'estimated_hours',parseFloat(this.value)||0)" onclick="event.stopPropagation()" title="Est. hours"></div>
     <div><select class="quick-status" onchange="quickStatusChange(${t.id},this.value)" onclick="event.stopPropagation()">
       ${['not-started','in-progress','completed','stuck','awaiting-client','awaiting-manager','ready-to-invoice','invoiced'].map(s=>`<option value="${s}" ${t.progress===s?'selected':''}>${progressLabel(s)}</option>`).join('')}
     </select></div>
     <div class="task-actions">
-      <button class="btn-icon" onclick="event.stopPropagation();showInlineEdit(${t.id})" title="Quick edit">&#9998;</button>
       <button class="btn-icon" onclick="editTask(${t.id})" title="Full edit">&#128196;</button>
       <button class="pin-btn ${t.is_pinned?'pinned':''}" onclick="toggleTaskPin(${t.id},event)" title="${t.is_pinned?'Unpin':'Pin'}">${t.is_pinned?'&#9733;':'&#9734;'}</button>
       <button class="btn-icon" onclick="archiveTask(${t.id})" title="Archive">&#128230;</button>
       ${currentUser?.role==='owner'?`<button class="btn-icon" onclick="deleteTask(${t.id})" title="Delete" style="color:var(--danger)">&#128465;</button>`:''}
     </div>
   </div>${sc?renderCommentThread(t):''}`;
+}
+
+async function inlineFieldChange(taskId, field, value) {
+  const body = {};
+  body[field] = value;
+  await api(`/api/tasks/${taskId}`, { method: 'PUT', body });
+  // Update local data without full reload for snappier feel
+  for (const c of clients) for (const p of c.projects) {
+    const t = p.tasks.find(x => x.id === taskId);
+    if (t) { t[field] = value; break; }
+  }
 }
 
 async function quickStatusChange(taskId, newStatus) {
@@ -955,13 +968,205 @@ function toggleMyTasks() {
   myTasksFilter = !myTasksFilter;
   const btn = document.getElementById('myTasksBtn');
   if (btn) btn.classList.toggle('active', myTasksFilter);
-  renderClients();
+  const hdr = document.getElementById('clientTableHeader');
+  if (hdr) hdr.style.display = myTasksFilter ? 'none' : '';
+  if (myTasksFilter) {
+    renderMyTasksView();
+  } else {
+    renderClients();
+  }
+}
+
+function renderMyTasksView() {
+  const ct = document.getElementById('clientList');
+  const myName = currentUser?.display_name || '';
+  const today = localDateStr(new Date());
+
+  // Gather all tasks for this user across all clients
+  const allTasks = [];
+  for (const c of clients) {
+    for (const p of c.projects) {
+      for (const t of p.tasks) {
+        if (t.assignee === myName || t.secondary_assignee === myName) {
+          allTasks.push({ ...t, project_name: p.name, client_name: c.name, client_code: c.code, client_logo: c.logo_url, client_id: c.id, project_id: p.id });
+        }
+      }
+    }
+  }
+
+  const active = allTasks.filter(t => t.progress !== 'completed' && t.progress !== 'invoiced');
+  const done = allTasks.filter(t => t.progress === 'completed' || t.progress === 'invoiced');
+
+  // Sort: overdue first, then by due date (soonest first), then by priority
+  const priOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+  active.sort((a, b) => {
+    const aDate = a.deadline || a.planned_date || '9999';
+    const bDate = b.deadline || b.planned_date || '9999';
+    const aOverdue = aDate < today ? 0 : 1;
+    const bOverdue = bDate < today ? 0 : 1;
+    if (aOverdue !== bOverdue) return aOverdue - bOverdue;
+    if (aDate !== bDate) return aDate < bDate ? -1 : 1;
+    return (priOrder[a.priority] || 2) - (priOrder[b.priority] || 2);
+  });
+
+  const overdue = active.filter(t => { const d = t.deadline || t.planned_date; return d && d < today; });
+  const totalH = active.reduce((s, t) => s + (t.estimated_hours || 0), 0);
+  const fmt = h => h % 1 === 0 ? h : h.toFixed(1);
+
+  let html = `<div class="my-tasks-header">
+    <h3>${esc(myName)}'s Tasks</h3>
+    <div style="display:flex;align-items:center;gap:14px;font-size:12px;color:var(--text-secondary)">
+      <span>${active.length} active</span>
+      <span>${fmt(totalH)}h total</span>
+      ${overdue.length ? `<span style="color:var(--danger)">${overdue.length} overdue</span>` : ''}
+      ${done.length ? `<span>${done.length} done</span>` : ''}
+    </div>
+  </div>`;
+
+  // Reschedule bar
+  if (overdue.length) {
+    html += `<div class="reschedule-bar">
+      <span style="color:var(--danger);font-weight:600">${overdue.length} task${overdue.length > 1 ? 's' : ''} overdue</span>
+      <span>&mdash; push them forward by</span>
+      <select id="rescheduleAmount" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:4px 8px;font-size:12px;color:var(--text);font-family:inherit">
+        <option value="1">1 day</option>
+        <option value="2">2 days</option>
+        <option value="3">3 days</option>
+        <option value="7" selected>1 week</option>
+        <option value="14">2 weeks</option>
+        <option value="custom">Pick a date...</option>
+      </select>
+      <input type="date" id="rescheduleDate" style="display:none;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:4px 8px;font-size:12px;color:var(--text);font-family:inherit">
+      <button class="btn btn-primary btn-sm" onclick="rescheduleOverdue()">Reschedule Overdue</button>
+      <button class="btn btn-ghost btn-sm" onclick="rescheduleAll()">Reschedule All</button>
+    </div>`;
+  }
+
+  html += '<div class="my-tasks-view">';
+
+  function myTaskRow(t) {
+    const dc = getDeadlineClass(t.deadline, t.progress);
+    const isDone = t.progress === 'completed' || t.progress === 'invoiced';
+    const isSignOff = t.secondary_assignee === myName && t.assignee !== myName;
+    return `<div class="my-task-row ${isDone ? 'completed' : ''}" data-task-id="${t.id}">
+      <input type="checkbox" class="task-checkbox" ${selectedTasks.has(t.id)?'checked':''} onclick="event.stopPropagation();toggleTaskSelect(${t.id})" title="Select">
+      <div class="my-task-client">
+        ${t.client_logo ? `<img src="${esc(t.client_logo)}" alt="">` : `<span class="client-code-badge">${esc(t.client_code || t.client_name.substring(0,3))}</span>`}
+        <span style="font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.client_name)}</span>
+      </div>
+      <div class="my-task-info">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="priority-badge priority-${t.priority}"></span>
+          <span class="task-title" onclick="editTask(${t.id})">${esc(t.title)}</span>
+          ${isSignOff ? '<span style="font-size:10px;background:var(--warning);color:#000;padding:1px 5px;border-radius:3px;font-weight:600">Sign-off</span>' : ''}
+          ${t.is_recurring?'<span class="recurring-badge" title="Recurring">&#8635;</span>':''}
+        </div>
+        <div class="task-sub">${esc(t.project_name)}${t.notes ? ' &middot; ' + esc(t.notes.substring(0, 60)) : ''}</div>
+      </div>
+      <div style="min-width:105px"><input type="date" class="inline-date ${dc}" value="${t.deadline||''}" onchange="inlineFieldChange(${t.id},'deadline',this.value)" onclick="event.stopPropagation()" title="Deadline"></div>
+      <div style="min-width:105px"><input type="date" class="inline-date" value="${t.planned_date||''}" onchange="inlineFieldChange(${t.id},'planned_date',this.value)" onclick="event.stopPropagation()" title="Planned"></div>
+      <div style="min-width:50px"><input type="number" class="inline-hours" value="${t.estimated_hours||''}" min="0" step="0.5" onchange="inlineFieldChange(${t.id},'estimated_hours',parseFloat(this.value)||0)" onclick="event.stopPropagation()" title="Hours"></div>
+      <div><select class="quick-status" onchange="quickStatusChange(${t.id},this.value)" onclick="event.stopPropagation()">
+        ${['not-started','in-progress','completed','stuck','awaiting-client','awaiting-manager','ready-to-invoice','invoiced'].map(s=>`<option value="${s}" ${t.progress===s?'selected':''}>${progressLabel(s)}</option>`).join('')}
+      </select></div>
+    </div>`;
+  }
+
+  html += active.map(myTaskRow).join('');
+
+  if (done.length) {
+    html += `<div style="padding:10px 14px;cursor:pointer;font-size:12px;color:var(--text-secondary)" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">&#9660; ${done.length} completed</div>`;
+    html += `<div style="display:none">${done.map(myTaskRow).join('')}</div>`;
+  }
+
+  html += '</div>';
+  ct.innerHTML = html;
+
+  // Wire up the reschedule date picker toggle
+  const sel = document.getElementById('rescheduleAmount');
+  const datePicker = document.getElementById('rescheduleDate');
+  if (sel && datePicker) {
+    sel.addEventListener('change', () => {
+      datePicker.style.display = sel.value === 'custom' ? '' : 'none';
+    });
+  }
+}
+
+async function rescheduleOverdue() {
+  await doReschedule(true);
+}
+
+async function rescheduleAll() {
+  const active = getMyActiveTasks();
+  if (!confirm(`Reschedule ALL ${active.length} active tasks by the selected amount?`)) return;
+  await doReschedule(false);
+}
+
+function getMyActiveTasks() {
+  const myName = currentUser?.display_name || '';
+  const tasks = [];
+  for (const c of clients) for (const p of c.projects) for (const t of p.tasks) {
+    if ((t.assignee === myName || t.secondary_assignee === myName) && t.progress !== 'completed' && t.progress !== 'invoiced') {
+      tasks.push(t);
+    }
+  }
+  return tasks;
+}
+
+async function doReschedule(overdueOnly) {
+  const sel = document.getElementById('rescheduleAmount');
+  const datePicker = document.getElementById('rescheduleDate');
+  if (!sel) return;
+
+  const today = localDateStr(new Date());
+  const myName = currentUser?.display_name || '';
+  const tasks = getMyActiveTasks();
+  const toUpdate = overdueOnly
+    ? tasks.filter(t => { const d = t.deadline || t.planned_date; return d && d < today; })
+    : tasks;
+
+  if (!toUpdate.length) return;
+
+  let shiftDays = 0;
+  let targetDate = '';
+
+  if (sel.value === 'custom') {
+    targetDate = datePicker?.value;
+    if (!targetDate) { alert('Pick a target date'); return; }
+  } else {
+    shiftDays = parseInt(sel.value) || 7;
+  }
+
+  for (const t of toUpdate) {
+    const body = {};
+    if (targetDate) {
+      if (t.deadline) body.deadline = targetDate;
+      if (t.planned_date) body.planned_date = targetDate;
+      if (!t.deadline && !t.planned_date) body.planned_date = targetDate;
+    } else {
+      if (t.deadline) body.deadline = shiftDate(t.deadline, shiftDays);
+      if (t.planned_date) body.planned_date = shiftDate(t.planned_date, shiftDays);
+      if (!t.deadline && !t.planned_date) body.planned_date = shiftDate(today, shiftDays);
+    }
+    await api(`/api/tasks/${t.id}`, { method: 'PUT', body });
+  }
+
+  await loadClients();
+  renderMyTasksView();
+}
+
+function shiftDate(dateStr, days) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split('T')[0];
 }
 
 function clearAllFilters() {
   myTasksFilter = false;
   currentFilter = 'all';
   document.getElementById('myTasksBtn')?.classList.remove('active');
+  const hdr = document.getElementById('clientTableHeader');
+  if (hdr) hdr.style.display = '';
   document.querySelectorAll('.filter-btn[data-filter]').forEach(b => {
     b.classList.toggle('active', b.dataset.filter === 'all');
   });

@@ -571,6 +571,81 @@ a:hover { color: #6dd4a8; }
 .task-row.task-selected { background: rgba(46, 170, 123, 0.1); border-left: 3px solid var(--accent); }
 .task-checkbox { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); flex-shrink: 0; }
 
+/* ─── Inline Task Edits ──────────────────────────── */
+.inline-date, .inline-hours {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: 3px 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+.inline-date:hover, .inline-hours:hover { border-color: var(--border); }
+.inline-date:focus, .inline-hours:focus { border-color: var(--accent); outline: none; background: var(--bg-glass); color: var(--text); }
+.inline-date.deadline-overdue { color: var(--danger); }
+.inline-date.deadline-soon { color: var(--warning); }
+.inline-hours { width: 50px; text-align: center; }
+.inline-hours::-webkit-inner-spin-button { opacity: 0; }
+.inline-hours:hover::-webkit-inner-spin-button { opacity: 1; }
+
+/* ─── My Tasks Flat View ─────────────────────────── */
+.my-tasks-view { display: flex; flex-direction: column; gap: 2px; }
+.my-task-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+.my-task-row:hover { background: var(--bg-glass); }
+.my-task-row.completed { opacity: 0.5; }
+.my-task-client {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 120px;
+  max-width: 160px;
+  flex-shrink: 0;
+}
+.my-task-client img { width: 24px; height: 24px; border-radius: 6px; object-fit: cover; }
+.my-task-client .client-code-badge {
+  font-size: 9px;
+  font-weight: 700;
+  background: var(--bg-glass);
+  border: 1px solid var(--border);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.my-task-info { flex: 1; min-width: 0; }
+.my-task-info .task-title { font-weight: 600; font-size: 13px; cursor: pointer; }
+.my-task-info .task-title:hover { color: var(--accent); }
+.my-task-info .task-sub { font-size: 11px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.my-tasks-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 2px solid var(--border);
+  gap: 12px;
+}
+.my-tasks-header h3 { font-size: 15px; font-weight: 700; font-family: 'Montserrat', sans-serif; }
+.reschedule-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--bg-glass);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
 /* ─── Workload Summary ─────────────────────────── */
 .workload-summary {
   display: flex;
