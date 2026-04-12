@@ -1494,6 +1494,10 @@ function downloadBackup(file) {
   window.open(`/api/backups/download/${encodeURIComponent(file)}`, '_blank');
 }
 
+function exportExcel() {
+  window.open('/api/export/excel', '_blank');
+}
+
 async function restoreBackup(file) {
   if (!confirm(`RESTORE from backup "${file}"?\n\nThis will REPLACE all current data with the backup. This cannot be undone.\n\nAre you sure?`)) return;
   if (!confirm('FINAL WARNING: All current tasks, projects, and comments will be overwritten. Continue?')) return;

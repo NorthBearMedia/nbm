@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { readdirSync, copyFileSync, statSync } from 'fs';
 import { join } from 'path';
 import Database from 'better-sqlite3';
+import XLSX from 'xlsx';
 import db from '../database.js';
 import { requireAuth } from '../middleware.js';
 
@@ -114,6 +115,116 @@ router.get('/api/clients/:id/timeline', requireAuth, (req, res) => {
   });
 
   res.json(enriched);
+});
+
+// ─── Export to Excel ─────────────────────────────────
+router.get('/api/export/excel', requireAuth, (req, res) => {
+  const isOwner = req.user.role === 'owner';
+  const priv = isOwner ? '' : 'AND c.is_private = 0';
+
+  // All active tasks (not completed/invoiced) with client + project info
+  const tasks = db.prepare(`
+    SELECT t.id, t.title, t.assignee, t.secondary_assignee, t.deadline, t.planned_date,
+           t.estimated_hours, t.progress, t.priority, t.notes, t.references_text,
+           t.is_recurring, t.created_at,
+           p.name as project_name, p.status as project_status,
+           c.name as client_name, c.code as client_code, c.agreement_type
+    FROM tasks t
+    JOIN projects p ON t.project_id = p.id
+    JOIN clients c ON p.client_id = c.id
+    WHERE t.archived = 0 AND t.progress NOT IN ('completed', 'invoiced')
+    ${priv}
+    ORDER BY c.name, p.name, t.priority, t.deadline
+  `).all();
+
+  // All active projects
+  const projects = db.prepare(`
+    SELECT p.id, p.name, p.status, p.created_at,
+           c.name as client_name, c.code as client_code,
+           (SELECT count(*) FROM tasks t WHERE t.project_id = p.id AND t.archived = 0 AND t.progress NOT IN ('completed','invoiced')) as active_tasks,
+           (SELECT count(*) FROM tasks t WHERE t.project_id = p.id AND t.archived = 0 AND t.progress IN ('completed','invoiced')) as completed_tasks,
+           (SELECT COALESCE(sum(t.estimated_hours), 0) FROM tasks t WHERE t.project_id = p.id AND t.archived = 0 AND t.progress NOT IN ('completed','invoiced')) as total_hours
+    FROM projects p
+    JOIN clients c ON p.client_id = c.id
+    WHERE p.archived = 0 ${priv}
+    ORDER BY c.name, p.name
+  `).all();
+
+  // All active clients
+  const clientRows = db.prepare(`
+    SELECT c.id, c.name, c.code, c.agreement_type, c.notes, c.gmail_link, c.drive_link, c.created_at,
+           (SELECT count(*) FROM projects p WHERE p.client_id = c.id AND p.archived = 0) as active_projects,
+           (SELECT count(*) FROM tasks t JOIN projects p ON t.project_id = p.id WHERE p.client_id = c.id AND t.archived = 0 AND t.progress NOT IN ('completed','invoiced')) as active_tasks,
+           (SELECT COALESCE(sum(t.estimated_hours), 0) FROM tasks t JOIN projects p ON t.project_id = p.id WHERE p.client_id = c.id AND t.archived = 0 AND t.progress NOT IN ('completed','invoiced')) as total_hours
+    FROM clients c
+    WHERE c.archived = 0 ${priv}
+    ORDER BY c.name
+  `).all();
+
+  const wb = XLSX.utils.book_new();
+
+  // --- Tasks sheet ---
+  const taskRows = tasks.map(t => ({
+    'Ref': 'NB' + String(t.id).padStart(3, '0'),
+    'Client': t.client_name,
+    'Client Code': t.client_code || '',
+    'Project': t.project_name,
+    'Task': t.title,
+    'Assigned To': t.assignee || '',
+    'Also Assigned': t.secondary_assignee || '',
+    'Priority': t.priority,
+    'Status': t.progress,
+    'Deadline': t.deadline || '',
+    'Planned Date': t.planned_date || '',
+    'Est. Hours': t.estimated_hours || 0,
+    'Notes': t.notes || '',
+    'References': t.references_text || '',
+    'Recurring': t.is_recurring ? 'Yes' : '',
+    'Created': t.created_at ? t.created_at.split('T')[0].split(' ')[0] : '',
+  }));
+  const wsTask = XLSX.utils.json_to_sheet(taskRows);
+  // Auto-width columns
+  wsTask['!cols'] = Object.keys(taskRows[0] || {}).map(k => ({ wch: Math.max(k.length, 12) }));
+  XLSX.utils.book_append_sheet(wb, wsTask, 'Tasks');
+
+  // --- Projects sheet ---
+  const projRows = projects.map(p => ({
+    'Client': p.client_name,
+    'Client Code': p.client_code || '',
+    'Project': p.name,
+    'Status': p.status || '',
+    'Active Tasks': p.active_tasks,
+    'Completed Tasks': p.completed_tasks,
+    'Total Hours (Active)': p.total_hours,
+    'Created': p.created_at ? p.created_at.split('T')[0].split(' ')[0] : '',
+  }));
+  const wsProj = XLSX.utils.json_to_sheet(projRows);
+  wsProj['!cols'] = Object.keys(projRows[0] || {}).map(k => ({ wch: Math.max(k.length, 12) }));
+  XLSX.utils.book_append_sheet(wb, wsProj, 'Projects');
+
+  // --- Clients sheet ---
+  const cRows = clientRows.map(c => ({
+    'Client': c.name,
+    'Code': c.code || '',
+    'Type': c.agreement_type,
+    'Active Projects': c.active_projects,
+    'Active Tasks': c.active_tasks,
+    'Total Hours (Active)': c.total_hours,
+    'Notes': c.notes || '',
+    'Gmail': c.gmail_link || '',
+    'Drive': c.drive_link || '',
+    'Created': c.created_at ? c.created_at.split('T')[0].split(' ')[0] : '',
+  }));
+  const wsCli = XLSX.utils.json_to_sheet(cRows);
+  wsCli['!cols'] = Object.keys(cRows[0] || {}).map(k => ({ wch: Math.max(k.length, 12) }));
+  XLSX.utils.book_append_sheet(wb, wsCli, 'Clients');
+
+  // Generate buffer and send
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  const ts = new Date().toISOString().split('T')[0];
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="NBM-Console-Export-${ts}.xlsx"`);
+  res.send(Buffer.from(buf));
 });
 
 // ─── Backups (owner only) ─────────────────────────────
