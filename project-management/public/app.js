@@ -1955,8 +1955,8 @@ function renderAIEmpty() {
   const name = currentUser?.display_name?.split(' ')[0] || 'there';
   document.getElementById('aiMessages').innerHTML = `
     <div class="ai-empty">
-      <span class="ai-empty-icon">&#10024;</span>
-      Hi ${esc(name)} — I can create tasks, plan your week, find things, and update work on your behalf.
+      <span class="ai-empty-icon">&#128059;</span>
+      Hi ${esc(name)} — I'm The Bear. I can create tasks, plan your week, find things, and update work on your behalf.
       <br><br>
       Try: <em>"Create a task for me to edit the reel for MHC by Friday, 3 hours"</em>
     </div>`;
