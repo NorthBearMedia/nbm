@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>North Bear Console</title>
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=32">
+  <link rel="stylesheet" href="styles.css?v=33">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -302,7 +302,39 @@
     </div>
   </div>
 
+  <!-- AI Assistant Launcher + Panel -->
+  <button id="aiLauncher" class="ai-launcher" onclick="toggleAI()" title="Claude Assistant" style="display:none">
+    <span class="ai-launcher-icon">&#10024;</span>
+    <span class="ai-launcher-label">Ask Claude</span>
+  </button>
+
+  <div id="aiPanel" class="ai-panel" style="display:none">
+    <div class="ai-header">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:18px">&#10024;</span>
+        <div>
+          <div class="ai-title">Claude Assistant</div>
+          <div class="ai-subtitle">Create tasks, plan work, get answers</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button class="ai-icon-btn" onclick="resetAIChat()" title="New conversation">&#8634;</button>
+        <button class="ai-icon-btn" onclick="toggleAI()" title="Close">&times;</button>
+      </div>
+    </div>
+    <div id="aiMessages" class="ai-messages"></div>
+    <div class="ai-suggestions" id="aiSuggestions">
+      <button class="ai-chip" onclick="sendAIPrompt('What do I have on this week?')">What's on this week?</button>
+      <button class="ai-chip" onclick="sendAIPrompt('Give me a workload summary for the team.')">Team workload</button>
+      <button class="ai-chip" onclick="sendAIPrompt('Create a task for me: ')">Create a task...</button>
+    </div>
+    <form id="aiForm" class="ai-input-row" onsubmit="event.preventDefault();sendAIMessage()">
+      <textarea id="aiInput" placeholder="Ask Claude to create tasks, plan your week, find something..." rows="1"></textarea>
+      <button type="submit" class="ai-send" id="aiSendBtn" title="Send">&#10148;</button>
+    </form>
+  </div>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=32"></script>
+  <script src="app.js?v=33"></script>
 </body>
 </html>

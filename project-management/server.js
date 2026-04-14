@@ -11,6 +11,7 @@ import projectRoutes from './routes/projects.js';
 import taskRoutes, { deleteAttachmentHandler } from './routes/tasks.js';
 import userRoutes from './routes/users.js';
 import systemRoutes, { createBackupRoutes } from './routes/system.js';
+import aiRoutes from './routes/ai.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -70,6 +71,7 @@ app.use('/api/users', userRoutes);
 app.delete('/api/attachments/:id', requireAuth, requireWrite, deleteAttachmentHandler);
 app.use(systemRoutes);
 app.use(createBackupRoutes(backupDir, backupDatabase));
+app.use(aiRoutes);
 
 // ─── Seed Users ─────────────────────────────────────────
 // Creates default users ONLY when the users table is empty.
@@ -103,4 +105,9 @@ app.use((err, req, res, next) => {
 // ─── Start ──────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`North Bear Console running at http://localhost:${PORT}`);
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.log('AI assistant disabled — set ANTHROPIC_API_KEY to enable.');
+  } else {
+    console.log('AI assistant enabled.');
+  }
 });

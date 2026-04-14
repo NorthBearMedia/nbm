@@ -1922,3 +1922,180 @@ async function toggleTaskPin(taskId, event) {
     document.getElementById('clientList').innerHTML='<div class="empty-state"><p>Error loading data. Please refresh.</p></div>';
   }
 })();
+
+// ─── AI Assistant ───────────────────────────────────────
+let aiHistory = [];      // Full message list sent to API (role + content arrays)
+let aiAvailable = false;
+let aiBusy = false;
+
+async function checkAIAvailable() {
+  try {
+    const s = await api('/api/ai/status');
+    aiAvailable = !!s.available;
+    const btn = document.getElementById('aiLauncher');
+    if (btn) btn.style.display = aiAvailable ? '' : 'none';
+  } catch {}
+}
+
+function toggleAI() {
+  const panel = document.getElementById('aiPanel');
+  const launcher = document.getElementById('aiLauncher');
+  if (panel.style.display === 'none') {
+    panel.style.display = 'flex';
+    launcher.style.display = 'none';
+    if (!aiHistory.length) renderAIEmpty();
+    setTimeout(() => document.getElementById('aiInput')?.focus(), 50);
+  } else {
+    panel.style.display = 'none';
+    launcher.style.display = '';
+  }
+}
+
+function renderAIEmpty() {
+  const name = currentUser?.display_name?.split(' ')[0] || 'there';
+  document.getElementById('aiMessages').innerHTML = `
+    <div class="ai-empty">
+      <span class="ai-empty-icon">&#10024;</span>
+      Hi ${esc(name)} — I can create tasks, plan your week, find things, and update work on your behalf.
+      <br><br>
+      Try: <em>"Create a task for me to edit the reel for MHC by Friday, 3 hours"</em>
+    </div>`;
+}
+
+function resetAIChat() {
+  aiHistory = [];
+  renderAIEmpty();
+  document.getElementById('aiSuggestions').style.display = '';
+}
+
+function renderAIHistory() {
+  const box = document.getElementById('aiMessages');
+  box.innerHTML = '';
+  for (const m of aiHistory) {
+    if (m.role === 'user' && typeof m.content === 'string') {
+      box.insertAdjacentHTML('beforeend', `<div class="ai-msg ai-msg-user">${esc(m.content)}</div>`);
+    } else if (m.role === 'assistant' && Array.isArray(m.content)) {
+      // Render text blocks; tool_use blocks render as a small audit trail line
+      const texts = m.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+      const tools = m.content.filter(b => b.type === 'tool_use');
+      if (tools.length) {
+        box.insertAdjacentHTML('beforeend', renderToolLogHTML(tools));
+      }
+      if (texts) {
+        box.insertAdjacentHTML('beforeend', `<div class="ai-msg ai-msg-assistant">${formatMarkdownish(texts)}</div>`);
+      }
+    }
+  }
+  box.scrollTop = box.scrollHeight;
+}
+
+function renderToolLogHTML(toolUses) {
+  const rows = toolUses.map(t => {
+    const label = prettyToolLabel(t.name, t.input);
+    return `<div class="ai-tool-row"><span class="ai-tool-name">&rarr;</span> ${esc(label)}</div>`;
+  }).join('');
+  return `<div class="ai-msg-tools">${rows}</div>`;
+}
+
+function prettyToolLabel(name, input) {
+  switch (name) {
+    case 'create_task': return `Creating task "${input.title || ''}"`;
+    case 'update_task': return `Updating task #${input.task_id}`;
+    case 'create_project': return `Creating project "${input.name || ''}"`;
+    case 'list_clients': return 'Looking up clients';
+    case 'list_projects': return input.client_id ? `Listing projects for client #${input.client_id}` : 'Listing projects';
+    case 'list_team_members': return 'Looking up team members';
+    case 'search_tasks': return `Searching tasks: "${input.query}"`;
+    case 'get_workload_summary': return 'Checking workload';
+    case 'list_tasks_for_user': return `Listing tasks for ${input.assignee}`;
+    default: return name;
+  }
+}
+
+function formatMarkdownish(text) {
+  // Minimal inline formatting: bold **x**, code `x`, preserve newlines via white-space:pre-wrap (already set)
+  return esc(text)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px;font-size:12px">$1</code>');
+}
+
+function sendAIPrompt(text) {
+  const input = document.getElementById('aiInput');
+  input.value = text;
+  input.focus();
+  // Only auto-send if the prompt doesn't end with "..."
+  if (!text.endsWith('...') && !text.endsWith(': ')) sendAIMessage();
+}
+
+async function sendAIMessage() {
+  if (aiBusy) return;
+  const input = document.getElementById('aiInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  aiHistory.push({ role: 'user', content: text });
+  input.value = '';
+  input.style.height = 'auto';
+  document.getElementById('aiSuggestions').style.display = 'none';
+  renderAIHistory();
+  showAIThinking(true);
+  aiBusy = true;
+  document.getElementById('aiSendBtn').disabled = true;
+
+  try {
+    const resp = await api('/api/ai/chat', { method: 'POST', body: { messages: aiHistory } });
+    if (resp.assistant_content) {
+      aiHistory.push({ role: 'assistant', content: resp.assistant_content });
+    } else if (resp.reply) {
+      aiHistory.push({ role: 'assistant', content: [{ type: 'text', text: resp.reply }] });
+    }
+    showAIThinking(false);
+    renderAIHistory();
+    // If any tool mutated data, refresh the console
+    const didMutate = (resp.tool_calls || []).some(tc => ['create_task', 'update_task', 'create_project'].includes(tc.tool));
+    if (didMutate) {
+      try { await loadClients(); await loadWorkloadSummary(); } catch {}
+    }
+  } catch (err) {
+    showAIThinking(false);
+    const box = document.getElementById('aiMessages');
+    box.insertAdjacentHTML('beforeend', `<div class="ai-msg-error">${esc(err.message || 'Error')}</div>`);
+    box.scrollTop = box.scrollHeight;
+  } finally {
+    aiBusy = false;
+    document.getElementById('aiSendBtn').disabled = false;
+    input.focus();
+  }
+}
+
+function showAIThinking(on) {
+  const box = document.getElementById('aiMessages');
+  const existing = box.querySelector('.ai-thinking');
+  if (existing) existing.remove();
+  if (on) {
+    box.insertAdjacentHTML('beforeend', '<div class="ai-thinking"><span class="ai-dot"></span><span class="ai-dot"></span><span class="ai-dot"></span> Thinking...</div>');
+    box.scrollTop = box.scrollHeight;
+  }
+}
+
+// Auto-grow textarea and submit on Enter (Shift+Enter for newline)
+document.addEventListener('DOMContentLoaded', () => {
+  const ta = document.getElementById('aiInput');
+  if (!ta) return;
+  ta.addEventListener('input', () => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+  });
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendAIMessage();
+    }
+  });
+});
+
+// Kick off availability check after user loads
+(async function initAI() {
+  // Wait a moment so loadCurrentUser has a chance to run
+  setTimeout(() => { checkAIAvailable(); }, 500);
+})();
