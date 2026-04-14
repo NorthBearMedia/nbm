@@ -43,6 +43,7 @@ routes/
    | `RAILWAY_VOLUME_MOUNT_PATH` | Yes | — | Set to `/data` (path where you mounted the volume) |
    | `NODE_ENV` | Recommended | — | Set to `production` for secure cookies + HSTS |
    | `SEED_ADMIN` | First deploy only | — | Set to `1` to create the default admin user |
+   | `ANTHROPIC_API_KEY` | No | — | Enables the in-app Claude assistant. Get one from https://console.anthropic.com/settings/keys |
 
 3. **Root Directory**: Set to `project-management` in Railway service settings.
 
