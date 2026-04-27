@@ -4,7 +4,7 @@ This document is the standing brief for any AI (Claude Code or otherwise) pickin
 
 ## What this is
 
-Internal project management system for **North Bear Media**, a creative production company. Single-tenant, run by the team. Replaces a spreadsheet-based workflow with a real app that tracks **clients → projects → tasks**, plus calendar / focus / today views, multi-assignee with manager sign-off, and an embedded AI assistant called **"The Bear"**.
+Internal project management system for **North Bear Media**, a creative production company. Single-tenant, run by the team. Replaces a spreadsheet-based workflow with a real app that tracks **clients → tasks** (flat structure, no project layer), plus calendar / focus / today views, multi-assignee with manager sign-off, and an embedded AI assistant called **"The Bear"**.
 
 Live at: deployed on **Railway** (not Render — the `render.yaml` is leftover but the docs in `README.md` reference Railway).
 
@@ -20,7 +20,7 @@ Live at: deployed on **Railway** (not Render — the `render.yaml` is leftover b
 │   ├── routes/
 │   │   ├── auth.js            Login / logout / session
 │   │   ├── clients.js         Client CRUD + logo + history
-│   │   ├── projects.js        Project CRUD
+│   │   ├── projects.js        Project CRUD (legacy — projects layer removed from UI)
 │   │   ├── tasks.js           Task CRUD, attachments, comments, calendar, search,
 │   │   │                       /summary, /workload-detail, /:id/duplicate, by-date
 │   │   ├── users.js           User mgmt, avatars, passwords
@@ -72,10 +72,10 @@ clients         id, name, code (3 letters), agreement_type (recurring|ad-hoc),
                 logo_url, gmail_link, drive_link, notes, sort_order,
                 is_private (owner-only), archived, created_at
 
-projects        id, client_id, name, status (active|on-hold|completed|
-                ready-to-invoice|invoiced), notes, sort_order, archived
+projects        id, client_id, name, status, notes, sort_order, archived
+                (LEGACY — table still exists but UI uses client_id on tasks directly)
 
-tasks           id, project_id, title, assignee, secondary_assignee,
+tasks           id, client_id, project_id (legacy), title, assignee, secondary_assignee,
                 deadline, planned_date, completed_at, estimated_hours,
                 progress (not-started|in-progress|completed|stuck|
                   awaiting-client|awaiting-manager|ready-to-invoice|invoiced),
@@ -96,7 +96,7 @@ Tasks display as `NB###` (zero-padded id). Search supports `NB123` lookups.
 
 ## Existing features (post-Apr 2026)
 
-- **Hierarchical home:** Clients → expand to projects → expand to tasks. Drag-and-drop reorder. Manual / alpha / recent / outstanding sort.
+- **Flat home:** Clients → expand to see tasks directly (no project layer). Drag-and-drop reorder. Manual / alpha / recent / outstanding sort.
 - **Today view:** All tasks for a date, grouped by assignee.
 - **Calendar view:** Monthly grid, per-person filter.
 - **Focus view:** Working Now / Up Next / Blocked / Needs Your Sign-off (when manager).
@@ -107,8 +107,8 @@ Tasks display as `NB###` (zero-padded id). Search supports `NB123` lookups.
 - **Recurring tasks:** Auto-create next occurrence on completion.
 - **Activity log:** Cascade-proof audit trail. Owner-only Global History view.
 - **Hourly + pre-migration backups + restore-from-backup.**
-- **Excel export:** `/api/export/excel` — Tasks + Projects + Clients sheets, excludes completed/invoiced.
-- **The Bear (AI assistant):** Floating chat panel in bottom-right. Tools: list_clients, list_projects, list_team_members, create_project, create_task, update_task, search_tasks, get_workload_summary, list_tasks_for_user. All actions log activity with "(via AI assistant)". Hidden when `ANTHROPIC_API_KEY` unset.
+- **Excel export:** `/api/export/excel` — Tasks + Clients sheets, excludes completed/invoiced.
+- **The Bear (AI assistant):** Floating chat panel in bottom-right. Tools: list_clients, list_team_members, create_task, update_task, search_tasks, get_workload_summary, list_tasks_for_user. All actions log activity with "(via AI assistant)". Hidden when `ANTHROPIC_API_KEY` unset.
 
 ## Conventions
 
@@ -119,7 +119,7 @@ Tasks display as `NB###` (zero-padded id). Search supports `NB123` lookups.
 - **CSS variables:** `--primary` is `#3eaf84` (NBM green). Use existing variables, don't hardcode colors.
 - **Cache busting:** `app.js` and `styles.css` are loaded with `?v=N` query params in `index.html`. Bump the version when changing them so users don't see stale cached assets.
 - **Activity logging:** Every meaningful mutation calls `logActivity(entityType, entityId, action, displayName, detail)`. The author always comes from `req.user.display_name`, never the request body.
-- **Privacy filter:** Every SQL query that lists clients/projects/tasks must respect `is_private` for non-owners. The pattern is `const priv = isOwner ? '' : 'AND c.is_private = 0';`.
+- **Privacy filter:** Every SQL query that lists clients/tasks must respect `is_private` for non-owners. The pattern is `const priv = isOwner ? '' : 'AND c.is_private = 0';`.
 
 ## Environment variables
 

@@ -6,10 +6,8 @@ let currentUser = null;
 let currentFilter = 'all';
 let currentView = 'clients';
 let expandedClients = new Set();
-let expandedProjects = new Set();
 let expandedComments = new Set();
 let showCompletedTasks = new Set();
-let showArchivedProjects = new Set();
 let showArchivedTasks = new Set();
 let calendarDate = new Date();
 let draggedClientId = null;
@@ -146,7 +144,7 @@ function showStatPopup(type) {
   document.getElementById('statsModalTitle').textContent = titles[type]||'Tasks';
   const now = localDateStr(new Date());
   const items = [];
-  for (const c of clients) for (const p of c.projects) for (const task of p.tasks) {
+  for (const c of clients) for (const task of c.tasks) {
     let m = false;
     if (type==='outstanding' && task.progress!=='completed' && task.progress!=='invoiced') m=true;
     if (type==='in-progress' && task.progress==='in-progress') m=true;
@@ -154,15 +152,15 @@ function showStatPopup(type) {
     if (type==='overdue' && task.deadline && task.deadline<now && task.progress!=='completed' && task.progress!=='invoiced') m=true;
     if (type==='stuck' && task.progress==='stuck') m=true;
     if (type==='awaiting-manager' && task.progress==='awaiting-manager') m=true;
-    if (m) items.push({task,project:p,client:c});
+    if (m) items.push({task,client:c});
   }
   const ct = document.getElementById('statsModalContent');
   ct.innerHTML = items.length===0 ? '<div style="padding:24px;text-align:center;color:var(--text-secondary)">None</div>' :
-    items.map(({task,project,client})=>`
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer" onclick="navigateToTask(${client.id},${project.id},${task.id})">
+    items.map(({task,client})=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer" onclick="navigateToTask(${client.id},${task.id})">
         <div>
           <div style="font-weight:600;font-size:13px">${esc(task.title)}</div>
-          <div style="font-size:11px;color:var(--text-secondary)">${esc(client.name)} &rarr; ${esc(project.name)}</div>
+          <div style="font-size:11px;color:var(--text-secondary)">${esc(client.name)}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
           <span class="status-badge status-${task.progress}">${progressLabel(task.progress)}</span>
@@ -293,7 +291,7 @@ function renderWorkloadDetailTasks(data, ct, category) {
             <span class="priority-badge priority-${t.priority}"></span>
             <span style="font-weight:600;font-size:13px">${esc(t.title)}</span>
           </div>
-          <div style="font-size:11px;color:var(--text-secondary)">${t.client_code ? '[' + esc(t.client_code) + '] ' : ''}${esc(t.client_name)} &rarr; ${esc(t.project_name)}</div>
+          <div style="font-size:11px;color:var(--text-secondary)">${t.client_code ? '[' + esc(t.client_code) + '] ' : ''}${esc(t.client_name)}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
           ${t.estimated_hours ? `<span style="font-size:12px;color:var(--text-secondary)">${t.estimated_hours}h</span>` : ''}
@@ -306,10 +304,10 @@ function renderWorkloadDetailTasks(data, ct, category) {
   ct.innerHTML = html;
 }
 
-function navigateToTask(cid,pid,tid) {
+function navigateToTask(cid,tid) {
   closeModal('statsModal');
   if (currentView!=='clients') { document.querySelector('[data-view="clients"]').click(); }
-  expandedClients.add(cid); expandedProjects.add(pid); renderClients();
+  expandedClients.add(cid); renderClients();
   setTimeout(()=>{ const el=document.querySelector(`[data-task-id="${tid}"]`); if(el){el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('highlight'); setTimeout(()=>{el.classList.remove('highlight');},2000);} },100);
 }
 
@@ -338,12 +336,10 @@ function fmtFileSize(bytes){if(bytes<1024)return bytes+'B';if(bytes<1048576)retu
 
 // ─── Toggles ────────────────────────────────────────────
 function toggleClient(id){expandedClients.has(id)?expandedClients.delete(id):expandedClients.add(id);saveExpandedState();renderClients();}
-function toggleProject(id){expandedProjects.has(id)?expandedProjects.delete(id):expandedProjects.add(id);saveExpandedState();renderClients();}
-function saveExpandedState(){try{localStorage.setItem('nbm_expandedClients',JSON.stringify([...expandedClients]));localStorage.setItem('nbm_expandedProjects',JSON.stringify([...expandedProjects]));}catch{}}
+function saveExpandedState(){try{localStorage.setItem('nbm_expandedClients',JSON.stringify([...expandedClients]));}catch{}}
 function toggleComments(tid){expandedComments.has(tid)?expandedComments.delete(tid):expandedComments.add(tid);renderClients();}
-function toggleCompletedTasks(pid){showCompletedTasks.has(pid)?showCompletedTasks.delete(pid):showCompletedTasks.add(pid);renderClients();}
-function toggleArchivedProjects(cid){showArchivedProjects.has(cid)?showArchivedProjects.delete(cid):showArchivedProjects.add(cid);renderClients();}
-function toggleArchivedTasks(pid){showArchivedTasks.has(pid)?showArchivedTasks.delete(pid):showArchivedTasks.add(pid);renderClients();}
+function toggleCompletedTasks(cid){showCompletedTasks.has(cid)?showCompletedTasks.delete(cid):showCompletedTasks.add(cid);renderClients();}
+function toggleArchivedTasks(cid){showArchivedTasks.has(cid)?showArchivedTasks.delete(cid):showArchivedTasks.add(cid);renderClients();}
 
 // ─── Modal ──────────────────────────────────────────────
 function openModal(id){document.getElementById(id).classList.add('active');document.getElementById('modalBackdrop').classList.add('active');}
@@ -381,6 +377,12 @@ function renderClients() {
     const links=[];
     if(c.gmail_link)links.push(`<a href="${esc(c.gmail_link)}" target="_blank" class="client-link" onclick="event.stopPropagation()" title="Gmail">&#9993;</a>`);
     if(c.drive_link)links.push(`<a href="${esc(c.drive_link)}" target="_blank" class="client-link" onclick="event.stopPropagation()" title="Drive">&#128193;</a>`);
+    const myName=currentUser?.display_name||'';
+    const allTasks=myTasksFilter?c.tasks.filter(t=>t.assignee===myName):c.tasks;
+    const active=allTasks.filter(t=>t.progress!=='completed'&&t.progress!=='invoiced').sort((a,b)=>(b.is_pinned||0)-(a.is_pinned||0));
+    const done=allTasks.filter(t=>t.progress==='completed'||t.progress==='invoiced');
+    const arch=c.archivedTasks||[];
+    const showDone=showCompletedTasks.has(c.id), showArch=showArchivedTasks.has(c.id);
     return `<div class="client-row ${ex?'expanded':''}" data-client-id="${c.id}" ${canDrag?`draggable="true" ondragstart="onDragStart(event,${c.id})" ondragover="onDragOver(event)" ondrop="onDrop(event,${c.id})" ondragend="onDragEnd(event)" ondragleave="onDragLeave(event)"`:''}>
       <div class="client-summary" onclick="toggleClient(${c.id})">
         <div class="client-info">
@@ -392,7 +394,7 @@ function renderClients() {
           </div>
         </div>
         <div><span class="client-type-badge type-${c.agreement_type}">${c.agreement_type==='recurring'?'Recurring':'Ad Hoc'}</span></div>
-        <div style="text-align:center">${c.projects.length}</div>
+        <div style="text-align:center">${s.totalTasks}</div>
         <div style="text-align:center"><span class="${s.outstandingTasks>0?(s.overdueTasks>0?'overdue':''):'completed'}" style="font-weight:600">${s.outstandingTasks}</span></div>
         <div>
           <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
@@ -400,7 +402,7 @@ function renderClients() {
         </div>
         <div class="client-actions" onclick="event.stopPropagation()">
           <button class="btn-icon" onclick="editClient(${c.id})" title="Edit">&#9998;</button>
-          <button class="btn-icon" onclick="openProjectModal(${c.id})" title="Add Project">+</button>
+          <button class="btn-icon" onclick="openTaskModal(${c.id})" title="Add Task">+</button>
           <button class="btn-icon" onclick="showClientTimeline(${c.id},'${esc(c.name)}')" title="Timeline">&#128200;</button>
           <button class="btn-icon" onclick="showClientHistory(${c.id},'${esc(c.name)}')" title="History">&#128337;</button>
           <button class="pin-btn ${isPinned('client',c.id)?'pinned':''}" onclick="togglePin('client',${c.id},event)" title="${isPinned('client',c.id)?'Unpin':'Pin'}">${isPinned('client',c.id)?'&#9733;':'&#9734;'}</button>
@@ -410,59 +412,17 @@ function renderClients() {
       </div>
       <div class="client-projects">
         <div class="client-projects-inner">
-          ${c.projects.map(p=>renderProject(p,c.id)).join('')}
-          ${renderArchivedProjects(c)}
-          <div style="padding:8px 16px"><button class="btn btn-ghost btn-sm" onclick="openProjectModal(${c.id})">+ Add Project</button></div>
+          ${active.map(t=>renderTask(t)).join('')}
+          ${!active.length?'<div style="padding:12px 16px;color:var(--text-secondary);font-size:13px">No active tasks</div>':''}
+          <div style="padding:6px 16px"><button class="btn btn-ghost btn-sm" onclick="openTaskModal(${c.id})">+ Add Task</button></div>
+          ${done.length?`<div style="padding:4px 16px"><button class="btn btn-ghost btn-sm" onclick="toggleCompletedTasks(${c.id})">${showDone?'&#9660;':'&#9654;'} ${done.length} completed</button>${showDone?done.map(t=>renderTask(t,true)).join(''):''}</div>`:''}
+          ${arch.length?`<div style="padding:4px 16px"><button class="btn btn-ghost btn-sm" onclick="toggleArchivedTasks(${c.id})">${showArch?'&#9660;':'&#9654;'} ${arch.length} archived</button>${showArch?arch.map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;opacity:0.5;font-size:13px"><span>${esc(t.title)}</span><button class="btn btn-ghost btn-sm" onclick="restoreTask(${t.id})">Restore</button></div>`).join(''):''}</div>`:''}
         </div>
       </div>
     </div>`;
   }).join('');
 }
 
-function renderArchivedProjects(c) {
-  if(!c.archivedProjects||!c.archivedProjects.length)return'';
-  const show=showArchivedProjects.has(c.id);
-  return `<div style="padding:4px 16px">
-    <button class="btn btn-ghost btn-sm" onclick="toggleArchivedProjects(${c.id})">${show?'&#9660;':'&#9654;'} ${c.archivedProjects.length} archived project${c.archivedProjects.length!==1?'s':''}</button>
-    ${show?c.archivedProjects.map(p=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;opacity:0.6"><span>${esc(p.name)}</span><button class="btn btn-ghost btn-sm" onclick="restoreProject(${p.id})">Restore</button></div>`).join(''):''}
-  </div>`;
-}
-
-function renderProject(p, cid) {
-  const ex=expandedProjects.has(p.id);
-  const myName=currentUser?.display_name||'';
-  const allTasks=myTasksFilter?p.tasks.filter(t=>t.assignee===myName):p.tasks;
-  const active=allTasks.filter(t=>t.progress!=='completed'&&t.progress!=='invoiced').sort((a,b)=>(b.is_pinned||0)-(a.is_pinned||0));
-  const done=allTasks.filter(t=>t.progress==='completed'||t.progress==='invoiced');
-  const arch=p.archivedTasks||[];
-  const showDone=showCompletedTasks.has(p.id), showArch=showArchivedTasks.has(p.id);
-  return `<div class="project-section ${ex?'expanded':''}" data-project-id="${p.id}">
-    <div class="project-header" onclick="toggleProject(${p.id})">
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:10px;transition:transform 0.2s;transform:rotate(${ex?'90':'0'}deg)">&#9654;</span>
-        <span style="font-weight:600">${esc(p.name)}</span>
-        <span class="status-badge status-${p.status}">${p.status}</span>
-        <span style="font-size:11px;color:var(--text-secondary)">${active.length} active${done.length?', '+done.length+' done':''}</span>
-      </div>
-      <div onclick="event.stopPropagation()" style="display:flex;gap:4px">
-        <button class="btn-icon" onclick="editProject(${p.id},${cid})" title="Edit">&#9998;</button>
-        <button class="btn-icon" onclick="duplicateProject(${p.id})" title="Duplicate">&#128203;</button>
-        <button class="btn-icon" onclick="completeProject(${p.id})" title="Mark Completed">&#10003;</button>
-        <button class="btn-icon" onclick="archiveProject(${p.id})" title="Archive">&#128230;</button>
-        ${currentUser?.role==='owner'?`<button class="btn-icon" onclick="deleteProject(${p.id})" title="Delete" style="color:var(--danger)">&#128465;</button>`:''}
-      </div>
-    </div>
-    <div class="project-tasks">
-      <div class="project-tasks-inner">
-        ${active.map(t=>renderTask(t)).join('')}
-        ${!active.length?'<div style="padding:12px 16px;color:var(--text-secondary);font-size:13px">No active tasks</div>':''}
-        <div style="padding:6px 16px"><button class="btn btn-ghost btn-sm" onclick="openTaskModal(${p.id})">+ Add Task</button></div>
-        ${done.length?`<div style="padding:4px 16px"><button class="btn btn-ghost btn-sm" onclick="toggleCompletedTasks(${p.id})">${showDone?'&#9660;':'&#9654;'} ${done.length} completed</button>${showDone?done.map(t=>renderTask(t,true)).join(''):''}</div>`:''}
-        ${arch.length?`<div style="padding:4px 16px"><button class="btn btn-ghost btn-sm" onclick="toggleArchivedTasks(${p.id})">${showArch?'&#9660;':'&#9654;'} ${arch.length} archived</button>${showArch?arch.map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;opacity:0.5;font-size:13px"><span>${esc(t.title)}</span><button class="btn btn-ghost btn-sm" onclick="restoreTask(${t.id})">Restore</button></div>`).join(''):''}</div>`:''}
-      </div>
-    </div>
-  </div>`;
-}
 
 function renderTask(t, isDone) {
   const dc=getDeadlineClass(t.deadline,t.progress);
@@ -505,8 +465,8 @@ async function inlineFieldChange(taskId, field, value) {
   body[field] = value;
   await api(`/api/tasks/${taskId}`, { method: 'PUT', body });
   // Update local data without full reload for snappier feel
-  for (const c of clients) for (const p of c.projects) {
-    const t = p.tasks.find(x => x.id === taskId);
+  for (const c of clients) {
+    const t = c.tasks.find(x => x.id === taskId);
     if (t) { t[field] = value; break; }
   }
 }
@@ -551,10 +511,7 @@ async function onDrop(e,targetId){
 
 // ─── Archive ────────────────────────────────────────────
 async function archiveClient(id){const c=clients.find(x=>x.id===id);if(!confirm(`Archive "${c?.name}"?`))return;await api(`/api/clients/${id}/archive`,{method:'PUT'});expandedClients.delete(id);await loadClients();}
-async function deleteClient(id){const c=clients.find(x=>x.id===id);const name=c?c.name:'this client';if(!confirm(`Permanently delete "${name}" and all its projects/tasks? This cannot be undone.`))return;if(!confirm(`Are you sure? This will delete ALL data for "${name}".`))return;await api(`/api/clients/${id}`,{method:'DELETE'});expandedClients.delete(id);await loadClients();}
-async function archiveProject(id){if(!confirm('Archive this project?'))return;await api(`/api/projects/${id}/archive`,{method:'PUT'});expandedProjects.delete(id);await loadClients();}
-async function completeProject(id){if(!confirm('Mark this project as completed?'))return;await api(`/api/projects/${id}`,{method:'PUT',body:{status:'completed'}});await loadClients();}
-async function deleteProject(id){let name='this project';for(const c of clients)for(const p of c.projects)if(p.id===id){name=p.name;break;}if(!confirm(`Permanently delete "${name}" and all its tasks? This cannot be undone.`))return;if(!confirm(`Are you sure? All tasks in "${name}" will be lost forever.`))return;await api(`/api/projects/${id}`,{method:'DELETE'});expandedProjects.delete(id);await loadClients();}
+async function deleteClient(id){const c=clients.find(x=>x.id===id);const name=c?c.name:'this client';if(!confirm(`Permanently delete "${name}" and all its tasks? This cannot be undone.`))return;if(!confirm(`Are you sure? This will delete ALL data for "${name}".`))return;await api(`/api/clients/${id}`,{method:'DELETE'});expandedClients.delete(id);await loadClients();}
 async function archiveTask(id){await api(`/api/tasks/${id}/archive`,{method:'PUT'});await loadClients();}
 async function deleteTask(id){const t=findTaskById(id);const title=t?t.title:'this task';if(!confirm(`Permanently delete "${title}"? This cannot be undone.`))return;await api(`/api/tasks/${id}`,{method:'DELETE'});await loadClients();}
 
@@ -599,15 +556,10 @@ function renderBatchBar() {
 }
 
 function openMoveModal() {
-  // Build a client → project tree for the picker
   let html = '<div class="form-error" id="moveFormError" style="display:none"></div>';
   html += '<div class="move-tree">';
   for (const c of clients) {
-    html += `<div class="move-client"><strong>${esc(c.name)}</strong>`;
-    for (const p of c.projects) {
-      html += `<label class="move-project-option"><input type="radio" name="moveTarget" value="${p.id}"> ${esc(p.name)}</label>`;
-    }
-    html += '</div>';
+    html += `<label class="move-project-option"><input type="radio" name="moveTarget" value="${c.id}"> <strong>${esc(c.name)}</strong> <span style="color:var(--text-secondary);font-size:12px">[${esc(c.code||'')}]</span></label>`;
   }
   html += '</div>';
   html += `<div class="form-actions" style="margin-top:16px">
@@ -621,7 +573,7 @@ function openMoveModal() {
     modal.id = 'moveModal';
     modal.className = 'modal';
     modal.style.maxWidth = '500px';
-    modal.innerHTML = `<div class="modal-header"><h2>Move Tasks to Project</h2><button class="modal-close" onclick="closeModal('moveModal')">&times;</button></div><div id="moveModalBody" style="padding:20px 28px"></div>`;
+    modal.innerHTML = `<div class="modal-header"><h2>Move Tasks to Client</h2><button class="modal-close" onclick="closeModal('moveModal')">&times;</button></div><div id="moveModalBody" style="padding:20px 28px"></div>`;
     document.body.appendChild(modal);
   }
   document.getElementById('moveModalBody').innerHTML = html;
@@ -632,14 +584,14 @@ async function executeBatchMove() {
   const selected = document.querySelector('input[name="moveTarget"]:checked');
   if (!selected) {
     const err = document.getElementById('moveFormError');
-    err.textContent = 'Select a destination project';
+    err.textContent = 'Select a destination client';
     err.style.display = 'block';
     return;
   }
   const targetId = +selected.value;
   const ids = [...selectedTasks];
   try {
-    const res = await api('/api/tasks/batch-move', { method: 'POST', body: { task_ids: ids, target_project_id: targetId } });
+    await api('/api/tasks/batch-move', { method: 'POST', body: { task_ids: ids, target_client_id: targetId } });
     closeModal('moveModal');
     clearTaskSelection();
     await loadClients();
@@ -670,7 +622,6 @@ async function batchDuplicate() {
   await loadClients();
 }
 
-async function restoreProject(id){await api(`/api/projects/${id}/archive`,{method:'PUT'});await loadClients();}
 async function restoreTask(id){await api(`/api/tasks/${id}/archive`,{method:'PUT'});await loadClients();}
 async function restoreClient(id){await api(`/api/clients/${id}/archive`,{method:'PUT'});await loadClients();await showArchiveModal();}
 async function permanentDeleteClient(id){if(!confirm('Permanently delete? Cannot be undone.'))return;await api(`/api/clients/${id}`,{method:'DELETE'});await loadClients();await showArchiveModal();}
@@ -730,50 +681,12 @@ document.getElementById('clientForm').addEventListener('submit',async e=>{
   finally { setSaving(btn, false); }
 });
 
-// ─── Project CRUD ───────────────────────────────────────
-function openProjectModal(cid){
-  document.getElementById('projectModalTitle').textContent='New Project';
-  document.getElementById('projectFormError').style.display='none';
-  document.getElementById('projectId').value='';
-  document.getElementById('projectClientId').value=cid;
-  document.getElementById('projectName').value='';
-  document.getElementById('projectStatus').value='active';
-  document.getElementById('projectNotes').value='';
-  openModal('projectModal');
-}
-function editProject(pid,cid){
-  const c=clients.find(x=>x.id===cid);const p=c?.projects.find(x=>x.id===pid);if(!p)return;
-  document.getElementById('projectModalTitle').textContent='Edit Project';
-  document.getElementById('projectFormError').style.display='none';
-  document.getElementById('projectId').value=p.id;
-  document.getElementById('projectClientId').value=cid;
-  document.getElementById('projectName').value=p.name;
-  document.getElementById('projectStatus').value=p.status;
-  document.getElementById('projectNotes').value=p.notes||'';
-  openModal('projectModal');
-}
-document.getElementById('projectForm').addEventListener('submit',async e=>{
-  e.preventDefault();
-  const errEl=document.getElementById('projectFormError');
-  errEl.style.display='none';
-  const id=document.getElementById('projectId').value;
-  const data={client_id:+document.getElementById('projectClientId').value,name:document.getElementById('projectName').value,status:document.getElementById('projectStatus').value,notes:document.getElementById('projectNotes').value};
-  if (!data.name.trim()) { errEl.textContent='Project name is required.'; errEl.style.display='block'; return; }
-  const btn=e.target.querySelector('[type="submit"]');
-  setSaving(btn, true);
-  try {
-    if(id)await api(`/api/projects/${id}`,{method:'PUT',body:data});else await api('/api/projects',{method:'POST',body:data});
-    closeModal('projectModal');await loadClients();
-  } catch(err) { errEl.textContent=err.message; errEl.style.display='block'; }
-  finally { setSaving(btn, false); }
-});
-
 // ─── Task CRUD ──────────────────────────────────────────
-function openTaskModal(pid){
+function openTaskModal(cid){
   document.getElementById('taskModalTitle').textContent='New Task';
   document.getElementById('taskFormError').style.display='none';
   ['taskId','taskTitle','taskDeadline','taskPlannedDate','taskEstHours','taskReferences','taskNotes'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('taskProjectId').value=pid;
+  document.getElementById('taskClientId').value=cid;
   document.getElementById('taskProgress').value='not-started';
   document.getElementById('taskPriority').value='medium';
   document.getElementById('taskRecurring').checked=false;
@@ -789,10 +702,10 @@ function openTaskModal(pid){
 }
 
 function findTaskById(id) {
-  for(const c of clients) for(const p of c.projects) {
-    let t = p.tasks.find(x=>x.id===id);
+  for(const c of clients) {
+    let t = c.tasks.find(x=>x.id===id);
     if(t) return t;
-    if(p.archivedTasks) { t = p.archivedTasks.find(x=>x.id===id); if(t) return t; }
+    if(c.archivedTasks) { t = c.archivedTasks.find(x=>x.id===id); if(t) return t; }
   }
   return null;
 }
@@ -803,7 +716,7 @@ function editTask(id){
   document.getElementById('taskModalTitle').textContent = 'Edit Task — ' + taskRef(t.id);
   document.getElementById('taskFormError').style.display='none';
   document.getElementById('taskId').value=t.id;
-  document.getElementById('taskProjectId').value=t.project_id;
+  document.getElementById('taskClientId').value=t.client_id;
   document.getElementById('taskTitle').value=t.title;
   document.getElementById('taskDeadline').value=t.deadline||'';
   document.getElementById('taskPlannedDate').value=t.planned_date||'';
@@ -844,7 +757,7 @@ document.getElementById('taskForm').addEventListener('submit',async e=>{
   const title=document.getElementById('taskTitle').value.trim();
   if (!title) { errEl.textContent='Task title is required.'; errEl.style.display='block'; return; }
   const data={
-    project_id:+document.getElementById('taskProjectId').value,
+    client_id:+document.getElementById('taskClientId').value,
     title,
     assignee:document.getElementById('taskAssignee').value,
     secondary_assignee:document.getElementById('taskSecondaryAssignee').value,
@@ -985,11 +898,9 @@ function renderMyTasksView() {
   // Gather all tasks for this user across all clients
   const allTasks = [];
   for (const c of clients) {
-    for (const p of c.projects) {
-      for (const t of p.tasks) {
-        if (t.assignee === myName || t.secondary_assignee === myName) {
-          allTasks.push({ ...t, project_name: p.name, client_name: c.name, client_code: c.code, client_logo: c.logo_url, client_id: c.id, project_id: p.id });
-        }
+    for (const t of c.tasks) {
+      if (t.assignee === myName || t.secondary_assignee === myName) {
+        allTasks.push({ ...t, client_name: c.name, client_code: c.code, client_logo: c.logo_url, client_id: c.id });
       }
     }
   }
@@ -1061,7 +972,7 @@ function renderMyTasksView() {
           ${isSignOff ? '<span style="font-size:10px;background:var(--warning);color:#000;padding:1px 5px;border-radius:3px;font-weight:600">Sign-off</span>' : ''}
           ${t.is_recurring?'<span class="recurring-badge" title="Recurring">&#8635;</span>':''}
         </div>
-        <div class="task-sub">${esc(t.project_name)}${t.notes ? ' &middot; ' + esc(t.notes.substring(0, 60)) : ''}</div>
+        <div class="task-sub">${t.notes ? esc(t.notes.substring(0, 60)) : ''}</div>
       </div>
       <div style="min-width:105px"><input type="date" class="inline-date ${dc}" value="${t.deadline||''}" onchange="inlineFieldChange(${t.id},'deadline',this.value)" onclick="event.stopPropagation()" title="Deadline"></div>
       <div style="min-width:105px"><input type="date" class="inline-date" value="${t.planned_date||''}" onchange="inlineFieldChange(${t.id},'planned_date',this.value)" onclick="event.stopPropagation()" title="Planned"></div>
@@ -1105,7 +1016,7 @@ async function rescheduleAll() {
 function getMyActiveTasks() {
   const myName = currentUser?.display_name || '';
   const tasks = [];
-  for (const c of clients) for (const p of c.projects) for (const t of p.tasks) {
+  for (const c of clients) for (const t of c.tasks) {
     if ((t.assignee === myName || t.secondary_assignee === myName) && t.progress !== 'completed' && t.progress !== 'invoiced') {
       tasks.push(t);
     }
@@ -1223,7 +1134,7 @@ if (searchInput) {
               ${t.archived ? '<span style="font-size:10px;color:var(--text-muted)">(archived)</span>' : ''}
             </div>
             <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">
-              ${esc(t.client_name)} → ${esc(t.project_name)} · ${esc(t.assignee || 'Unassigned')} · <span class="status-badge status-${t.progress}">${progressLabel(t.progress)}</span>
+              ${esc(t.client_name)} · ${esc(t.assignee || 'Unassigned')} · <span class="status-badge status-${t.progress}">${progressLabel(t.progress)}</span>
             </div>
           </div>
         `).join('');
@@ -1245,19 +1156,16 @@ function navigateToTaskFromSearch(taskId) {
   document.getElementById('taskSearch').value = '';
   // Try to find in loaded clients first
   for (const c of clients) {
-    for (const p of c.projects) {
-      const t = p.tasks.find(x => x.id === taskId);
-      if (t) {
-        if (currentView !== 'clients') document.querySelector('[data-view="clients"]').click();
-        expandedClients.add(c.id);
-        expandedProjects.add(p.id);
-        renderClients();
-        setTimeout(() => {
-          const el = document.querySelector(`[data-task-id="${taskId}"]`);
-          if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('highlight'); setTimeout(() => el.classList.remove('highlight'), 2000); }
-        }, 100);
-        return;
-      }
+    const t = c.tasks.find(x => x.id === taskId);
+    if (t) {
+      if (currentView !== 'clients') document.querySelector('[data-view="clients"]').click();
+      expandedClients.add(c.id);
+      renderClients();
+      setTimeout(() => {
+        const el = document.querySelector(`[data-task-id="${taskId}"]`);
+        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('highlight'); setTimeout(() => el.classList.remove('highlight'), 2000); }
+      }, 100);
+      return;
     }
   }
   // If not found in current view, just open the edit modal
@@ -1287,7 +1195,7 @@ async function loadTodayView(){
     html+=gTasks.map(t=>`<div class="today-task" onclick="editTask(${t.id})" style="cursor:pointer">
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:13px">${esc(t.title)}</div>
-        <div style="font-size:11px;color:var(--text-secondary)">${t.client_code?'['+esc(t.client_code)+'] ':''}${esc(t.client_name)} &rarr; ${esc(t.project_name)}</div>
+        <div style="font-size:11px;color:var(--text-secondary)">${t.client_code?'['+esc(t.client_code)+'] ':''}${esc(t.client_name)}</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
         <span class="priority-badge priority-${t.priority}"></span>
@@ -1299,15 +1207,11 @@ async function loadTodayView(){
     </div>`).join('');
     html+='</div>';
   }
-  // Build project options for quick-add
-  const projOpts = [];
-  for (const c of clients) for (const p of c.projects) if (!p.archived) projOpts.push({ id: p.id, label: `${c.code || c.name.substring(0,3)} / ${p.name}` });
-
   html += `<form class="today-quick-add" onsubmit="todayQuickAdd(event);return false;">
     <input type="text" id="todayQuickTitle" placeholder="Quick add task for this day..." required>
-    <select id="todayQuickProject" required style="min-width:160px">
-      <option value="">Project...</option>
-      ${projOpts.map(p => `<option value="${p.id}">${esc(p.label)}</option>`).join('')}
+    <select id="todayQuickClient" required style="min-width:160px">
+      <option value="">Client...</option>
+      ${clients.map(c => `<option value="${c.id}">${esc(c.code || c.name.substring(0,3))} — ${esc(c.name)}</option>`).join('')}
     </select>
     <button type="submit" class="btn btn-primary btn-sm">+ Add</button>
   </form>`;
@@ -1500,7 +1404,7 @@ function exportExcel() {
 
 async function restoreBackup(file) {
   if (!confirm(`RESTORE from backup "${file}"?\n\nThis will REPLACE all current data with the backup. This cannot be undone.\n\nAre you sure?`)) return;
-  if (!confirm('FINAL WARNING: All current tasks, projects, and comments will be overwritten. Continue?')) return;
+  if (!confirm('FINAL WARNING: All current tasks and comments will be overwritten. Continue?')) return;
   const res = await api('/api/backups/restore', { method: 'POST', body: { file } });
   if (res.success) {
     alert('Backup restored successfully. Reloading...');
@@ -1614,10 +1518,8 @@ async function loadFocusView() {
   // Get all tasks across clients
   const allTasks = [];
   for (const c of clients) {
-    for (const p of c.projects) {
-      for (const t of p.tasks) {
-        allTasks.push({ ...t, project_name: p.name, client_name: c.name, client_code: c.code });
-      }
+    for (const t of c.tasks) {
+      allTasks.push({ ...t, client_name: c.name, client_code: c.code });
     }
   }
   // Include tasks where user is primary OR secondary assignee (sign-off tasks)
@@ -1642,7 +1544,7 @@ async function loadFocusView() {
           <span style="font-weight:600;font-size:14px">${esc(t.title)}</span>
           ${fromLabel}
         </div>
-        <div class="focus-meta">${esc(t.client_code || '')} ${esc(t.client_name)} &rarr; ${esc(t.project_name)}${t.deadline ? ' &middot; Due ' + fmtDateShort(t.deadline) : ''}${t.secondary_assignee && !isSignOff ? ' &middot; +' + esc(t.secondary_assignee) : ''}</div>
+        <div class="focus-meta">${esc(t.client_code || '')} ${esc(t.client_name)}${t.deadline ? ' &middot; Due ' + fmtDateShort(t.deadline) : ''}${t.secondary_assignee && !isSignOff ? ' &middot; +' + esc(t.secondary_assignee) : ''}</div>
       </div>
       <div class="focus-actions">
         <select class="quick-status" onchange="quickStatusChange(${t.id},this.value).then(()=>loadFocusView())" onclick="event.stopPropagation()">
@@ -1813,9 +1715,6 @@ function renderPinnedDashboard() {
       label = c.name;
       icon = c.logo_url ? `<img src="${esc(c.logo_url)}" style="width:18px;height:18px;border-radius:4px;object-fit:cover">` : '';
       onclick = `toggleClient(${c.id});expandedClients.add(${c.id});renderClients();`;
-    } else if (pin.entity_type === 'project') {
-      for (const c of clients) { const p = c.projects.find(x => x.id === pin.entity_id); if (p) { label = p.name; onclick = `expandedClients.add(${c.id});expandedProjects.add(${p.id});renderClients();`; break; } }
-      if (!label) return '';
     } else if (pin.entity_type === 'task') {
       const t = findTaskById(pin.entity_id);
       if (!t) return '';
@@ -1872,22 +1771,15 @@ async function showClientTimeline(clientId, clientName) {
   openModal('timelineModal');
 }
 
-// ─── Duplicate Project ─────────────────────────────────
-async function duplicateProject(pid) {
-  if (!confirm('Duplicate this project with all its tasks?')) return;
-  await api(`/api/projects/${pid}/duplicate`, { method: 'POST' });
-  await loadClients();
-}
-
 // ─── Quick Add from Today View ─────────────────────────
 async function todayQuickAdd(e) {
   e.preventDefault();
   const title = document.getElementById('todayQuickTitle')?.value.trim();
-  const projectId = document.getElementById('todayQuickProject')?.value;
-  if (!title || !projectId) return;
+  const clientId = document.getElementById('todayQuickClient')?.value;
+  if (!title || !clientId) return;
   const date = document.getElementById('todayDate').value || localDateStr(new Date());
   const person = document.getElementById('todayPerson').value;
-  await api('/api/tasks', { method: 'POST', body: { project_id: +projectId, title, planned_date: date, assignee: person || '' } });
+  await api('/api/tasks', { method: 'POST', body: { client_id: +clientId, title, planned_date: date, assignee: person || '' } });
   document.getElementById('todayQuickTitle').value = '';
   await loadClients();
   await loadTodayView();
@@ -1911,10 +1803,8 @@ async function toggleTaskPin(taskId, event) {
     // Restore expanded state from localStorage
     try {
       const ec = JSON.parse(localStorage.getItem('nbm_expandedClients') || '[]');
-      const ep = JSON.parse(localStorage.getItem('nbm_expandedProjects') || '[]');
       ec.forEach(id => expandedClients.add(id));
-      ep.forEach(id => expandedProjects.add(id));
-      if (ec.length || ep.length) renderClients();
+      if (ec.length) renderClients();
     } catch {}
     document.getElementById('todayDate').value=localDateStr(new Date());
   } catch(e) {
@@ -2001,9 +1891,7 @@ function prettyToolLabel(name, input) {
   switch (name) {
     case 'create_task': return `Creating task "${input.title || ''}"`;
     case 'update_task': return `Updating task #${input.task_id}`;
-    case 'create_project': return `Creating project "${input.name || ''}"`;
     case 'list_clients': return 'Looking up clients';
-    case 'list_projects': return input.client_id ? `Listing projects for client #${input.client_id}` : 'Listing projects';
     case 'list_team_members': return 'Looking up team members';
     case 'search_tasks': return `Searching tasks: "${input.query}"`;
     case 'get_workload_summary': return 'Checking workload';
@@ -2052,7 +1940,7 @@ async function sendAIMessage() {
     showAIThinking(false);
     renderAIHistory();
     // If any tool mutated data, refresh the console
-    const didMutate = (resp.tool_calls || []).some(tc => ['create_task', 'update_task', 'create_project'].includes(tc.tool));
+    const didMutate = (resp.tool_calls || []).some(tc => ['create_task', 'update_task'].includes(tc.tool));
     if (didMutate) {
       try { await loadClients(); await loadWorkloadSummary(); } catch {}
     }

@@ -7,9 +7,8 @@ const router = Router();
 
 // ─── Task CRUD ────────────────────────────────────────
 
-// Helper: check if a project's parent client is private and user is not owner
-function checkPrivateClient(req, res, projectId) {
-  const row = db.prepare('SELECT c.is_private FROM projects p JOIN clients c ON p.client_id = c.id WHERE p.id = ?').get(projectId);
+function checkPrivateClient(req, res, clientId) {
+  const row = db.prepare('SELECT is_private FROM clients WHERE id = ?').get(clientId);
   if (row?.is_private && req.user.role !== 'owner') {
     res.status(403).json({ error: 'Access denied' });
     return false;
@@ -18,13 +17,13 @@ function checkPrivateClient(req, res, projectId) {
 }
 
 router.post('/', requireAuth, requireWrite, (req, res) => {
-  const { project_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit } = req.body;
-  if (!project_id || !title) return res.status(400).json({ error: 'project_id and title required' });
-  if (!checkPrivateClient(req, res, project_id)) return;
+  const { client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit } = req.body;
+  if (!client_id || !title) return res.status(400).json({ error: 'client_id and title required' });
+  if (!checkPrivateClient(req, res, client_id)) return;
 
   const result = db.prepare(
-    'INSERT INTO tasks (project_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(project_id, title, assignee || '', secondary_assignee || '', deadline || '', planned_date || '', estimated_hours || 0, priority || 'medium', references_text || '', notes || '', is_recurring ? 1 : 0, recur_interval || 0, recur_unit || '');
+    'INSERT INTO tasks (client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(client_id, title, assignee || '', secondary_assignee || '', deadline || '', planned_date || '', estimated_hours || 0, priority || 'medium', references_text || '', notes || '', is_recurring ? 1 : 0, recur_interval || 0, recur_unit || '');
 
   logActivity('task', result.lastInsertRowid, 'created', req.user.display_name, `Created task "${title}"`);
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid);
@@ -36,9 +35,8 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   let { title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, progress, priority, references_text, notes, is_recurring, recur_interval, recur_unit } = req.body;
   const old = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!old) return res.status(404).json({ error: 'Task not found' });
-  if (!checkPrivateClient(req, res, old.project_id)) return;
+  if (!checkPrivateClient(req, res, old.client_id)) return;
 
-  // Set completed_at when task is marked completed/invoiced, clear it if moved back
   let completedAt = undefined;
   if (progress && (progress === 'completed' || progress === 'invoiced') && old.progress !== 'completed' && old.progress !== 'invoiced') {
     completedAt = new Date().toISOString().split('T')[0];
@@ -46,16 +44,13 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
     completedAt = '';
   }
 
-  // Manager sign-off: when set to awaiting-manager, auto-tag the owner
   if (progress === 'awaiting-manager' && old.progress !== 'awaiting-manager') {
     const owner = db.prepare("SELECT display_name FROM users WHERE role='owner' LIMIT 1").get();
     if (owner && secondary_assignee === undefined) {
       secondary_assignee = owner.display_name;
     }
   }
-  // Clear secondary when manager signs off (moves away from awaiting-manager)
   if (progress && progress !== 'awaiting-manager' && old.progress === 'awaiting-manager' && secondary_assignee === undefined) {
-    // Only clear if the secondary was auto-set (is the owner)
     const owner = db.prepare("SELECT display_name FROM users WHERE role='owner' LIMIT 1").get();
     if (owner && old.secondary_assignee === owner.display_name) {
       secondary_assignee = '';
@@ -75,12 +70,11 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   if (deadline !== undefined && deadline !== old.deadline) changes.push('deadline changed');
   if (changes.length) logActivity('task', req.params.id, 'updated', req.user.display_name, changes.join(', '));
 
-  // Recurring: if completed and is recurring, create next occurrence
   if (progress === 'completed' && old.progress !== 'completed' && old.is_recurring && old.recur_interval > 0) {
     const nextDate = calculateNextDate(old.deadline || old.planned_date || new Date().toISOString().split('T')[0], old.recur_interval, old.recur_unit);
     const newTask = db.prepare(
-      'INSERT INTO tasks (project_id, title, assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(old.project_id, old.title, old.assignee, nextDate, nextDate, old.estimated_hours, old.priority, old.references_text, old.notes, 1, old.recur_interval, old.recur_unit);
+      'INSERT INTO tasks (client_id, title, assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(old.client_id, old.title, old.assignee, nextDate, nextDate, old.estimated_hours, old.priority, old.references_text, old.notes, 1, old.recur_interval, old.recur_unit);
     logActivity('task', newTask.lastInsertRowid, 'created', 'System', `Auto-created recurring task "${old.title}" (next: ${nextDate})`);
   }
 
@@ -103,24 +97,23 @@ function calculateNextDate(fromDate, interval, unit) {
 
 // ─── Batch Move Tasks ────────────────────────────────
 router.post('/batch-move', requireAuth, requireWrite, (req, res) => {
-  const { task_ids, target_project_id } = req.body;
-  if (!Array.isArray(task_ids) || !task_ids.length || !target_project_id) {
-    return res.status(400).json({ error: 'task_ids array and target_project_id required' });
+  const { task_ids, target_client_id } = req.body;
+  if (!Array.isArray(task_ids) || !task_ids.length || !target_client_id) {
+    return res.status(400).json({ error: 'task_ids array and target_client_id required' });
   }
-  // Verify target project exists and check privacy
-  const targetProj = db.prepare('SELECT p.*, c.name as client_name FROM projects p JOIN clients c ON p.client_id = c.id WHERE p.id = ?').get(target_project_id);
-  if (!targetProj) return res.status(404).json({ error: 'Target project not found' });
-  if (!checkPrivateClient(req, res, target_project_id)) return;
+  const targetClient = db.prepare('SELECT * FROM clients WHERE id = ?').get(target_client_id);
+  if (!targetClient) return res.status(404).json({ error: 'Target client not found' });
+  if (!checkPrivateClient(req, res, target_client_id)) return;
 
-  const update = db.prepare('UPDATE tasks SET project_id = ? WHERE id = ?');
+  const update = db.prepare('UPDATE tasks SET client_id = ? WHERE id = ?');
   const moved = [];
   db.transaction(() => {
     for (const id of task_ids) {
       const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
       if (!task) continue;
-      update.run(target_project_id, id);
+      update.run(target_client_id, id);
       moved.push(task.title);
-      logActivity('task', id, 'updated', req.user.display_name, `Moved to "${targetProj.name}" (${targetProj.client_name})`);
+      logActivity('task', id, 'updated', req.user.display_name, `Moved to "${targetClient.name}"`);
     }
   })();
 
@@ -137,7 +130,7 @@ router.delete('/:id', requireAuth, requireRole('owner'), (req, res) => {
 router.put('/:id/archive', requireAuth, requireWrite, (req, res) => {
   const t = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!t) return res.status(404).json({ error: 'Task not found' });
-  if (!checkPrivateClient(req, res, t.project_id)) return;
+  if (!checkPrivateClient(req, res, t.client_id)) return;
   const ns = t.archived ? 0 : 1;
   db.prepare('UPDATE tasks SET archived = ? WHERE id = ?').run(ns, req.params.id);
   logActivity('task', req.params.id, ns ? 'archived' : 'restored', req.user.display_name, `${ns ? 'Archived' : 'Restored'} "${t.title}"`);
@@ -147,9 +140,9 @@ router.put('/:id/archive', requireAuth, requireWrite, (req, res) => {
 // ─── Attachments ──────────────────────────────────────
 
 router.post('/:id/attachments', requireAuth, requireWrite, (req, res, next) => {
-  const t = db.prepare('SELECT project_id FROM tasks WHERE id = ?').get(req.params.id);
+  const t = db.prepare('SELECT client_id FROM tasks WHERE id = ?').get(req.params.id);
   if (!t) return res.status(404).json({ error: 'Task not found' });
-  if (!checkPrivateClient(req, res, t.project_id)) return;
+  if (!checkPrivateClient(req, res, t.client_id)) return;
   next();
 }, attachUpload.array('files', 10), (req, res) => {
   if (!req.files || !req.files.length) return res.status(400).json({ error: 'No files' });
@@ -163,10 +156,9 @@ router.post('/:id/attachments', requireAuth, requireWrite, (req, res, next) => {
   res.json(results);
 });
 
-// Mounted at /api/attachments/:id via server.js
 export function deleteAttachmentHandler(req, res) {
   const row = db.prepare(
-    'SELECT c.is_private FROM task_attachments a JOIN tasks t ON a.task_id = t.id JOIN projects p ON t.project_id = p.id JOIN clients c ON p.client_id = c.id WHERE a.id = ?'
+    'SELECT c.is_private FROM task_attachments a JOIN tasks t ON a.task_id = t.id JOIN clients c ON t.client_id = c.id WHERE a.id = ?'
   ).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Attachment not found' });
   if (row.is_private && req.user.role !== 'owner') return res.status(403).json({ error: 'Access denied' });
@@ -179,10 +171,9 @@ export function deleteAttachmentHandler(req, res) {
 router.post('/:id/comments', requireAuth, requireWrite, (req, res) => {
   const { content } = req.body;
   if (!content) return res.status(400).json({ error: 'Content required' });
-  const t = db.prepare('SELECT project_id FROM tasks WHERE id = ?').get(req.params.id);
+  const t = db.prepare('SELECT client_id FROM tasks WHERE id = ?').get(req.params.id);
   if (!t) return res.status(404).json({ error: 'Task not found' });
-  if (!checkPrivateClient(req, res, t.project_id)) return;
-  // Author derived from authenticated session, not client
+  if (!checkPrivateClient(req, res, t.client_id)) return;
   const author = req.user.display_name;
   const r = db.prepare('INSERT INTO comments (task_id, author, content) VALUES (?, ?, ?)').run(req.params.id, author, content);
   logActivity('task', req.params.id, 'commented', author, content.substring(0, 100));
@@ -198,9 +189,9 @@ router.get('/:id/checklist', requireAuth, (req, res) => {
 router.post('/:id/checklist', requireAuth, requireWrite, (req, res) => {
   const { label } = req.body;
   if (!label) return res.status(400).json({ error: 'Label required' });
-  const t = db.prepare('SELECT project_id FROM tasks WHERE id = ?').get(req.params.id);
+  const t = db.prepare('SELECT client_id FROM tasks WHERE id = ?').get(req.params.id);
   if (!t) return res.status(404).json({ error: 'Task not found' });
-  if (!checkPrivateClient(req, res, t.project_id)) return;
+  if (!checkPrivateClient(req, res, t.client_id)) return;
   const maxOrder = db.prepare('SELECT MAX(sort_order) as m FROM checklist_items WHERE task_id = ?').get(req.params.id)?.m || 0;
   const r = db.prepare('INSERT INTO checklist_items (task_id, label, sort_order) VALUES (?, ?, ?)').run(req.params.id, label, maxOrder + 1);
   res.json(db.prepare('SELECT * FROM checklist_items WHERE id = ?').get(r.lastInsertRowid));
@@ -234,11 +225,11 @@ router.put('/:id/pin', requireAuth, (req, res) => {
 router.post('/:id/duplicate', requireAuth, requireWrite, (req, res) => {
   const old = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!old) return res.status(404).json({ error: 'Task not found' });
-  if (!checkPrivateClient(req, res, old.project_id)) return;
+  if (!checkPrivateClient(req, res, old.client_id)) return;
 
   const r = db.prepare(
-    'INSERT INTO tasks (project_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(old.project_id, old.title + ' (copy)', old.assignee, old.secondary_assignee || '', old.deadline, old.planned_date, old.estimated_hours, old.priority, old.references_text, old.notes, old.is_recurring, old.recur_interval, old.recur_unit);
+    'INSERT INTO tasks (client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(old.client_id, old.title + ' (copy)', old.assignee, old.secondary_assignee || '', old.deadline, old.planned_date, old.estimated_hours, old.priority, old.references_text, old.notes, old.is_recurring, old.recur_interval, old.recur_unit);
 
   logActivity('task', r.lastInsertRowid, 'created', req.user.display_name, `Duplicated from "${old.title}"`);
   res.json(db.prepare('SELECT * FROM tasks WHERE id = ?').get(r.lastInsertRowid));
@@ -250,16 +241,15 @@ router.get('/summary', requireAuth, (req, res) => {
   const priv = isOwner ? '' : 'AND c.is_private = 0';
   const tasks = db.prepare(`
     SELECT t.assignee, t.estimated_hours, t.planned_date, t.deadline, t.progress, t.priority
-    FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id
+    FROM tasks t JOIN clients c ON t.client_id=c.id
     WHERE t.archived=0 AND t.progress NOT IN ('completed','invoiced') ${priv}
   `).all();
 
   const today = new Date().toISOString().split('T')[0];
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
-  // Week boundaries (Mon-Sun)
   const now = new Date();
-  const dayOfWeek = now.getDay(); // 0=Sun
+  const dayOfWeek = now.getDay();
   const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
   const weekStart = new Date(now);
   weekStart.setDate(now.getDate() + mondayOffset);
@@ -268,7 +258,6 @@ router.get('/summary', requireAuth, (req, res) => {
   const wsStr = weekStart.toISOString().split('T')[0];
   const weStr = weekEnd.toISOString().split('T')[0];
 
-  // Next week
   const nextWeekStart = new Date(weekEnd);
   nextWeekStart.setDate(weekEnd.getDate() + 1);
   const nextWeekEnd = new Date(nextWeekStart);
@@ -294,7 +283,6 @@ router.get('/summary', requireAuth, (req, res) => {
     if (d >= wsStr && d <= weStr) { thisWeekHours += h; thisWeekTasks++; }
     if (d >= nwsStr && d <= nweStr) { nextWeekHours += h; nextWeekTasks++; }
 
-    // Per-person breakdown
     const name = t.assignee || 'Unassigned';
     if (!byPerson[name]) byPerson[name] = { thisWeek: 0, nextWeek: 0, total: 0, tasks: 0 };
     byPerson[name].total += h;
@@ -303,9 +291,8 @@ router.get('/summary', requireAuth, (req, res) => {
     if (d >= nwsStr && d <= nweStr) byPerson[name].nextWeek += h;
   }
 
-  // Completed today — separate query since main query filters out completed tasks
   const completedToday = db.prepare(`
-    SELECT t.estimated_hours FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id
+    SELECT t.estimated_hours FROM tasks t JOIN clients c ON t.client_id=c.id
     WHERE t.archived=0 AND t.progress IN ('completed','invoiced') AND t.completed_at=? ${priv}
   `).all(today);
   const completedTodayHours = completedToday.reduce((s, t) => s + (t.estimated_hours || 0), 0);
@@ -324,13 +311,12 @@ router.get('/summary', requireAuth, (req, res) => {
 });
 
 // ─── Workload Detail ────────────────────────────────
-// Returns actual task lists for a given workload category or date
 router.get('/workload-detail', requireAuth, (req, res) => {
   const { category, date } = req.query;
   const isOwner = req.user.role === 'owner';
   const priv = isOwner ? '' : 'AND c.is_private = 0';
-  const baseSelect = `SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code
-    FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id
+  const baseSelect = `SELECT t.*, c.name as client_name, c.code as client_code
+    FROM tasks t JOIN clients c ON t.client_id=c.id
     WHERE t.archived=0 ${priv}`;
 
   const today = new Date().toISOString().split('T')[0];
@@ -347,7 +333,6 @@ router.get('/workload-detail', requireAuth, (req, res) => {
 
   let tasks;
   if (category === 'date' && date) {
-    // Show all tasks for a specific date — both planned and completed on that day
     const planned = db.prepare(`${baseSelect} AND t.progress NOT IN ('completed','invoiced') AND (t.planned_date=? OR t.deadline=?) ORDER BY t.assignee, t.priority`).all(date, date);
     const completed = db.prepare(`${baseSelect} AND t.progress IN ('completed','invoiced') AND t.completed_at=? ORDER BY t.assignee`).all(date);
     return res.json({ planned, completed });
@@ -377,8 +362,8 @@ router.get('/by-date', requireAuth, (req, res) => {
   const isOwner = req.user.role === 'owner';
   const priv = isOwner ? '' : 'AND c.is_private = 0';
   const q = assignee
-    ? db.prepare(`SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.planned_date=? AND t.assignee=? AND t.archived=0 ${priv} ORDER BY t.priority, t.sort_order`)
-    : db.prepare(`SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.planned_date=? AND t.archived=0 ${priv} ORDER BY t.assignee, t.priority, t.sort_order`);
+    ? db.prepare(`SELECT t.*, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN clients c ON t.client_id=c.id WHERE t.planned_date=? AND t.assignee=? AND t.archived=0 ${priv} ORDER BY t.priority, t.sort_order`)
+    : db.prepare(`SELECT t.*, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN clients c ON t.client_id=c.id WHERE t.planned_date=? AND t.archived=0 ${priv} ORDER BY t.assignee, t.priority, t.sort_order`);
   res.json(assignee ? q.all(d, assignee) : q.all(d));
 });
 
@@ -388,8 +373,8 @@ router.get('/calendar', requireAuth, (req, res) => {
   const isOwner = req.user.role === 'owner';
   const priv = isOwner ? '' : 'AND c.is_private = 0';
   const q = assignee
-    ? db.prepare(`SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.archived=0 AND t.assignee=? AND (t.planned_date BETWEEN ? AND ? OR t.deadline BETWEEN ? AND ?) ${priv} ORDER BY t.planned_date, t.deadline`)
-    : db.prepare(`SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.archived=0 AND (t.planned_date BETWEEN ? AND ? OR t.deadline BETWEEN ? AND ?) ${priv} ORDER BY t.planned_date, t.deadline`);
+    ? db.prepare(`SELECT t.*, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN clients c ON t.client_id=c.id WHERE t.archived=0 AND t.assignee=? AND (t.planned_date BETWEEN ? AND ? OR t.deadline BETWEEN ? AND ?) ${priv} ORDER BY t.planned_date, t.deadline`)
+    : db.prepare(`SELECT t.*, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN clients c ON t.client_id=c.id WHERE t.archived=0 AND (t.planned_date BETWEEN ? AND ? OR t.deadline BETWEEN ? AND ?) ${priv} ORDER BY t.planned_date, t.deadline`);
   res.json(assignee ? q.all(assignee, start, end, start, end) : q.all(start, end, start, end));
 });
 
@@ -405,9 +390,9 @@ router.get('/search', requireAuth, (req, res) => {
   let tasks;
   if (refMatch) {
     const taskId = parseInt(refMatch[1]);
-    tasks = db.prepare(`SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE t.id=? ${priv}`).all(taskId);
+    tasks = db.prepare(`SELECT t.*, c.name as client_name, c.code as client_code FROM tasks t JOIN clients c ON t.client_id=c.id WHERE t.id=? ${priv}`).all(taskId);
   } else {
-    tasks = db.prepare(`SELECT t.*, p.name as project_name, c.name as client_name, c.code as client_code FROM tasks t JOIN projects p ON t.project_id=p.id JOIN clients c ON p.client_id=c.id WHERE (t.title LIKE ? OR t.notes LIKE ? OR t.assignee LIKE ?) ${priv} ORDER BY t.archived ASC, t.created_at DESC LIMIT 20`).all(`%${q}%`, `%${q}%`, `%${q}%`);
+    tasks = db.prepare(`SELECT t.*, c.name as client_name, c.code as client_code FROM tasks t JOIN clients c ON t.client_id=c.id WHERE (t.title LIKE ? OR t.notes LIKE ? OR t.assignee LIKE ?) ${priv} ORDER BY t.archived ASC, t.created_at DESC LIMIT 20`).all(`%${q}%`, `%${q}%`, `%${q}%`);
   }
   res.json(tasks);
 });

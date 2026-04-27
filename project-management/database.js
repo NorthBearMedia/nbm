@@ -164,6 +164,26 @@ try { db.exec("ALTER TABLE users ADD COLUMN password_salt TEXT DEFAULT ''"); } c
 try { db.exec('ALTER TABLE tasks ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0'); } catch {}
 try { db.exec("ALTER TABLE tasks ADD COLUMN completed_at TEXT DEFAULT ''"); } catch {}
 try { db.exec("ALTER TABLE tasks ADD COLUMN secondary_assignee TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE tasks ADD COLUMN client_id INTEGER DEFAULT NULL"); } catch {}
+
+// Backfill client_id from projects for tasks that don't have it yet
+try {
+  const unfilled = db.prepare("SELECT count(*) as c FROM tasks WHERE client_id IS NULL AND project_id IS NOT NULL").get().c;
+  if (unfilled > 0) {
+    db.prepare("UPDATE tasks SET client_id = (SELECT client_id FROM projects WHERE projects.id = tasks.project_id) WHERE client_id IS NULL AND project_id IS NOT NULL").run();
+    console.log(`[DB] Backfilled client_id for ${unfilled} tasks from projects`);
+  }
+  const orphans = db.prepare("SELECT count(*) as c FROM tasks WHERE client_id IS NULL").get().c;
+  if (orphans > 0) {
+    const firstClient = db.prepare("SELECT id FROM clients ORDER BY id LIMIT 1").get();
+    if (firstClient) {
+      db.prepare("UPDATE tasks SET client_id = ? WHERE client_id IS NULL").run(firstClient.id);
+      console.log(`[DB] Assigned ${orphans} orphaned tasks to client #${firstClient.id}`);
+    }
+  }
+} catch (err) {
+  console.error('[DB] client_id backfill error:', err.message);
+}
 
 // Backfill completed_at from activity log for tasks completed before the column existed
 try {

@@ -5,7 +5,6 @@ import { logActivity } from '../lib/activity.js';
 
 const router = Router();
 
-// Helper: load client and block non-owners from private clients
 function requireClientAccess(req, res) {
   const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
   if (!client) { res.status(404).json({ error: 'Client not found' }); return null; }
@@ -26,10 +25,8 @@ router.get('/', requireAuth, (req, res) => {
     clients = db.prepare(`SELECT * FROM clients WHERE 1=1 ${arc} ${privateFilter} ORDER BY sort_order, name`).all();
   }
 
-  const projectsStmt = db.prepare('SELECT * FROM projects WHERE client_id = ? AND archived = 0 ORDER BY sort_order, name');
-  const archivedProjectsStmt = db.prepare('SELECT * FROM projects WHERE client_id = ? AND archived = 1 ORDER BY sort_order, name');
-  const tasksStmt = db.prepare('SELECT * FROM tasks WHERE project_id = ? AND archived = 0 ORDER BY sort_order, created_at');
-  const archivedTasksStmt = db.prepare('SELECT * FROM tasks WHERE project_id = ? AND archived = 1 ORDER BY sort_order, created_at');
+  const tasksStmt = db.prepare('SELECT * FROM tasks WHERE client_id = ? AND archived = 0 ORDER BY sort_order, created_at');
+  const archivedTasksStmt = db.prepare('SELECT * FROM tasks WHERE client_id = ? AND archived = 1 ORDER BY sort_order, created_at');
   const commentsStmt = db.prepare('SELECT * FROM comments WHERE task_id = ? ORDER BY created_at DESC');
   const attachStmt = db.prepare('SELECT * FROM task_attachments WHERE task_id = ? ORDER BY created_at DESC');
 
@@ -37,27 +34,23 @@ router.get('/', requireAuth, (req, res) => {
   const doneStatuses = ['completed', 'invoiced'];
 
   for (const client of clients) {
-    client.projects = projectsStmt.all(client.id);
-    client.archivedProjects = archivedProjectsStmt.all(client.id);
+    client.tasks = tasksStmt.all(client.id);
+    client.archivedTasks = archivedTasksStmt.all(client.id);
     let totalTasks = 0, completedTasks = 0, overdueTasks = 0, inProgressTasks = 0, blockedTasks = 0, awaitingManager = 0;
 
-    for (const project of [...client.projects, ...client.archivedProjects]) {
-      project.tasks = tasksStmt.all(project.id);
-      project.archivedTasks = archivedTasksStmt.all(project.id);
-      for (const task of [...project.tasks, ...project.archivedTasks]) {
-        task.comments = commentsStmt.all(task.id);
-        task.attachments = attachStmt.all(task.id);
-      }
-      if (!project.archived) {
-        for (const task of project.tasks) {
-          totalTasks++;
-          if (doneStatuses.includes(task.progress)) completedTasks++;
-          if (task.progress === 'in-progress') inProgressTasks++;
-          if (task.progress === 'stuck') blockedTasks++;
-          if (task.progress === 'awaiting-manager') awaitingManager++;
-          if (task.deadline && task.deadline < now && !doneStatuses.includes(task.progress)) overdueTasks++;
-        }
-      }
+    for (const task of client.tasks) {
+      task.comments = commentsStmt.all(task.id);
+      task.attachments = attachStmt.all(task.id);
+      totalTasks++;
+      if (doneStatuses.includes(task.progress)) completedTasks++;
+      if (task.progress === 'in-progress') inProgressTasks++;
+      if (task.progress === 'stuck') blockedTasks++;
+      if (task.progress === 'awaiting-manager') awaitingManager++;
+      if (task.deadline && task.deadline < now && !doneStatuses.includes(task.progress)) overdueTasks++;
+    }
+    for (const task of client.archivedTasks) {
+      task.comments = commentsStmt.all(task.id);
+      task.attachments = attachStmt.all(task.id);
     }
     client.stats = { totalTasks, completedTasks, overdueTasks, inProgressTasks, blockedTasks, awaitingManager, outstandingTasks: totalTasks - completedTasks };
   }
@@ -79,7 +72,6 @@ router.post('/', requireAuth, requireWrite, (req, res) => {
   res.json(db.prepare('SELECT * FROM clients WHERE id = ?').get(result.lastInsertRowid));
 });
 
-// Must be before /:id routes
 router.put('/reorder', requireAuth, requireWrite, (req, res) => {
   const { order } = req.body;
   if (!Array.isArray(order)) return res.status(400).json({ error: 'order must be an array' });
@@ -139,14 +131,9 @@ router.get('/:id/history', requireAuth, (req, res) => {
   if (!client) return res.status(404).json({ error: 'Client not found' });
   if (client.is_private && req.user.role !== 'owner') return res.status(403).json({ error: 'Access denied' });
   const limit = Math.min(parseInt(req.query.limit) || 100, 500);
-  const pids = db.prepare('SELECT id FROM projects WHERE client_id = ?').all(cid).map(p => p.id);
-  let tids = [];
-  if (pids.length > 0) {
-    tids = db.prepare(`SELECT id FROM tasks WHERE project_id IN (${pids.map(() => '?').join(',')})`).all(...pids).map(t => t.id);
-  }
+  const tids = db.prepare('SELECT id FROM tasks WHERE client_id = ?').all(cid).map(t => t.id);
   const conds = ["(entity_type='client' AND entity_id=?)"];
   const params = [cid];
-  if (pids.length) { conds.push(`(entity_type='project' AND entity_id IN (${pids.map(() => '?').join(',')}))`); params.push(...pids); }
   if (tids.length) { conds.push(`(entity_type='task' AND entity_id IN (${tids.map(() => '?').join(',')}))`); params.push(...tids); }
   params.push(limit);
   res.json(db.prepare(`SELECT * FROM activity_log WHERE ${conds.join(' OR ')} ORDER BY created_at DESC LIMIT ?`).all(...params));

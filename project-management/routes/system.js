@@ -14,7 +14,6 @@ router.get('/api/health', (req, res) => {
     db.prepare('SELECT 1').get();
     const counts = {
       clients: db.prepare('SELECT count(*) as c FROM clients').get().c,
-      projects: db.prepare('SELECT count(*) as c FROM projects').get().c,
       tasks: db.prepare('SELECT count(*) as c FROM tasks').get().c,
     };
     res.json({ status: 'ok', timestamp: new Date().toISOString(), counts });
@@ -83,33 +82,22 @@ router.get('/api/clients/:id/timeline', requireAuth, (req, res) => {
   if (client.is_private && req.user.role !== 'owner') return res.status(403).json({ error: 'Access denied' });
 
   const limit = Math.min(parseInt(req.query.limit) || 50, 200);
-  // Get project IDs for this client
-  const pids = db.prepare('SELECT id FROM projects WHERE client_id = ?').all(cid).map(p => p.id);
-  if (!pids.length) return res.json([]);
+  const tids = db.prepare('SELECT id FROM tasks WHERE client_id = ?').all(cid).map(t => t.id);
 
-  // Get task IDs
-  const tids = db.prepare(`SELECT id FROM tasks WHERE project_id IN (${pids.map(() => '?').join(',')})`).all(...pids).map(t => t.id);
-
-  // Build timeline from activity_log — filter to meaningful actions
   const conds = [];
   const params = [];
   conds.push("(entity_type='client' AND entity_id=?)");
   params.push(cid);
-  if (pids.length) { conds.push(`(entity_type='project' AND entity_id IN (${pids.map(() => '?').join(',')}))`); params.push(...pids); }
   if (tids.length) { conds.push(`(entity_type='task' AND entity_id IN (${tids.map(() => '?').join(',')}))`); params.push(...tids); }
   params.push(limit);
 
   const logs = db.prepare(`SELECT * FROM activity_log WHERE (${conds.join(' OR ')}) AND action IN ('created','completed','updated','archived','restored','commented','deleted') ORDER BY created_at DESC LIMIT ?`).all(...params);
 
-  // Enrich with entity names
   const enriched = logs.map(l => {
     let entityName = '';
     if (l.entity_type === 'task') {
       const t = db.prepare('SELECT title FROM tasks WHERE id = ?').get(l.entity_id);
       entityName = t?.title || 'Deleted task';
-    } else if (l.entity_type === 'project') {
-      const p = db.prepare('SELECT name FROM projects WHERE id = ?').get(l.entity_id);
-      entityName = p?.name || 'Deleted project';
     }
     return { ...l, entity_name: entityName };
   });
@@ -122,40 +110,22 @@ router.get('/api/export/excel', requireAuth, (req, res) => {
   const isOwner = req.user.role === 'owner';
   const priv = isOwner ? '' : 'AND c.is_private = 0';
 
-  // All active tasks (not completed/invoiced) with client + project info
   const tasks = db.prepare(`
     SELECT t.id, t.title, t.assignee, t.secondary_assignee, t.deadline, t.planned_date,
            t.estimated_hours, t.progress, t.priority, t.notes, t.references_text,
            t.is_recurring, t.created_at,
-           p.name as project_name, p.status as project_status,
            c.name as client_name, c.code as client_code, c.agreement_type
     FROM tasks t
-    JOIN projects p ON t.project_id = p.id
-    JOIN clients c ON p.client_id = c.id
+    JOIN clients c ON t.client_id = c.id
     WHERE t.archived = 0 AND t.progress NOT IN ('completed', 'invoiced')
     ${priv}
-    ORDER BY c.name, p.name, t.priority, t.deadline
+    ORDER BY c.name, t.priority, t.deadline
   `).all();
 
-  // All active projects
-  const projects = db.prepare(`
-    SELECT p.id, p.name, p.status, p.created_at,
-           c.name as client_name, c.code as client_code,
-           (SELECT count(*) FROM tasks t WHERE t.project_id = p.id AND t.archived = 0 AND t.progress NOT IN ('completed','invoiced')) as active_tasks,
-           (SELECT count(*) FROM tasks t WHERE t.project_id = p.id AND t.archived = 0 AND t.progress IN ('completed','invoiced')) as completed_tasks,
-           (SELECT COALESCE(sum(t.estimated_hours), 0) FROM tasks t WHERE t.project_id = p.id AND t.archived = 0 AND t.progress NOT IN ('completed','invoiced')) as total_hours
-    FROM projects p
-    JOIN clients c ON p.client_id = c.id
-    WHERE p.archived = 0 ${priv}
-    ORDER BY c.name, p.name
-  `).all();
-
-  // All active clients
   const clientRows = db.prepare(`
     SELECT c.id, c.name, c.code, c.agreement_type, c.notes, c.gmail_link, c.drive_link, c.created_at,
-           (SELECT count(*) FROM projects p WHERE p.client_id = c.id AND p.archived = 0) as active_projects,
-           (SELECT count(*) FROM tasks t JOIN projects p ON t.project_id = p.id WHERE p.client_id = c.id AND t.archived = 0 AND t.progress NOT IN ('completed','invoiced')) as active_tasks,
-           (SELECT COALESCE(sum(t.estimated_hours), 0) FROM tasks t JOIN projects p ON t.project_id = p.id WHERE p.client_id = c.id AND t.archived = 0 AND t.progress NOT IN ('completed','invoiced')) as total_hours
+           (SELECT count(*) FROM tasks t WHERE t.client_id = c.id AND t.archived = 0 AND t.progress NOT IN ('completed','invoiced')) as active_tasks,
+           (SELECT COALESCE(sum(t.estimated_hours), 0) FROM tasks t WHERE t.client_id = c.id AND t.archived = 0 AND t.progress NOT IN ('completed','invoiced')) as total_hours
     FROM clients c
     WHERE c.archived = 0 ${priv}
     ORDER BY c.name
@@ -163,12 +133,10 @@ router.get('/api/export/excel', requireAuth, (req, res) => {
 
   const wb = XLSX.utils.book_new();
 
-  // --- Tasks sheet ---
   const taskRows = tasks.map(t => ({
     'Ref': 'NB' + String(t.id).padStart(3, '0'),
     'Client': t.client_name,
     'Client Code': t.client_code || '',
-    'Project': t.project_name,
     'Task': t.title,
     'Assigned To': t.assignee || '',
     'Also Assigned': t.secondary_assignee || '',
@@ -183,31 +151,13 @@ router.get('/api/export/excel', requireAuth, (req, res) => {
     'Created': t.created_at ? t.created_at.split('T')[0].split(' ')[0] : '',
   }));
   const wsTask = XLSX.utils.json_to_sheet(taskRows);
-  // Auto-width columns
   wsTask['!cols'] = Object.keys(taskRows[0] || {}).map(k => ({ wch: Math.max(k.length, 12) }));
   XLSX.utils.book_append_sheet(wb, wsTask, 'Tasks');
 
-  // --- Projects sheet ---
-  const projRows = projects.map(p => ({
-    'Client': p.client_name,
-    'Client Code': p.client_code || '',
-    'Project': p.name,
-    'Status': p.status || '',
-    'Active Tasks': p.active_tasks,
-    'Completed Tasks': p.completed_tasks,
-    'Total Hours (Active)': p.total_hours,
-    'Created': p.created_at ? p.created_at.split('T')[0].split(' ')[0] : '',
-  }));
-  const wsProj = XLSX.utils.json_to_sheet(projRows);
-  wsProj['!cols'] = Object.keys(projRows[0] || {}).map(k => ({ wch: Math.max(k.length, 12) }));
-  XLSX.utils.book_append_sheet(wb, wsProj, 'Projects');
-
-  // --- Clients sheet ---
   const cRows = clientRows.map(c => ({
     'Client': c.name,
     'Code': c.code || '',
     'Type': c.agreement_type,
-    'Active Projects': c.active_projects,
     'Active Tasks': c.active_tasks,
     'Total Hours (Active)': c.total_hours,
     'Notes': c.notes || '',
@@ -219,7 +169,6 @@ router.get('/api/export/excel', requireAuth, (req, res) => {
   wsCli['!cols'] = Object.keys(cRows[0] || {}).map(k => ({ wch: Math.max(k.length, 12) }));
   XLSX.utils.book_append_sheet(wb, wsCli, 'Clients');
 
-  // Generate buffer and send
   const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
   const ts = new Date().toISOString().split('T')[0];
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -260,7 +209,6 @@ export function createBackupRoutes(backupDir, backupFn) {
     res.json({ success: true, message: 'Backup started' });
   });
 
-  // Download a backup file (for off-site storage)
   r.get('/api/backups/download/:file', requireAuth, (req, res) => {
     if (req.user.role !== 'owner') return res.status(403).json({ error: 'Owner only' });
     const file = req.params.file;
@@ -276,7 +224,6 @@ export function createBackupRoutes(backupDir, backupFn) {
     res.download(backupPath, file);
   });
 
-  // Restore tasks, projects, comments etc from a backup file
   r.post('/api/backups/restore', requireAuth, (req, res) => {
     if (req.user.role !== 'owner') return res.status(403).json({ error: 'Owner only' });
     const { file } = req.body;
