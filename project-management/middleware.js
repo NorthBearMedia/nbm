@@ -86,7 +86,7 @@ export function securityHeaders(req, res, next) {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(self), geolocation=()');
   if (process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV === 'production') {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
@@ -164,6 +164,16 @@ export const avatarUpload = multer({
   }),
   limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: imageFilter,
+});
+
+export const aiMediaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'audio/webm', 'audio/mp4', 'audio/mpeg', 'audio/ogg', 'audio/wav'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only image or audio files are allowed'), false);
+  },
 });
 
 // ─── Password Validation ──────────────────────────────

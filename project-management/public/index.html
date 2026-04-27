@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>North Bear Console</title>
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=52">
+  <link rel="stylesheet" href="styles.css?v=53">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -327,13 +327,17 @@
       <button class="ai-chip" onclick="sendAIPrompt('Give me a workload summary for the team.')">Team workload</button>
       <button class="ai-chip" onclick="sendAIPrompt('Create a task for me: ')">Create a task...</button>
     </div>
+    <div id="aiMediaPreview" class="ai-media-preview" style="display:none"></div>
     <form id="aiForm" class="ai-input-row" onsubmit="event.preventDefault();sendAIMessage()">
+      <input type="file" id="aiImageInput" accept="image/*" style="display:none" onchange="handleAIImageSelect(this)">
+      <button type="button" class="ai-media-btn" id="aiImageBtn" onclick="document.getElementById('aiImageInput').click()" title="Send image">&#128247;</button>
+      <button type="button" class="ai-media-btn" id="aiMicBtn" onclick="toggleVoiceRecording()" title="Voice note">&#127908;</button>
       <textarea id="aiInput" placeholder="Ask The Bear to create tasks, plan your week, find something..." rows="1"></textarea>
       <button type="submit" class="ai-send" id="aiSendBtn" title="Send">&#10148;</button>
     </form>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=52"></script>
+  <script src="app.js?v=53"></script>
 </body>
 </html>

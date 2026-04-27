@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
 import db from '../database.js';
-import { requireAuth, requireWrite } from '../middleware.js';
+import { requireAuth, requireWrite, aiMediaUpload } from '../middleware.js';
 import { logActivity } from '../lib/activity.js';
 
 const router = Router();
@@ -232,7 +232,13 @@ Guidelines:
 - After creating items, confirm briefly with the NB### reference number.
 - If a request is ambiguous (e.g. which client), ask a short clarifying question before acting.
 - Do not invent clients — always look them up first. If one doesn't exist, tell the user and suggest creating it.
-- Priority guide: "critical" = must-do-now blocker, "high" = time-sensitive, "medium" = default, "low" = nice-to-have.`;
+- Priority guide: "critical" = must-do-now blocker, "high" = time-sensitive, "medium" = default, "low" = nice-to-have.
+
+Voice / Image input:
+- When the user sends a voice transcription or an image, interpret the content and present your understanding as a clear summary BEFORE creating any tasks.
+- For voice notes: extract the tasks/intentions, list them out with proposed client, assignee, deadline, and priority, then ask "Shall I go ahead and create these?" Wait for confirmation before using create_task.
+- For images (e.g. screenshots of briefs, whiteboards, task lists): describe what you see, extract actionable items, propose tasks, then ask for confirmation before creating them.
+- Only proceed to create tasks after the user confirms or says something like "yes", "go ahead", "do it", "looks good".`;
 }
 
 router.post('/api/ai/chat', requireAuth, requireWrite, async (req, res) => {
@@ -299,6 +305,92 @@ router.post('/api/ai/chat', requireAuth, requireWrite, async (req, res) => {
     });
   } catch (err) {
     console.error('[AI]', err);
+    return res.status(500).json({ error: err.message || 'AI request failed' });
+  }
+});
+
+router.post('/api/ai/chat-media', requireAuth, requireWrite, (req, res, next) => {
+  aiMediaUpload.single('media')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+}, async (req, res) => {
+  const c = getClient();
+  if (!c) return res.status(503).json({ error: 'AI assistant unavailable' });
+
+  let history;
+  try { history = JSON.parse(req.body.messages || '[]'); } catch { history = []; }
+  const text = req.body.text || '';
+  const mediaType = req.body.mediaType || '';
+
+  const userContent = [];
+
+  if (req.file) {
+    const base64 = req.file.buffer.toString('base64');
+    const mime = req.file.mimetype;
+    if (mime.startsWith('image/')) {
+      userContent.push({ type: 'image', source: { type: 'base64', media_type: mime, data: base64 } });
+      userContent.push({ type: 'text', text: text || 'I sent you an image. Please interpret it and suggest tasks based on what you see.' });
+    } else {
+      userContent.push({ type: 'text', text: `[Voice transcription]: ${text || '(no transcription available)'}` });
+    }
+  } else if (text) {
+    userContent.push({ type: 'text', text });
+  } else {
+    return res.status(400).json({ error: 'No media or text provided' });
+  }
+
+  const conversation = history.map(m => {
+    if (m.role === 'user' && typeof m.content === 'string') return { role: 'user', content: m.content };
+    if (m.role === 'assistant' && Array.isArray(m.content)) return { role: 'assistant', content: m.content };
+    if (m.role === 'user' && Array.isArray(m.content)) return { role: 'user', content: m.content };
+    return null;
+  }).filter(Boolean);
+
+  conversation.push({ role: 'user', content: userContent });
+
+  const toolLog = [];
+
+  try {
+    let iteration = 0;
+    const maxIterations = 15;
+
+    while (iteration++ < maxIterations) {
+      const response = await c.messages.create({
+        model: 'claude-opus-4-6',
+        max_tokens: 8192,
+        system: buildSystemPrompt(req.user),
+        tools: TOOLS,
+        messages: conversation,
+        thinking: { type: 'adaptive' }
+      });
+
+      conversation.push({ role: 'assistant', content: response.content });
+
+      if (response.stop_reason !== 'tool_use') {
+        const textOut = response.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+        return res.json({
+          reply: textOut,
+          assistant_content: response.content,
+          user_content: userContent,
+          tool_calls: toolLog,
+          usage: response.usage
+        });
+      }
+
+      const toolUses = response.content.filter(b => b.type === 'tool_use');
+      const toolResults = [];
+      for (const tu of toolUses) {
+        const result = executeTool(tu.name, tu.input || {}, req.user);
+        toolLog.push({ tool: tu.name, input: tu.input, result });
+        toolResults.push({ type: 'tool_result', tool_use_id: tu.id, content: JSON.stringify(result) });
+      }
+      conversation.push({ role: 'user', content: toolResults });
+    }
+
+    return res.json({ reply: 'Stopped after maximum tool iterations.', tool_calls: toolLog });
+  } catch (err) {
+    console.error('[AI media]', err);
     return res.status(500).json({ error: err.message || 'AI request failed' });
   }
 });

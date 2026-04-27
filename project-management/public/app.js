@@ -1696,6 +1696,11 @@ async function toggleTaskPin(taskId, event) {
 let aiHistory = [];      // Full message list sent to API (role + content arrays)
 let aiAvailable = false;
 let aiBusy = false;
+let aiPendingImage = null;   // { file, dataUrl }
+let aiRecording = false;
+let aiMediaRecorder = null;
+let aiAudioChunks = [];
+let aiSpeechRecognition = null;
 
 async function checkAIAvailable() {
   try {
@@ -1733,6 +1738,8 @@ function renderAIEmpty() {
 
 function resetAIChat() {
   aiHistory = [];
+  clearAIMedia();
+  if (aiRecording) stopVoiceRecording();
   renderAIEmpty();
   document.getElementById('aiSuggestions').style.display = '';
 }
@@ -1742,9 +1749,19 @@ function renderAIHistory() {
   box.innerHTML = '';
   for (const m of aiHistory) {
     if (m.role === 'user' && typeof m.content === 'string') {
-      box.insertAdjacentHTML('beforeend', `<div class="ai-msg ai-msg-user">${esc(m.content)}</div>`);
+      let html = '';
+      if (m._media === 'image') html = '<div class="ai-media-tag">&#128247; Image attached</div>';
+      else if (m._media === 'audio') html = '<div class="ai-media-tag">&#127908; Voice note</div>';
+      box.insertAdjacentHTML('beforeend', `<div class="ai-msg ai-msg-user">${html}${esc(m.content)}</div>`);
+    } else if (m.role === 'user' && Array.isArray(m.content)) {
+      let html = '';
+      for (const block of m.content) {
+        if (block.type === 'image') html += '<div class="ai-media-tag">&#128247; Image attached</div>';
+        else if (block.type === 'text' && block.text.startsWith('[Voice transcription]')) html += '<div class="ai-media-tag">&#127908; Voice note</div>';
+        if (block.type === 'text') html += esc(block.text);
+      }
+      box.insertAdjacentHTML('beforeend', `<div class="ai-msg ai-msg-user">${html}</div>`);
     } else if (m.role === 'assistant' && Array.isArray(m.content)) {
-      // Render text blocks; tool_use blocks render as a small audit trail line
       const texts = m.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
       const tools = m.content.filter(b => b.type === 'tool_use');
       if (tools.length) {
@@ -1794,10 +1811,148 @@ function sendAIPrompt(text) {
   if (!text.endsWith('...') && !text.endsWith(': ')) sendAIMessage();
 }
 
+function handleAIImageSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+  const reader = new FileReader();
+  reader.onload = () => {
+    aiPendingImage = { file, dataUrl: reader.result };
+    showAIMediaPreview();
+  };
+  reader.readAsDataURL(file);
+}
+
+function showAIMediaPreview() {
+  const preview = document.getElementById('aiMediaPreview');
+  if (!aiPendingImage) { preview.style.display = 'none'; return; }
+  preview.style.display = 'flex';
+  preview.innerHTML = `<img src="${aiPendingImage.dataUrl}" class="ai-preview-thumb"><span class="ai-preview-name">${esc(aiPendingImage.file.name)}</span><button type="button" class="ai-preview-remove" onclick="clearAIMedia()">&times;</button>`;
+}
+
+function clearAIMedia() {
+  aiPendingImage = null;
+  document.getElementById('aiMediaPreview').style.display = 'none';
+}
+
+function toggleVoiceRecording() {
+  if (aiRecording) { stopVoiceRecording(); return; }
+  startVoiceRecording();
+}
+
+async function startVoiceRecording() {
+  const micBtn = document.getElementById('aiMicBtn');
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    // Fallback: record audio blob without live transcription
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      aiAudioChunks = [];
+      aiMediaRecorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4' });
+      aiMediaRecorder.ondataavailable = e => { if (e.data.size > 0) aiAudioChunks.push(e.data); };
+      aiMediaRecorder.onstop = () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(aiAudioChunks, { type: aiMediaRecorder.mimeType });
+        finishVoiceRecording(null, blob);
+      };
+      aiMediaRecorder.start();
+      aiRecording = true;
+      micBtn.classList.add('ai-recording');
+      micBtn.innerHTML = '&#9632;';
+      micBtn.title = 'Stop recording';
+    } catch (err) {
+      alert('Microphone access denied. Please allow microphone access to use voice notes.');
+    }
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    aiAudioChunks = [];
+    aiMediaRecorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4' });
+    aiMediaRecorder.ondataavailable = e => { if (e.data.size > 0) aiAudioChunks.push(e.data); };
+    aiMediaRecorder.onstop = () => { stream.getTracks().forEach(t => t.stop()); };
+    aiMediaRecorder.start();
+  } catch (err) {
+    alert('Microphone access denied. Please allow microphone access to use voice notes.');
+    return;
+  }
+
+  aiSpeechRecognition = new SpeechRecognition();
+  aiSpeechRecognition.continuous = true;
+  aiSpeechRecognition.interimResults = false;
+  aiSpeechRecognition.lang = 'en-GB';
+  let transcript = '';
+  aiSpeechRecognition.onresult = e => {
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) transcript += e.results[i][0].transcript + ' ';
+    }
+  };
+  aiSpeechRecognition.onerror = () => {};
+  aiSpeechRecognition.start();
+
+  aiRecording = true;
+  micBtn.classList.add('ai-recording');
+  micBtn.innerHTML = '&#9632;';
+  micBtn.title = 'Stop recording';
+
+  aiSpeechRecognition._getTranscript = () => transcript.trim();
+}
+
+function stopVoiceRecording() {
+  const micBtn = document.getElementById('aiMicBtn');
+  aiRecording = false;
+  micBtn.classList.remove('ai-recording');
+  micBtn.innerHTML = '&#127908;';
+  micBtn.title = 'Voice note';
+
+  let transcript = '';
+  if (aiSpeechRecognition) {
+    transcript = aiSpeechRecognition._getTranscript ? aiSpeechRecognition._getTranscript() : '';
+    aiSpeechRecognition.stop();
+    aiSpeechRecognition = null;
+  }
+
+  if (aiMediaRecorder && aiMediaRecorder.state !== 'inactive') {
+    const rec = aiMediaRecorder;
+    const origOnStop = rec.onstop;
+    rec.onstop = () => {
+      rec.stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(aiAudioChunks, { type: rec.mimeType });
+      finishVoiceRecording(transcript, blob);
+    };
+    rec.stop();
+  }
+}
+
+function finishVoiceRecording(transcript, audioBlob) {
+  const input = document.getElementById('aiInput');
+  if (transcript) {
+    input.value = transcript;
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+    input.focus();
+  } else {
+    input.value = '[Voice note attached — see audio]';
+    sendAIMediaMessage(audioBlob, 'audio', '');
+  }
+}
+
 async function sendAIMessage() {
   if (aiBusy) return;
   const input = document.getElementById('aiInput');
   const text = input.value.trim();
+
+  if (aiPendingImage) {
+    const img = aiPendingImage;
+    clearAIMedia();
+    input.value = '';
+    input.style.height = 'auto';
+    sendAIMediaMessage(img.file, 'image', text);
+    return;
+  }
+
   if (!text) return;
 
   aiHistory.push({ role: 'user', content: text });
@@ -1818,7 +1973,6 @@ async function sendAIMessage() {
     }
     showAIThinking(false);
     renderAIHistory();
-    // If any tool mutated data, refresh the console
     const didMutate = (resp.tool_calls || []).some(tc => ['create_task', 'update_task'].includes(tc.tool));
     if (didMutate) {
       try { await loadClients(); await loadWorkloadSummary(); } catch {}
@@ -1832,6 +1986,60 @@ async function sendAIMessage() {
     aiBusy = false;
     document.getElementById('aiSendBtn').disabled = false;
     input.focus();
+  }
+}
+
+async function sendAIMediaMessage(file, type, text) {
+  if (aiBusy) return;
+
+  const label = type === 'image' ? (text || 'Sent an image') : (text || 'Sent a voice note');
+  aiHistory.push({ role: 'user', content: label, _media: type });
+  document.getElementById('aiSuggestions').style.display = 'none';
+  renderAIHistory();
+  showAIThinking(true);
+  aiBusy = true;
+  document.getElementById('aiSendBtn').disabled = true;
+
+  try {
+    const fd = new FormData();
+    fd.append('media', file);
+    fd.append('text', text || '');
+    fd.append('mediaType', type);
+    const historyForServer = aiHistory.slice(0, -1).map(m => {
+      if (m._media) return { role: m.role, content: typeof m.content === 'string' ? m.content : m.content };
+      return { role: m.role, content: m.content };
+    });
+    fd.append('messages', JSON.stringify(historyForServer));
+
+    const token = document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('nbm_session='));
+    const resp = await fetch('/api/ai/chat-media', { method: 'POST', body: fd, credentials: 'same-origin' });
+    if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.error || 'Request failed'); }
+    const data = await resp.json();
+
+    if (data.user_content) {
+      aiHistory[aiHistory.length - 1] = { role: 'user', content: data.user_content };
+    }
+
+    if (data.assistant_content) {
+      aiHistory.push({ role: 'assistant', content: data.assistant_content });
+    } else if (data.reply) {
+      aiHistory.push({ role: 'assistant', content: [{ type: 'text', text: data.reply }] });
+    }
+    showAIThinking(false);
+    renderAIHistory();
+    const didMutate = (data.tool_calls || []).some(tc => ['create_task', 'update_task'].includes(tc.tool));
+    if (didMutate) {
+      try { await loadClients(); await loadWorkloadSummary(); } catch {}
+    }
+  } catch (err) {
+    showAIThinking(false);
+    const box = document.getElementById('aiMessages');
+    box.insertAdjacentHTML('beforeend', `<div class="ai-msg-error">${esc(err.message || 'Error')}</div>`);
+    box.scrollTop = box.scrollHeight;
+  } finally {
+    aiBusy = false;
+    document.getElementById('aiSendBtn').disabled = false;
+    document.getElementById('aiInput').focus();
   }
 }
 
