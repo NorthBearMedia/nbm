@@ -119,10 +119,15 @@ function executeTool(name, input, user) {
         const cl = db.prepare('SELECT is_private FROM clients WHERE id = ?').get(input.client_id);
         if (!cl) return { error: 'Client not found' };
         if (cl.is_private && !isOwner) return { error: 'Access denied' };
+        let proj = db.prepare('SELECT id FROM projects WHERE client_id = ? ORDER BY id LIMIT 1').get(input.client_id);
+        if (!proj) {
+          const pr = db.prepare('INSERT INTO projects (client_id, name, status) VALUES (?, ?, ?)').run(input.client_id, 'General', 'active');
+          proj = { id: pr.lastInsertRowid };
+        }
         const r = db.prepare(
-          'INSERT INTO tasks (client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, priority, references_text, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          'INSERT INTO tasks (project_id, client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, priority, references_text, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         ).run(
-          input.client_id, input.title,
+          proj.id, input.client_id, input.title,
           input.assignee || '', input.secondary_assignee || '',
           input.deadline || '', input.planned_date || '',
           input.estimated_hours || 0, input.priority || 'medium',

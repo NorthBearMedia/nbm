@@ -21,9 +21,14 @@ router.post('/', requireAuth, requireWrite, (req, res) => {
   if (!client_id || !title) return res.status(400).json({ error: 'client_id and title required' });
   if (!checkPrivateClient(req, res, client_id)) return;
 
+  let proj = db.prepare('SELECT id FROM projects WHERE client_id = ? ORDER BY id LIMIT 1').get(client_id);
+  if (!proj) {
+    const pr = db.prepare('INSERT INTO projects (client_id, name, status) VALUES (?, ?, ?)').run(client_id, 'General', 'active');
+    proj = { id: pr.lastInsertRowid };
+  }
   const result = db.prepare(
-    'INSERT INTO tasks (client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(client_id, title, assignee || '', secondary_assignee || '', deadline || '', planned_date || '', estimated_hours || 0, priority || 'medium', references_text || '', notes || '', is_recurring ? 1 : 0, recur_interval || 0, recur_unit || '');
+    'INSERT INTO tasks (project_id, client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(proj.id, client_id, title, assignee || '', secondary_assignee || '', deadline || '', planned_date || '', estimated_hours || 0, priority || 'medium', references_text || '', notes || '', is_recurring ? 1 : 0, recur_interval || 0, recur_unit || '');
 
   logActivity('task', result.lastInsertRowid, 'created', req.user.display_name, `Created task "${title}"`);
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid);
@@ -73,8 +78,8 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   if (progress === 'completed' && old.progress !== 'completed' && old.is_recurring && old.recur_interval > 0) {
     const nextDate = calculateNextDate(old.deadline || old.planned_date || new Date().toISOString().split('T')[0], old.recur_interval, old.recur_unit);
     const newTask = db.prepare(
-      'INSERT INTO tasks (client_id, title, assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(old.client_id, old.title, old.assignee, nextDate, nextDate, old.estimated_hours, old.priority, old.references_text, old.notes, 1, old.recur_interval, old.recur_unit);
+      'INSERT INTO tasks (project_id, client_id, title, assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(old.project_id, old.client_id, old.title, old.assignee, nextDate, nextDate, old.estimated_hours, old.priority, old.references_text, old.notes, 1, old.recur_interval, old.recur_unit);
     logActivity('task', newTask.lastInsertRowid, 'created', 'System', `Auto-created recurring task "${old.title}" (next: ${nextDate})`);
   }
 
@@ -228,8 +233,8 @@ router.post('/:id/duplicate', requireAuth, requireWrite, (req, res) => {
   if (!checkPrivateClient(req, res, old.client_id)) return;
 
   const r = db.prepare(
-    'INSERT INTO tasks (client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(old.client_id, old.title + ' (copy)', old.assignee, old.secondary_assignee || '', old.deadline, old.planned_date, old.estimated_hours, old.priority, old.references_text, old.notes, old.is_recurring, old.recur_interval, old.recur_unit);
+    'INSERT INTO tasks (project_id, client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(old.project_id, old.client_id, old.title + ' (copy)', old.assignee, old.secondary_assignee || '', old.deadline, old.planned_date, old.estimated_hours, old.priority, old.references_text, old.notes, old.is_recurring, old.recur_interval, old.recur_unit);
 
   logActivity('task', r.lastInsertRowid, 'created', req.user.display_name, `Duplicated from "${old.title}"`);
   res.json(db.prepare('SELECT * FROM tasks WHERE id = ?').get(r.lastInsertRowid));

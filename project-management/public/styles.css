@@ -1457,7 +1457,7 @@ a:hover { color: #6dd4a8; }
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 24px;
+  padding: 24px 160px 24px 24px;
   font-size: 11px;
   color: var(--text-muted);
   border-top: 1px solid var(--border);
