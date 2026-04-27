@@ -5,14 +5,9 @@ let appUsers = [];
 let currentUser = null;
 let currentFilter = 'all';
 let currentView = 'clients';
-let expandedClients = new Set();
-let expandedComments = new Set();
 let showCompletedTasks = new Set();
-let showArchivedTasks = new Set();
 let calendarDate = new Date();
-let draggedClientId = null;
 let myTasksFilter = false;
-let clientSortMode = 'manual';
 let selectedTasks = new Set();
 
 async function loadCurrentUser() {
@@ -69,10 +64,10 @@ function setSaving(btn, saving) {
 async function loadClients() {
   const fp = currentFilter !== 'all' ? `?filter=${currentFilter}` : '';
   clients = await api(`/api/clients${fp}`);
+  updateClientFilterDropdown();
   renderStats();
   if (currentView === 'clients') {
-    if (myTasksFilter) renderMyTasksView();
-    else renderClients();
+    renderClients();
   }
   loadWorkloadSummary();
 }
@@ -83,6 +78,7 @@ async function loadTeam() {
   teamMembers = appUsers.map(u => ({ id: u.id, name: u.display_name, role: u.role, avatar_color: u.avatar_color, avatar_url: u.avatar_url }));
   updateUserSelector();
   updatePersonDropdowns();
+  updatePersonFilter();
 }
 
 function updateUserSelector() {
@@ -99,6 +95,31 @@ function updatePersonDropdowns() {
     const cur = sel.value;
     sel.innerHTML = '<option value="">Everyone</option>' + appUsers.map(u => `<option value="${esc(u.display_name)}" ${u.display_name===cur?'selected':''}>${esc(u.display_name)}</option>`).join('');
   });
+}
+
+// ─── Nav Menu ──────────────────────────────────────────
+function toggleNavMenu() {
+  const dd = document.getElementById('navDropdown');
+  dd.classList.toggle('open');
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.nav-menu-wrap')) {
+    document.getElementById('navDropdown')?.classList.remove('open');
+  }
+});
+
+function updateClientFilterDropdown() {
+  const sel = document.getElementById('clientFilter');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All Clients</option>' + clients.map(c => `<option value="${c.id}" ${String(c.id)===cur?'selected':''}>${esc(c.name)}</option>`).join('');
+}
+
+function updatePersonFilter() {
+  const sel = document.getElementById('personFilter');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All People</option>' + appUsers.map(u => `<option value="${esc(u.display_name)}" ${u.display_name===cur?'selected':''}>${esc(u.display_name)}</option>`).join('');
 }
 
 // ─── View Switching ─────────────────────────────────────
@@ -307,7 +328,7 @@ function renderWorkloadDetailTasks(data, ct, category) {
 function navigateToTask(cid,tid) {
   closeModal('statsModal');
   if (currentView!=='clients') { document.querySelector('[data-view="clients"]').click(); }
-  expandedClients.add(cid); renderClients();
+  renderClients();
   setTimeout(()=>{ const el=document.querySelector(`[data-task-id="${tid}"]`); if(el){el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('highlight'); setTimeout(()=>{el.classList.remove('highlight');},2000);} },100);
 }
 
@@ -335,11 +356,7 @@ function fmtDateTime(ds){if(!ds)return'';const d=new Date(ds.replace(' ','T')+(d
 function fmtFileSize(bytes){if(bytes<1024)return bytes+'B';if(bytes<1048576)return(bytes/1024).toFixed(1)+'KB';return(bytes/1048576).toFixed(1)+'MB';}
 
 // ─── Toggles ────────────────────────────────────────────
-function toggleClient(id){expandedClients.has(id)?expandedClients.delete(id):expandedClients.add(id);saveExpandedState();renderClients();}
-function saveExpandedState(){try{localStorage.setItem('nbm_expandedClients',JSON.stringify([...expandedClients]));}catch{}}
-function toggleComments(tid){expandedComments.has(tid)?expandedComments.delete(tid):expandedComments.add(tid);renderClients();}
-function toggleCompletedTasks(cid){showCompletedTasks.has(cid)?showCompletedTasks.delete(cid):showCompletedTasks.add(cid);renderClients();}
-function toggleArchivedTasks(cid){showArchivedTasks.has(cid)?showArchivedTasks.delete(cid):showArchivedTasks.add(cid);renderClients();}
+function toggleCompletedTasks(key){showCompletedTasks.has(key)?showCompletedTasks.delete(key):showCompletedTasks.add(key);renderClients();}
 
 // ─── Modal ──────────────────────────────────────────────
 function openModal(id){document.getElementById(id).classList.add('active');document.getElementById('modalBackdrop').classList.add('active');}
@@ -348,17 +365,121 @@ function closeAllModals(){document.querySelectorAll('.modal.active').forEach(m=>
 document.getElementById('modalBackdrop').addEventListener('click',closeAllModals);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAllModals();});
 
-// ─── Render Clients ─────────────────────────────────────
+// ─── Render Flat Task List (Default Home View) ─────────
 function renderClients() {
   const ct = document.getElementById('clientList');
   if (!clients.length) { ct.innerHTML='<div class="empty-state"><img src="/NBM%20Logo%20No%20NG%20Light%20Lines.png" alt="" style="width:80px;opacity:0.3;margin-bottom:16px"><p>No clients yet. Click + to add one.</p></div>'; return; }
-  // Sort clients
-  const sorted = [...clients];
-  if (clientSortMode === 'alpha') sorted.sort((a,b) => a.name.localeCompare(b.name));
-  else if (clientSortMode === 'alpha-desc') sorted.sort((a,b) => b.name.localeCompare(a.name));
-  else if (clientSortMode === 'recent') sorted.sort((a,b) => (b.updated_at||b.created_at||'').localeCompare(a.updated_at||a.created_at||''));
-  else if (clientSortMode === 'outstanding') sorted.sort((a,b) => b.stats.outstandingTasks - a.stats.outstandingTasks);
-  const canDrag = clientSortMode === 'manual';
+
+  const today = localDateStr(new Date());
+  const myName = currentUser?.display_name || '';
+  const clientFilterId = document.getElementById('clientFilter')?.value;
+  const personFilterVal = document.getElementById('personFilter')?.value;
+  const statusFilterVal = document.getElementById('statusFilter')?.value;
+
+  const allTasks = [];
+  for (const c of clients) {
+    if (clientFilterId && String(c.id) !== clientFilterId) continue;
+    for (const t of c.tasks) {
+      if (myTasksFilter && t.assignee !== myName && t.secondary_assignee !== myName) continue;
+      if (personFilterVal && t.assignee !== personFilterVal && t.secondary_assignee !== personFilterVal) continue;
+      if (statusFilterVal && t.progress !== statusFilterVal) continue;
+      allTasks.push({ ...t, client_name: c.name, client_code: c.code, client_logo: c.logo_url, client_id: c.id });
+    }
+  }
+
+  const active = allTasks.filter(t => t.progress !== 'completed' && t.progress !== 'invoiced');
+  const done = allTasks.filter(t => t.progress === 'completed' || t.progress === 'invoiced');
+
+  const priOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+  active.sort((a, b) => {
+    if ((b.is_pinned||0) !== (a.is_pinned||0)) return (b.is_pinned||0) - (a.is_pinned||0);
+    const aDate = a.deadline || a.planned_date || '9999';
+    const bDate = b.deadline || b.planned_date || '9999';
+    const aOverdue = aDate < today ? 0 : 1;
+    const bOverdue = bDate < today ? 0 : 1;
+    if (aOverdue !== bOverdue) return aOverdue - bOverdue;
+    if (aDate !== bDate) return aDate < bDate ? -1 : 1;
+    return (priOrder[a.priority] || 2) - (priOrder[b.priority] || 2);
+  });
+
+  const overdue = active.filter(t => { const d = t.deadline || t.planned_date; return d && d < today; });
+  const totalH = active.reduce((s, t) => s + (t.estimated_hours || 0), 0);
+  const fmt = h => h % 1 === 0 ? h : h.toFixed(1);
+
+  let html = `<div class="flat-tasks-header">
+    <div style="display:flex;align-items:center;gap:14px;font-size:12px;color:var(--text-secondary)">
+      <span style="font-weight:600;color:var(--text)">${active.length} active</span>
+      <span>${fmt(totalH)}h total</span>
+      ${overdue.length ? `<span style="color:var(--danger)">${overdue.length} overdue</span>` : ''}
+      ${done.length ? `<span>${done.length} done</span>` : ''}
+    </div>
+  </div>`;
+
+  if (overdue.length && myTasksFilter) {
+    html += `<div class="reschedule-bar">
+      <span style="color:var(--danger);font-weight:600">${overdue.length} overdue</span>
+      <span>&mdash; push forward by</span>
+      <select id="rescheduleAmount" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:4px 8px;font-size:12px;color:var(--text);font-family:inherit">
+        <option value="1">1 day</option><option value="2">2 days</option><option value="3">3 days</option><option value="7" selected>1 week</option><option value="14">2 weeks</option><option value="custom">Pick a date...</option>
+      </select>
+      <input type="date" id="rescheduleDate" style="display:none;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:4px 8px;font-size:12px;color:var(--text);font-family:inherit">
+      <button class="btn btn-primary btn-sm" onclick="rescheduleOverdue()">Reschedule Overdue</button>
+    </div>`;
+  }
+
+  html += '<div class="flat-tasks-list">';
+
+  function flatTaskRow(t, isDone) {
+    const dc = getDeadlineClass(t.deadline, t.progress);
+    const mem = findUser(t.assignee);
+    const sel = selectedTasks.has(t.id);
+    return `<div class="flat-task-row ${isDone ? 'completed' : ''} ${sel ? 'task-selected' : ''}" data-task-id="${t.id}">
+      <input type="checkbox" class="task-checkbox" ${sel?'checked':''} onclick="event.stopPropagation();toggleTaskSelect(${t.id})" title="Select">
+      <div class="flat-task-client">
+        ${t.client_logo ? `<img src="${esc(t.client_logo)}" alt="">` : `<span class="client-code-badge">${esc(t.client_code || t.client_name.substring(0,3))}</span>`}
+        <span class="flat-task-client-name">${esc(t.client_name)}</span>
+      </div>
+      <div class="flat-task-info">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="task-ref" title="Ref: ${taskRef(t.id)}">${taskRef(t.id)}</span>
+          <span class="priority-badge priority-${t.priority}" title="${priorityLabel(t.priority)}"></span>
+          <span class="task-title" onclick="editTask(${t.id})">${esc(t.title)}</span>
+          ${t.is_pinned?'<span style="color:var(--primary);font-size:11px">&#9733;</span>':''}
+          ${t.is_recurring?'<span class="recurring-badge" title="Recurring">&#8635;</span>':''}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;min-width:80px">
+        ${userAvatar(mem, 22)}<span style="font-size:12px">${esc(t.assignee||'')}</span>
+      </div>
+      <div style="min-width:110px"><input type="date" class="inline-date ${dc}" value="${t.deadline||''}" onchange="inlineFieldChange(${t.id},'deadline',this.value)" onclick="event.stopPropagation()" title="Deadline"></div>
+      <div style="min-width:110px"><input type="date" class="inline-date" value="${t.planned_date||''}" onchange="inlineFieldChange(${t.id},'planned_date',this.value)" onclick="event.stopPropagation()" title="Planned date"></div>
+      <div style="min-width:50px"><input type="number" class="inline-hours" value="${t.estimated_hours||''}" min="0" step="0.5" onchange="inlineFieldChange(${t.id},'estimated_hours',parseFloat(this.value)||0)" onclick="event.stopPropagation()" title="Est. hours"></div>
+      <div><select class="quick-status" onchange="quickStatusChange(${t.id},this.value)" onclick="event.stopPropagation()">
+        ${['not-started','in-progress','completed','stuck','awaiting-client','awaiting-manager','ready-to-invoice','invoiced'].map(s=>`<option value="${s}" ${t.progress===s?'selected':''}>${progressLabel(s)}</option>`).join('')}
+      </select></div>
+      <div class="task-actions">
+        <button class="btn-icon" onclick="editTask(${t.id})" title="Full edit">&#128196;</button>
+        <button class="btn-icon" onclick="archiveTask(${t.id})" title="Archive">&#128230;</button>
+      </div>
+    </div>`;
+  }
+
+  html += active.map(t => flatTaskRow(t, false)).join('');
+
+  if (!active.length) {
+    html += '<div style="padding:24px;text-align:center;color:var(--text-secondary)">No active tasks matching filters</div>';
+  }
+
+  if (done.length) {
+    const showDone = showCompletedTasks.has(0);
+    html += `<div style="padding:10px 14px;cursor:pointer;font-size:12px;color:var(--text-secondary);border-top:1px solid var(--border)" onclick="toggleCompletedTasks(0)">
+      ${showDone?'&#9660;':'&#9654;'} ${done.length} completed
+    </div>`;
+    if (showDone) html += done.map(t => flatTaskRow(t, true)).join('');
+  }
+
+  html += '</div>';
+
   // Filter notice
   const fn = document.getElementById('filterNotice');
   if (fn) {
@@ -370,95 +491,16 @@ function renderClients() {
       fn.style.display = 'block';
     } else { fn.style.display = 'none'; }
   }
-  ct.innerHTML = sorted.map(c => {
-    const ex = expandedClients.has(c.id);
-    const s = c.stats;
-    const pct = s.totalTasks ? Math.round(s.completedTasks/s.totalTasks*100) : 0;
-    const links=[];
-    if(c.gmail_link)links.push(`<a href="${esc(c.gmail_link)}" target="_blank" class="client-link" onclick="event.stopPropagation()" title="Gmail">&#9993;</a>`);
-    if(c.drive_link)links.push(`<a href="${esc(c.drive_link)}" target="_blank" class="client-link" onclick="event.stopPropagation()" title="Drive">&#128193;</a>`);
-    const myName=currentUser?.display_name||'';
-    const allTasks=myTasksFilter?c.tasks.filter(t=>t.assignee===myName):c.tasks;
-    const active=allTasks.filter(t=>t.progress!=='completed'&&t.progress!=='invoiced').sort((a,b)=>(b.is_pinned||0)-(a.is_pinned||0));
-    const done=allTasks.filter(t=>t.progress==='completed'||t.progress==='invoiced');
-    const arch=c.archivedTasks||[];
-    const showDone=showCompletedTasks.has(c.id), showArch=showArchivedTasks.has(c.id);
-    return `<div class="client-row ${ex?'expanded':''}" data-client-id="${c.id}" ${canDrag?`draggable="true" ondragstart="onDragStart(event,${c.id})" ondragover="onDragOver(event)" ondrop="onDrop(event,${c.id})" ondragend="onDragEnd(event)" ondragleave="onDragLeave(event)"`:''}>
-      <div class="client-summary" onclick="toggleClient(${c.id})">
-        <div class="client-info">
-          ${canDrag?'<span class="drag-handle" onclick="event.stopPropagation()">&#9776;</span>':''}
-          <div class="client-logo">${c.logo_url?`<img src="${esc(c.logo_url)}" alt="">`:esc(c.code||c.name.substring(0,3).toUpperCase())}</div>
-          <div>
-            <div class="client-name">${c.is_private?'<span title="Private — only visible to you" style="font-size:12px;margin-right:4px">&#128274;</span>':''}${esc(c.name)} <span class="client-code">${esc(c.code||'')}</span></div>
-            <div style="display:flex;gap:6px;align-items:center">${links.join('')}</div>
-          </div>
-        </div>
-        <div><span class="client-type-badge type-${c.agreement_type}">${c.agreement_type==='recurring'?'Recurring':'Ad Hoc'}</span></div>
-        <div style="text-align:center">${s.totalTasks}</div>
-        <div style="text-align:center"><span class="${s.outstandingTasks>0?(s.overdueTasks>0?'overdue':''):'completed'}" style="font-weight:600">${s.outstandingTasks}</span></div>
-        <div>
-          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-          <div style="font-size:10px;color:var(--text-secondary);margin-top:2px">${s.completedTasks}/${s.totalTasks}</div>
-        </div>
-        <div class="client-actions" onclick="event.stopPropagation()">
-          <button class="btn-icon" onclick="editClient(${c.id})" title="Edit">&#9998;</button>
-          <button class="btn-icon" onclick="openTaskModal(${c.id})" title="Add Task">+</button>
-          <button class="btn-icon" onclick="showClientTimeline(${c.id},'${esc(c.name)}')" title="Timeline">&#128200;</button>
-          <button class="btn-icon" onclick="showClientHistory(${c.id},'${esc(c.name)}')" title="History">&#128337;</button>
-          <button class="pin-btn ${isPinned('client',c.id)?'pinned':''}" onclick="togglePin('client',${c.id},event)" title="${isPinned('client',c.id)?'Unpin':'Pin'}">${isPinned('client',c.id)?'&#9733;':'&#9734;'}</button>
-          <button class="btn-icon" onclick="archiveClient(${c.id})" title="Archive">&#128230;</button>
-          ${currentUser?.role==='owner'?`<button class="btn-icon" onclick="deleteClient(${c.id})" title="Delete" style="color:var(--danger)">&#128465;</button>`:''}
-        </div>
-      </div>
-      <div class="client-projects">
-        <div class="client-projects-inner">
-          ${active.map(t=>renderTask(t)).join('')}
-          ${!active.length?'<div style="padding:12px 16px;color:var(--text-secondary);font-size:13px">No active tasks</div>':''}
-          <div style="padding:6px 16px"><button class="btn btn-ghost btn-sm" onclick="openTaskModal(${c.id})">+ Add Task</button></div>
-          ${done.length?`<div style="padding:4px 16px"><button class="btn btn-ghost btn-sm" onclick="toggleCompletedTasks(${c.id})">${showDone?'&#9660;':'&#9654;'} ${done.length} completed</button>${showDone?done.map(t=>renderTask(t,true)).join(''):''}</div>`:''}
-          ${arch.length?`<div style="padding:4px 16px"><button class="btn btn-ghost btn-sm" onclick="toggleArchivedTasks(${c.id})">${showArch?'&#9660;':'&#9654;'} ${arch.length} archived</button>${showArch?arch.map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;opacity:0.5;font-size:13px"><span>${esc(t.title)}</span><button class="btn btn-ghost btn-sm" onclick="restoreTask(${t.id})">Restore</button></div>`).join(''):''}</div>`:''}
-        </div>
-      </div>
-    </div>`;
-  }).join('');
+
+  ct.innerHTML = html;
+
+  const sel = document.getElementById('rescheduleAmount');
+  const datePicker = document.getElementById('rescheduleDate');
+  if (sel && datePicker) {
+    sel.addEventListener('change', () => { datePicker.style.display = sel.value === 'custom' ? '' : 'none'; });
+  }
 }
 
-
-function renderTask(t, isDone) {
-  const dc=getDeadlineClass(t.deadline,t.progress);
-  const mem=findUser(t.assignee);
-  const cc=t.comments?t.comments.length:0;
-  const ac=t.attachments?t.attachments.length:0;
-  const sc=expandedComments.has(t.id);
-  const sel=selectedTasks.has(t.id);
-  return `<div class="task-row ${isDone?'completed':''} ${sel?'task-selected':''}" data-task-id="${t.id}">
-    <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">
-      <input type="checkbox" class="task-checkbox" ${sel?'checked':''} onclick="event.stopPropagation();toggleTaskSelect(${t.id})" title="Select for batch actions">
-      <span class="task-ref" title="Ref: ${taskRef(t.id)}">${taskRef(t.id)}</span>
-      <span class="priority-badge priority-${t.priority}" title="${priorityLabel(t.priority)}"></span>
-      <span class="task-title" onclick="editTask(${t.id})" style="cursor:pointer">${esc(t.title)}</span>
-      ${t.is_recurring?'<span class="recurring-badge" title="Recurring">&#8635;</span>':''}
-      ${cc?`<span style="font-size:11px;color:var(--text-secondary);cursor:pointer" onclick="toggleComments(${t.id})">&#128172;${cc}</span>`:''}
-      ${ac?`<span style="font-size:11px;color:var(--text-secondary)">&#128206;${ac}</span>`:''}
-    </div>
-    <div style="display:flex;align-items:center;gap:4px;min-width:80px">
-      ${userAvatar(mem, 22)}<span style="font-size:12px">${esc(t.assignee||'')}</span>
-      ${t.secondary_assignee ? `<span style="font-size:10px;color:var(--text-secondary)" title="Also: ${esc(t.secondary_assignee)}">+${userAvatar(findUser(t.secondary_assignee), 18)}</span>` : ''}
-    </div>
-    <div style="min-width:110px"><input type="date" class="inline-date ${dc}" value="${t.deadline||''}" onchange="inlineFieldChange(${t.id},'deadline',this.value)" onclick="event.stopPropagation()" title="Deadline"></div>
-    <div style="min-width:110px"><input type="date" class="inline-date" value="${t.planned_date||''}" onchange="inlineFieldChange(${t.id},'planned_date',this.value)" onclick="event.stopPropagation()" title="Planned date"></div>
-    <div style="min-width:50px"><input type="number" class="inline-hours" value="${t.estimated_hours||''}" min="0" step="0.5" onchange="inlineFieldChange(${t.id},'estimated_hours',parseFloat(this.value)||0)" onclick="event.stopPropagation()" title="Est. hours"></div>
-    <div><select class="quick-status" onchange="quickStatusChange(${t.id},this.value)" onclick="event.stopPropagation()">
-      ${['not-started','in-progress','completed','stuck','awaiting-client','awaiting-manager','ready-to-invoice','invoiced'].map(s=>`<option value="${s}" ${t.progress===s?'selected':''}>${progressLabel(s)}</option>`).join('')}
-    </select></div>
-    <div class="task-actions">
-      <button class="btn-icon" onclick="editTask(${t.id})" title="Full edit">&#128196;</button>
-      <button class="pin-btn ${t.is_pinned?'pinned':''}" onclick="toggleTaskPin(${t.id},event)" title="${t.is_pinned?'Unpin':'Pin'}">${t.is_pinned?'&#9733;':'&#9734;'}</button>
-      <button class="btn-icon" onclick="archiveTask(${t.id})" title="Archive">&#128230;</button>
-      ${currentUser?.role==='owner'?`<button class="btn-icon" onclick="deleteTask(${t.id})" title="Delete" style="color:var(--danger)">&#128465;</button>`:''}
-    </div>
-  </div>${sc?renderCommentThread(t):''}`;
-}
 
 async function inlineFieldChange(taskId, field, value) {
   const body = {};
@@ -480,38 +522,9 @@ async function quickStatusChange(taskId, newStatus) {
   if (!wasComplete && (newStatus === 'completed' || newStatus === 'invoiced')) celebrate();
 }
 
-function renderCommentThread(t) {
-  const cs=t.comments||[];
-  return `<div class="comment-section">
-    ${!cs.length?'<div style="font-size:12px;color:var(--text-secondary);padding:4px 0">No comments yet</div>':''}
-    ${cs.map(c=>{const m=findUser(c.author);return`<div class="comment">${userAvatar(m,24)||`<span style="width:24px;height:24px;border-radius:50%;background:#64748b;display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:600;flex-shrink:0">${(c.author||'?')[0].toUpperCase()}</span>`}<div style="flex:1;min-width:0"><div style="font-size:11px"><strong>${esc(c.author)}</strong> <span style="color:var(--text-secondary)">${timeAgo(c.created_at)}</span></div><div style="font-size:13px;margin-top:2px">${esc(c.content)}</div></div></div>`;}).join('')}
-    <form class="comment-form" onsubmit="addComment(event,${t.id})"><input type="text" placeholder="Write a comment..." required><button type="submit" class="btn btn-primary btn-sm">Post</button></form>
-  </div>`;
-}
-
-// ─── Drag & Drop ────────────────────────────────────────
-function onDragStart(e,id){draggedClientId=id;e.target.closest('.client-row').classList.add('dragging');e.dataTransfer.effectAllowed='move';}
-function onDragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';e.target.closest('.client-row')?.classList.add('drag-over');}
-function onDragLeave(e){e.target.closest('.client-row')?.classList.remove('drag-over');}
-function onDragEnd(e){document.querySelectorAll('.dragging,.drag-over').forEach(el=>{el.classList.remove('dragging','drag-over');});draggedClientId=null;}
-async function onDrop(e,targetId){
-  e.preventDefault();
-  document.querySelectorAll('.drag-over').forEach(el=>el.classList.remove('drag-over'));
-  if(!draggedClientId||draggedClientId===targetId)return;
-  const order=clients.map(c=>c.id);
-  const fromIdx=order.indexOf(draggedClientId);
-  const toIdx=order.indexOf(targetId);
-  if(fromIdx===-1||toIdx===-1)return;
-  order.splice(fromIdx,1);
-  order.splice(toIdx,0,draggedClientId);
-  draggedClientId=null;
-  await api('/api/clients/reorder',{method:'PUT',body:{order}});
-  await loadClients();
-}
-
 // ─── Archive ────────────────────────────────────────────
-async function archiveClient(id){const c=clients.find(x=>x.id===id);if(!confirm(`Archive "${c?.name}"?`))return;await api(`/api/clients/${id}/archive`,{method:'PUT'});expandedClients.delete(id);await loadClients();}
-async function deleteClient(id){const c=clients.find(x=>x.id===id);const name=c?c.name:'this client';if(!confirm(`Permanently delete "${name}" and all its tasks? This cannot be undone.`))return;if(!confirm(`Are you sure? This will delete ALL data for "${name}".`))return;await api(`/api/clients/${id}`,{method:'DELETE'});expandedClients.delete(id);await loadClients();}
+async function archiveClient(id){const c=clients.find(x=>x.id===id);if(!confirm(`Archive "${c?.name}"?`))return;await api(`/api/clients/${id}/archive`,{method:'PUT'});await loadClients();}
+async function deleteClient(id){const c=clients.find(x=>x.id===id);const name=c?c.name:'this client';if(!confirm(`Permanently delete "${name}" and all its tasks? This cannot be undone.`))return;if(!confirm(`Are you sure? This will delete ALL data for "${name}".`))return;await api(`/api/clients/${id}`,{method:'DELETE'});await loadClients();}
 async function archiveTask(id){await api(`/api/tasks/${id}/archive`,{method:'PUT'});await loadClients();}
 async function deleteTask(id){const t=findTaskById(id);const title=t?t.title:'this task';if(!confirm(`Permanently delete "${title}"? This cannot be undone.`))return;await api(`/api/tasks/${id}`,{method:'DELETE'});await loadClients();}
 
@@ -870,147 +883,20 @@ document.querySelectorAll('.filter-btn[data-filter]').forEach(btn=>{
   });
 });
 
-// ─── Sort ─────────────────────────────────────────────
-document.getElementById('clientSort').addEventListener('change', function() {
-  clientSortMode = this.value;
-  renderClients();
-});
+document.getElementById('clientFilter')?.addEventListener('change', () => renderClients());
+document.getElementById('personFilter')?.addEventListener('change', () => renderClients());
+document.getElementById('statusFilter')?.addEventListener('change', () => renderClients());
 
 // ─── My Tasks Filter ──────────────────────────────────
 function toggleMyTasks() {
   myTasksFilter = !myTasksFilter;
   const btn = document.getElementById('myTasksBtn');
   if (btn) btn.classList.toggle('active', myTasksFilter);
-  const hdr = document.getElementById('clientTableHeader');
-  if (hdr) hdr.style.display = myTasksFilter ? 'none' : '';
-  if (myTasksFilter) {
-    renderMyTasksView();
-  } else {
-    renderClients();
-  }
-}
-
-function renderMyTasksView() {
-  const ct = document.getElementById('clientList');
-  const myName = currentUser?.display_name || '';
-  const today = localDateStr(new Date());
-
-  // Gather all tasks for this user across all clients
-  const allTasks = [];
-  for (const c of clients) {
-    for (const t of c.tasks) {
-      if (t.assignee === myName || t.secondary_assignee === myName) {
-        allTasks.push({ ...t, client_name: c.name, client_code: c.code, client_logo: c.logo_url, client_id: c.id });
-      }
-    }
-  }
-
-  const active = allTasks.filter(t => t.progress !== 'completed' && t.progress !== 'invoiced');
-  const done = allTasks.filter(t => t.progress === 'completed' || t.progress === 'invoiced');
-
-  // Sort: overdue first, then by due date (soonest first), then by priority
-  const priOrder = { critical: 0, high: 1, medium: 2, low: 3 };
-  active.sort((a, b) => {
-    const aDate = a.deadline || a.planned_date || '9999';
-    const bDate = b.deadline || b.planned_date || '9999';
-    const aOverdue = aDate < today ? 0 : 1;
-    const bOverdue = bDate < today ? 0 : 1;
-    if (aOverdue !== bOverdue) return aOverdue - bOverdue;
-    if (aDate !== bDate) return aDate < bDate ? -1 : 1;
-    return (priOrder[a.priority] || 2) - (priOrder[b.priority] || 2);
-  });
-
-  const overdue = active.filter(t => { const d = t.deadline || t.planned_date; return d && d < today; });
-  const totalH = active.reduce((s, t) => s + (t.estimated_hours || 0), 0);
-  const fmt = h => h % 1 === 0 ? h : h.toFixed(1);
-
-  let html = `<div class="my-tasks-header">
-    <h3>${esc(myName)}'s Tasks</h3>
-    <div style="display:flex;align-items:center;gap:14px;font-size:12px;color:var(--text-secondary)">
-      <span>${active.length} active</span>
-      <span>${fmt(totalH)}h total</span>
-      ${overdue.length ? `<span style="color:var(--danger)">${overdue.length} overdue</span>` : ''}
-      ${done.length ? `<span>${done.length} done</span>` : ''}
-    </div>
-  </div>`;
-
-  // Reschedule bar
-  if (overdue.length) {
-    html += `<div class="reschedule-bar">
-      <span style="color:var(--danger);font-weight:600">${overdue.length} task${overdue.length > 1 ? 's' : ''} overdue</span>
-      <span>&mdash; push them forward by</span>
-      <select id="rescheduleAmount" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:4px 8px;font-size:12px;color:var(--text);font-family:inherit">
-        <option value="1">1 day</option>
-        <option value="2">2 days</option>
-        <option value="3">3 days</option>
-        <option value="7" selected>1 week</option>
-        <option value="14">2 weeks</option>
-        <option value="custom">Pick a date...</option>
-      </select>
-      <input type="date" id="rescheduleDate" style="display:none;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:4px 8px;font-size:12px;color:var(--text);font-family:inherit">
-      <button class="btn btn-primary btn-sm" onclick="rescheduleOverdue()">Reschedule Overdue</button>
-      <button class="btn btn-ghost btn-sm" onclick="rescheduleAll()">Reschedule All</button>
-    </div>`;
-  }
-
-  html += '<div class="my-tasks-view">';
-
-  function myTaskRow(t) {
-    const dc = getDeadlineClass(t.deadline, t.progress);
-    const isDone = t.progress === 'completed' || t.progress === 'invoiced';
-    const isSignOff = t.secondary_assignee === myName && t.assignee !== myName;
-    return `<div class="my-task-row ${isDone ? 'completed' : ''}" data-task-id="${t.id}">
-      <input type="checkbox" class="task-checkbox" ${selectedTasks.has(t.id)?'checked':''} onclick="event.stopPropagation();toggleTaskSelect(${t.id})" title="Select">
-      <div class="my-task-client">
-        ${t.client_logo ? `<img src="${esc(t.client_logo)}" alt="">` : `<span class="client-code-badge">${esc(t.client_code || t.client_name.substring(0,3))}</span>`}
-        <span style="font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.client_name)}</span>
-      </div>
-      <div class="my-task-info">
-        <div style="display:flex;align-items:center;gap:6px">
-          <span class="priority-badge priority-${t.priority}"></span>
-          <span class="task-title" onclick="editTask(${t.id})">${esc(t.title)}</span>
-          ${isSignOff ? '<span style="font-size:10px;background:var(--warning);color:#000;padding:1px 5px;border-radius:3px;font-weight:600">Sign-off</span>' : ''}
-          ${t.is_recurring?'<span class="recurring-badge" title="Recurring">&#8635;</span>':''}
-        </div>
-        <div class="task-sub">${t.notes ? esc(t.notes.substring(0, 60)) : ''}</div>
-      </div>
-      <div style="min-width:105px"><input type="date" class="inline-date ${dc}" value="${t.deadline||''}" onchange="inlineFieldChange(${t.id},'deadline',this.value)" onclick="event.stopPropagation()" title="Deadline"></div>
-      <div style="min-width:105px"><input type="date" class="inline-date" value="${t.planned_date||''}" onchange="inlineFieldChange(${t.id},'planned_date',this.value)" onclick="event.stopPropagation()" title="Planned"></div>
-      <div style="min-width:50px"><input type="number" class="inline-hours" value="${t.estimated_hours||''}" min="0" step="0.5" onchange="inlineFieldChange(${t.id},'estimated_hours',parseFloat(this.value)||0)" onclick="event.stopPropagation()" title="Hours"></div>
-      <div><select class="quick-status" onchange="quickStatusChange(${t.id},this.value)" onclick="event.stopPropagation()">
-        ${['not-started','in-progress','completed','stuck','awaiting-client','awaiting-manager','ready-to-invoice','invoiced'].map(s=>`<option value="${s}" ${t.progress===s?'selected':''}>${progressLabel(s)}</option>`).join('')}
-      </select></div>
-    </div>`;
-  }
-
-  html += active.map(myTaskRow).join('');
-
-  if (done.length) {
-    html += `<div style="padding:10px 14px;cursor:pointer;font-size:12px;color:var(--text-secondary)" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">&#9660; ${done.length} completed</div>`;
-    html += `<div style="display:none">${done.map(myTaskRow).join('')}</div>`;
-  }
-
-  html += '</div>';
-  ct.innerHTML = html;
-
-  // Wire up the reschedule date picker toggle
-  const sel = document.getElementById('rescheduleAmount');
-  const datePicker = document.getElementById('rescheduleDate');
-  if (sel && datePicker) {
-    sel.addEventListener('change', () => {
-      datePicker.style.display = sel.value === 'custom' ? '' : 'none';
-    });
-  }
+  renderClients();
 }
 
 async function rescheduleOverdue() {
   await doReschedule(true);
-}
-
-async function rescheduleAll() {
-  const active = getMyActiveTasks();
-  if (!confirm(`Reschedule ALL ${active.length} active tasks by the selected amount?`)) return;
-  await doReschedule(false);
 }
 
 function getMyActiveTasks() {
@@ -1063,7 +949,6 @@ async function doReschedule(overdueOnly) {
   }
 
   await loadClients();
-  renderMyTasksView();
 }
 
 function shiftDate(dateStr, days) {
@@ -1076,8 +961,9 @@ function clearAllFilters() {
   myTasksFilter = false;
   currentFilter = 'all';
   document.getElementById('myTasksBtn')?.classList.remove('active');
-  const hdr = document.getElementById('clientTableHeader');
-  if (hdr) hdr.style.display = '';
+  document.getElementById('clientFilter').value = '';
+  document.getElementById('personFilter').value = '';
+  document.getElementById('statusFilter').value = '';
   document.querySelectorAll('.filter-btn[data-filter]').forEach(b => {
     b.classList.toggle('active', b.dataset.filter === 'all');
   });
@@ -1159,7 +1045,6 @@ function navigateToTaskFromSearch(taskId) {
     const t = c.tasks.find(x => x.id === taskId);
     if (t) {
       if (currentView !== 'clients') document.querySelector('[data-view="clients"]').click();
-      expandedClients.add(c.id);
       renderClients();
       setTimeout(() => {
         const el = document.querySelector(`[data-task-id="${taskId}"]`);
@@ -1714,7 +1599,7 @@ function renderPinnedDashboard() {
       if (!c) return '';
       label = c.name;
       icon = c.logo_url ? `<img src="${esc(c.logo_url)}" style="width:18px;height:18px;border-radius:4px;object-fit:cover">` : '';
-      onclick = `toggleClient(${c.id});expandedClients.add(${c.id});renderClients();`;
+      onclick = `document.getElementById('clientFilter').value='${c.id}';renderClients();`;
     } else if (pin.entity_type === 'task') {
       const t = findTaskById(pin.entity_id);
       if (!t) return '';
@@ -1800,12 +1685,6 @@ async function toggleTaskPin(taskId, event) {
     await loadClients();
     await loadWorkloadSummary();
     await loadPins();
-    // Restore expanded state from localStorage
-    try {
-      const ec = JSON.parse(localStorage.getItem('nbm_expandedClients') || '[]');
-      ec.forEach(id => expandedClients.add(id));
-      if (ec.length) renderClients();
-    } catch {}
     document.getElementById('todayDate').value=localDateStr(new Date());
   } catch(e) {
     console.error('Init error:', e);

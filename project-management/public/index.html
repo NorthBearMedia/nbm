@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>North Bear Console</title>
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=50">
+  <link rel="stylesheet" href="styles.css?v=52">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -30,30 +30,45 @@
         <div id="searchResults" style="display:none;position:absolute;top:100%;right:0;margin-top:8px;width:450px;max-height:400px;overflow-y:auto;background:rgba(45,41,42,0.97);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);z-index:999"></div>
       </div>
       <button class="nav-action" id="addClientBtn" title="New Client">+</button>
-      <button class="nav-action" id="manageTeamBtn" title="Team">&#128101;</button>
-      <button class="nav-action" id="manageUsersBtn" title="Users &amp; Permissions">&#9881;</button>
-      <button class="nav-action" id="manageBackupsBtn" title="Backups" style="display:none">&#128190;</button>
-      <button class="nav-action" id="globalHistoryBtn" title="Activity Log" style="display:none">&#128337;</button>
-      <button class="nav-action" onclick="exportExcel()" title="Export to Excel">&#128202;</button>
-      <button class="nav-action" id="viewArchiveBtn" title="Archive">&#128230;</button>
-      <button class="nav-action" onclick="logout()" title="Sign Out">&#9211;</button>
+      <div class="nav-menu-wrap" style="position:relative">
+        <button class="nav-action" id="navMenuBtn" title="Menu" onclick="toggleNavMenu()">&#9776;</button>
+        <div class="nav-dropdown" id="navDropdown">
+          <button class="nav-dropdown-item" id="manageTeamBtn">&#128101; Team</button>
+          <button class="nav-dropdown-item" id="manageUsersBtn">&#9881; Users &amp; Permissions</button>
+          <button class="nav-dropdown-item" id="manageBackupsBtn" style="display:none">&#128190; Backups</button>
+          <button class="nav-dropdown-item" id="globalHistoryBtn" style="display:none">&#128337; Activity Log</button>
+          <div class="nav-dropdown-sep"></div>
+          <button class="nav-dropdown-item" onclick="exportExcel()">&#128202; Export to Excel</button>
+          <button class="nav-dropdown-item" id="viewArchiveBtn">&#128230; Archive</button>
+          <div class="nav-dropdown-sep"></div>
+          <button class="nav-dropdown-item" onclick="logout()" style="color:var(--text-secondary)">&#9211; Sign Out</button>
+        </div>
+      </div>
     </div>
   </nav>
 
   <div class="sub-bar" id="clientSubBar">
     <div class="filter-group">
-      <button class="filter-btn active" data-filter="all">All Clients</button>
+      <button class="filter-btn active" data-filter="all">All</button>
       <button class="filter-btn" data-filter="recurring">Recurring</button>
       <button class="filter-btn" data-filter="ad-hoc">Ad Hoc</button>
       <span style="width:1px;height:20px;background:var(--border);margin:0 4px"></span>
       <button class="filter-btn" id="myTasksBtn" onclick="toggleMyTasks()">My Tasks</button>
       <span style="width:1px;height:20px;background:var(--border);margin:0 4px"></span>
-      <select id="clientSort" style="background:var(--bg-glass);border:1px solid var(--border);border-radius:var(--radius);padding:5px 10px;font-size:12px;color:var(--text);cursor:pointer;font-family:inherit">
-        <option value="manual">Manual Order</option>
-        <option value="alpha">A &rarr; Z</option>
-        <option value="alpha-desc">Z &rarr; A</option>
-        <option value="recent">Recently Changed</option>
-        <option value="outstanding">Most Outstanding</option>
+      <select id="clientFilter" style="background:var(--bg-glass);border:1px solid var(--border);border-radius:var(--radius);padding:5px 10px;font-size:12px;color:var(--text);cursor:pointer;font-family:inherit">
+        <option value="">All Clients</option>
+      </select>
+      <select id="personFilter" style="background:var(--bg-glass);border:1px solid var(--border);border-radius:var(--radius);padding:5px 10px;font-size:12px;color:var(--text);cursor:pointer;font-family:inherit">
+        <option value="">All People</option>
+      </select>
+      <select id="statusFilter" style="background:var(--bg-glass);border:1px solid var(--border);border-radius:var(--radius);padding:5px 10px;font-size:12px;color:var(--text);cursor:pointer;font-family:inherit">
+        <option value="">All Statuses</option>
+        <option value="not-started">Not Started</option>
+        <option value="in-progress">In Progress</option>
+        <option value="stuck">Stuck</option>
+        <option value="awaiting-client">Awaiting Client</option>
+        <option value="awaiting-manager">Awaiting Manager</option>
+        <option value="ready-to-invoice">Ready to Invoice</option>
       </select>
     </div>
     <div class="stats-bar" id="statsBar"></div>
@@ -63,9 +78,6 @@
     <div id="workloadSummary" class="workload-summary" style="display:none"></div>
     <div id="clientsView">
       <div class="table-container">
-        <div class="table-header" id="clientTableHeader">
-          <div>Client</div><div>Type</div><div style="text-align:center">Tasks</div><div style="text-align:center">Outstanding</div><div>Progress</div><div></div>
-        </div>
         <div id="clientList" class="client-list"><div class="empty-state"><img src="/NBM%20Logo%20No%20NG%20Light%20Lines.png" alt="" style="width:80px;opacity:0.3;margin-bottom:16px"><p>Loading...</p></div></div>
         <div id="filterNotice" style="display:none"></div>
       </div>
@@ -322,6 +334,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=51"></script>
+  <script src="app.js?v=52"></script>
 </body>
 </html>
