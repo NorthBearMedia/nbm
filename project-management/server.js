@@ -12,6 +12,7 @@ import taskRoutes, { deleteAttachmentHandler } from './routes/tasks.js';
 import userRoutes from './routes/users.js';
 import systemRoutes, { createBackupRoutes } from './routes/system.js';
 import aiRoutes from './routes/ai.js';
+import gmailRoutes from './routes/gmail.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -72,6 +73,7 @@ app.delete('/api/attachments/:id', requireAuth, requireWrite, deleteAttachmentHa
 app.use(systemRoutes);
 app.use(createBackupRoutes(backupDir, backupDatabase));
 app.use(aiRoutes);
+app.use(gmailRoutes);
 
 // ─── Seed Users ─────────────────────────────────────────
 // Creates default users ONLY when the users table is empty.

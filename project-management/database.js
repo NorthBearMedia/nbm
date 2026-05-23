@@ -166,6 +166,16 @@ try { db.exec("ALTER TABLE tasks ADD COLUMN completed_at TEXT DEFAULT ''"); } ca
 try { db.exec("ALTER TABLE tasks ADD COLUMN secondary_assignee TEXT DEFAULT ''"); } catch {}
 try { db.exec("ALTER TABLE tasks ADD COLUMN client_id INTEGER DEFAULT NULL"); } catch {}
 
+// Gmail OAuth tokens per user
+db.exec(`CREATE TABLE IF NOT EXISTS gmail_tokens (
+  user_id INTEGER PRIMARY KEY,
+  access_token TEXT NOT NULL,
+  refresh_token TEXT NOT NULL,
+  expiry_date INTEGER NOT NULL,
+  email TEXT DEFAULT '',
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+)`);
+
 // Backfill client_id from projects for tasks that don't have it yet
 try {
   const unfilled = db.prepare("SELECT count(*) as c FROM tasks WHERE client_id IS NULL AND project_id IS NOT NULL").get().c;

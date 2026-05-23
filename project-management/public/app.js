@@ -132,11 +132,13 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     document.getElementById('todayView').style.display = currentView === 'today' ? '' : 'none';
     document.getElementById('calendarView').style.display = currentView === 'calendar' ? '' : 'none';
     document.getElementById('focusView').style.display = currentView === 'focus' ? '' : 'none';
+    document.getElementById('emailView').style.display = currentView === 'email' ? '' : 'none';
     document.getElementById('clientSubBar').style.display = currentView === 'clients' ? '' : 'none';
     document.getElementById('workloadSummary').style.display = currentView === 'clients' ? 'flex' : 'none';
     if (currentView === 'today') loadTodayView();
     if (currentView === 'calendar') loadCalendarView();
     if (currentView === 'focus') loadFocusView();
+    if (currentView === 'email') loadEmailView();
   });
 });
 
@@ -1691,6 +1693,151 @@ async function toggleTaskPin(taskId, event) {
     document.getElementById('clientList').innerHTML='<div class="empty-state"><p>Error loading data. Please refresh.</p></div>';
   }
 })();
+
+// ─── Gmail Integration ───────────────────────────────────
+let gmailConnected = false;
+let gmailNextPageToken = null;
+
+async function checkGmailStatus() {
+  try {
+    const s = await api('/api/gmail/status');
+    if (s.configured) {
+      document.getElementById('emailNavTab').style.display = '';
+      gmailConnected = s.connected;
+      if (window.location.hash === '#email') {
+        document.querySelector('[data-view="email"]').click();
+      }
+    }
+  } catch {}
+}
+
+function loadEmailView() {
+  if (!gmailConnected) {
+    document.getElementById('emailList').style.display = 'none';
+    document.getElementById('emailThreadView').style.display = 'none';
+    document.getElementById('emailLoadMore').style.display = 'none';
+    document.getElementById('emailConnect').style.display = '';
+    return;
+  }
+  document.getElementById('emailConnect').style.display = 'none';
+  document.getElementById('emailList').style.display = '';
+  document.getElementById('emailThreadView').style.display = 'none';
+  loadGmailInbox();
+}
+
+async function loadGmailInbox(more) {
+  const list = document.getElementById('emailList');
+  const label = document.getElementById('emailLabelFilter').value;
+  if (!more) { list.innerHTML = '<div class="email-loading">Loading...</div>'; gmailNextPageToken = null; }
+
+  try {
+    const params = new URLSearchParams({ label });
+    if (gmailNextPageToken && more) params.set('pageToken', gmailNextPageToken);
+    const data = await api(`/api/gmail/inbox?${params}`);
+    if (!more) list.innerHTML = '';
+
+    if (!data.messages?.length && !more) {
+      list.innerHTML = '<div class="email-empty">No emails found</div>';
+      document.getElementById('emailLoadMore').style.display = 'none';
+      return;
+    }
+
+    for (const m of data.messages) {
+      list.insertAdjacentHTML('beforeend', renderEmailRow(m));
+    }
+
+    gmailNextPageToken = data.nextPageToken;
+    document.getElementById('emailLoadMore').style.display = data.nextPageToken ? '' : 'none';
+  } catch (err) {
+    if (err.message?.includes('not connected') || err.message?.includes('expired')) {
+      gmailConnected = false;
+      loadEmailView();
+      return;
+    }
+    list.innerHTML = `<div class="email-empty" style="color:var(--error)">${esc(err.message || 'Failed to load')}</div>`;
+  }
+}
+
+async function searchGmail() {
+  const q = document.getElementById('emailSearchInput').value.trim();
+  if (!q) { loadGmailInbox(); return; }
+  const list = document.getElementById('emailList');
+  list.innerHTML = '<div class="email-loading">Searching...</div>';
+
+  try {
+    const data = await api(`/api/gmail/inbox?q=${encodeURIComponent(q)}`);
+    list.innerHTML = '';
+    if (!data.messages?.length) {
+      list.innerHTML = '<div class="email-empty">No results</div>';
+      return;
+    }
+    for (const m of data.messages) {
+      list.insertAdjacentHTML('beforeend', renderEmailRow(m));
+    }
+    document.getElementById('emailLoadMore').style.display = data.nextPageToken ? '' : 'none';
+    gmailNextPageToken = data.nextPageToken;
+  } catch (err) {
+    list.innerHTML = `<div class="email-empty" style="color:var(--error)">${esc(err.message)}</div>`;
+  }
+}
+
+function renderEmailRow(m) {
+  const fromName = m.from.replace(/<[^>]+>/g, '').trim() || m.from;
+  const d = new Date(m.date);
+  const isToday = d.toDateString() === new Date().toDateString();
+  const dateStr = isToday ? d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const unreadClass = m.unread ? 'email-row-unread' : '';
+
+  return `<div class="email-row ${unreadClass}" onclick="openEmailThread('${m.threadId}')">
+    <div class="email-row-from">${esc(fromName)}</div>
+    <div class="email-row-content">
+      <span class="email-row-subject">${esc(m.subject || '(no subject)')}</span>
+      <span class="email-row-snippet"> — ${esc(m.snippet)}</span>
+    </div>
+    <div class="email-row-date">${dateStr}</div>
+  </div>`;
+}
+
+async function openEmailThread(threadId) {
+  document.getElementById('emailList').style.display = 'none';
+  document.getElementById('emailLoadMore').style.display = 'none';
+  document.getElementById('emailThreadView').style.display = '';
+  const content = document.getElementById('emailThreadContent');
+  content.innerHTML = '<div class="email-loading">Loading thread...</div>';
+
+  try {
+    const data = await api(`/api/gmail/thread/${threadId}`);
+    content.innerHTML = '';
+    for (const m of data.messages) {
+      const fromName = m.from.replace(/<[^>]+>/g, '').trim() || m.from;
+      const d = new Date(m.date);
+      const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const isHtml = m.mimeType === 'text/html' || m.body.includes('<div') || m.body.includes('<p');
+      const bodyHtml = isHtml
+        ? `<iframe class="email-body-frame" srcdoc="${esc(m.body).replace(/"/g, '&quot;')}" sandbox="allow-same-origin"></iframe>`
+        : `<pre class="email-body-text">${esc(m.body)}</pre>`;
+
+      content.insertAdjacentHTML('beforeend', `<div class="email-thread-msg">
+        <div class="email-thread-header">
+          <strong>${esc(fromName)}</strong>
+          <span class="email-thread-date">${dateStr}</span>
+        </div>
+        <div class="email-thread-subject">${esc(m.subject)}</div>
+        <div class="email-thread-body">${bodyHtml}</div>
+      </div>`);
+    }
+  } catch (err) {
+    content.innerHTML = `<div class="email-empty" style="color:var(--error)">${esc(err.message)}</div>`;
+  }
+}
+
+function closeEmailThread() {
+  document.getElementById('emailThreadView').style.display = 'none';
+  document.getElementById('emailList').style.display = '';
+  document.getElementById('emailLoadMore').style.display = gmailNextPageToken ? '' : 'none';
+}
+
+setTimeout(() => { checkGmailStatus(); }, 600);
 
 // ─── AI Assistant ───────────────────────────────────────
 let aiHistory = [];      // Full message list sent to API (role + content arrays)

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>North Bear Console</title>
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=54">
+  <link rel="stylesheet" href="styles.css?v=55">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -23,6 +23,7 @@
       <button class="nav-tab" data-view="today"><span class="nav-icon">&#9788;</span> Today</button>
       <button class="nav-tab" data-view="calendar"><span class="nav-icon">&#128197;</span> Calendar</button>
       <button class="nav-tab" data-view="focus"><span class="nav-icon">&#9889;</span> Focus</button>
+      <button class="nav-tab" data-view="email" id="emailNavTab" style="display:none"><span class="nav-icon">&#9993;</span> Email</button>
     </div>
     <div class="nav-right">
       <div class="search-container" style="position:relative">
@@ -125,6 +126,45 @@
         <div class="focus-section">
           <h3 class="focus-heading">Blocked</h3>
           <div id="focusBlocked" class="focus-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Email View -->
+    <div id="emailView" style="display:none">
+      <div class="email-container">
+        <div class="email-toolbar">
+          <div class="email-toolbar-left">
+            <select id="emailLabelFilter" class="filter-select" onchange="loadGmailInbox()">
+              <option value="INBOX">Inbox</option>
+              <option value="STARRED">Starred</option>
+              <option value="SENT">Sent</option>
+              <option value="IMPORTANT">Important</option>
+              <option value="DRAFT">Drafts</option>
+            </select>
+            <div class="email-search-wrap">
+              <input type="text" id="emailSearchInput" placeholder="Search emails..." onkeydown="if(event.key==='Enter'){searchGmail()}">
+              <button class="btn btn-ghost btn-sm" onclick="searchGmail()">Search</button>
+            </div>
+          </div>
+          <div class="email-toolbar-right">
+            <button class="btn btn-ghost btn-sm" onclick="loadGmailInbox()" title="Refresh">&#8635; Refresh</button>
+            <span id="emailConnectedAs" class="email-connected-as"></span>
+          </div>
+        </div>
+        <div id="emailThreadView" style="display:none">
+          <button class="btn btn-ghost btn-sm email-back-btn" onclick="closeEmailThread()">&larr; Back to inbox</button>
+          <div id="emailThreadContent"></div>
+        </div>
+        <div id="emailList"></div>
+        <div id="emailLoadMore" style="display:none;text-align:center;padding:16px">
+          <button class="btn btn-ghost" onclick="loadGmailInbox(true)">Load more</button>
+        </div>
+        <div id="emailConnect" style="display:none;text-align:center;padding:60px 20px">
+          <div style="font-size:40px;margin-bottom:16px">&#9993;</div>
+          <h3 style="margin-bottom:8px">Connect your Gmail</h3>
+          <p style="color:var(--text-secondary);margin-bottom:20px;font-size:13px">View your inbox directly in the Console</p>
+          <a href="/auth/gmail/connect" class="btn btn-primary">Connect Gmail</a>
         </div>
       </div>
     </div>
@@ -338,6 +378,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=53"></script>
+  <script src="app.js?v=55"></script>
 </body>
 </html>
