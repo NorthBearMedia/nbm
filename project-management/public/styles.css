@@ -2066,6 +2066,26 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   background: #fff;
   border-radius: var(--radius);
 }
+.email-reply-box {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-glass);
+}
+.email-reply-box textarea {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+}
 
 /* ─── AI ASSISTANT ───────────────────────────────────── */
 .ai-launcher {

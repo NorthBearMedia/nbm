@@ -51,7 +51,10 @@ router.get('/auth/gmail/connect', requireAuth, (req, res) => {
   const url = oauth2.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
-    scope: ['https://www.googleapis.com/auth/gmail.readonly'],
+    scope: [
+      'https://www.googleapis.com/auth/gmail.modify',
+      'https://www.googleapis.com/auth/gmail.send',
+    ],
   });
   res.redirect(url);
 });
@@ -190,11 +193,86 @@ router.get('/api/gmail/labels', requireAuth, async (req, res) => {
   const gmail = google.gmail({ version: 'v1', auth });
   try {
     const result = await gmail.users.labels.list({ userId: 'me' });
-    const labels = (result.data.labels || [])
-      .filter(l => l.type === 'user' || ['INBOX', 'SENT', 'STARRED', 'IMPORTANT', 'DRAFT'].includes(l.id))
-      .map(l => ({ id: l.id, name: l.name, type: l.type }));
-    res.json({ labels });
+    const systemOrder = ['INBOX', 'STARRED', 'IMPORTANT', 'SENT', 'DRAFT', 'SPAM', 'TRASH'];
+    const systemLabels = [];
+    const userLabels = [];
+    for (const l of (result.data.labels || [])) {
+      if (l.labelListVisibility === 'labelHide' && l.type === 'system') continue;
+      if (['CHAT', 'UNREAD', 'CATEGORY_PERSONAL', 'CATEGORY_SOCIAL', 'CATEGORY_UPDATES', 'CATEGORY_PROMOTIONS', 'CATEGORY_FORUMS'].includes(l.id)) continue;
+      const entry = { id: l.id, name: l.name, type: l.type };
+      if (l.type === 'system' && systemOrder.includes(l.id)) systemLabels.push(entry);
+      else if (l.type === 'user') userLabels.push(entry);
+    }
+    systemLabels.sort((a, b) => systemOrder.indexOf(a.id) - systemOrder.indexOf(b.id));
+    userLabels.sort((a, b) => a.name.localeCompare(b.name));
+    res.json({ labels: [...systemLabels, ...userLabels] });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Send a new email
+router.post('/api/gmail/send', requireAuth, async (req, res) => {
+  const auth = getAuthenticatedClient(req);
+  if (!auth) return res.status(401).json({ error: 'Gmail not connected' });
+
+  const { to, subject, body } = req.body;
+  if (!to) return res.status(400).json({ error: 'Recipient required' });
+
+  const gmail = google.gmail({ version: 'v1', auth });
+  const row = db.prepare('SELECT email FROM gmail_tokens WHERE user_id = ?').get(req.user.id);
+  const from = row?.email || req.user.email || '';
+
+  const rawMessage = [
+    `From: ${from}`,
+    `To: ${to}`,
+    `Subject: ${subject || '(no subject)'}`,
+    'Content-Type: text/plain; charset=utf-8',
+    '',
+    body || '',
+  ].join('\r\n');
+
+  const encoded = Buffer.from(rawMessage).toString('base64url');
+
+  try {
+    const sent = await gmail.users.messages.send({ userId: 'me', requestBody: { raw: encoded } });
+    res.json({ success: true, id: sent.data.id });
+  } catch (err) {
+    console.error('[Gmail] send error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Reply to a thread
+router.post('/api/gmail/reply', requireAuth, async (req, res) => {
+  const auth = getAuthenticatedClient(req);
+  if (!auth) return res.status(401).json({ error: 'Gmail not connected' });
+
+  const { threadId, messageId, to, subject, body } = req.body;
+  if (!threadId || !to) return res.status(400).json({ error: 'threadId and to required' });
+
+  const gmail = google.gmail({ version: 'v1', auth });
+  const row = db.prepare('SELECT email FROM gmail_tokens WHERE user_id = ?').get(req.user.id);
+  const from = row?.email || '';
+
+  const rawMessage = [
+    `From: ${from}`,
+    `To: ${to}`,
+    `Subject: ${subject?.startsWith('Re:') ? subject : 'Re: ' + (subject || '')}`,
+    `In-Reply-To: ${messageId || ''}`,
+    `References: ${messageId || ''}`,
+    'Content-Type: text/plain; charset=utf-8',
+    '',
+    body || '',
+  ].join('\r\n');
+
+  const encoded = Buffer.from(rawMessage).toString('base64url');
+
+  try {
+    const sent = await gmail.users.messages.send({ userId: 'me', requestBody: { raw: encoded, threadId } });
+    res.json({ success: true, id: sent.data.id });
+  } catch (err) {
+    console.error('[Gmail] reply error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

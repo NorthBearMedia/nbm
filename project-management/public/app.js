@@ -1697,6 +1697,8 @@ async function toggleTaskPin(taskId, event) {
 // ─── Gmail Integration ───────────────────────────────────
 let gmailConnected = false;
 let gmailNextPageToken = null;
+let gmailLabelsLoaded = false;
+let gmailCurrentThread = null;
 
 async function checkGmailStatus() {
   try {
@@ -1704,6 +1706,10 @@ async function checkGmailStatus() {
     if (s.configured) {
       document.getElementById('emailNavTab').style.display = '';
       gmailConnected = s.connected;
+      if (s.connected && s.email) {
+        const el = document.getElementById('emailConnectedAs');
+        if (el) el.textContent = s.email;
+      }
       if (window.location.hash === '#email') {
         document.querySelector('[data-view="email"]').click();
       }
@@ -1722,12 +1728,28 @@ function loadEmailView() {
   document.getElementById('emailConnect').style.display = 'none';
   document.getElementById('emailList').style.display = '';
   document.getElementById('emailThreadView').style.display = 'none';
+  if (!gmailLabelsLoaded) loadGmailLabels();
   loadGmailInbox();
+}
+
+async function loadGmailLabels() {
+  try {
+    const data = await api('/api/gmail/labels');
+    const select = document.getElementById('emailLabelFilter');
+    select.innerHTML = '';
+    for (const l of data.labels) {
+      const opt = document.createElement('option');
+      opt.value = l.id;
+      opt.textContent = l.name;
+      select.appendChild(opt);
+    }
+    gmailLabelsLoaded = true;
+  } catch {}
 }
 
 async function loadGmailInbox(more) {
   const list = document.getElementById('emailList');
-  const label = document.getElementById('emailLabelFilter').value;
+  const label = document.getElementById('emailLabelFilter').value || 'INBOX';
   if (!more) { list.innerHTML = '<div class="email-loading">Loading...</div>'; gmailNextPageToken = null; }
 
   try {
@@ -1781,6 +1803,16 @@ async function searchGmail() {
   }
 }
 
+async function disconnectGmail() {
+  if (!confirm('Disconnect your Gmail from the Console?')) return;
+  try {
+    await api('/api/gmail/disconnect', { method: 'POST' });
+    gmailConnected = false;
+    gmailLabelsLoaded = false;
+    loadEmailView();
+  } catch {}
+}
+
 function renderEmailRow(m) {
   const fromName = m.from.replace(/<[^>]+>/g, '').trim() || m.from;
   const d = new Date(m.date);
@@ -1804,9 +1836,11 @@ async function openEmailThread(threadId) {
   document.getElementById('emailThreadView').style.display = '';
   const content = document.getElementById('emailThreadContent');
   content.innerHTML = '<div class="email-loading">Loading thread...</div>';
+  document.getElementById('emailReplyText').value = '';
 
   try {
     const data = await api(`/api/gmail/thread/${threadId}`);
+    gmailCurrentThread = { threadId, messages: data.messages };
     content.innerHTML = '';
     for (const m of data.messages) {
       const fromName = m.from.replace(/<[^>]+>/g, '').trim() || m.from;
@@ -1835,6 +1869,62 @@ function closeEmailThread() {
   document.getElementById('emailThreadView').style.display = 'none';
   document.getElementById('emailList').style.display = '';
   document.getElementById('emailLoadMore').style.display = gmailNextPageToken ? '' : 'none';
+  gmailCurrentThread = null;
+}
+
+async function sendReply() {
+  if (!gmailCurrentThread?.messages?.length) return;
+  const body = document.getElementById('emailReplyText').value.trim();
+  if (!body) return;
+  const last = gmailCurrentThread.messages[gmailCurrentThread.messages.length - 1];
+  const replyTo = last.from.match(/<([^>]+)>/)?.[1] || last.from;
+
+  try {
+    await api('/api/gmail/reply', { method: 'POST', body: {
+      threadId: gmailCurrentThread.threadId,
+      messageId: last.id,
+      to: replyTo,
+      subject: last.subject,
+      body,
+    }});
+    document.getElementById('emailReplyText').value = '';
+    openEmailThread(gmailCurrentThread.threadId);
+  } catch (err) {
+    alert('Failed to send: ' + (err.message || 'Unknown error'));
+  }
+}
+
+function openComposeModal() {
+  document.getElementById('composeTo').value = '';
+  document.getElementById('composeSubject').value = '';
+  document.getElementById('composeBody').value = '';
+  document.getElementById('composeModal').style.display = '';
+  document.getElementById('composeTo').focus();
+}
+
+function closeComposeModal() {
+  document.getElementById('composeModal').style.display = 'none';
+}
+
+async function sendComposedEmail() {
+  const to = document.getElementById('composeTo').value.trim();
+  const subject = document.getElementById('composeSubject').value.trim();
+  const body = document.getElementById('composeBody').value.trim();
+  if (!to) return;
+
+  const btn = document.getElementById('composeSendBtn');
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+
+  try {
+    await api('/api/gmail/send', { method: 'POST', body: { to, subject, body } });
+    closeComposeModal();
+  } catch (err) {
+    alert('Failed to send: ' + (err.message || 'Unknown error'));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send';
+  }
 }
 
 setTimeout(() => { checkGmailStatus(); }, 600);

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>North Bear Console</title>
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=55">
+  <link rel="stylesheet" href="styles.css?v=56">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -135,26 +135,28 @@
       <div class="email-container">
         <div class="email-toolbar">
           <div class="email-toolbar-left">
-            <select id="emailLabelFilter" class="filter-select" onchange="loadGmailInbox()">
-              <option value="INBOX">Inbox</option>
-              <option value="STARRED">Starred</option>
-              <option value="SENT">Sent</option>
-              <option value="IMPORTANT">Important</option>
-              <option value="DRAFT">Drafts</option>
-            </select>
+            <select id="emailLabelFilter" class="filter-select" onchange="loadGmailInbox()"></select>
             <div class="email-search-wrap">
               <input type="text" id="emailSearchInput" placeholder="Search emails..." onkeydown="if(event.key==='Enter'){searchGmail()}">
               <button class="btn btn-ghost btn-sm" onclick="searchGmail()">Search</button>
             </div>
           </div>
           <div class="email-toolbar-right">
-            <button class="btn btn-ghost btn-sm" onclick="loadGmailInbox()" title="Refresh">&#8635; Refresh</button>
+            <button class="btn btn-primary btn-sm" onclick="openComposeModal()">&#9998; Compose</button>
+            <button class="btn btn-ghost btn-sm" onclick="loadGmailInbox()" title="Refresh">&#8635;</button>
             <span id="emailConnectedAs" class="email-connected-as"></span>
+            <button class="btn btn-ghost btn-sm" onclick="disconnectGmail()" title="Disconnect Gmail" style="font-size:11px;opacity:0.6">Disconnect</button>
           </div>
         </div>
         <div id="emailThreadView" style="display:none">
           <button class="btn btn-ghost btn-sm email-back-btn" onclick="closeEmailThread()">&larr; Back to inbox</button>
           <div id="emailThreadContent"></div>
+          <div id="emailReplyBox" class="email-reply-box">
+            <textarea id="emailReplyText" placeholder="Write a reply..." rows="4"></textarea>
+            <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px">
+              <button class="btn btn-primary btn-sm" onclick="sendReply()">Send Reply</button>
+            </div>
+          </div>
         </div>
         <div id="emailList"></div>
         <div id="emailLoadMore" style="display:none;text-align:center;padding:16px">
@@ -163,9 +165,30 @@
         <div id="emailConnect" style="display:none;text-align:center;padding:60px 20px">
           <div style="font-size:40px;margin-bottom:16px">&#9993;</div>
           <h3 style="margin-bottom:8px">Connect your Gmail</h3>
-          <p style="color:var(--text-secondary);margin-bottom:20px;font-size:13px">View your inbox directly in the Console</p>
+          <p style="color:var(--text-secondary);margin-bottom:20px;font-size:13px">Send and receive email directly in the Console</p>
           <a href="/auth/gmail/connect" class="btn btn-primary">Connect Gmail</a>
         </div>
+      </div>
+    </div>
+
+    <!-- Compose Email Modal -->
+    <div id="composeModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeComposeModal()">
+      <div class="modal" style="max-width:600px">
+        <div class="modal-header">
+          <h2>New Email</h2>
+          <button class="modal-close" onclick="closeComposeModal()">&times;</button>
+        </div>
+        <form id="composeForm" onsubmit="event.preventDefault();sendComposedEmail()">
+          <div style="display:flex;flex-direction:column;gap:10px;padding:0 0 16px">
+            <input type="email" id="composeTo" placeholder="To" required style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;color:var(--text);font-size:13px;outline:none;font-family:inherit">
+            <input type="text" id="composeSubject" placeholder="Subject" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;color:var(--text);font-size:13px;outline:none;font-family:inherit">
+            <textarea id="composeBody" placeholder="Write your message..." rows="10" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;color:var(--text);font-size:13px;outline:none;font-family:inherit;resize:vertical"></textarea>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px">
+            <button type="button" class="btn btn-ghost" onclick="closeComposeModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="composeSendBtn">Send</button>
+          </div>
+        </form>
       </div>
     </div>
   </main>
@@ -378,6 +401,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=55"></script>
+  <script src="app.js?v=56"></script>
 </body>
 </html>
