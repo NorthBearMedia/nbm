@@ -4,7 +4,7 @@ let teamMembers = [];
 let appUsers = [];
 let currentUser = null;
 let currentFilter = 'all';
-let currentView = 'clients';
+let currentView = 'dashboard';
 let showCompletedTasks = new Set();
 let calendarDate = new Date();
 let myTasksFilter = false;
@@ -128,6 +128,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
     currentView = tab.dataset.view;
+    document.getElementById('dashboardView').style.display = currentView === 'dashboard' ? '' : 'none';
     document.getElementById('clientsView').style.display = currentView === 'clients' ? '' : 'none';
     document.getElementById('todayView').style.display = currentView === 'today' ? '' : 'none';
     document.getElementById('calendarView').style.display = currentView === 'calendar' ? '' : 'none';
@@ -135,12 +136,233 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     document.getElementById('emailView').style.display = currentView === 'email' ? '' : 'none';
     document.getElementById('clientSubBar').style.display = currentView === 'clients' ? '' : 'none';
     document.getElementById('workloadSummary').style.display = currentView === 'clients' ? 'flex' : 'none';
+    if (currentView === 'dashboard') loadDashboard();
     if (currentView === 'today') loadTodayView();
     if (currentView === 'calendar') loadCalendarView();
     if (currentView === 'focus') loadFocusView();
     if (currentView === 'email') loadEmailView();
   });
 });
+
+// ─── Dashboard ─────────────────────────────────────────
+let dashWaConfigs = [];
+
+async function loadDashboard() {
+  renderDashGreeting();
+  renderDashStats();
+  renderDashUrgentTasks();
+  renderDashSchedule();
+  loadDashEmails();
+  loadDashXero();
+  loadDashWhatsApp();
+  loadDashAnalytics();
+  renderDashSocial();
+  loadDashActivity();
+}
+
+function renderDashGreeting() {
+  const name = currentUser?.display_name?.split(' ')[0] || 'there';
+  const h = new Date().getHours();
+  const greeting = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  document.getElementById('dashGreeting').textContent = `${greeting}, ${name}`;
+  const opts = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+  document.getElementById('dashDate').textContent = new Date().toLocaleDateString('en-GB', opts);
+}
+
+function renderDashStats() {
+  const today = new Date().toISOString().split('T')[0];
+  let urgent = 0, overdue = 0, dueToday = 0, totalActive = 0;
+  for (const c of clients) {
+    for (const t of (c.tasks || [])) {
+      if (['completed', 'invoiced'].includes(t.progress)) continue;
+      totalActive++;
+      const d = t.planned_date || t.deadline || '';
+      if (d && d < today) overdue++;
+      if (d === today) dueToday++;
+      if (t.priority === 'critical' || t.priority === 'high') urgent++;
+    }
+  }
+  document.getElementById('dashStats').innerHTML = `
+    <div class="dash-stat dash-stat--danger"><div class="dash-stat-icon">&#9888;</div><div class="dash-stat-value">${overdue}</div><div class="dash-stat-label">Overdue</div></div>
+    <div class="dash-stat dash-stat--warning"><div class="dash-stat-icon">&#128293;</div><div class="dash-stat-value">${urgent}</div><div class="dash-stat-label">Urgent</div></div>
+    <div class="dash-stat dash-stat--blue"><div class="dash-stat-icon">&#128197;</div><div class="dash-stat-value">${dueToday}</div><div class="dash-stat-label">Due Today</div></div>
+    <div class="dash-stat dash-stat--teal"><div class="dash-stat-icon">&#9783;</div><div class="dash-stat-value">${totalActive}</div><div class="dash-stat-label">Active Tasks</div></div>
+    <div class="dash-stat dash-stat--purple" id="dashStatEmails"><div class="dash-stat-icon">&#9993;</div><div class="dash-stat-value">—</div><div class="dash-stat-label">Unread</div></div>
+    <div class="dash-stat dash-stat--orange" id="dashStatMessages"><div class="dash-stat-icon">&#128172;</div><div class="dash-stat-value">—</div><div class="dash-stat-label">Messages</div></div>
+  `;
+}
+
+function renderDashUrgentTasks() {
+  const today = new Date().toISOString().split('T')[0];
+  const tasks = [];
+  for (const c of clients) {
+    for (const t of (c.tasks || [])) {
+      if (['completed', 'invoiced'].includes(t.progress)) continue;
+      const d = t.planned_date || t.deadline || '';
+      const isOverdue = d && d < today;
+      const isCritical = t.priority === 'critical' || t.priority === 'high';
+      if (isOverdue || isCritical) tasks.push({ ...t, client_name: c.name, client_code: c.code, overdue: isOverdue });
+    }
+  }
+  tasks.sort((a, b) => (a.overdue === b.overdue ? 0 : a.overdue ? -1 : 1));
+  const body = document.getElementById('dashUrgentBody');
+  if (!tasks.length) { body.innerHTML = '<div class="dash-widget-empty">No urgent tasks right now</div>'; return; }
+  body.innerHTML = tasks.slice(0, 8).map(t => {
+    const badge = t.overdue ? '<span class="badge badge-danger">Overdue</span>' : `<span class="badge badge-warning">${t.priority}</span>`;
+    return `<div class="dash-widget-row" onclick="openTaskModal(${t.id})"><div class="dash-widget-row-title">${esc(t.title)}</div><div class="dash-widget-row-meta">${esc(t.client_name)}</div>${badge}</div>`;
+  }).join('');
+}
+
+function renderDashSchedule() {
+  const today = new Date().toISOString().split('T')[0];
+  const tasks = [];
+  for (const c of clients) {
+    for (const t of (c.tasks || [])) {
+      if (['completed', 'invoiced'].includes(t.progress)) continue;
+      const d = t.planned_date || t.deadline || '';
+      if (d === today) tasks.push({ ...t, client_name: c.name });
+    }
+  }
+  const body = document.getElementById('dashScheduleBody');
+  if (!tasks.length) { body.innerHTML = '<div class="dash-widget-empty">Nothing scheduled today</div>'; return; }
+  body.innerHTML = tasks.map(t => {
+    const hours = t.estimated_hours ? `<span class="dash-widget-row-meta">${t.estimated_hours}h</span>` : '';
+    return `<div class="dash-widget-row" onclick="openTaskModal(${t.id})"><div class="dash-widget-row-title">${esc(t.title)}</div><div class="dash-widget-row-meta">${esc(t.assignee || 'Unassigned')} · ${esc(t.client_name)}</div>${hours}</div>`;
+  }).join('');
+}
+
+async function loadDashEmails() {
+  const body = document.getElementById('dashEmailBody');
+  if (!gmailConnected) {
+    body.innerHTML = '<div class="dash-widget-empty"><div style="font-size:28px;margin-bottom:8px">&#9993;</div><p>Connect Gmail to see your inbox</p><a href="/auth/gmail/connect" class="dash-connect-btn">Connect Gmail</a></div>';
+    return;
+  }
+  body.innerHTML = '<div class="dash-widget-empty">Loading...</div>';
+  try {
+    const data = await api('/api/gmail/inbox?label=INBOX');
+    const unread = (data.messages || []).filter(m => m.unread).length;
+    const emailStat = document.getElementById('dashStatEmails');
+    if (emailStat) emailStat.querySelector('.dash-stat-value').textContent = unread;
+    if (!data.messages?.length) { body.innerHTML = '<div class="dash-widget-empty">Inbox empty</div>'; return; }
+    body.innerHTML = data.messages.slice(0, 6).map(m => {
+      const from = m.from.replace(/<[^>]+>/g, '').trim();
+      const d = new Date(m.date);
+      const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      const cls = m.unread ? 'dash-widget-row email-row-unread' : 'dash-widget-row';
+      return `<div class="${cls}" onclick="document.querySelector('[data-view=email]').click();setTimeout(()=>openEmailThread('${m.threadId}'),300)"><div class="dash-widget-row-title">${esc(m.subject || '(no subject)')}</div><div class="dash-widget-row-meta">${esc(from)} · ${time}</div></div>`;
+    }).join('');
+  } catch { body.innerHTML = '<div class="dash-widget-empty">Failed to load emails</div>'; }
+}
+
+async function loadDashXero() {
+  const body = document.getElementById('dashXeroBody');
+  try {
+    const status = await api('/api/xero/status');
+    if (!status.configured) {
+      body.innerHTML = '<div class="dash-widget-empty"><div style="font-size:28px;margin-bottom:8px">&#128176;</div><p>Connect Xero for invoices &amp; revenue</p><p style="font-size:11px;color:var(--text-muted);margin-top:8px">Set XERO_CLIENT_ID and XERO_CLIENT_SECRET in Railway</p></div>';
+      return;
+    }
+    if (!status.connected) {
+      body.innerHTML = '<div class="dash-widget-empty"><div style="font-size:28px;margin-bottom:8px">&#128176;</div><p>Connect your Xero account</p><a href="/auth/xero/connect" class="dash-connect-btn">Connect Xero</a></div>';
+      return;
+    }
+    body.innerHTML = '<div class="dash-widget-empty">Loading...</div>';
+    const data = await api('/api/xero/dashboard');
+    const fmtMoney = n => '£' + (n || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    body.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:4px 0">
+        <div class="dash-xero-card"><div class="dash-xero-value">${fmtMoney(data.outstanding_total)}</div><div class="dash-xero-label">Outstanding</div></div>
+        <div class="dash-xero-card" style="border-color:var(--error)"><div class="dash-xero-value" style="color:var(--error)">${fmtMoney(data.overdue_total)}</div><div class="dash-xero-label">Overdue</div></div>
+        <div class="dash-xero-card" style="border-color:var(--primary)"><div class="dash-xero-value" style="color:var(--primary)">${fmtMoney(data.revenue_this_month)}</div><div class="dash-xero-label">Revenue (this month)</div></div>
+        <div class="dash-xero-card"><div class="dash-xero-value">${data.outstanding_count || 0}</div><div class="dash-xero-label">Open invoices</div></div>
+      </div>
+    `;
+  } catch { body.innerHTML = '<div class="dash-widget-empty">Failed to load Xero data</div>'; }
+}
+
+async function loadDashWhatsApp() {
+  const body1 = document.getElementById('dashWa1Body');
+  const body2 = document.getElementById('dashWa2Body');
+  try {
+    const cfg = await api('/api/whatsapp/config');
+    dashWaConfigs = cfg.configs || cfg || [];
+    if (!dashWaConfigs.length) {
+      const connectHtml = '<div class="dash-widget-empty"><div style="font-size:28px;margin-bottom:8px">&#128172;</div><p>Set up WhatsApp Business</p><p style="font-size:11px;color:var(--text-muted);margin-top:8px">Owner can configure in Settings</p></div>';
+      body1.innerHTML = connectHtml;
+      body2.innerHTML = connectHtml;
+      return;
+    }
+    for (let i = 0; i < 2; i++) {
+      const config = dashWaConfigs[i];
+      const bodyEl = i === 0 ? body1 : body2;
+      const titleEl = document.getElementById(`dashWa${i + 1}Title`);
+      const inputEl = document.getElementById(`dashWa${i + 1}Input`);
+      if (!config) { bodyEl.innerHTML = '<div class="dash-widget-empty">Not configured</div>'; continue; }
+      titleEl.textContent = `WhatsApp — ${config.label}`;
+      inputEl.style.display = 'flex';
+      try {
+        const msgs = await api(`/api/whatsapp/messages/${config.id}`);
+        const list = msgs.messages || msgs || [];
+        if (!list.length) { bodyEl.innerHTML = '<div class="dash-widget-empty">No messages yet</div>'; continue; }
+        bodyEl.innerHTML = list.slice(0, 10).reverse().map(m => {
+          const cls = m.direction === 'outbound' ? 'wa-msg wa-msg-outbound' : 'wa-msg wa-msg-inbound';
+          const name = m.contact_name || m.from_number || '';
+          const time = new Date(m.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+          return `<div class="${cls}"><div class="wa-msg-meta">${esc(name)} · ${time}</div><div>${esc(m.body)}</div></div>`;
+        }).join('');
+        bodyEl.scrollTop = bodyEl.scrollHeight;
+      } catch { bodyEl.innerHTML = '<div class="dash-widget-empty">Failed to load messages</div>'; }
+    }
+    // Update message stat
+    try {
+      const dash = await api('/api/whatsapp/dashboard');
+      const total = (dash.lines || []).reduce((s, l) => s + (l.unread_count || 0), 0);
+      const msgStat = document.getElementById('dashStatMessages');
+      if (msgStat) msgStat.querySelector('.dash-stat-value').textContent = total;
+    } catch {}
+  } catch { body1.innerHTML = '<div class="dash-widget-empty">WhatsApp unavailable</div>'; body2.innerHTML = body1.innerHTML; }
+}
+
+async function sendDashWa(lineNum) {
+  const config = dashWaConfigs[lineNum - 1];
+  if (!config) return;
+  const toEl = document.getElementById(`wa${lineNum}To`);
+  const msgEl = document.getElementById(`wa${lineNum}Msg`);
+  const to = toEl.value.trim();
+  const body = msgEl.value.trim();
+  if (!to || !body) return;
+  try {
+    await api('/api/whatsapp/send', { method: 'POST', body: { configId: config.id, to, body } });
+    msgEl.value = '';
+    loadDashWhatsApp();
+  } catch (err) { alert('Failed: ' + (err.message || 'Error')); }
+}
+
+async function loadDashAnalytics() {
+  const body = document.getElementById('dashAnalyticsBody');
+  body.innerHTML = '<div class="dash-widget-empty"><div style="font-size:28px;margin-bottom:8px">&#128200;</div><p>Web Analytics</p><p style="font-size:11px;color:var(--text-muted);margin-top:8px">Coming soon — connect Google Analytics</p></div>';
+}
+
+function renderDashSocial() {
+  const body = document.getElementById('dashSocialBody');
+  body.innerHTML = '<div class="dash-widget-empty"><div style="font-size:28px;margin-bottom:8px">&#128241;</div><p>Social Analytics</p><p style="font-size:11px;color:var(--text-muted);margin-top:8px">Coming soon — connect Meta, TikTok, LinkedIn</p></div>';
+}
+
+async function loadDashActivity() {
+  const body = document.getElementById('dashActivityBody');
+  try {
+    const data = await api('/api/history?limit=10');
+    const items = data.entries || data || [];
+    if (!items.length) { body.innerHTML = '<div class="dash-widget-empty">No recent activity</div>'; return; }
+    body.innerHTML = items.map(e => {
+      const time = new Date(e.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      return `<div class="dash-widget-row"><div class="dash-widget-row-title">${esc(e.details || e.action)}</div><div class="dash-widget-row-meta">${esc(e.display_name || '')} · ${time}</div></div>`;
+    }).join('');
+  } catch { body.innerHTML = '<div class="dash-widget-empty">Failed to load activity</div>'; }
+}
+
+// Load dashboard on initial page load
+setTimeout(() => { if (currentView === 'dashboard') loadDashboard(); }, 700);
 
 // ─── Stats ──────────────────────────────────────────────
 function renderStats() {

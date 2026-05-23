@@ -13,6 +13,8 @@ import userRoutes from './routes/users.js';
 import systemRoutes, { createBackupRoutes } from './routes/system.js';
 import aiRoutes from './routes/ai.js';
 import gmailRoutes from './routes/gmail.js';
+import xeroRoutes from './routes/xero.js';
+import whatsappRoutes from './routes/whatsapp.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -74,6 +76,8 @@ app.use(systemRoutes);
 app.use(createBackupRoutes(backupDir, backupDatabase));
 app.use(aiRoutes);
 app.use(gmailRoutes);
+app.use(xeroRoutes);
+app.use(whatsappRoutes);
 
 // ─── Seed Users ─────────────────────────────────────────
 // Creates default users ONLY when the users table is empty.

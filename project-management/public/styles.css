@@ -1954,6 +1954,323 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   .today-task { padding: 10px 16px; }
 }
 
+/* ─── DASHBOARD ─────────────────────────────────────── */
+.dashboard {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+
+/* Greeting / hero */
+.dash-greeting {
+  margin-bottom: 32px;
+}
+.dash-greeting h1 {
+  font-family: var(--font-heading);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+.dash-greeting .dash-date {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  font-weight: 400;
+}
+
+/* ── Stat cards row ── */
+.dash-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+  margin-bottom: 28px;
+}
+.dash-stat {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.dash-stat::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-glass);
+  opacity: 0;
+  transition: opacity 0.25s;
+  pointer-events: none;
+}
+.dash-stat:hover::before { opacity: 1; }
+.dash-stat:hover { border-color: rgba(62, 175, 132, 0.25); }
+
+.dash-stat-icon {
+  font-size: 18px;
+  margin-bottom: 4px;
+}
+.dash-stat-value {
+  font-family: var(--font-heading);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.1;
+}
+.dash-stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+/* Accent color variants for stat left border */
+.dash-stat--success { border-left-color: var(--success); }
+.dash-stat--warning { border-left-color: var(--warning); }
+.dash-stat--danger  { border-left-color: var(--danger); }
+.dash-stat--blue    { border-left-color: var(--blue); }
+.dash-stat--purple  { border-left-color: var(--purple); }
+.dash-stat--teal    { border-left-color: var(--teal); }
+.dash-stat--orange  { border-left-color: var(--orange); }
+
+/* ── Widget grid ── */
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+.dash-widget {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.dash-widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  min-height: 50px;
+}
+.dash-widget-title {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dash-widget-action {
+  font-size: 12px;
+  color: var(--primary);
+  cursor: pointer;
+  font-weight: 600;
+  transition: color 0.15s;
+  background: none;
+  border: none;
+  padding: 0;
+}
+.dash-widget-action:hover { color: var(--primary-hover); }
+
+.dash-widget-body {
+  padding: 12px 20px;
+  max-height: 360px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.dash-widget-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  gap: 14px;
+  min-height: 160px;
+}
+.dash-widget-empty span {
+  font-size: 28px;
+  opacity: 0.5;
+}
+
+/* ── Widget rows (task / email items) ── */
+.dash-widget-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: background 0.15s;
+  border-radius: 6px;
+  margin: 0 -8px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.dash-widget-row:last-child { border-bottom: none; }
+.dash-widget-row:hover { background: var(--bg-hover); }
+
+.dash-widget-row .row-title {
+  font-size: 13px;
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-widget-row .row-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.dash-widget-row .row-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* ── Connect button ── */
+.dash-connect-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  background: var(--gradient);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 2px 12px rgba(62, 175, 132, 0.25);
+}
+.dash-connect-btn:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(62, 175, 132, 0.35);
+}
+.dash-connect-btn:active { transform: translateY(0); }
+
+/* ── WhatsApp message bubbles ── */
+.wa-msg {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  margin-bottom: 8px;
+  position: relative;
+  word-wrap: break-word;
+}
+.wa-msg-inbound {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+  color: var(--text);
+}
+.wa-msg-outbound {
+  align-self: flex-end;
+  background: rgba(62, 175, 132, 0.15);
+  border: 1px solid rgba(62, 175, 132, 0.2);
+  border-bottom-right-radius: 4px;
+  color: var(--text);
+}
+.wa-msg-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.wa-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  background: rgba(30, 27, 28, 0.4);
+}
+.wa-input-row input {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.wa-input-row input:focus { border-color: var(--primary); }
+.wa-input-row button {
+  background: var(--gradient);
+  border: none;
+  color: #fff;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: opacity 0.15s, transform 0.15s;
+  flex-shrink: 0;
+}
+.wa-input-row button:hover { opacity: 0.9; transform: scale(1.05); }
+
+/* ── Dashboard responsive ── */
+@media (max-width: 900px) {
+  .dash-grid { grid-template-columns: 1fr; }
+  .dash-stats { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+}
+@media (max-width: 600px) {
+  .dashboard { padding: 20px 16px 40px; }
+  .dash-greeting h1 { font-size: 22px; }
+  .dash-stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .dash-stat { padding: 14px 16px; }
+  .dash-stat-value { font-size: 22px; }
+  .dash-widget-body { padding: 10px 16px; max-height: 280px; }
+}
+
+.dash-xero-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+.dash-xero-value { font-size: 20px; font-weight: 700; font-family: var(--font-heading); }
+.dash-xero-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-top: 2px; }
+.dash-widget-full { grid-column: 1 / -1; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+.badge-danger { background: rgba(220,50,50,0.15); color: #e44; }
+.badge-warning { background: rgba(230,160,30,0.15); color: #eaa020; }
+
 /* ─── EMAIL VIEW ─────────────────────────────────────── */
 .email-container { max-width: 900px; margin: 0 auto; }
 .email-toolbar {

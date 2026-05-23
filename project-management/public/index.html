@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>North Bear Console</title>
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=56">
+  <link rel="stylesheet" href="styles.css?v=57">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -19,7 +19,8 @@
       </div>
     </div>
     <div class="nav-center">
-      <button class="nav-tab active" data-view="clients"><span class="nav-icon">&#9783;</span> Home</button>
+      <button class="nav-tab active" data-view="dashboard"><span class="nav-icon">&#9670;</span> Dashboard</button>
+      <button class="nav-tab" data-view="clients"><span class="nav-icon">&#9783;</span> Tasks</button>
       <button class="nav-tab" data-view="today"><span class="nav-icon">&#9788;</span> Today</button>
       <button class="nav-tab" data-view="calendar"><span class="nav-icon">&#128197;</span> Calendar</button>
       <button class="nav-tab" data-view="focus"><span class="nav-icon">&#9889;</span> Focus</button>
@@ -76,8 +77,87 @@
   </div>
 
   <main class="main">
+    <!-- Dashboard View -->
+    <div id="dashboardView">
+      <div class="dashboard">
+        <div class="dash-greeting">
+          <h2 id="dashGreeting"></h2>
+          <p id="dashDate" class="dash-date"></p>
+        </div>
+        <div class="dash-stats" id="dashStats"></div>
+        <div class="dash-grid">
+          <div class="dash-widget" id="dashUrgentTasks">
+            <div class="dash-widget-header">
+              <span class="dash-widget-title">Urgent Tasks</span>
+              <button class="btn btn-ghost btn-sm" onclick="document.querySelector('[data-view=clients]').click()">View all</button>
+            </div>
+            <div class="dash-widget-body" id="dashUrgentBody"></div>
+          </div>
+          <div class="dash-widget" id="dashEmails">
+            <div class="dash-widget-header">
+              <span class="dash-widget-title">Latest Emails</span>
+              <button class="btn btn-ghost btn-sm" onclick="document.querySelector('[data-view=email]').click()">Inbox</button>
+            </div>
+            <div class="dash-widget-body" id="dashEmailBody"></div>
+          </div>
+          <div class="dash-widget" id="dashXero">
+            <div class="dash-widget-header">
+              <span class="dash-widget-title">Xero — Invoices &amp; Revenue</span>
+            </div>
+            <div class="dash-widget-body" id="dashXeroBody"></div>
+          </div>
+          <div class="dash-widget" id="dashSchedule">
+            <div class="dash-widget-header">
+              <span class="dash-widget-title">Today's Schedule</span>
+            </div>
+            <div class="dash-widget-body" id="dashScheduleBody"></div>
+          </div>
+          <div class="dash-widget" id="dashAnalytics">
+            <div class="dash-widget-header">
+              <span class="dash-widget-title">Web Analytics</span>
+            </div>
+            <div class="dash-widget-body" id="dashAnalyticsBody"></div>
+          </div>
+          <div class="dash-widget" id="dashSocial">
+            <div class="dash-widget-header">
+              <span class="dash-widget-title">Social Analytics</span>
+            </div>
+            <div class="dash-widget-body" id="dashSocialBody"></div>
+          </div>
+          <div class="dash-widget" id="dashWhatsapp1">
+            <div class="dash-widget-header">
+              <span class="dash-widget-title" id="dashWa1Title">WhatsApp — Line 1</span>
+            </div>
+            <div class="dash-widget-body" id="dashWa1Body"></div>
+            <div class="wa-input-row" id="dashWa1Input" style="display:none">
+              <input type="text" id="wa1To" placeholder="Phone (e.g. 447...)" class="wa-to-input">
+              <input type="text" id="wa1Msg" placeholder="Message..." class="wa-msg-input" onkeydown="if(event.key==='Enter')sendDashWa(1)">
+              <button class="btn btn-primary btn-sm" onclick="sendDashWa(1)">Send</button>
+            </div>
+          </div>
+          <div class="dash-widget" id="dashWhatsapp2">
+            <div class="dash-widget-header">
+              <span class="dash-widget-title" id="dashWa2Title">WhatsApp — Line 2</span>
+            </div>
+            <div class="dash-widget-body" id="dashWa2Body"></div>
+            <div class="wa-input-row" id="dashWa2Input" style="display:none">
+              <input type="text" id="wa2To" placeholder="Phone (e.g. 447...)" class="wa-to-input">
+              <input type="text" id="wa2Msg" placeholder="Message..." class="wa-msg-input" onkeydown="if(event.key==='Enter')sendDashWa(2)">
+              <button class="btn btn-primary btn-sm" onclick="sendDashWa(2)">Send</button>
+            </div>
+          </div>
+          <div class="dash-widget dash-widget-full" id="dashActivity">
+            <div class="dash-widget-header">
+              <span class="dash-widget-title">Recent Activity</span>
+            </div>
+            <div class="dash-widget-body" id="dashActivityBody"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="workloadSummary" class="workload-summary" style="display:none"></div>
-    <div id="clientsView">
+    <div id="clientsView" style="display:none">
       <div class="table-container">
         <div id="clientList" class="client-list"><div class="empty-state"><img src="/NBM%20Logo%20No%20NG%20Light%20Lines.png" alt="" style="width:80px;opacity:0.3;margin-bottom:16px"><p>Loading...</p></div></div>
         <div id="filterNotice" style="display:none"></div>
@@ -401,6 +481,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=56"></script>
+  <script src="app.js?v=57"></script>
 </body>
 </html>

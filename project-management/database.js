@@ -176,6 +176,49 @@ db.exec(`CREATE TABLE IF NOT EXISTS gmail_tokens (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 )`);
 
+// Xero OAuth tokens
+db.exec(`CREATE TABLE IF NOT EXISTS xero_tokens (
+  user_id INTEGER PRIMARY KEY,
+  access_token TEXT NOT NULL,
+  refresh_token TEXT NOT NULL,
+  expiry_date INTEGER NOT NULL,
+  tenant_id TEXT DEFAULT '',
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+)`);
+
+// WhatsApp Business API config (one row per phone number)
+db.exec(`CREATE TABLE IF NOT EXISTS whatsapp_config (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  label TEXT NOT NULL,
+  phone_number_id TEXT NOT NULL,
+  waba_id TEXT DEFAULT '',
+  access_token TEXT NOT NULL,
+  verify_token TEXT NOT NULL,
+  enabled INTEGER DEFAULT 1
+)`);
+
+// WhatsApp messages
+db.exec(`CREATE TABLE IF NOT EXISTS whatsapp_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  config_id INTEGER NOT NULL,
+  direction TEXT NOT NULL DEFAULT 'inbound',
+  from_number TEXT DEFAULT '',
+  to_number TEXT DEFAULT '',
+  contact_name TEXT DEFAULT '',
+  body TEXT DEFAULT '',
+  timestamp TEXT DEFAULT (datetime('now')),
+  wa_message_id TEXT DEFAULT '',
+  read INTEGER DEFAULT 0,
+  FOREIGN KEY (config_id) REFERENCES whatsapp_config(id) ON DELETE CASCADE
+)`);
+
+// Analytics config
+db.exec(`CREATE TABLE IF NOT EXISTS analytics_config (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  ga_property_id TEXT DEFAULT '',
+  enabled INTEGER DEFAULT 1
+)`);
+
 // Backfill client_id from projects for tasks that don't have it yet
 try {
   const unfilled = db.prepare("SELECT count(*) as c FROM tasks WHERE client_id IS NULL AND project_id IS NOT NULL").get().c;
