@@ -51,10 +51,7 @@ router.get('/auth/gmail/connect', requireAuth, (req, res) => {
   const url = oauth2.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
-    scope: [
-      'https://www.googleapis.com/auth/gmail.readonly',
-      'https://www.googleapis.com/auth/userinfo.email',
-    ],
+    scope: ['https://www.googleapis.com/auth/gmail.readonly'],
   });
   res.redirect(url);
 });
@@ -68,9 +65,9 @@ router.get('/auth/gmail/callback', requireAuth, async (req, res) => {
     const { tokens } = await oauth2.getToken(code);
     oauth2.setCredentials(tokens);
 
-    const people = google.people({ version: 'v1', auth: oauth2 });
-    const me = await people.people.get({ resourceName: 'people/me', personFields: 'emailAddresses' });
-    const email = me.data.emailAddresses?.[0]?.value || '';
+    const gmail = google.gmail({ version: 'v1', auth: oauth2 });
+    const profile = await gmail.users.getProfile({ userId: 'me' });
+    const email = profile.data.emailAddress || '';
 
     db.prepare(
       'INSERT INTO gmail_tokens (user_id, access_token, refresh_token, expiry_date, email) VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET access_token=?, refresh_token=?, expiry_date=?, email=?'
