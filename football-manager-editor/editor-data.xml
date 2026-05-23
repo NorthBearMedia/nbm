@@ -1,0 +1,425 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+================================================================================
+  FOOTBALL MANAGER - EDITOR DATA (human-readable source file)
+================================================================================
+
+  WHAT THIS IS
+  A complete, well-formed blueprint of the data changes you want to make in
+  Football Manager: clubs, players, attributes, contracts and transfers. It
+  uses FM's real data model so it maps 1:1 onto the in-game editor's fields.
+
+  IMPORTANT: HOW FM ACTUALLY STORES EDITS
+  The official FM in-game / pre-game editor saves its projects as a COMPILED
+  BINARY ".fmf" file. There is no supported way to hand-write a .fmf, and the
+  editor has no "import arbitrary XML data" button. So this XML is NOT loaded
+  directly by the game. Use it as the authoritative spec:
+
+    1. Open the Football Manager Editor (Steam > Library > Tools).
+    2. File > New Database (pick the same data level you ship for).
+    3. Recreate each <club>/<player>/<transfer> below using these exact values.
+    4. File > Save (or Build) -> produces "your-edits.fmf".
+    5. Drop the .fmf in:
+         Documents/Sports Interactive/Football Manager 20XX/editor data/
+    6. Tick it on the "Add/Remove" screen when starting a new save.
+
+  CONVENTIONS USED BELOW
+  * Attributes:        integer 1-20 (FM player attribute scale).
+  * current_ability /
+    potential_ability: integer 1-200 (FM CA/PA scale). For PA, a NEGATIVE value
+                       means a random range, mirroring the editor:
+                         -10 = 170-200, -9 = 150-180, -8 = 130-160, -75 = exactly 75+random.
+  * Positions:         rating 1-20 for how natural a player is there
+                       (20 = natural, 1 = makeshift). Omit a position to leave it 1.
+  * Dates:             YYYY-MM-DD.
+  * Money:             whole units of the club's currency (no separators).
+  * unique_id:         editor entity id. Use negative ids for NEW entities you
+                       are creating so they never clash with the base database.
+                       Reference real existing entities by their real positive id.
+================================================================================
+-->
+<football_manager_editor_data version="2024" data_format="fm-editor-source-1.0">
+
+  <meta>
+    <project_name>North Bear FC Project</project_name>
+    <author>North Bear Media</author>
+    <game_version>Football Manager 2024</game_version>
+    <notes>Sample template: one new club, one newgen wonderkid, edited star player, and a transfer.</notes>
+  </meta>
+
+  <!-- ====================== NATIONS (reference existing) ====================== -->
+  <nations>
+    <!-- England already exists in the base DB; we only reference it by id. -->
+    <nation unique_id="769" name="England" nationality="English" continent="Europe"/>
+  </nations>
+
+  <!-- ====================== STADIUMS ====================== -->
+  <stadiums>
+    <stadium unique_id="-9001" name="The Bear Pit" capacity="24500" seating="24500" nation_id="769"/>
+  </stadiums>
+
+  <!-- ====================== COMPETITIONS (reference existing) ====================== -->
+  <competitions>
+    <!-- Reference an existing division to place the new club into. -->
+    <competition unique_id="612" name="Sky Bet Championship" nation_id="769" reputation="6500"/>
+  </competitions>
+
+  <!-- ====================== CLUBS ====================== -->
+  <clubs>
+    <club unique_id="-1000" name="North Bear FC" short_name="North Bear" nickname="The Bears">
+      <nation_id>769</nation_id>
+      <city>Newcastle</city>
+      <founded>2026</founded>
+      <reputation>6200</reputation>          <!-- 1-10000 -->
+      <division_id>612</division_id>          <!-- plays in the Championship reference above -->
+      <stadium_id>-9001</stadium_id>
+      <finances>
+        <currency>GBP</currency>
+        <balance>18000000</balance>
+        <transfer_budget>12000000</transfer_budget>
+        <wage_budget_weekly>350000</wage_budget_weekly>
+      </finances>
+      <colours>
+        <primary>#0A2A4A</primary>
+        <secondary>#2EAA7B</secondary>
+      </colours>
+    </club>
+  </clubs>
+
+  <!-- ====================== PLAYERS ====================== -->
+  <players>
+
+    <!-- 1) GOALKEEPER (note the goalkeeping attribute block) -->
+    <player unique_id="-2001">
+      <first_name>Marcus</first_name>
+      <last_name>Bell</last_name>
+      <common_name></common_name>
+      <date_of_birth>1997-03-14</date_of_birth>
+      <nation_id>769</nation_id>
+      <second_nation_id></second_nation_id>
+      <club_id>-1000</club_id>
+      <squad_number>1</squad_number>
+      <height_cm>191</height_cm>
+      <weight_kg>84</weight_kg>
+      <preferred_foot>Right</preferred_foot>     <!-- Right | Left | Either -->
+      <current_ability>132</current_ability>
+      <potential_ability>150</potential_ability>
+      <positions>
+        <position name="GK" rating="20"/>
+      </positions>
+      <goalkeeping>
+        <aerial_reach>13</aerial_reach>
+        <command_of_area>12</command_of_area>
+        <communication>13</communication>
+        <eccentricity>6</eccentricity>
+        <first_touch>11</first_touch>
+        <handling>14</handling>
+        <kicking>13</kicking>
+        <one_on_ones>13</one_on_ones>
+        <passing>11</passing>
+        <punching_tendency>9</punching_tendency>
+        <reflexes>15</reflexes>
+        <rushing_out_tendency>11</rushing_out_tendency>
+        <throwing>12</throwing>
+      </goalkeeping>
+      <mental>
+        <aggression>9</aggression>
+        <anticipation>13</anticipation>
+        <bravery>13</bravery>
+        <composure>13</composure>
+        <concentration>14</concentration>
+        <decisions>13</decisions>
+        <determination>15</determination>
+        <flair>7</flair>
+        <leadership>12</leadership>
+        <off_the_ball>4</off_the_ball>
+        <positioning>14</positioning>
+        <teamwork>12</teamwork>
+        <vision>10</vision>
+        <work_rate>13</work_rate>
+      </mental>
+      <physical>
+        <acceleration>11</acceleration>
+        <agility>13</agility>
+        <balance>12</balance>
+        <jumping_reach>14</jumping_reach>
+        <natural_fitness>15</natural_fitness>
+        <pace>11</pace>
+        <stamina>12</stamina>
+        <strength>13</strength>
+      </physical>
+      <hidden>
+        <consistency>13</consistency>
+        <important_matches>12</important_matches>
+        <injury_proneness>7</injury_proneness>
+        <versatility>6</versatility>
+      </hidden>
+      <personality>Professional</personality>
+      <media_handling>Reserved</media_handling>
+      <contract>
+        <wage_weekly>14000</wage_weekly>
+        <expires>2028-06-30</expires>
+        <release_clause>0</release_clause>
+        <value>3500000</value>
+      </contract>
+    </player>
+
+    <!-- 2) STAR OUTFIELD PLAYER (edited existing-style profile) -->
+    <player unique_id="-2002">
+      <first_name>Diogo</first_name>
+      <last_name>Faria</last_name>
+      <common_name></common_name>
+      <date_of_birth>1998-11-02</date_of_birth>
+      <nation_id>769</nation_id>
+      <club_id>-1000</club_id>
+      <squad_number>10</squad_number>
+      <height_cm>179</height_cm>
+      <weight_kg>74</weight_kg>
+      <preferred_foot>Left</preferred_foot>
+      <current_ability>158</current_ability>
+      <potential_ability>168</potential_ability>
+      <positions>
+        <position name="AM(C)" rating="20"/>
+        <position name="AM(L)" rating="16"/>
+        <position name="M(C)"  rating="14"/>
+        <position name="ST(C)" rating="13"/>
+      </positions>
+      <technical>
+        <corners>14</corners>
+        <crossing>14</crossing>
+        <dribbling>17</dribbling>
+        <finishing>15</finishing>
+        <first_touch>16</first_touch>
+        <free_kick_taking>15</free_kick_taking>
+        <heading>9</heading>
+        <long_shots>15</long_shots>
+        <long_throws>5</long_throws>
+        <marking>7</marking>
+        <passing>17</passing>
+        <penalty_taking>14</penalty_taking>
+        <tackling>8</tackling>
+        <technique>17</technique>
+      </technical>
+      <mental>
+        <aggression>10</aggression>
+        <anticipation>15</anticipation>
+        <bravery>12</bravery>
+        <composure>16</composure>
+        <concentration>14</concentration>
+        <decisions>16</decisions>
+        <determination>15</determination>
+        <flair>17</flair>
+        <leadership>12</leadership>
+        <off_the_ball>16</off_the_ball>
+        <positioning>11</positioning>
+        <teamwork>13</teamwork>
+        <vision>17</vision>
+        <work_rate>13</work_rate>
+      </mental>
+      <physical>
+        <acceleration>15</acceleration>
+        <agility>16</agility>
+        <balance>15</balance>
+        <jumping_reach>9</jumping_reach>
+        <natural_fitness>15</natural_fitness>
+        <pace>15</pace>
+        <stamina>14</stamina>
+        <strength>11</strength>
+      </physical>
+      <hidden>
+        <consistency>15</consistency>
+        <important_matches>15</important_matches>
+        <injury_proneness>6</injury_proneness>
+        <versatility>12</versatility>
+      </hidden>
+      <personality>Model Professional</personality>
+      <media_handling>Outspoken</media_handling>
+      <preferred_moves>
+        <move>Tries Killer Balls Often</move>
+        <move>Plays One-Twos</move>
+        <move>Cuts Inside From Both Wings</move>
+      </preferred_moves>
+      <contract>
+        <wage_weekly>42000</wage_weekly>
+        <expires>2029-06-30</expires>
+        <release_clause>25000000</release_clause>
+        <value>22000000</value>
+      </contract>
+    </player>
+
+    <!-- 3) NEWGEN WONDERKID (negative PA = random high range) -->
+    <player unique_id="-2003">
+      <first_name>Kai</first_name>
+      <last_name>Ferguson</last_name>
+      <common_name></common_name>
+      <date_of_birth>2008-07-21</date_of_birth>   <!-- 17 y/o at a 2026 start -->
+      <nation_id>769</nation_id>
+      <club_id>-1000</club_id>
+      <squad_number>37</squad_number>
+      <height_cm>183</height_cm>
+      <weight_kg>72</weight_kg>
+      <preferred_foot>Right</preferred_foot>
+      <current_ability>108</current_ability>
+      <potential_ability>-9</potential_ability>   <!-- random 150-180 -->
+      <positions>
+        <position name="M(C)"  rating="20"/>
+        <position name="DM"    rating="16"/>
+        <position name="AM(C)" rating="14"/>
+      </positions>
+      <technical>
+        <corners>9</corners>
+        <crossing>11</crossing>
+        <dribbling>13</dribbling>
+        <finishing>10</finishing>
+        <first_touch>14</first_touch>
+        <free_kick_taking>9</free_kick_taking>
+        <heading>10</heading>
+        <long_shots>12</long_shots>
+        <long_throws>4</long_throws>
+        <marking>11</marking>
+        <passing>15</passing>
+        <penalty_taking>9</penalty_taking>
+        <tackling>13</tackling>
+        <technique>14</technique>
+      </technical>
+      <mental>
+        <aggression>12</aggression>
+        <anticipation>13</anticipation>
+        <bravery>13</bravery>
+        <composure>13</composure>
+        <concentration>12</concentration>
+        <decisions>14</decisions>
+        <determination>17</determination>
+        <flair>13</flair>
+        <leadership>10</leadership>
+        <off_the_ball>13</off_the_ball>
+        <positioning>13</positioning>
+        <teamwork>15</teamwork>
+        <vision>15</vision>
+        <work_rate>15</work_rate>
+      </mental>
+      <physical>
+        <acceleration>13</acceleration>
+        <agility>13</agility>
+        <balance>13</balance>
+        <jumping_reach>12</jumping_reach>
+        <natural_fitness>15</natural_fitness>
+        <pace>13</pace>
+        <stamina>14</stamina>
+        <strength>12</strength>
+      </physical>
+      <hidden>
+        <consistency>12</consistency>
+        <important_matches>11</important_matches>
+        <injury_proneness>5</injury_proneness>
+        <versatility>13</versatility>
+      </hidden>
+      <personality>Determined</personality>
+      <media_handling>Unflappable</media_handling>
+      <contract>
+        <wage_weekly>3500</wage_weekly>
+        <expires>2030-06-30</expires>
+        <release_clause>0</release_clause>
+        <value>1200000</value>
+      </contract>
+    </player>
+
+    <!-- 4) NO-NONSENSE CENTRE-BACK -->
+    <player unique_id="-2004">
+      <first_name>Tomas</first_name>
+      <last_name>Novak</last_name>
+      <common_name></common_name>
+      <date_of_birth>1995-01-30</date_of_birth>
+      <nation_id>769</nation_id>
+      <club_id>-1000</club_id>
+      <squad_number>4</squad_number>
+      <height_cm>190</height_cm>
+      <weight_kg>85</weight_kg>
+      <preferred_foot>Right</preferred_foot>
+      <current_ability>140</current_ability>
+      <potential_ability>145</potential_ability>
+      <positions>
+        <position name="D(C)" rating="20"/>
+        <position name="DM"   rating="12"/>
+        <position name="D(R)" rating="10"/>
+      </positions>
+      <technical>
+        <corners>3</corners>
+        <crossing>6</crossing>
+        <dribbling>7</dribbling>
+        <finishing>5</finishing>
+        <first_touch>11</first_touch>
+        <free_kick_taking>4</free_kick_taking>
+        <heading>16</heading>
+        <long_shots>6</long_shots>
+        <long_throws>5</long_throws>
+        <marking>16</marking>
+        <passing>12</passing>
+        <penalty_taking>5</penalty_taking>
+        <tackling>16</tackling>
+        <technique>10</technique>
+      </technical>
+      <mental>
+        <aggression>15</aggression>
+        <anticipation>15</anticipation>
+        <bravery>16</bravery>
+        <composure>13</composure>
+        <concentration>15</concentration>
+        <decisions>14</decisions>
+        <determination>15</determination>
+        <flair>5</flair>
+        <leadership>15</leadership>
+        <off_the_ball>7</off_the_ball>
+        <positioning>16</positioning>
+        <teamwork>14</teamwork>
+        <vision>10</vision>
+        <work_rate>14</work_rate>
+      </mental>
+      <physical>
+        <acceleration>11</acceleration>
+        <agility>10</agility>
+        <balance>13</balance>
+        <jumping_reach>16</jumping_reach>
+        <natural_fitness>15</natural_fitness>
+        <pace>12</pace>
+        <stamina>13</stamina>
+        <strength>16</strength>
+      </physical>
+      <hidden>
+        <consistency>14</consistency>
+        <important_matches>13</important_matches>
+        <injury_proneness>8</injury_proneness>
+        <versatility>9</versatility>
+      </hidden>
+      <personality>Leader</personality>
+      <media_handling>Level-Headed</media_handling>
+      <contract>
+        <wage_weekly>28000</wage_weekly>
+        <expires>2027-06-30</expires>
+        <release_clause>0</release_clause>
+        <value>9000000</value>
+      </contract>
+    </player>
+
+  </players>
+
+  <!-- ====================== TRANSFERS ====================== -->
+  <!--
+    A transfer moves a player to a club on a date for a fee. Reference players
+    and clubs by their unique_id. For loans, set type="loan" and add a
+    loan_until date.
+  -->
+  <transfers>
+    <transfer>
+      <player_id>-2002</player_id>            <!-- Diogo Faria -->
+      <from_club_id>-1000</from_club_id>       <!-- North Bear FC -->
+      <to_club_id>-1000</to_club_id>           <!-- stays (illustrative); change to a real club id to sell -->
+      <type>permanent</type>                   <!-- permanent | loan | free -->
+      <date>2026-08-15</date>
+      <fee>22000000</fee>
+      <currency>GBP</currency>
+      <loan_until></loan_until>
+    </transfer>
+  </transfers>
+
+</football_manager_editor_data>
