@@ -128,6 +128,7 @@ function renderSetup() {
       <div class="wizard-body">
         <p class="hint" style="margin-bottom:10px">Once Google is connected, this fills in every site's Analytics &amp; Search Console automatically (and checks each website for installed tags). Re-run it any time.</p>
         <button class="btn primary" id="autoConnectAllBtn">⚡ Auto-connect all sites</button>
+        <button class="btn" id="hostingerImportBtn">⬇ Import websites from Hostinger</button>
         <div id="importBlock" style="margin-top:14px"></div>
       </div>
     </div>
@@ -171,6 +172,7 @@ function renderSetup() {
 
   // step 3 events
   $('#autoConnectAllBtn')?.addEventListener('click', autoConnectAll);
+  $('#hostingerImportBtn')?.addEventListener('click', hostingerImport);
   if (lastDiscovery) renderImportBlock();
 }
 
@@ -238,6 +240,50 @@ async function autoConnectAll(e) {
   else toast(`Done — ${filledCount} connection(s) filled in, everything wired up ✓`, 'ok', 7000);
 }
 
+async function hostingerImport(e) {
+  const btn = e.target;
+  btn.disabled = true; btn.textContent = 'Fetching your websites…';
+  let data;
+  try { data = await api('/api/hostinger/websites'); }
+  catch (err) {
+    toast(err.message, 'err', 9000);
+    btn.disabled = false; btn.textContent = '⬇ Import websites from Hostinger';
+    return;
+  }
+  btn.disabled = false; btn.textContent = '⬇ Import websites from Hostinger';
+  const fresh = data.websites.filter(w => !w.alreadyInPulse);
+  $('#modalRoot').innerHTML = `
+  <div class="modal-backdrop" id="backdrop"><div class="modal">
+    <h3>Websites on your Hostinger account</h3>
+    ${fresh.length ? `
+      <p class="hint" style="margin-bottom:10px">Tick the client websites to bring into Pulse. Each is set to monthly reports —
+      nothing sends until you add that client's email address.</p>
+      ${fresh.map(w => `
+        <label class="import-row"><input type="checkbox" value="${esc(w.domain)}" checked>
+          <strong>${esc(w.domain)}</strong></label>`).join('')}
+      <div class="modal-actions">
+        <button class="btn" id="cancelBtn">Cancel</button>
+        <button class="btn primary" id="hostingerImportConfirm">Import &amp; auto-connect selected</button>
+      </div>` : `
+      <p class="hint">All ${data.websites.length} Hostinger website(s) are already in Pulse ✓</p>
+      <div class="modal-actions"><button class="btn" id="cancelBtn">Close</button></div>`}
+  </div></div>`;
+  $('#cancelBtn').onclick = closeModal;
+  $('#backdrop').onclick = ev => { if (ev.target.id === 'backdrop') closeModal(); };
+  $('#hostingerImportConfirm')?.addEventListener('click', async (ev) => {
+    const domains = [...document.querySelectorAll('#modalRoot input:checked')].map(i => i.value);
+    if (!domains.length) return toast('Nothing ticked', 'err');
+    ev.target.disabled = true; ev.target.textContent = 'Importing & connecting…';
+    try {
+      const r = await api('/api/hostinger/import-sites', { method: 'POST', body: { domains } });
+      closeModal();
+      const lines = r.results.map(x => `${x.domain}: ${x.filled.length ? 'connected ' + x.filled.join(', ') : x.notes[0] || 'imported'}`);
+      showNotesModal('Hostinger import complete', `${r.created} site(s) imported.`, lines);
+      await Promise.all([loadSites(), refreshSetup()]);
+    } catch (err) { toast(err.message, 'err', 9000); ev.target.disabled = false; ev.target.textContent = 'Import & auto-connect selected'; }
+  });
+}
+
 function showNotesModal(title, summary, notes) {
   $('#modalRoot').innerHTML = `
   <div class="modal-backdrop" id="backdrop"><div class="modal">
@@ -266,6 +312,9 @@ function showSettingsModal() {
           <div class="help">Your own Google email. With domain-wide delegation authorised in Google Workspace admin
           (incl. the <strong>webmasters.readonly</strong> scope), rankings are read as you — read-only, and no
           per-site grants are ever needed.</div></div>
+        <div class="field full"><label>Hostinger API token ${s.hostinger_token_set ? '(saved — leave blank to keep)' : ''}</label>
+          <input name="hostinger_api_token" type="password" placeholder="${s.hostinger_token_set ? '••••••••••••' : 'hPanel → Account → API → New token'}">
+          <div class="help">Lets Pulse list every website on your Hostinger account and import them in one click.</div></div>
         <div class="field full"><label>Replace Google service account key (optional)</label>
           <textarea name="google_json" rows="3" placeholder='Paste new key JSON only if you need to replace it${setup.googleServiceAccountEmail ? ' — current: ' + esc(setup.googleServiceAccountEmail) : ''}'></textarea></div>
       </div>

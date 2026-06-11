@@ -19,6 +19,7 @@ import { testSmtp, sendTestEmail } from './lib/email.js';
 import { discoverAll, clearDiscoveryCache, normalizeHost } from './lib/discovery.js';
 import { autoConnectSite } from './lib/autoconnect.js';
 import { seedFirstCustomer } from './lib/seed.js';
+import * as hostinger from './lib/hostinger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -293,6 +294,41 @@ app.get('/api/reports/:id/download', requireAdmin, (req, res) => {
 app.post('/api/sync-clarity', requireAdmin, async (req, res) => {
   const synced = await syncAllClarity();
   res.json({ ok: true, synced });
+});
+
+// ─── Hostinger: list + one-click import of all hosted sites ──────
+app.get('/api/hostinger/websites', requireAdmin, async (req, res) => {
+  try {
+    const domains = await hostinger.listDomains();
+    const existing = new Set(db.prepare('SELECT domain FROM sites').all().map(r => normalizeHost(r.domain)).filter(Boolean));
+    res.json({ ok: true, websites: domains.map(d => ({ ...d, alreadyInPulse: existing.has(normalizeHost(d.domain)) })) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/hostinger/import-sites', requireAdmin, async (req, res) => {
+  const wanted = (req.body?.domains || []).map(d => normalizeHost(d)).filter(Boolean);
+  if (!wanted.length) return res.status(400).json({ error: 'No websites selected' });
+  const existing = new Set(db.prepare('SELECT domain FROM sites').all().map(r => normalizeHost(r.domain)).filter(Boolean));
+  const created = [];
+  for (const domain of wanted) {
+    if (existing.has(domain)) continue;
+    const prettyName = domain.split('.')[0].replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const info = db.prepare(`INSERT INTO sites (client_name, domain, report_frequency, notes, dashboard_token, next_report_at)
+                             VALUES (?, ?, 'monthly', ?, ?, ?)`)
+      .run(prettyName, domain,
+        'Imported from Hostinger — add the client\'s email to start their monthly reports.',
+        newDashboardToken(), nextRunAt('monthly'));
+    created.push({ id: info.lastInsertRowid, domain });
+  }
+  // Wire up whatever can be discovered, site by site (Google + installed tags).
+  const results = [];
+  for (const site of created) {
+    try {
+      const r = await autoConnectSite(site.id);
+      results.push({ domain: site.domain, filled: Object.keys(r.filled), notes: r.notes });
+    } catch (err) { results.push({ domain: site.domain, filled: [], notes: [err.message] }); }
+  }
+  res.json({ ok: true, created: created.length, results });
 });
 
 // ─── Client-facing (secret dashboard link, no login) ─────────────
