@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your Website Dashboard — North Bear Media</title>
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="icon" href="/assets/favicon.svg">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <img class="logo" src="/assets/nbm-logo-light-trimmed.png" alt="North Bear Media">
+      <div>
+        <div class="title">Your Website <span>Dashboard</span></div>
+        <div class="subtitle">Live analytics by North Bear Media</div>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn primary" id="requestReportBtn">✉ Email me a fresh report</button>
+    </div>
+
+    <div id="app">
+      <div class="loading-overlay"><div class="spinner"></div>Fetching your latest numbers…</div>
+    </div>
+
+    <div class="footer-note">
+      Dashboard &amp; reports by <a href="https://northbearmedia.co.uk" target="_blank" rel="noopener">North Bear Media</a>
+      · Questions? <a href="mailto:info@northbearmedia.co.uk">info@northbearmedia.co.uk</a>
+    </div>
+  </div>
+  <div id="toast"></div>
+  <script src="/client.js"></script>
+</body>
+</html>

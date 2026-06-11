@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>North Bear Pulse — Login</title>
+  <link rel="icon" href="/assets/favicon.svg">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <img src="/assets/nbm-logo-light-trimmed.png" alt="North Bear Media">
+      <h1>North Bear <span style="color:var(--green-light)">Pulse</span></h1>
+      <p>Client analytics &amp; automated reports</p>
+      <form id="loginForm">
+        <input type="password" id="password" placeholder="Admin password" autofocus autocomplete="current-password">
+        <button class="btn primary" type="submit">Sign in</button>
+        <div class="login-error" id="error"></div>
+      </form>
+    </div>
+  </div>
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: document.getElementById('password').value }),
+      });
+      if (res.ok) location.href = '/';
+      else document.getElementById('error').textContent = (await res.json()).error || 'Login failed';
+    });
+  </script>
+</body>
+</html>

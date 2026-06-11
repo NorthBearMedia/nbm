@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>North Bear Pulse — Admin</title>
+  <link rel="icon" href="/assets/favicon.svg">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <img class="logo" src="/assets/nbm-logo-light-trimmed.png" alt="North Bear Media">
+      <div>
+        <div class="title">North Bear <span>Pulse</span></div>
+        <div class="subtitle">Client analytics &amp; automated reports</div>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn" id="syncClarityBtn" title="Snapshot today's Microsoft Clarity data for all sites">Sync Clarity</button>
+      <button class="btn" id="testEmailBtn">Test email</button>
+      <button class="btn primary" id="addSiteBtn">+ Add client site</button>
+      <button class="btn" id="logoutBtn">Log out</button>
+    </div>
+
+    <div class="panel" id="setupPanel" style="display:none"></div>
+
+    <div class="section-head"><h2>Client sites</h2><div class="accent"></div><span class="hint" id="siteCount"></span></div>
+    <div class="sites-grid" id="sitesGrid"></div>
+    <div class="loading-overlay" id="loading"><div class="spinner"></div>Loading…</div>
+  </div>
+
+  <div id="modalRoot"></div>
+  <div id="toast"></div>
+  <script src="/admin.js"></script>
+</body>
+</html>

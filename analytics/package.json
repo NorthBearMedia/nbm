@@ -1,0 +1,26 @@
+{
+  "name": "north-bear-pulse",
+  "version": "1.0.0",
+  "description": "North Bear Pulse — automated client analytics dashboards and branded PDF reports for North Bear Media",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "sample-report": "node scripts/sample-report.js",
+    "sync-clarity": "node scripts/sync-clarity.js",
+    "send-due": "node scripts/send-due.js"
+  },
+  "author": "North Bear Media",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "google-auth-library": "^9.15.0",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.9.16",
+    "pdfkit": "^0.15.1"
+  }
+}

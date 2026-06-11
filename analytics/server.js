@@ -1,0 +1,257 @@
+import express from 'express';
+import cookieParser from 'cookie-parser';
+import { createHmac, timingSafeEqual } from 'crypto';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { existsSync } from 'fs';
+
+import { config, setupStatus } from './config.js';
+import db, { newDashboardToken } from './database.js';
+import { startScheduler, syncAllClarity } from './lib/scheduler.js';
+import { runReport, previewReportPdf } from './lib/reporter.js';
+import { gatherReportData } from './lib/report-data.js';
+import { nextRunAt, periodFor, addDays, todayISO } from './lib/dates.js';
+import * as ga4 from './lib/ga4.js';
+import * as gsc from './lib/gsc.js';
+import * as clarity from './lib/clarity.js';
+import { testSmtp } from './lib/email.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const app = express();
+app.use(express.json());
+app.use(cookieParser());
+
+// ─── Admin auth (single password, stateless HMAC-signed cookie) ──
+const SECRET = createHmac('sha256', 'nbm-pulse-v1').update(config.adminPassword || 'unset').digest();
+
+function signSession(expiresMs) {
+  const sig = createHmac('sha256', SECRET).update(String(expiresMs)).digest('hex');
+  return `${expiresMs}.${sig}`;
+}
+
+function isValidSession(token) {
+  if (!token || !config.adminPassword) return false;
+  const [expires, sig] = token.split('.');
+  if (!expires || !sig || Number(expires) < Date.now()) return false;
+  const expected = createHmac('sha256', SECRET).update(expires).digest('hex');
+  try { return timingSafeEqual(Buffer.from(sig), Buffer.from(expected)); } catch { return false; }
+}
+
+function requireAdmin(req, res, next) {
+  if (!isValidSession(req.cookies?.pulse_session)) return res.status(401).json({ error: 'Not authenticated' });
+  next();
+}
+
+app.post('/api/login', (req, res) => {
+  if (!config.adminPassword) return res.status(500).json({ error: 'ADMIN_PASSWORD is not set on the server' });
+  if (req.body?.password !== config.adminPassword) return res.status(401).json({ error: 'Wrong password' });
+  const expires = Date.now() + 7 * 24 * 60 * 60 * 1000;
+  res.cookie('pulse_session', signSession(expires), { httpOnly: true, maxAge: expires - Date.now(), sameSite: 'lax' });
+  res.json({ ok: true });
+});
+
+app.post('/api/logout', (req, res) => {
+  res.clearCookie('pulse_session');
+  res.json({ ok: true });
+});
+
+// ─── Admin: setup + sites ─────────────────────────────────────────
+app.get('/api/setup-status', requireAdmin, (req, res) => res.json(setupStatus()));
+
+app.post('/api/test-smtp', requireAdmin, async (req, res) => {
+  try { await testSmtp(); res.json({ ok: true }); }
+  catch (err) { res.json({ ok: false, error: err.message }); }
+});
+
+function siteSummary(site) {
+  const lastReport = db.prepare('SELECT created_at, status, period_label, trigger_type FROM reports WHERE site_id = ? ORDER BY id DESC LIMIT 1').get(site.id);
+  const claritySnapshots = db.prepare('SELECT COUNT(*) AS n FROM clarity_snapshots WHERE site_id = ?').get(site.id).n;
+  const { clarity_api_token, ...safe } = site;
+  return {
+    ...safe,
+    has_clarity_token: Boolean(clarity_api_token),
+    lastReport: lastReport || null,
+    claritySnapshots,
+    dashboardUrl: `${config.appUrl}/r/${site.dashboard_token}`,
+  };
+}
+
+app.get('/api/sites', requireAdmin, (req, res) => {
+  const sites = db.prepare('SELECT * FROM sites ORDER BY client_name COLLATE NOCASE').all();
+  res.json(sites.map(siteSummary));
+});
+
+const SITE_FIELDS = ['client_name', 'contact_name', 'contact_emails', 'domain', 'ga4_property_id', 'ga4_measurement_id', 'gsc_site_url', 'clarity_project_id', 'clarity_api_token', 'report_frequency', 'notes'];
+
+function cleanSiteBody(body) {
+  const out = {};
+  for (const f of SITE_FIELDS) {
+    if (body[f] !== undefined) out[f] = String(body[f] ?? '').trim();
+  }
+  if (out.report_frequency && !['weekly', 'monthly', 'quarterly', 'none'].includes(out.report_frequency)) {
+    out.report_frequency = 'monthly';
+  }
+  return out;
+}
+
+app.post('/api/sites', requireAdmin, (req, res) => {
+  const data = cleanSiteBody(req.body || {});
+  if (!data.client_name) return res.status(400).json({ error: 'Client name is required' });
+  const freq = data.report_frequency || 'monthly';
+  const info = db.prepare(`INSERT INTO sites (client_name, contact_name, contact_emails, domain, ga4_property_id, ga4_measurement_id, gsc_site_url, clarity_project_id, clarity_api_token, report_frequency, notes, dashboard_token, next_report_at)
+    VALUES (@client_name, @contact_name, @contact_emails, @domain, @ga4_property_id, @ga4_measurement_id, @gsc_site_url, @clarity_project_id, @clarity_api_token, @report_frequency, @notes, @token, @next)`)
+    .run({
+      client_name: '', contact_name: '', contact_emails: '', domain: '', ga4_property_id: '', ga4_measurement_id: '',
+      gsc_site_url: '', clarity_project_id: '', clarity_api_token: '', notes: '',
+      ...data, report_frequency: freq,
+      token: newDashboardToken(), next: nextRunAt(freq),
+    });
+  res.json(siteSummary(db.prepare('SELECT * FROM sites WHERE id = ?').get(info.lastInsertRowid)));
+});
+
+app.put('/api/sites/:id', requireAdmin, (req, res) => {
+  const site = db.prepare('SELECT * FROM sites WHERE id = ?').get(req.params.id);
+  if (!site) return res.status(404).json({ error: 'Site not found' });
+  const data = cleanSiteBody(req.body || {});
+  // Blank clarity token in the form means "keep the existing one".
+  if (data.clarity_api_token === '') delete data.clarity_api_token;
+  if (req.body?.clear_clarity_token) data.clarity_api_token = '';
+  if (req.body?.active !== undefined) data.active = req.body.active ? 1 : 0;
+  if (data.report_frequency && data.report_frequency !== site.report_frequency) {
+    data.next_report_at = nextRunAt(data.report_frequency);
+  }
+  const keys = Object.keys(data);
+  if (keys.length) {
+    db.prepare(`UPDATE sites SET ${keys.map(k => `${k} = @${k}`).join(', ')} WHERE id = @id`).run({ ...data, id: site.id });
+  }
+  res.json(siteSummary(db.prepare('SELECT * FROM sites WHERE id = ?').get(site.id)));
+});
+
+app.delete('/api/sites/:id', requireAdmin, (req, res) => {
+  db.prepare('DELETE FROM sites WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+app.post('/api/sites/:id/test-connections', requireAdmin, async (req, res) => {
+  const site = db.prepare('SELECT * FROM sites WHERE id = ?').get(req.params.id);
+  if (!site) return res.status(404).json({ error: 'Site not found' });
+  async function check(configured, fn) {
+    if (!configured) return { status: 'not-configured' };
+    try { await fn(); return { status: 'ok' }; }
+    catch (err) { return { status: 'error', error: err.message.slice(0, 300) }; }
+  }
+  res.json({
+    ga4: await check(site.ga4_property_id, () => ga4.testConnection(site.ga4_property_id)),
+    gsc: await check(site.gsc_site_url, () => gsc.testConnection(site.gsc_site_url)),
+    clarity: await check(site.clarity_api_token, () => clarity.testConnection(site.clarity_api_token)),
+  });
+});
+
+app.post('/api/sites/:id/send-report', requireAdmin, async (req, res) => {
+  const site = db.prepare('SELECT * FROM sites WHERE id = ?').get(req.params.id);
+  if (!site) return res.status(404).json({ error: 'Site not found' });
+  const result = await runReport(site, { trigger: 'manual' });
+  res.json(result);
+});
+
+app.get('/api/sites/:id/preview.pdf', requireAdmin, async (req, res) => {
+  const site = db.prepare('SELECT * FROM sites WHERE id = ?').get(req.params.id);
+  if (!site) return res.status(404).json({ error: 'Site not found' });
+  try {
+    const pdf = await previewReportPdf(site);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="preview-${site.id}.pdf"`);
+    res.send(pdf);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/sites/:id/reports', requireAdmin, (req, res) => {
+  res.json(db.prepare('SELECT id, period_start, period_end, period_label, sent_to, trigger_type, status, error, created_at, pdf_path FROM reports WHERE site_id = ? ORDER BY id DESC LIMIT 50').all(req.params.id));
+});
+
+app.get('/api/reports/:id/download', requireAdmin, (req, res) => {
+  const report = db.prepare('SELECT * FROM reports WHERE id = ?').get(req.params.id);
+  if (!report?.pdf_path) return res.status(404).json({ error: 'Report not found' });
+  const path = join(config.reportsDir, report.pdf_path);
+  if (!existsSync(path)) return res.status(404).json({ error: 'PDF file no longer exists' });
+  res.download(path, report.pdf_path.replace(/^\d+-\d+-/, ''));
+});
+
+app.post('/api/sync-clarity', requireAdmin, async (req, res) => {
+  const synced = await syncAllClarity();
+  res.json({ ok: true, synced });
+});
+
+// ─── Client-facing (secret dashboard link, no login) ─────────────
+function siteByToken(token) {
+  return db.prepare('SELECT * FROM sites WHERE dashboard_token = ? AND active = 1').get(token);
+}
+
+// Live dashboard data is cached briefly to stay well inside API quotas.
+const dataCache = new Map();
+const CACHE_TTL = 10 * 60 * 1000;
+
+app.get('/api/client/:token/data', async (req, res) => {
+  const site = siteByToken(req.params.token);
+  if (!site) return res.status(404).json({ error: 'Dashboard not found' });
+  const rangeDays = { '7': 7, '30': 30, '90': 90 }[String(req.query.range)] || 30;
+  const cacheKey = `${site.id}:${rangeDays}`;
+  const cached = dataCache.get(cacheKey);
+  if (cached && cached.at > Date.now() - CACHE_TTL) return res.json(cached.data);
+
+  const end = addDays(todayISO(), -1);
+  const start = addDays(end, -(rangeDays - 1));
+  try {
+    const data = await gatherReportData(site, start, end);
+    const payload = {
+      clientName: site.client_name,
+      domain: site.domain,
+      frequency: site.report_frequency,
+      rangeDays,
+      ...data,
+    };
+    dataCache.set(cacheKey, { at: Date.now(), data: payload });
+    res.json(payload);
+  } catch (err) {
+    res.status(500).json({ error: 'Could not load analytics right now. Please try again shortly.' });
+  }
+});
+
+app.post('/api/client/:token/request-report', async (req, res) => {
+  const site = siteByToken(req.params.token);
+  if (!site) return res.status(404).json({ error: 'Dashboard not found' });
+  const recent = db.prepare(`SELECT COUNT(*) AS n FROM reports WHERE site_id = ? AND trigger_type = 'requested' AND created_at > datetime('now', '-1 day')`).get(site.id).n;
+  if (recent >= 3) {
+    return res.status(429).json({ error: 'You can request up to 3 reports a day — your most recent one should already be in your inbox.' });
+  }
+  const result = await runReport(site, { trigger: 'requested' });
+  if (!result.ok) return res.status(500).json({ error: 'Sorry, we could not generate your report just now. North Bear Media has been notified.' });
+  const masked = site.contact_emails.split(',').map(e => {
+    const [user, dom] = e.trim().split('@');
+    return user && dom ? `${user.slice(0, 2)}…@${dom}` : e;
+  }).join(', ');
+  res.json({ ok: true, message: `Done! A fresh PDF report (${result.periodText}) is on its way to ${masked}.` });
+});
+
+// ─── Pages + static ───────────────────────────────────────────────
+app.get('/r/:token', (req, res) => {
+  if (!siteByToken(req.params.token)) return res.status(404).send('Dashboard not found');
+  res.sendFile(join(__dirname, 'public', 'client.html'));
+});
+
+app.get('/login', (req, res) => res.sendFile(join(__dirname, 'public', 'login.html')));
+
+app.get('/', (req, res) => {
+  if (!isValidSession(req.cookies?.pulse_session)) return res.redirect('/login');
+  res.sendFile(join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/healthz', (req, res) => res.json({ ok: true }));
+app.use(express.static(join(__dirname, 'public')));
+
+app.listen(config.port, () => {
+  console.log(`North Bear Pulse running on port ${config.port} — ${config.appUrl}`);
+  startScheduler();
+});
