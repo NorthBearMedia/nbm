@@ -1,34 +1,38 @@
-// Shared Google service-account client. One service account is granted
-// Viewer access on every client's GA4 property and Search Console property,
-// so a single key connects all sites. Credentials come from the setup
-// wizard (or .env) and the client is rebuilt if they change.
+// Shared Google service-account auth. Two modes:
+//  · default — act as the robot itself (GA4 Viewer grants, etc.)
+//  · impersonation — with Workspace domain-wide delegation authorised,
+//    act AS a real user (read-only) so e.g. Search Console needs no
+//    per-site grants at all.
+// Clients are cached per credential/subject/scopes and rebuilt if the
+// key changes.
 import { JWT } from 'google-auth-library';
 import { getGoogleServiceAccount } from './runtime-config.js';
 
-let client = null;
-let clientKey = '';
+const clients = new Map();
 
-export function googleClient() {
+const DEFAULT_SCOPES = [
+  'https://www.googleapis.com/auth/analytics.readonly',
+  'https://www.googleapis.com/auth/webmasters.readonly',
+];
+
+export function googleClient({ scopes = DEFAULT_SCOPES, subject = null } = {}) {
   const sa = getGoogleServiceAccount();
   if (!sa) {
     throw new Error('Google is not connected yet — open the setup wizard in the admin console');
   }
-  const key = `${sa.client_email}:${(sa.private_key || '').slice(64, 96)}`;
-  if (!client || clientKey !== key) {
-    client = new JWT({
+  const cacheKey = [sa.client_email, (sa.private_key || '').slice(64, 96), subject || '-', scopes.join(' ')].join('|');
+  if (!clients.has(cacheKey)) {
+    clients.set(cacheKey, new JWT({
       email: sa.client_email,
       key: sa.private_key,
-      scopes: [
-        'https://www.googleapis.com/auth/analytics.readonly',
-        'https://www.googleapis.com/auth/webmasters.readonly',
-      ],
-    });
-    clientKey = key;
+      scopes,
+      subject: subject || undefined,
+    }));
   }
-  return client;
+  return clients.get(cacheKey);
 }
 
-export async function googleRequest(opts) {
-  const res = await googleClient().request(opts);
+export async function googleRequest(opts, clientOpts) {
+  const res = await googleClient(clientOpts).request(opts);
   return res.data;
 }
