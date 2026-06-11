@@ -59,6 +59,34 @@ caringplacesltd.co.uk (533120439). Pixieset Gallery (473790671) is
 unwanted — user said remove from Pulse; deleting the GA4 property
 needs explicit confirmation first.
 
+## Session findings 2026-06-11 (network-restricted session)
+
+Session ran in a Claude Code environment whose network allowlist
+permitted `*.googleapis.com` but **blocked** the Pulse app
+(`nbm-production-604e.up.railway.app`), the Hostinger API
+(`developers.hostinger.com`), and public websites — so runbook steps
+1–4 could not run. **Fix before next session:** in the environment's
+network policy (claude.ai/code → environment settings), allow those
+two hosts plus the client site domains (for tag checks), or use full
+network access. Docs:
+https://code.claude.com/docs/en/claude-code-on-the-web
+
+Completed via Google APIs (service account + delegation both verified
+working live):
+
+- **Step 5, partial**: northbearmedia.co.uk property 526994009 stream
+  is `G-9NX0CJ85CL` (created 2026-03-04); 1 session / 30d. Swept all
+  19 properties in account 341873953 — only IWPG (127 sessions) and
+  Caring Places (22) have traffic; Pixieset Gallery (G-TCGWD6TBY8)
+  tracks only `northbearmedia.pixieset.com`. So NBM site traffic is
+  NOT landing elsewhere in the account: the installed tag is either
+  missing or points outside the account. Confirming requires fetching
+  the live homepage (blocked this session).
+- **GSC inventory** (as norton@): verified properties are
+  `sc-domain:northbearmedia.co.uk`, `sc-domain:iwpg.co.uk`,
+  `https://evccitysprint.co.uk/` (owner); `https://theelectricvan.co/`
+  unverified. The other 16 client domains still need the step-4 sweep.
+
 ## Next-session runbook (in order)
 
 1. Verify network: `curl https://nbm-production-604e.up.railway.app/healthz`.
