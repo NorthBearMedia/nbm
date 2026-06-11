@@ -50,6 +50,10 @@ export function getGscReaderEmail() {
   return pick('gsc_reader_email', process.env.GSC_READER_EMAIL || '');
 }
 
+export function getHostingerToken() {
+  return pick('hostinger_api_token', process.env.HOSTINGER_API_TOKEN || '');
+}
+
 export function saveGoogleServiceAccount(json) {
   let parsed;
   try { parsed = typeof json === 'string' ? JSON.parse(json) : json; }
@@ -61,14 +65,15 @@ export function saveGoogleServiceAccount(json) {
   return parsed;
 }
 
-const SETTING_KEYS = ['smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'email_from', 'email_bcc', 'app_url', 'gsc_reader_email'];
+const SETTING_KEYS = ['smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'email_from', 'email_bcc', 'app_url', 'gsc_reader_email', 'hostinger_api_token'];
+const KEEP_IF_BLANK = new Set(['smtp_pass', 'hostinger_api_token']);
 
 export function saveSettings(body) {
   for (const key of SETTING_KEYS) {
     if (body[key] === undefined) continue;
     const value = String(body[key] ?? '').trim();
-    // A blank password field in the form means "keep the saved one".
-    if (key === 'smtp_pass' && value === '') continue;
+    // A blank secret field in the form means "keep the saved one".
+    if (KEEP_IF_BLANK.has(key) && value === '') continue;
     setSetting(key, value);
   }
 }
@@ -95,6 +100,7 @@ export function setupStatus() {
       email_bcc: getEmailBcc(),
       app_url: getAppUrl(),
       gsc_reader_email: getGscReaderEmail(),
+      hostinger_token_set: Boolean(getHostingerToken()),
     },
   };
 }
