@@ -1,11 +1,12 @@
-// North Bear Pulse — admin console
+// North Bear Pulse — admin console (with first-run setup wizard)
 let sites = [];
 let setup = null;
+let lastDiscovery = null;
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-function toast(msg, type = 'ok', ms = 3500) {
+function toast(msg, type = 'ok', ms = 4500) {
   const t = $('#toast');
   t.textContent = msg;
   t.className = `show ${type}`;
@@ -25,29 +26,280 @@ async function api(path, opts = {}) {
   return data;
 }
 
-// ─── Setup status panel ───────────────────────────────────────────
+async function refreshSetup() {
+  setup = await api('/api/setup-status');
+  renderSetup();
+}
+
+// ─── Setup wizard / status panel ──────────────────────────────────
+
+function stepState() {
+  return {
+    email: setup.smtp && setup.smtpVerified,
+    google: setup.google && setup.googleApiOk,
+    sites: setup.sitesTotal > 0 && setup.sitesGoogleConnected === setup.sitesTotal,
+  };
+}
+
+function stepBadge(done, n) {
+  return `<span class="step-badge ${done ? 'done' : ''}">${done ? '✓' : n}</span>`;
+}
+
+function emailFormFields(s) {
+  return `
+    <div class="form-grid">
+      <div class="field"><label>Mail server</label><input name="smtp_host" value="${esc(s.smtp_host || 'smtp.hostinger.com')}"></div>
+      <div class="field"><label>Port</label><input name="smtp_port" value="${esc(s.smtp_port || 465)}"></div>
+      <div class="field"><label>Mailbox (user)</label><input name="smtp_user" value="${esc(s.smtp_user)}" placeholder="reports@northbearmedia.co.uk"></div>
+      <div class="field"><label>Mailbox password ${s.smtp_pass_set ? '(saved — leave blank to keep)' : ''}</label><input name="smtp_pass" type="password" placeholder="${s.smtp_pass_set ? '••••••••••••' : ''}"></div>
+      <div class="field"><label>Send copies to me (BCC)</label><input name="email_bcc" value="${esc(s.email_bcc || 'info@northbearmedia.co.uk')}"></div>
+      <div class="field"><label>From name (optional)</label><input name="email_from" value="${esc(s.email_from)}" placeholder="North Bear Media Reports &lt;reports@…&gt;"></div>
+    </div>`;
+}
+
 function renderSetup() {
   const panel = $('#setupPanel');
-  const issues = [];
-  if (!setup.google) issues.push('Google service account not configured — Google Analytics and Search Console data won\'t load. See README for the 10-minute setup.');
-  if (!setup.smtp) issues.push('Email (SMTP) not configured — reports can\'t be sent yet. Add your Hostinger mailbox details to .env.');
   panel.style.display = 'block';
+  const st = stepState();
+  const allDone = st.email && st.google && st.sites;
+
+  if (allDone) {
+    panel.innerHTML = `
+      <div class="row" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <span class="chip ok">Email ✓</span>
+        <span class="chip ok">Google ✓</span>
+        <span class="chip ok">${setup.sitesGoogleConnected}/${setup.sitesTotal} sites connected</span>
+        ${setup.sitesMissingEmail ? `<span class="chip warn">${setup.sitesMissingEmail} site(s) need a client email</span>` : ''}
+        <span class="hint">Reports go out automatically at 07:00 ${esc(setup.timezone)} on each client's schedule.</span>
+      </div>`;
+    return;
+  }
+
   panel.innerHTML = `
-    <h2>System status</h2>
-    <div class="hint" style="margin-bottom:12px">Reports go out automatically on each client's schedule (07:00 ${esc(setup.timezone)}). Clarity data is snapshotted nightly.</div>
-    <div class="row" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:${issues.length ? '12px' : '0'}">
-      <span class="chip ${setup.google ? 'ok' : 'err'}">Google API ${setup.google ? 'connected' : 'not set up'}</span>
-      <span class="chip ${setup.smtp ? 'ok' : 'err'}">Email ${setup.smtp ? 'configured' : 'not set up'}</span>
-      <span class="chip ${setup.adminPassword ? 'ok' : 'err'}">Admin password ${setup.adminPassword ? 'set' : 'missing'}</span>
-      ${setup.googleServiceAccountEmail ? `<span class="chip" style="cursor:pointer" title="Click to copy. Grant this email Viewer access in each client's GA4 property and Search Console." onclick="navigator.clipboard.writeText('${esc(setup.googleServiceAccountEmail)}').then(()=>window._toast('Service account email copied — add it as a Viewer in GA4 & Search Console'))">${esc(setup.googleServiceAccountEmail)} ⧉</span>` : ''}
+    <h2>Set up North Bear Pulse</h2>
+    <div class="hint" style="margin-bottom:16px">Three steps, copy &amp; paste, ~15 minutes total — then everything runs itself.</div>
+
+    <!-- STEP 1: EMAIL -->
+    <div class="wizard-step">
+      <div class="wizard-head">${stepBadge(st.email, 1)}<strong>Email sending</strong>
+        ${st.email ? '<span class="chip ok">working ✓</span>' : '<span class="chip warn">needed to send reports</span>'}</div>
+      <div class="wizard-body">
+        <p class="hint" style="margin-bottom:10px">Use any Hostinger mailbox — e.g. create <strong>reports@northbearmedia.co.uk</strong> in hPanel → Emails (2 min), then enter it here. "Save &amp; send test" emails you a real test so you know it works.</p>
+        <form id="emailForm">${emailFormFields(setup.settings)}</form>
+        <div style="margin-top:12px"><button class="btn primary" id="saveEmailBtn">Save &amp; send me a test email</button></div>
+      </div>
     </div>
-    ${issues.map(i => `<div class="hint" style="color:var(--amber)">⚠ ${esc(i)}</div>`).join('')}
+
+    <!-- STEP 2: GOOGLE -->
+    <div class="wizard-step">
+      <div class="wizard-head">${stepBadge(st.google, 2)}<strong>Connect Google (one time — covers every client)</strong>
+        ${st.google ? '<span class="chip ok">connected ✓</span>' : setup.google ? '<span class="chip warn">key saved — APIs not reachable yet</span>' : ''}</div>
+      <div class="wizard-body">
+        ${setup.google ? '' : `
+        <ol class="wizard-list">
+          <li><a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener">Create a Google Cloud project</a> (call it <em>NBM Pulse</em> — free, no billing needed).</li>
+          <li>Enable three APIs (click each link → press <em>Enable</em>):
+            <a href="https://console.cloud.google.com/apis/library/analyticsdata.googleapis.com" target="_blank" rel="noopener">Analytics Data</a> ·
+            <a href="https://console.cloud.google.com/apis/library/analyticsadmin.googleapis.com" target="_blank" rel="noopener">Analytics Admin</a> ·
+            <a href="https://console.cloud.google.com/apis/library/searchconsole.googleapis.com" target="_blank" rel="noopener">Search Console</a></li>
+          <li><a href="https://console.cloud.google.com/iam-admin/serviceaccounts" target="_blank" rel="noopener">Create a service account</a> (name: <em>nbm-pulse</em>, no roles) → open it → <em>Keys → Add key → Create new key → JSON</em>. A file downloads.</li>
+          <li>Open that file in a text editor (or Notepad), copy everything, and paste it below:</li>
+        </ol>
+        <div class="field"><textarea id="saJson" rows="4" placeholder='{ "type": "service_account", "project_id": … }'></textarea></div>
+        <div style="margin-top:10px"><button class="btn primary" id="saveGoogleBtn">Connect Google</button></div>`}
+        ${setup.googleServiceAccountEmail ? `
+        <div class="grant-box">
+          <div><strong>Your robot's email</strong> — give it read access to each client's data (one-time, ~30 seconds each):</div>
+          <div class="chip" id="copySaEmail" style="cursor:pointer;margin:8px 0" title="Click to copy">${esc(setup.googleServiceAccountEmail)} ⧉</div>
+          <ul class="wizard-list">
+            <li><strong>GA4:</strong> <a href="https://analytics.google.com/" target="_blank" rel="noopener">analytics.google.com</a> → Admin → <em>Account</em> access management → + Add user → paste → role <em>Viewer</em>. Adding it at <em>account</em> level covers every property in that account at once.</li>
+            <li><strong>Search Console:</strong> <a href="https://search.google.com/search-console" target="_blank" rel="noopener">search console</a> → each property → Settings → Users → Add user → paste → <em>Full</em>.</li>
+          </ul>
+          <button class="btn" id="scanGoogleBtn">Scan my Google account</button>
+          <span class="hint" id="scanResult"></span>
+        </div>` : ''}
+      </div>
+    </div>
+
+    <!-- STEP 3: SITES -->
+    <div class="wizard-step">
+      <div class="wizard-head">${stepBadge(st.sites, 3)}<strong>Wire up the websites</strong>
+        <span class="chip ${st.sites ? 'ok' : ''}">${setup.sitesGoogleConnected}/${setup.sitesTotal} connected</span></div>
+      <div class="wizard-body">
+        <p class="hint" style="margin-bottom:10px">Once Google is connected, this fills in every site's Analytics &amp; Search Console automatically (and checks each website for installed tags). Re-run it any time.</p>
+        <button class="btn primary" id="autoConnectAllBtn">⚡ Auto-connect all sites</button>
+        <div id="importBlock" style="margin-top:14px"></div>
+      </div>
+    </div>
+
+    <p class="hint" style="margin-top:10px"><strong>Optional extra:</strong> Microsoft Clarity (heatmaps &amp; frustration signals) — for each site, grab an API token from <a href="https://clarity.microsoft.com" target="_blank" rel="noopener">clarity.microsoft.com</a> → project → Settings → Data Export, and paste it in the site's <em>Edit</em> form. Auto-connect finds the project ID by itself if Clarity is installed on the site.</p>
   `;
+
+  // step 1 events
+  $('#saveEmailBtn')?.addEventListener('click', async (e) => {
+    e.target.disabled = true; e.target.textContent = 'Saving…';
+    try {
+      const body = Object.fromEntries(new FormData($('#emailForm')).entries());
+      body.smtp_secure = String(Number(body.smtp_port) === 465);
+      await api('/api/settings', { method: 'PUT', body });
+      e.target.textContent = 'Sending test…';
+      const r = await api('/api/test-smtp', { method: 'POST', body: { to: body.email_bcc || body.smtp_user } });
+      if (r.ok) toast(`Test email sent to ${r.sentTo} — check the inbox ✓`, 'ok', 7000);
+      else toast(`Saved, but sending failed: ${r.error}`, 'err', 9000);
+      await refreshSetup();
+    } catch (err) { toast(err.message, 'err', 7000); }
+    finally { e.target.disabled = false; e.target.textContent = 'Save & send me a test email'; }
+  });
+
+  // step 2 events
+  $('#saveGoogleBtn')?.addEventListener('click', async (e) => {
+    const json = $('#saJson').value.trim();
+    if (!json) return toast('Paste the JSON key file contents first', 'err');
+    e.target.disabled = true; e.target.textContent = 'Connecting…';
+    try {
+      const r = await api('/api/google/credentials', { method: 'POST', body: { json } });
+      if (r.apiOk) toast(`Google connected ✓ — found ${r.propertiesFound} Analytics properties and ${r.gscSitesFound} Search Console sites`, 'ok', 8000);
+      else toast(`Key saved (${r.clientEmail}). ${r.apiError || 'Now grant it access, then scan.'}`, 'err', 12000);
+      await refreshSetup();
+    } catch (err) { toast(err.message, 'err', 9000); e.target.disabled = false; e.target.textContent = 'Connect Google'; }
+  });
+  $('#copySaEmail')?.addEventListener('click', () => {
+    navigator.clipboard.writeText(setup.googleServiceAccountEmail)
+      .then(() => toast('Robot email copied — paste it into GA4 and Search Console user management'));
+  });
+  $('#scanGoogleBtn')?.addEventListener('click', () => scanGoogle());
+
+  // step 3 events
+  $('#autoConnectAllBtn')?.addEventListener('click', autoConnectAll);
+  if (lastDiscovery) renderImportBlock();
 }
-window._toast = toast;
+
+async function scanGoogle() {
+  const btn = $('#scanGoogleBtn'), out = $('#scanResult');
+  if (btn) { btn.disabled = true; btn.textContent = 'Scanning…'; }
+  try {
+    lastDiscovery = await api('/api/google/discover?refresh=1');
+    const nP = lastDiscovery.properties.length, nG = lastDiscovery.gscSites.length;
+    const errs = Object.values(lastDiscovery.errors || {});
+    if (out) out.textContent = ` Found ${nP} Analytics properties and ${nG} Search Console sites.${errs.length ? ' ⚠ ' + errs.join(' ') : ''}`;
+    await refreshSetup();
+    renderImportBlock();
+    if (nP || nG) toast(`Scan complete — ${nP} Analytics properties, ${nG} Search Console sites visible`, 'ok', 7000);
+    else toast(errs[0] || 'Nothing visible yet — grant the robot email access first, then re-scan', 'err', 10000);
+  } catch (err) { toast(err.message, 'err', 9000); }
+  if (btn) { btn.disabled = false; btn.textContent = 'Scan my Google account'; }
+}
+
+function renderImportBlock() {
+  const block = $('#importBlock');
+  if (!block || !lastDiscovery) return;
+  const unlinked = lastDiscovery.properties.filter(p => !p.linked);
+  if (!unlinked.length) { block.innerHTML = ''; return; }
+  block.innerHTML = `
+    <div class="grant-box">
+      <strong>Found in your Google account but not in Pulse yet</strong>
+      <div class="hint" style="margin:4px 0 10px">Tick the ones that are client websites and import them — Analytics &amp; Search Console come pre-wired. You just add each client's email afterwards.</div>
+      ${unlinked.map(p => `
+        <label class="import-row"><input type="checkbox" value="${esc(p.propertyId)}" checked>
+          <strong>${esc(p.displayName)}</strong>
+          <span class="hint">${esc(p.streams[0]?.defaultUri || 'no website address set in GA4')} · ${esc(p.accountName)}</span>
+        </label>`).join('')}
+      <button class="btn primary" id="importBtn" style="margin-top:10px">Import selected as new sites</button>
+    </div>`;
+  $('#importBtn').onclick = async (e) => {
+    const ids = [...block.querySelectorAll('input:checked')].map(i => i.value);
+    if (!ids.length) return toast('Nothing ticked', 'err');
+    e.target.disabled = true;
+    try {
+      const r = await api('/api/google/import-sites', { method: 'POST', body: { propertyIds: ids } });
+      toast(`Imported ${r.created.length} site(s) — add each client's email when you're ready to start their reports`, 'ok', 8000);
+      lastDiscovery = null;
+      await Promise.all([loadSites(), refreshSetup()]);
+    } catch (err) { toast(err.message, 'err', 8000); e.target.disabled = false; }
+  };
+}
+
+async function autoConnectAll(e) {
+  const btn = e?.target || $('#autoConnectAllBtn');
+  btn.disabled = true;
+  let filledCount = 0;
+  const notes = [];
+  for (const site of sites.filter(s => s.active)) {
+    btn.textContent = `Connecting ${site.client_name}…`;
+    try {
+      const r = await api(`/api/sites/${site.id}/autoconnect`, { method: 'POST' });
+      filledCount += Object.keys(r.filled).length;
+      r.notes.forEach(n => notes.push(`${site.client_name}: ${n}`));
+    } catch (err) { notes.push(`${site.client_name}: ${err.message}`); }
+  }
+  btn.disabled = false; btn.textContent = '⚡ Auto-connect all sites';
+  await Promise.all([loadSites(), refreshSetup()]);
+  if (notes.length) showNotesModal('Auto-connect results', `${filledCount} connection(s) filled in automatically.`, notes);
+  else toast(`Done — ${filledCount} connection(s) filled in, everything wired up ✓`, 'ok', 7000);
+}
+
+function showNotesModal(title, summary, notes) {
+  $('#modalRoot').innerHTML = `
+  <div class="modal-backdrop" id="backdrop"><div class="modal">
+    <h3>${esc(title)}</h3>
+    <p style="margin-bottom:12px">${esc(summary)}</p>
+    <ul class="wizard-list">${notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>
+    <div class="modal-actions"><button class="btn primary" id="cancelBtn">OK</button></div>
+  </div></div>`;
+  $('#cancelBtn').onclick = closeModal;
+  $('#backdrop').onclick = ev => { if (ev.target.id === 'backdrop') closeModal(); };
+}
+
+// ─── Settings modal (after first setup) ──────────────────────────
+function showSettingsModal() {
+  const s = setup.settings;
+  $('#modalRoot').innerHTML = `
+  <div class="modal-backdrop" id="backdrop"><div class="modal">
+    <h3>Settings</h3>
+    <form id="settingsForm">
+      ${emailFormFields(s)}
+      <div class="form-grid" style="margin-top:14px">
+        <div class="field full"><label>App address (used in email links)</label>
+          <input name="app_url" value="${esc(s.app_url)}" placeholder="${esc(location.origin)}"></div>
+        <div class="field full"><label>Replace Google service account key (optional)</label>
+          <textarea name="google_json" rows="3" placeholder='Paste new key JSON only if you need to replace it${setup.googleServiceAccountEmail ? ' — current: ' + esc(setup.googleServiceAccountEmail) : ''}'></textarea></div>
+      </div>
+    </form>
+    <div class="modal-actions">
+      <button class="btn left" id="testEmailBtn2">Send test email</button>
+      <button class="btn" id="cancelBtn">Cancel</button>
+      <button class="btn primary" id="saveSettingsBtn">Save</button>
+    </div>
+  </div></div>`;
+  $('#cancelBtn').onclick = closeModal;
+  $('#backdrop').onclick = e => { if (e.target.id === 'backdrop') closeModal(); };
+  $('#testEmailBtn2').onclick = async (e) => {
+    e.target.disabled = true;
+    try {
+      const r = await api('/api/test-smtp', { method: 'POST', body: {} });
+      toast(r.ok ? `Test email sent to ${r.sentTo} ✓` : `Failed: ${r.error}`, r.ok ? 'ok' : 'err', 8000);
+    } catch (err) { toast(err.message, 'err'); }
+    e.target.disabled = false;
+  };
+  $('#saveSettingsBtn').onclick = async () => {
+    const body = Object.fromEntries(new FormData($('#settingsForm')).entries());
+    body.smtp_secure = String(Number(body.smtp_port) === 465);
+    const googleJson = body.google_json?.trim();
+    delete body.google_json;
+    try {
+      await api('/api/settings', { method: 'PUT', body });
+      if (googleJson) {
+        const r = await api('/api/google/credentials', { method: 'POST', body: { json: googleJson } });
+        toast(r.apiOk ? 'Settings saved, Google key replaced ✓' : `Saved. Google: ${r.apiError || 'grant access then scan'}`, r.apiOk ? 'ok' : 'err', 8000);
+      } else toast('Settings saved');
+      closeModal();
+      await refreshSetup();
+    } catch (err) { toast(err.message, 'err', 8000); }
+  };
+}
 
 // ─── Sites ────────────────────────────────────────────────────────
-const FREQ_LABEL = { weekly: 'Weekly (Mondays)', monthly: 'Monthly (1st)', quarterly: 'Quarterly', none: 'No schedule' };
+const FREQ_LABEL = { weekly: 'Weekly (Mondays)', monthly: 'Monthly (1st)', quarterly: 'Quarterly', none: 'No schedule yet' };
 
 function sourceChip(label, configured) {
   return `<span class="chip ${configured ? 'ok' : ''}">${label}${configured ? ' ✓' : ' —'}</span>`;
@@ -59,7 +311,7 @@ function renderSites() {
   const grid = $('#sitesGrid');
   if (!sites.length) {
     grid.innerHTML = `<div class="panel" style="grid-column:1/-1;text-align:center;color:var(--text-muted)">
-      No client sites yet. Click <strong>+ Add client site</strong> to plug in your first one.</div>`;
+      No client sites yet. Click <strong>+ Add client site</strong>, or connect Google above and import them in one go.</div>`;
     return;
   }
   grid.innerHTML = sites.map(s => `
@@ -72,6 +324,7 @@ function renderSites() {
         ${sourceChip('Analytics', !!s.ga4_property_id)}
         ${sourceChip('Search', !!s.gsc_site_url)}
         ${sourceChip('Clarity', !!s.has_clarity_token)}
+        ${!s.contact_emails ? '<span class="chip warn">no client email</span>' : ''}
       </div>
       <div class="meta">
         ${esc(FREQ_LABEL[s.report_frequency] || s.report_frequency)}${s.next_report_at && s.report_frequency !== 'none' ? ` · next: ${esc(s.next_report_at)}` : ''}<br>
@@ -80,6 +333,7 @@ function renderSites() {
           : 'No reports sent yet'}
       </div>
       <div class="actions">
+        ${(!s.ga4_property_id || !s.gsc_site_url) ? '<button class="btn small primary" data-act="autoconnect">⚡ Auto-connect</button>' : ''}
         <button class="btn small" data-act="copy-link">Copy dashboard link</button>
         <a class="btn small" href="/r/${esc(s.dashboard_token)}" target="_blank" rel="noopener">Open dashboard</a>
         <a class="btn small" href="/api/sites/${s.id}/preview.pdf" target="_blank" rel="noopener">Preview PDF</a>
@@ -103,22 +357,31 @@ $('#sitesGrid').addEventListener('click', async (e) => {
   if (act === 'copy-link') {
     await navigator.clipboard.writeText(site.dashboardUrl);
     toast('Dashboard link copied — safe to send to the client');
+  } else if (act === 'autoconnect') {
+    btn.disabled = true; btn.textContent = 'Connecting…';
+    try {
+      const r = await api(`/api/sites/${site.id}/autoconnect`, { method: 'POST' });
+      const got = Object.keys(r.filled);
+      if (got.length) toast(`Connected: ${got.join(', ')} ✓`, 'ok', 7000);
+      if (r.notes.length) showNotesModal(`Auto-connect — ${site.client_name}`, got.length ? `Filled in: ${got.join(', ')}` : 'Nothing new could be filled in automatically yet.', r.notes);
+      await Promise.all([loadSites(), refreshSetup()]);
+    } catch (err) { toast(err.message, 'err', 8000); }
   } else if (act === 'send') {
     if (!confirm(`Email a report to ${site.contact_emails || '(no email set!)'} now?`)) return;
     btn.disabled = true; btn.textContent = 'Sending…';
     try {
       const r = await api(`/api/sites/${site.id}/send-report`, { method: 'POST' });
       if (r.ok) toast(`Report sent to ${r.sentTo.join(', ')}${r.warnings?.length ? ` (warnings: ${r.warnings.length})` : ''}`);
-      else toast(`Failed: ${r.error}`, 'err', 7000);
+      else toast(`Failed: ${r.error}`, 'err', 8000);
       await loadSites();
-    } catch (err) { toast(err.message, 'err', 7000); }
+    } catch (err) { toast(err.message, 'err', 8000); }
     btn.disabled = false; btn.textContent = 'Send report now';
   } else if (act === 'test') {
     btn.disabled = true; btn.textContent = 'Testing…';
     try {
       const r = await api(`/api/sites/${site.id}/test-connections`, { method: 'POST' });
       const fmt = (name, c) => `${name}: ${c.status === 'ok' ? '✓ working' : c.status === 'not-configured' ? 'not set up' : '✗ ' + c.error}`;
-      alert([fmt('Google Analytics', r.ga4), fmt('Search Console', r.gsc), fmt('Microsoft Clarity', r.clarity)].join('\n\n'));
+      showNotesModal(`Connections — ${site.client_name}`, '', [fmt('Google Analytics', r.ga4), fmt('Search Console', r.gsc), fmt('Microsoft Clarity', r.clarity)]);
     } catch (err) { toast(err.message, 'err'); }
     btn.disabled = false; btn.textContent = 'Test connections';
   } else if (act === 'snippet') {
@@ -144,7 +407,7 @@ function showSiteModal(site = null) {
           <input name="domain" value="${esc(site?.domain)}" placeholder="e.g. rmsfire.co.uk"></div>
         <div class="field"><label>Contact name</label>
           <input name="contact_name" value="${esc(site?.contact_name)}" placeholder="e.g. Sarah"></div>
-        <div class="field"><label>Report email(s) *</label>
+        <div class="field"><label>Report email(s)</label>
           <input name="contact_emails" value="${esc(site?.contact_emails)}" placeholder="client@email.com, second@email.com">
           <div class="help">Separate multiple addresses with commas</div></div>
         <div class="field"><label>Report frequency</label>
@@ -156,23 +419,23 @@ function showSiteModal(site = null) {
 
         <div class="full" style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
           <strong style="font-size:13px">Data sources</strong>
-          <div class="help" style="margin-top:2px">Fill in what you have — anything left blank just won't appear in reports yet.</div>
+          <div class="help" style="margin-top:2px">Tip: save with just the domain, then hit <strong>⚡ Auto-connect</strong> on the site card — it fills these in for you.</div>
         </div>
         <div class="field"><label>GA4 property ID</label>
-          <input name="ga4_property_id" value="${esc(site?.ga4_property_id)}" placeholder="e.g. 123456789">
+          <input name="ga4_property_id" value="${esc(site?.ga4_property_id)}" placeholder="auto-connect fills this">
           <div class="help">GA4 → Admin → Property details (numbers only)</div></div>
         <div class="field"><label>GA4 measurement ID</label>
-          <input name="ga4_measurement_id" value="${esc(site?.ga4_measurement_id)}" placeholder="e.g. G-XXXXXXXXXX">
-          <div class="help">Used to generate the tracking code</div></div>
+          <input name="ga4_measurement_id" value="${esc(site?.ga4_measurement_id)}" placeholder="auto-connect fills this">
+          <div class="help">The G-XXXX one, used for the tracking code</div></div>
         <div class="field"><label>Search Console property</label>
-          <input name="gsc_site_url" value="${esc(site?.gsc_site_url)}" placeholder="sc-domain:example.co.uk">
+          <input name="gsc_site_url" value="${esc(site?.gsc_site_url)}" placeholder="auto-connect fills this">
           <div class="help">"sc-domain:example.co.uk" or "https://example.co.uk/"</div></div>
         <div class="field"><label>Clarity project ID</label>
-          <input name="clarity_project_id" value="${esc(site?.clarity_project_id)}" placeholder="e.g. abcd1234ef">
+          <input name="clarity_project_id" value="${esc(site?.clarity_project_id)}" placeholder="auto-connect detects this">
           <div class="help">From the Clarity project URL</div></div>
         <div class="field full"><label>Clarity API token ${site?.has_clarity_token ? '(already saved — leave blank to keep)' : ''}</label>
           <input name="clarity_api_token" placeholder="${site?.has_clarity_token ? '••••••••••••' : 'Clarity → Settings → Data Export → Generate token'}">
-          <div class="help">Clarity → your project → Settings → Data Export → Generate new API token</div></div>
+          <div class="help">The one thing that can't be auto-fetched — Clarity → project → Settings → Data Export → Generate new API token</div></div>
         <div class="field full"><label>Notes</label>
           <textarea name="notes" rows="2">${esc(site?.notes)}</textarea></div>
       </form>
@@ -191,7 +454,7 @@ function showSiteModal(site = null) {
     await api(`/api/sites/${site.id}`, { method: 'DELETE' });
     toast('Site deleted');
     closeModal();
-    await loadSites();
+    await Promise.all([loadSites(), refreshSetup()]);
   };
   $('#saveBtn').onclick = async () => {
     const form = $('#siteForm');
@@ -199,12 +462,23 @@ function showSiteModal(site = null) {
     const body = Object.fromEntries(new FormData(form).entries());
     body.active = body.active === '1';
     try {
-      if (isNew) await api('/api/sites', { method: 'POST', body });
-      else await api(`/api/sites/${site.id}`, { method: 'PUT', body });
-      toast(isNew ? 'Site added — use "Tracking code" to plug it into the website' : 'Saved');
+      const saved = isNew
+        ? await api('/api/sites', { method: 'POST', body })
+        : await api(`/api/sites/${site.id}`, { method: 'PUT', body });
       closeModal();
-      await loadSites();
-    } catch (err) { toast(err.message, 'err', 6000); }
+      await Promise.all([loadSites(), refreshSetup()]);
+      if (isNew && saved.domain && !saved.ga4_property_id) {
+        toast('Site added — running auto-connect…', 'ok');
+        try {
+          const r = await api(`/api/sites/${saved.id}/autoconnect`, { method: 'POST' });
+          const got = Object.keys(r.filled);
+          toast(got.length ? `Auto-connected: ${got.join(', ')} ✓` : 'Added. Auto-connect found nothing yet — grant the robot access and retry.', got.length ? 'ok' : 'err', 8000);
+          await Promise.all([loadSites(), refreshSetup()]);
+        } catch { /* site saved fine; connect later */ }
+      } else {
+        toast(isNew ? 'Site added' : 'Saved');
+      }
+    } catch (err) { toast(err.message, 'err', 7000); }
   };
 }
 
@@ -240,7 +514,7 @@ function showSnippetModal(site) {
         <p class="hint" style="margin-bottom:12px">Paste this just before the closing <strong>&lt;/head&gt;</strong> tag on every page.
         In Hostinger Website Builder: <em>Settings → Integrations → Custom code → Head</em>. In WordPress: use the theme's header.php or a "header scripts" plugin.</p>
         <code class="snippet" id="snippetCode">${esc(snippet)}</code>` :
-        `<p class="hint">Add a <strong>GA4 measurement ID</strong> and/or <strong>Clarity project ID</strong> to this site first, then the code to paste will appear here.</p>`}
+        `<p class="hint">Add a <strong>GA4 measurement ID</strong> and/or <strong>Clarity project ID</strong> to this site first (⚡ Auto-connect usually finds them), then the code to paste will appear here.</p>`}
       <div class="modal-actions">
         ${snippet ? '<button class="btn primary" id="copySnippet">Copy code</button>' : ''}
         <button class="btn" id="cancelBtn">Close</button>
@@ -285,15 +559,8 @@ function closeModal() { $('#modalRoot').innerHTML = ''; }
 
 // ─── Top bar actions ──────────────────────────────────────────────
 $('#addSiteBtn').onclick = () => showSiteModal();
+$('#settingsBtn').onclick = () => showSettingsModal();
 $('#logoutBtn').onclick = async () => { await api('/api/logout', { method: 'POST' }); location.href = '/login'; };
-$('#testEmailBtn').onclick = async (e) => {
-  e.target.disabled = true;
-  try {
-    const r = await api('/api/test-smtp', { method: 'POST' });
-    toast(r.ok ? 'Email connection working ✓' : `Email problem: ${r.error}`, r.ok ? 'ok' : 'err', 6000);
-  } catch (err) { toast(err.message, 'err'); }
-  e.target.disabled = false;
-};
 $('#syncClarityBtn').onclick = async (e) => {
   e.target.disabled = true; e.target.textContent = 'Syncing…';
   try {
@@ -310,7 +577,13 @@ async function loadSites() {
 }
 (async () => {
   try {
-    [setup] = await Promise.all([api('/api/setup-status'), loadSites()]);
-    renderSetup();
+    await Promise.all([refreshSetup(), loadSites()]);
+    // Quietly self-heal the app URL so email links point at the real
+    // deployment instead of localhost — zero-setup nicety.
+    const saved = setup.settings.app_url || '';
+    if ((!saved || saved.includes('localhost')) && !location.origin.includes('localhost')) {
+      await api('/api/settings', { method: 'PUT', body: { app_url: location.origin } });
+      await refreshSetup();
+    }
   } catch (err) { /* redirected to login */ }
 })();

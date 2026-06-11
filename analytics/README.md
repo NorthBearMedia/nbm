@@ -10,109 +10,78 @@ Automated client analytics for North Bear Media. One small app that:
 - emails every client a **branded A4 PDF report** on their chosen schedule
   (weekly / monthly / quarterly), and lets them **request a fresh report**
   any time with one click
-- gives you an **admin console** to manage all ~20 sites in one place
+- sets itself up: a built-in **setup wizard**, **auto-discovery** of your
+  Google properties, **auto-detection** of tags already installed on each
+  website, and **bulk import** of all your clients in one click
 
-Run `npm run sample-report` to see what the PDF looks like with demo data
-(it writes `data/sample-report.pdf`) — no setup needed.
-
----
-
-## How it fits together
-
-```
-Client websites (Hostinger)
-  └── GA4 + Clarity tracking snippet  ← "Tracking code" button generates this
-            │
-            ▼
-Google Analytics ─┐
-Search Console  ──┼── live APIs ──► North Bear Pulse ──► client dashboards (/r/<secret>)
-Microsoft Clarity ┘   (one nightly                   ──► scheduled PDF reports by email
-                       snapshot for Clarity)         ──► "email me a fresh report" button
-```
-
-One Google **service account** (a robot Google login) is granted read-only
-access to every client's GA4 property and Search Console — so you set up
-Google once, then connecting a new client is just pasting two IDs.
+Run `npm run sample-report` to see the PDF with demo data (writes
+`data/sample-report.pdf`) — no setup needed.
 
 ---
 
-## Setup (about 30 minutes, one time)
+## Getting it running (the short version)
 
-### 1. Run the app
+The app configures itself from the browser. The only thing it can't do
+alone is type your passwords for you. Total hands-on time: **~20 minutes,
+once** — then it runs itself forever.
 
-```bash
-cd analytics
-npm install
-cp .env.example .env     # then edit .env
-npm start
+### 1. Deploy (5 min)
+
+**Railway** (same as the other NBM apps): New service → this repo →
+set *Root Directory* to `analytics` → add **one environment variable**:
+
+```
+ADMIN_PASSWORD = something-long-and-private
 ```
 
-Set at minimum in `.env`: `ADMIN_PASSWORD` (your console login),
-`APP_URL` (the public address of this app) and the SMTP settings.
+…and **attach a Volume** mounted at `/data` with env `DATA_DIR=/data`
+(without it the database and PDFs are wiped on each deploy). Railway
+gives you a URL — open it, log in.
 
-**Hosting:** deploy like the other NBM apps. On **Railway**: new service
-from this repo, set *Root Directory* to `analytics`, add the variables
-from `.env`, and **attach a Volume** mounted at `/data` with `DATA_DIR=/data`
-(otherwise the database and PDFs are wiped on every deploy). A Hostinger
-VPS running `npm start` under pm2 works just as well.
+A Dockerfile is included, so a Hostinger VPS (or anything that runs
+Docker or Node 20+) works exactly the same way.
 
-### 2. Email (5 min)
+### 2. First run — it's already going
 
-Use any Hostinger mailbox (e.g. create `reports@northbearmedia.co.uk` in
-hPanel → Emails). Put its details in `.env` (`SMTP_USER` / `SMTP_PASS` —
-host `smtp.hostinger.com`, port `465`). Click **Test email** in the admin
-console to confirm.
+On first boot the app **creates North Bear Media as customer #1**
+(norton@northbearmedia.co.uk, monthly reports) and immediately scans
+northbearmedia.co.uk for installed GA4/Clarity tags. The admin console
+opens with a 3-step wizard:
 
-### 3. Google service account (10 min, once for all clients)
+1. **Email** — type in a Hostinger mailbox (create one like
+   `reports@northbearmedia.co.uk` in hPanel → Emails first). The wizard
+   sends you a real test email so you *know* it works.
+2. **Google** — four clicks in Google Cloud (the wizard links you to the
+   exact pages): create a free project, enable 3 APIs, create a "service
+   account" robot, download its key file, paste it into the wizard. Then
+   grant the robot's email (shown with a copy button) **Viewer** access in
+   GA4 and Search Console. Granting at GA4 *account* level covers every
+   client property in that account in one go.
+3. **Wire up sites** — hit **⚡ Auto-connect all sites**. The app matches
+   every site to its GA4 property and Search Console entry by domain and
+   fills in all the IDs itself. **Scan my Google account** also lists any
+   client properties not in Pulse yet — tick them and import all 20 in
+   one click (each just needs the client's email added before its
+   reports start sending).
 
-1. Go to https://console.cloud.google.com → create a project (call it
-   "NBM Pulse").
-2. **APIs & Services → Library**: enable **Google Analytics Data API** and
-   **Google Search Console API**.
-3. **IAM & Admin → Service Accounts → Create service account** (name:
-   `nbm-pulse`). No roles needed. Open it → **Keys → Add key → JSON** —
-   a `.json` file downloads.
-4. Save that file as `analytics/data/google-service-account.json` (or
-   paste its contents into `GOOGLE_SERVICE_ACCOUNT_JSON` on Railway).
+**Optional:** Microsoft Clarity per site — auto-connect detects the
+project ID if Clarity is installed; you only paste the API token
+(clarity.microsoft.com → project → Settings → Data Export → Generate
+token). Clarity's API only exposes the last 1–3 days, so Pulse snapshots
+nightly at 03:40 and the Clarity section fills up from the day you
+connect it.
 
-The service account has an email address like
-`nbm-pulse@nbm-pulse.iam.gserviceaccount.com` — it's shown in the admin
-console with a copy button. You'll grant this email access per client:
+### Your actual to-do list
 
-- **GA4**: Admin → Property → Property access management → Add user →
-  paste the email → role **Viewer**.
-- **Search Console**: Settings → Users and permissions → Add user →
-  paste the email → **Full** (Restricted blocks API queries on some properties).
+- [ ] Deploy with `ADMIN_PASSWORD` (+ volume) and open the app
+- [ ] Wizard step 1: enter a Hostinger mailbox → test email arrives
+- [ ] Wizard step 2: Google Cloud robot (~10 min) + grant it access
+- [ ] Wizard step 3: two clicks (auto-connect, import)
+- [ ] Per client, when ready: add their email + frequency (and optionally
+      a Clarity token)
 
-### 4. Microsoft Clarity (per site, 2 min)
-
-In https://clarity.microsoft.com, open the site's project →
-**Settings → Data Export → Generate new API token**. Paste the token and
-the project ID (from the URL) into the site's settings in Pulse.
-
-> Clarity's API only exposes the last 1–3 days, so Pulse snapshots every
-> site nightly at 03:40 and builds reports from its own history. The
-> Clarity section fills up from the day you connect it.
-
----
-
-## Adding a client site (2 min each)
-
-1. **+ Add client site** in the admin console — name, email(s), report
-   frequency, plus whichever IDs you have:
-   - **GA4 property ID** — GA4 → Admin → Property details (just numbers)
-   - **GA4 measurement ID** — the `G-XXXXXXXX` one (for the tracking code)
-   - **Search Console property** — `sc-domain:example.co.uk` or `https://example.co.uk/`
-   - **Clarity project ID + API token**
-2. Grant the service account access in that client's GA4 + Search Console
-   (step 3 above).
-3. If the site doesn't have GA4/Clarity installed yet: click **Tracking
-   code**, copy, and paste it before `</head>` on the website
-   (Hostinger Website Builder: *Settings → Integrations → Custom code*;
-   WordPress: header scripts plugin or theme `header.php`).
-4. Click **Test connections** — three green ticks and you're done.
-5. Click **Copy dashboard link** and send it to the client. That link is
-   their dashboard *and* where they can request fresh reports.
+Everything else — fetching data, building PDFs, emailing on schedule,
+handling "send me a fresh report" requests — is automatic.
 
 ---
 
@@ -125,17 +94,27 @@ the project ID (from the URL) into the site's settings in Pulse.
 - **"Send report now"** (admin) → instantly, covering the last 30 days
 
 Every email has the PDF attached, headline numbers, and a button to the
-live dashboard. Failures are logged in each site's **History** (and
-nothing is sent to the client). With `EMAIL_BCC` set, you get a copy of
-every report.
-
-Times use `TIMEZONE` (default `Europe/London`).
+client's live dashboard (their private `/r/<secret>` link — the **Copy
+dashboard link** button gives you the exact URL to send them). Sites
+with no contact email or frequency "No schedule yet" never send anything.
+Failures show in the site's **History**; with a BCC set you get a copy of
+every report. Times use `TIMEZONE` (default `Europe/London`).
 
 ## Useful commands
 
 ```bash
-npm start              # run the app (scheduler included)
+npm start              # run the app (scheduler + wizard included)
 npm run sample-report  # demo PDF with fake data → data/sample-report.pdf
 npm run sync-clarity   # snapshot Clarity for all sites right now
 npm run send-due       # process any overdue scheduled reports right now
 ```
+
+## Notes for future-you
+
+- All wizard settings live in the `settings` table in SQLite and override
+  `.env` — `.env` works too if you prefer files (see `.env.example`).
+- The SQLite file and generated PDFs live in `DATA_DIR` (default
+  `./data`). Back that folder up and you've backed up everything.
+- The Google service account key and SMTP password are stored in that
+  database — treat the data directory (and access to the box) as secret.
+- Disable the first-run seed with `SEED_FIRST_SITE=false`.

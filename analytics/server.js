@@ -5,16 +5,20 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync } from 'fs';
 
-import { config, setupStatus } from './config.js';
-import db, { newDashboardToken } from './database.js';
+import { config } from './config.js';
+import db, { newDashboardToken, setSetting } from './database.js';
+import { setupStatus, saveSettings, saveGoogleServiceAccount, getAppUrl, getEmailBcc, getSmtp } from './lib/runtime-config.js';
 import { startScheduler, syncAllClarity } from './lib/scheduler.js';
 import { runReport, previewReportPdf } from './lib/reporter.js';
 import { gatherReportData } from './lib/report-data.js';
-import { nextRunAt, periodFor, addDays, todayISO } from './lib/dates.js';
+import { nextRunAt, addDays, todayISO } from './lib/dates.js';
 import * as ga4 from './lib/ga4.js';
 import * as gsc from './lib/gsc.js';
 import * as clarity from './lib/clarity.js';
-import { testSmtp } from './lib/email.js';
+import { testSmtp, sendTestEmail } from './lib/email.js';
+import { discoverAll, clearDiscoveryCache, normalizeHost } from './lib/discovery.js';
+import { autoConnectSite } from './lib/autoconnect.js';
+import { seedFirstCustomer } from './lib/seed.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -55,12 +59,111 @@ app.post('/api/logout', (req, res) => {
   res.json({ ok: true });
 });
 
-// ─── Admin: setup + sites ─────────────────────────────────────────
-app.get('/api/setup-status', requireAdmin, (req, res) => res.json(setupStatus()));
+// ─── Admin: setup wizard + settings ───────────────────────────────
+app.get('/api/setup-status', requireAdmin, (req, res) => {
+  const sites = db.prepare('SELECT id, client_name, domain, ga4_property_id, gsc_site_url, clarity_api_token, contact_emails FROM sites WHERE active = 1').all();
+  res.json({
+    ...setupStatus(),
+    sitesTotal: sites.length,
+    sitesGoogleConnected: sites.filter(s => s.ga4_property_id && s.gsc_site_url).length,
+    sitesFullyConnected: sites.filter(s => s.ga4_property_id && s.gsc_site_url && s.clarity_api_token).length,
+    sitesMissingEmail: sites.filter(s => !s.contact_emails).length,
+  });
+});
+
+app.put('/api/settings', requireAdmin, (req, res) => {
+  try {
+    const body = req.body || {};
+    saveSettings(body);
+    // Changed mail details need re-verifying.
+    if (Object.keys(body).some(k => k.startsWith('smtp_') || k === 'email_from')) {
+      setSetting('smtp_verified', 'false');
+    }
+    res.json({ ok: true, ...setupStatus() });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
 
 app.post('/api/test-smtp', requireAdmin, async (req, res) => {
-  try { await testSmtp(); res.json({ ok: true }); }
-  catch (err) { res.json({ ok: false, error: err.message }); }
+  try {
+    const to = String(req.body?.to || '').trim() || getEmailBcc() || getSmtp().user;
+    if (to) await sendTestEmail(to);
+    else await testSmtp();
+    setSetting('smtp_verified', 'true');
+    res.json({ ok: true, sentTo: to || null });
+  } catch (err) {
+    setSetting('smtp_verified', 'false');
+    res.json({ ok: false, error: err.message });
+  }
+});
+
+// Paste-the-key-file step: saves the service account and immediately tries
+// a real scan so the wizard can show green ticks (or the exact problem).
+app.post('/api/google/credentials', requireAdmin, async (req, res) => {
+  let sa;
+  try { sa = saveGoogleServiceAccount(req.body?.json ?? req.body); }
+  catch (err) { return res.status(400).json({ error: err.message }); }
+  clearDiscoveryCache();
+  let apiOk = false, scan = null, apiError = null;
+  try {
+    scan = await discoverAll({ refresh: true });
+    apiOk = !scan.errors.ga4 || !scan.errors.gsc;
+    apiError = scan.errors.ga4 || scan.errors.gsc || null;
+  } catch (err) { apiError = err.message; }
+  setSetting('google_api_ok', String(apiOk));
+  res.json({
+    ok: true,
+    clientEmail: sa.client_email,
+    apiOk,
+    apiError,
+    propertiesFound: scan?.properties.length ?? 0,
+    gscSitesFound: scan?.gscSites.length ?? 0,
+  });
+});
+
+app.get('/api/google/discover', requireAdmin, async (req, res) => {
+  try {
+    const scan = await discoverAll({ refresh: req.query.refresh === '1' });
+    setSetting('google_api_ok', String(!scan.errors.ga4 || !scan.errors.gsc));
+    const sites = db.prepare('SELECT id, client_name, domain, ga4_property_id, gsc_site_url FROM sites').all();
+    const linkedProps = new Set(sites.map(s => s.ga4_property_id).filter(Boolean));
+    const linkedHosts = new Set(sites.map(s => normalizeHost(s.domain)).filter(Boolean));
+    res.json({
+      ...scan,
+      properties: scan.properties.map(p => ({
+        ...p,
+        linked: linkedProps.has(p.propertyId) ||
+          p.streams.some(s => linkedHosts.has(normalizeHost(s.defaultUri))),
+      })),
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Bulk import: turn discovered GA4 properties into ready-made site records
+// (no email/schedule yet — those get added per client when ready).
+app.post('/api/google/import-sites', requireAdmin, async (req, res) => {
+  const wanted = new Set((req.body?.propertyIds || []).map(String));
+  if (!wanted.size) return res.status(400).json({ error: 'No properties selected' });
+  let scan;
+  try { scan = await discoverAll(); }
+  catch (err) { return res.status(500).json({ error: err.message }); }
+  const existingProps = new Set(db.prepare('SELECT ga4_property_id FROM sites').all().map(r => r.ga4_property_id).filter(Boolean));
+  const created = [];
+  for (const p of scan.properties) {
+    if (!wanted.has(p.propertyId) || existingProps.has(p.propertyId)) continue;
+    const stream = p.streams.find(s => s.defaultUri) || p.streams[0] || {};
+    const domain = normalizeHost(stream.defaultUri || '');
+    const gscMatch = domain
+      ? (scan.gscSites.find(s => s.siteUrl === `sc-domain:${domain}`)?.siteUrl ||
+         scan.gscSites.find(s => !s.siteUrl.startsWith('sc-domain:') && normalizeHost(s.siteUrl) === domain)?.siteUrl || '')
+      : '';
+    db.prepare(`INSERT INTO sites (client_name, domain, ga4_property_id, ga4_measurement_id, gsc_site_url, report_frequency, notes, dashboard_token, next_report_at)
+                VALUES (?, ?, ?, ?, ?, 'none', ?, ?, NULL)`)
+      .run(p.displayName, domain, p.propertyId, stream.measurementId || '', gscMatch,
+        'Imported from Google Analytics — add the client\'s email and pick a report frequency to go live.',
+        newDashboardToken());
+    created.push(p.displayName);
+  }
+  res.json({ ok: true, created });
 });
 
 function siteSummary(site) {
@@ -72,7 +175,7 @@ function siteSummary(site) {
     has_clarity_token: Boolean(clarity_api_token),
     lastReport: lastReport || null,
     claritySnapshots,
-    dashboardUrl: `${config.appUrl}/r/${site.dashboard_token}`,
+    dashboardUrl: `${getAppUrl()}/r/${site.dashboard_token}`,
   };
 }
 
@@ -130,6 +233,14 @@ app.put('/api/sites/:id', requireAdmin, (req, res) => {
 app.delete('/api/sites/:id', requireAdmin, (req, res) => {
   db.prepare('DELETE FROM sites WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
+});
+
+app.post('/api/sites/:id/autoconnect', requireAdmin, async (req, res) => {
+  try {
+    const result = await autoConnectSite(Number(req.params.id));
+    const site = db.prepare('SELECT * FROM sites WHERE id = ?').get(req.params.id);
+    res.json({ ...result, site: siteSummary(site) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/sites/:id/test-connections', requireAdmin, async (req, res) => {
@@ -252,6 +363,7 @@ app.get('/healthz', (req, res) => res.json({ ok: true }));
 app.use(express.static(join(__dirname, 'public')));
 
 app.listen(config.port, () => {
-  console.log(`North Bear Pulse running on port ${config.port} — ${config.appUrl}`);
+  console.log(`North Bear Pulse running on port ${config.port} — ${getAppUrl()}`);
+  seedFirstCustomer();
   startScheduler();
 });

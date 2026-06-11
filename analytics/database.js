@@ -56,10 +56,26 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_snapshots_site_date ON clarity_snapshots(site_id, snapshot_date);
   CREATE INDEX IF NOT EXISTS idx_reports_site ON reports(site_id, created_at);
+
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL DEFAULT '',
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 export function newDashboardToken() {
   return randomBytes(24).toString('hex');
+}
+
+export function getSetting(key) {
+  return db.prepare('SELECT value FROM settings WHERE key = ?').get(key)?.value ?? null;
+}
+
+export function setSetting(key, value) {
+  db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
+              ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`)
+    .run(key, String(value ?? ''));
 }
 
 export default db;

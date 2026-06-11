@@ -44,13 +44,6 @@ export const config = {
   emailBcc: process.env.EMAIL_BCC || '',
 };
 
-export function setupStatus() {
-  return {
-    adminPassword: Boolean(config.adminPassword),
-    google: Boolean(config.googleServiceAccount),
-    googleServiceAccountEmail: config.googleServiceAccount?.client_email || null,
-    smtp: Boolean(config.smtp.host && config.smtp.user && config.smtp.pass),
-    appUrl: config.appUrl,
-    timezone: config.timezone,
-  };
-}
+// Everything except ADMIN_PASSWORD can also be configured from the browser
+// via the setup wizard — see lib/runtime-config.js, which overlays settings
+// saved in the database on top of these environment defaults.

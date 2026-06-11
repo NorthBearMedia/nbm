@@ -27,7 +27,10 @@ export function initialiseSchedules() {
 
 export async function sendDueReports() {
   const now = nowStamp();
-  const due = db.prepare(`SELECT * FROM sites WHERE active = 1 AND report_frequency != 'none' AND next_report_at IS NOT NULL AND next_report_at <= ?`).all(now);
+  // Sites without a contact email can't receive anything — skip rather
+  // than logging a failure every cycle (covers bulk-imported sites that
+  // haven't been finished off yet).
+  const due = db.prepare(`SELECT * FROM sites WHERE active = 1 AND report_frequency != 'none' AND contact_emails != '' AND next_report_at IS NOT NULL AND next_report_at <= ?`).all(now);
   for (const site of due) {
     // Advance the schedule first so a crash mid-send can't cause an email storm.
     db.prepare('UPDATE sites SET next_report_at = ? WHERE id = ?').run(nextRunAt(site.report_frequency), site.id);
