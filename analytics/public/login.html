@@ -28,8 +28,9 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: document.getElementById('password').value }),
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) location.href = '/';
-      else document.getElementById('error').textContent = (await res.json()).error || 'Login failed';
+      else document.getElementById('error').textContent = data.error || 'Login failed';
     });
   </script>
 </body>
