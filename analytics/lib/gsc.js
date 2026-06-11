@@ -1,14 +1,27 @@
 // Google Search Console API — search rankings, clicks and impressions.
 // Accepts either a URL-prefix property ("https://example.com/") or a
 // domain property ("sc-domain:example.com").
+//
+// If a "Search Console reader" email is configured (Settings) and
+// domain-wide delegation is authorised, queries run AS that user,
+// read-only — no per-site robot grants needed. Otherwise the robot
+// queries directly and must have been added to each property.
 import { googleRequest } from './google.js';
+import { getGscReaderEmail } from './runtime-config.js';
+
+export function gscAuth() {
+  const subject = getGscReaderEmail();
+  return subject
+    ? { scopes: ['https://www.googleapis.com/auth/webmasters.readonly'], subject }
+    : undefined;
+}
 
 async function query(siteUrl, body) {
   return googleRequest({
     url: `https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
     method: 'POST',
     data: body,
-  });
+  }, gscAuth());
 }
 
 export async function fetchSummary(siteUrl, start, end) {

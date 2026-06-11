@@ -43,6 +43,13 @@ export function getGoogleServiceAccount() {
   return config.googleServiceAccount;
 }
 
+// When set (and domain-wide delegation is authorised in Google Workspace
+// admin), Search Console is read as this user — read-only — instead of
+// needing the robot granted on every property.
+export function getGscReaderEmail() {
+  return pick('gsc_reader_email', process.env.GSC_READER_EMAIL || '');
+}
+
 export function saveGoogleServiceAccount(json) {
   let parsed;
   try { parsed = typeof json === 'string' ? JSON.parse(json) : json; }
@@ -54,10 +61,10 @@ export function saveGoogleServiceAccount(json) {
   return parsed;
 }
 
-const SMTP_KEYS = ['smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'email_from', 'email_bcc', 'app_url'];
+const SETTING_KEYS = ['smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'email_from', 'email_bcc', 'app_url', 'gsc_reader_email'];
 
 export function saveSettings(body) {
-  for (const key of SMTP_KEYS) {
+  for (const key of SETTING_KEYS) {
     if (body[key] === undefined) continue;
     const value = String(body[key] ?? '').trim();
     // A blank password field in the form means "keep the saved one".
@@ -87,6 +94,7 @@ export function setupStatus() {
       email_from: getEmailFrom(),
       email_bcc: getEmailBcc(),
       app_url: getAppUrl(),
+      gsc_reader_email: getGscReaderEmail(),
     },
   };
 }

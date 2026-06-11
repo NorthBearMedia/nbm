@@ -261,6 +261,11 @@ function showSettingsModal() {
       <div class="form-grid" style="margin-top:14px">
         <div class="field full"><label>App address (used in email links)</label>
           <input name="app_url" value="${esc(s.app_url)}" placeholder="${esc(location.origin)}"></div>
+        <div class="field full"><label>Search Console reader (optional)</label>
+          <input name="gsc_reader_email" value="${esc(s.gsc_reader_email)}" placeholder="you@yourdomain.co.uk">
+          <div class="help">Your own Google email. With domain-wide delegation authorised in Google Workspace admin
+          (incl. the <strong>webmasters.readonly</strong> scope), rankings are read as you — read-only, and no
+          per-site grants are ever needed.</div></div>
         <div class="field full"><label>Replace Google service account key (optional)</label>
           <textarea name="google_json" rows="3" placeholder='Paste new key JSON only if you need to replace it${setup.googleServiceAccountEmail ? ' — current: ' + esc(setup.googleServiceAccountEmail) : ''}'></textarea></div>
       </div>

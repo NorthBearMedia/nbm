@@ -59,10 +59,11 @@ export async function listGa4Properties() {
 // ─── Search Console ───────────────────────────────────────────────
 
 export async function listGscSites() {
+  const { gscAuth } = await import('./gsc.js');
   const data = await googleRequest({
     url: 'https://searchconsole.googleapis.com/webmasters/v3/sites',
     method: 'GET',
-  });
+  }, gscAuth());
   return (data.siteEntry || [])
     .filter(s => s.permissionLevel !== 'siteUnverifiedUser')
     .map(s => ({ siteUrl: s.siteUrl, permissionLevel: s.permissionLevel }));
