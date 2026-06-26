@@ -68,14 +68,18 @@ function render(d) {
     </div>`;
 
     html += section('At a glance');
+    const thirdKpi = o.newUsers != null
+      ? kpi('New visitors', fmtInt(o.newUsers), pctChange(o.newUsers, p.newUsers))
+      : kpi('Pages per visit', (o.sessions ? o.screenPageViews / o.sessions : 0).toFixed(1), pctChange(o.sessions ? o.screenPageViews / o.sessions : 0, p.sessions ? p.screenPageViews / p.sessions : null));
     html += `<div class="kpi-grid">
       ${kpi('Visits', fmtInt(o.sessions), pctChange(o.sessions, p.sessions))}
       ${kpi('Visitors', fmtInt(o.totalUsers), pctChange(o.totalUsers, p.totalUsers))}
       ${kpi('Page views', fmtInt(o.screenPageViews), pctChange(o.screenPageViews, p.screenPageViews))}
-      ${kpi('New visitors', fmtInt(o.newUsers), pctChange(o.newUsers, p.newUsers))}
+      ${thirdKpi}
       ${kpi('Engagement rate', fmtPct(o.engagementRate * 100), pctChange(o.engagementRate, p.engagementRate))}
       ${kpi('Avg. visit length', fmtDur(o.averageSessionDuration), pctChange(o.averageSessionDuration, p.averageSessionDuration))}
     </div>`;
+    if (d.ga4.sourceLabel) html += `<div class="hint" style="margin-top:6px">Source: ${esc(d.ga4.sourceLabel)}</div>`;
   } else {
     html += `<div class="panel"><h2>Analytics warming up</h2>
       <p class="hint">Google Analytics isn't connected for your site yet — North Bear Media is on it. Your visits and visitors will appear here soon.</p></div>`;

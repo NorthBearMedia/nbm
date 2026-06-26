@@ -2,9 +2,10 @@
 // tag detection to fill in a site's blank connection fields automatically.
 // Only ever fills blanks — anything set by hand is left alone.
 import db from '../database.js';
-import { discoverAll, matchForDomain } from './discovery.js';
+import { discoverAll, matchForDomain, normalizeHost } from './discovery.js';
 import { detectTracking } from './detect.js';
-import { getGoogleServiceAccount } from './runtime-config.js';
+import * as fathom from './fathom.js';
+import { getGoogleServiceAccount, getFathomToken } from './runtime-config.js';
 
 export async function autoConnectSite(siteId) {
   const site = db.prepare('SELECT * FROM sites WHERE id = ?').get(siteId);
@@ -52,6 +53,22 @@ export async function autoConnectSite(siteId) {
     }
   } catch (err) {
     notes.push(`Couldn't scan the website for existing tags: ${err.message}`);
+  }
+
+  // 3. Match a Fathom site by domain/name (Fathom is the preferred source).
+  if (getFathomToken() && !site.fathom_site_id) {
+    try {
+      const host = normalizeHost(site.domain);
+      const name = (site.client_name || '').toLowerCase();
+      const fsites = await fathom.listSites();
+      const m = fsites.find(f => {
+        const fn = (f.name || '').toLowerCase(), fnHost = normalizeHost(f.name);
+        return (host && (fnHost === host || fn.includes(host))) || (name && fn && (fn === name || fn.includes(name)));
+      });
+      if (m) filled.fathom_site_id = String(m.id);
+    } catch (err) {
+      notes.push(`Couldn't reach Fathom: ${err.message}`);
+    }
   }
 
   const keys = Object.keys(filled);

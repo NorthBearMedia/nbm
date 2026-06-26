@@ -129,6 +129,7 @@ function renderSetup() {
         <p class="hint" style="margin-bottom:10px">Once Google is connected, this fills in every site's Analytics &amp; Search Console automatically (and checks each website for installed tags). Re-run it any time.</p>
         <button class="btn primary" id="autoConnectAllBtn">⚡ Auto-connect all sites</button>
         <button class="btn" id="hostingerImportBtn">⬇ Import websites from Hostinger</button>
+        ${setup.settings.fathom_token_set ? '<button class="btn" id="fathomMatchBtn">🔗 Connect Fathom to sites</button>' : ''}
         <div id="importBlock" style="margin-top:14px"></div>
       </div>
     </div>
@@ -173,6 +174,7 @@ function renderSetup() {
   // step 3 events
   $('#autoConnectAllBtn')?.addEventListener('click', autoConnectAll);
   $('#hostingerImportBtn')?.addEventListener('click', hostingerImport);
+  $('#fathomMatchBtn')?.addEventListener('click', fathomMatch);
   if (lastDiscovery) renderImportBlock();
 }
 
@@ -284,6 +286,18 @@ async function hostingerImport(e) {
   });
 }
 
+async function fathomMatch(e) {
+  const btn = e.target; btn.disabled = true; btn.textContent = 'Matching Fathom sites…';
+  try {
+    const r = await api('/api/fathom/match', { method: 'POST' });
+    const lines = r.matched.map(m => `${m.site} → ${m.fathom}${m.already ? ' (already linked)' : ' ✓'}`)
+      .concat(r.unmatched.map(u => `${u} — no Fathom site found (link manually in Edit)`));
+    showNotesModal('Fathom connected', `${r.fathomSitesFound} Fathom site(s) found · ${r.matched.length} linked.`, lines);
+    await Promise.all([loadSites(), refreshSetup()]);
+  } catch (err) { toast(err.message, 'err', 9000); }
+  btn.disabled = false; btn.textContent = '🔗 Connect Fathom to sites';
+}
+
 function showNotesModal(title, summary, notes) {
   $('#modalRoot').innerHTML = `
   <div class="modal-backdrop" id="backdrop"><div class="modal">
@@ -315,6 +329,10 @@ function showSettingsModal() {
         <div class="field full"><label>Hostinger API token ${s.hostinger_token_set ? '(saved — leave blank to keep)' : ''}</label>
           <input name="hostinger_api_token" type="password" placeholder="${s.hostinger_token_set ? '••••••••••••' : 'hPanel → Account → API → New token'}">
           <div class="help">Lets Pulse list every website on your Hostinger account and import them in one click.</div></div>
+        <div class="field full"><label>Fathom API key ${s.fathom_token_set ? '(saved — leave blank to keep)' : ''}</label>
+          <input name="fathom_api_token" type="password" placeholder="${s.fathom_token_set ? '••••••••••••' : 'Fathom → Settings → API → Create key'}">
+          <div class="help">Real, bot-filtered visitor data with history — becomes the primary source for reports.
+          After saving, use <strong>Connect Fathom</strong> in the setup panel to match it to your sites.</div></div>
         <div class="field full"><label>Replace Google service account key (optional)</label>
           <textarea name="google_json" rows="3" placeholder='Paste new key JSON only if you need to replace it${setup.googleServiceAccountEmail ? ' — current: ' + esc(setup.googleServiceAccountEmail) : ''}'></textarea></div>
       </div>
@@ -375,7 +393,7 @@ function renderSites() {
         ${s.domain ? `<a class="domain" href="https://${esc(s.domain)}" target="_blank" rel="noopener">${esc(s.domain)}</a>` : '<span class="meta">no domain set</span>'}
       </div>
       <div class="row">
-        ${sourceChip('Analytics', !!s.ga4_property_id)}
+        ${s.fathom_site_id ? sourceChip('Fathom', true) : sourceChip('Analytics', !!s.ga4_property_id)}
         ${sourceChip('Search', !!s.gsc_site_url)}
         ${sourceChip('Clarity', !!s.has_clarity_token)}
         ${!s.contact_emails ? '<span class="chip warn">no client email</span>' : ''}
@@ -435,7 +453,7 @@ $('#sitesGrid').addEventListener('click', async (e) => {
     try {
       const r = await api(`/api/sites/${site.id}/test-connections`, { method: 'POST' });
       const fmt = (name, c) => `${name}: ${c.status === 'ok' ? '✓ working' : c.status === 'not-configured' ? 'not set up' : '✗ ' + c.error}`;
-      showNotesModal(`Connections — ${site.client_name}`, '', [fmt('Google Analytics', r.ga4), fmt('Search Console', r.gsc), fmt('Microsoft Clarity', r.clarity)]);
+      showNotesModal(`Connections — ${site.client_name}`, '', [fmt('Fathom Analytics', r.fathom), fmt('Google Analytics', r.ga4), fmt('Search Console', r.gsc), fmt('Microsoft Clarity', r.clarity)]);
     } catch (err) { toast(err.message, 'err'); }
     btn.disabled = false; btn.textContent = 'Test connections';
   } else if (act === 'snippet') {
@@ -484,6 +502,9 @@ function showSiteModal(site = null) {
         <div class="field"><label>Search Console property</label>
           <input name="gsc_site_url" value="${esc(site?.gsc_site_url)}" placeholder="auto-connect fills this">
           <div class="help">"sc-domain:example.co.uk" or "https://example.co.uk/"</div></div>
+        <div class="field"><label>Fathom site ID</label>
+          <input name="fathom_site_id" value="${esc(site?.fathom_site_id)}" placeholder="Connect Fathom fills this">
+          <div class="help">Primary data source when set. Use “Connect Fathom” to fill automatically.</div></div>
         <div class="field"><label>Clarity project ID</label>
           <input name="clarity_project_id" value="${esc(site?.clarity_project_id)}" placeholder="auto-connect detects this">
           <div class="help">From the Clarity project URL</div></div>

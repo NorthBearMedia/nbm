@@ -4,6 +4,8 @@
 import * as ga4 from './ga4.js';
 import * as gsc from './gsc.js';
 import * as clarity from './clarity.js';
+import { gatherFathom } from './fathom.js';
+import { getFathomToken } from './runtime-config.js';
 import { previousPeriod } from './dates.js';
 
 async function attempt(name, warnings, fn) {
@@ -28,9 +30,18 @@ export async function gatherReportData(site, start, end) {
 
   const jobs = [];
 
-  if (site.ga4_property_id) {
-    const pid = site.ga4_property_id;
-    jobs.push((async () => {
+  // Web analytics: prefer Fathom when connected and matched to this site
+  // (real, bot-filtered, with history); fall back to GA4 if Fathom isn't set
+  // up or returns nothing. Resolved in one sequential job so the preference
+  // is deterministic; Search Console (below) still runs in parallel.
+  const useFathom = Boolean(getFathomToken() && site.fathom_site_id);
+  jobs.push((async () => {
+    if (useFathom) {
+      const block = await attempt('Fathom analytics', warnings, () => gatherFathom(site.fathom_site_id, start, end));
+      if (block) { data.ga4 = block; return; }
+    }
+    if (site.ga4_property_id) {
+      const pid = site.ga4_property_id;
       const [overview, prevOverview, timeseries, topPages, channels, devices] = await Promise.all([
         attempt('Analytics overview', warnings, () => ga4.fetchOverview(pid, start, end)),
         attempt('Analytics comparison', warnings, () => ga4.fetchOverview(pid, prev.start, prev.end)),
@@ -39,9 +50,9 @@ export async function gatherReportData(site, start, end) {
         attempt('Analytics channels', warnings, () => ga4.fetchChannels(pid, start, end)),
         attempt('Analytics devices', warnings, () => ga4.fetchDevices(pid, start, end)),
       ]);
-      if (overview) data.ga4 = { overview, prevOverview, timeseries: timeseries || [], topPages: topPages || [], channels: channels || [], devices: devices || [] };
-    })());
-  }
+      if (overview) data.ga4 = { sourceLabel: 'Google Analytics', overview, prevOverview, timeseries: timeseries || [], topPages: topPages || [], channels: channels || [], devices: devices || [] };
+    }
+  })());
 
   if (site.gsc_site_url) {
     const url = site.gsc_site_url;
