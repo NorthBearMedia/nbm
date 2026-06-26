@@ -20,6 +20,7 @@ import { discoverAll, clearDiscoveryCache, normalizeHost } from './lib/discovery
 import { autoConnectSite } from './lib/autoconnect.js';
 import { seedFirstCustomer } from './lib/seed.js';
 import * as hostinger from './lib/hostinger.js';
+import * as fathom from './lib/fathom.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -185,7 +186,7 @@ app.get('/api/sites', requireAdmin, (req, res) => {
   res.json(sites.map(siteSummary));
 });
 
-const SITE_FIELDS = ['client_name', 'contact_name', 'contact_emails', 'domain', 'ga4_property_id', 'ga4_measurement_id', 'gsc_site_url', 'clarity_project_id', 'clarity_api_token', 'report_frequency', 'notes'];
+const SITE_FIELDS = ['client_name', 'contact_name', 'contact_emails', 'domain', 'ga4_property_id', 'ga4_measurement_id', 'gsc_site_url', 'clarity_project_id', 'clarity_api_token', 'fathom_site_id', 'report_frequency', 'notes'];
 
 function cleanSiteBody(body) {
   const out = {};
@@ -202,11 +203,11 @@ app.post('/api/sites', requireAdmin, (req, res) => {
   const data = cleanSiteBody(req.body || {});
   if (!data.client_name) return res.status(400).json({ error: 'Client name is required' });
   const freq = data.report_frequency || 'monthly';
-  const info = db.prepare(`INSERT INTO sites (client_name, contact_name, contact_emails, domain, ga4_property_id, ga4_measurement_id, gsc_site_url, clarity_project_id, clarity_api_token, report_frequency, notes, dashboard_token, next_report_at)
-    VALUES (@client_name, @contact_name, @contact_emails, @domain, @ga4_property_id, @ga4_measurement_id, @gsc_site_url, @clarity_project_id, @clarity_api_token, @report_frequency, @notes, @token, @next)`)
+  const info = db.prepare(`INSERT INTO sites (client_name, contact_name, contact_emails, domain, ga4_property_id, ga4_measurement_id, gsc_site_url, clarity_project_id, clarity_api_token, fathom_site_id, report_frequency, notes, dashboard_token, next_report_at)
+    VALUES (@client_name, @contact_name, @contact_emails, @domain, @ga4_property_id, @ga4_measurement_id, @gsc_site_url, @clarity_project_id, @clarity_api_token, @fathom_site_id, @report_frequency, @notes, @token, @next)`)
     .run({
       client_name: '', contact_name: '', contact_emails: '', domain: '', ga4_property_id: '', ga4_measurement_id: '',
-      gsc_site_url: '', clarity_project_id: '', clarity_api_token: '', notes: '',
+      gsc_site_url: '', clarity_project_id: '', clarity_api_token: '', fathom_site_id: '', notes: '',
       ...data, report_frequency: freq,
       token: newDashboardToken(), next: nextRunAt(freq),
     });
@@ -253,6 +254,7 @@ app.post('/api/sites/:id/test-connections', requireAdmin, async (req, res) => {
     catch (err) { return { status: 'error', error: err.message.slice(0, 300) }; }
   }
   res.json({
+    fathom: await check(site.fathom_site_id, () => fathom.gatherFathom(site.fathom_site_id, addDays(todayISO(), -8), addDays(todayISO(), -1))),
     ga4: await check(site.ga4_property_id, () => ga4.testConnection(site.ga4_property_id)),
     gsc: await check(site.gsc_site_url, () => gsc.testConnection(site.gsc_site_url)),
     clarity: await check(site.clarity_api_token, () => clarity.testConnection(site.clarity_api_token)),
@@ -329,6 +331,44 @@ app.post('/api/hostinger/import-sites', requireAdmin, async (req, res) => {
     } catch (err) { results.push({ domain: site.domain, filled: [], notes: [err.message] }); }
   }
   res.json({ ok: true, created: created.length, results });
+});
+
+// ─── Fathom: connect every site's real visitor data in one click ──
+function fathomMatch(fathomSites, site) {
+  const host = normalizeHost(site.domain);
+  const name = (site.client_name || '').toLowerCase();
+  // Match a Fathom site to a Pulse site by domain or by name.
+  return fathomSites.find(f => {
+    const fn = (f.name || '').toLowerCase();
+    const fnHost = normalizeHost(f.name);
+    return (host && (fnHost === host || fn.includes(host) || host.includes(fnHost && fnHost.length > 3 ? fnHost : '\0')))
+      || (name && fn && (fn === name || fn.includes(name) || name.includes(fn)));
+  }) || null;
+}
+
+app.get('/api/fathom/sites', requireAdmin, async (req, res) => {
+  try { res.json({ ok: true, sites: await fathom.listSites() }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Auto-assign each Pulse site its Fathom site id by matching domain/name.
+app.post('/api/fathom/match', requireAdmin, async (req, res) => {
+  let fathomSites;
+  try { fathomSites = await fathom.listSites(); }
+  catch (err) { return res.status(500).json({ error: err.message }); }
+  const sites = db.prepare('SELECT * FROM sites').all();
+  const matched = [], unmatched = [];
+  for (const site of sites) {
+    if (site.fathom_site_id) { matched.push({ site: site.client_name, fathom: site.fathom_site_id, already: true }); continue; }
+    const m = fathomMatch(fathomSites, site);
+    if (m) {
+      db.prepare('UPDATE sites SET fathom_site_id = ? WHERE id = ?').run(String(m.id), site.id);
+      matched.push({ site: site.client_name, fathom: m.name || m.id });
+    } else {
+      unmatched.push(site.client_name);
+    }
+  }
+  res.json({ ok: true, fathomSitesFound: fathomSites.length, matched, unmatched });
 });
 
 // ─── Client-facing (secret dashboard link, no login) ─────────────

@@ -283,14 +283,24 @@ export async function generateReportPdf(data) {
     'Visits are the number of times people opened your website; visitors are the individual people behind them.');
   if (data.ga4?.overview) {
     const o = data.ga4.overview, p = data.ga4.prevOverview || {};
+    // GA4 reports new visitors; Fathom doesn't, so show pages-per-visit there.
+    const thirdCard = o.newUsers != null
+      ? { label: 'New visitors', value: fmtInt(o.newUsers), delta: pctChange(o.newUsers, p.newUsers) }
+      : { label: 'Pages per visit', value: (o.sessions ? o.screenPageViews / o.sessions : 0).toFixed(1),
+          delta: pctChange(o.sessions ? o.screenPageViews / o.sessions : 0, p.sessions ? p.screenPageViews / p.sessions : null) };
     y = kpiCards(doc, y, [
       { label: 'Visits', value: fmtInt(o.sessions), delta: pctChange(o.sessions, p.sessions) },
       { label: 'Visitors', value: fmtInt(o.totalUsers), delta: pctChange(o.totalUsers, p.totalUsers) },
       { label: 'Page views', value: fmtInt(o.screenPageViews), delta: pctChange(o.screenPageViews, p.screenPageViews) },
-      { label: 'New visitors', value: fmtInt(o.newUsers), delta: pctChange(o.newUsers, p.newUsers) },
+      thirdCard,
       { label: 'Engagement rate', value: fmtPct(o.engagementRate * 100), delta: pctChange(o.engagementRate, p.engagementRate) },
       { label: 'Avg. visit length', value: fmtDur(o.averageSessionDuration), delta: pctChange(o.averageSessionDuration, p.averageSessionDuration) },
     ]);
+    if (data.ga4.sourceLabel) {
+      doc.font('Helvetica-Oblique').fontSize(7).fillColor(C.faint)
+        .text(`Source: ${data.ga4.sourceLabel}`, M, y - 6, { width: CW });
+      y += 6;
+    }
   } else {
     y = emptyNote(doc, y, 'Google Analytics is not connected for this site yet — once connected, visits, visitors and engagement will appear here.');
   }
