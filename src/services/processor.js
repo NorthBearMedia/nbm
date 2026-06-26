@@ -123,25 +123,45 @@ export async function processNewMessages(client) {
       (m) => m.id === moderation.submissionMessageId
     );
 
-    // For CORRECTION requests, get images from the correction message specifically
-    let images = [];
+    // Resolve the image(s) to attach. The image MUST come from a message the AI
+    // explicitly identified — NEVER scavenged from elsewhere in the thread. That
+    // scavenging is what stapled old/unrelated images onto new submissions.
+    //
+    // For CORRECTION: if the AI pointed at a correction image we can't find, do
+    // NOT delete the live post and republish blind — ask the user to resend.
     if (action === "CORRECTION" && moderation.useImagesFromMessageId) {
       const correctionMsg = convo.thread.find(
         (m) => m.id === moderation.useImagesFromMessageId
       );
-      images = correctionMsg?.images || [];
+      if (!correctionMsg || (correctionMsg.images?.length || 0) === 0) {
+        console.warn(
+          `${tag} [WARN] CORRECTION points at image message ${moderation.useImagesFromMessageId} but no usable image found — asking the user to resend`
+        );
+        try {
+          await client.sendReply(
+            convo.senderId,
+            moderation.reply ||
+              "Could you resend the correct photo? I couldn't find it on my end."
+          );
+        } catch (err) {
+          console.warn(`${tag} [WARN] Could not send CORRECTION resend request: ${err.message}`);
+        }
+        saveConversation(convo, moderation, "ASK", null);
+        continue;
+      }
     }
 
-    // Fall back to the submission message's images
+    // Images come ONLY from the AI-identified image message, or failing that the
+    // submission message's own attachments. We never reach across the thread.
+    let images = [];
+    if (moderation.useImagesFromMessageId) {
+      const imageMsg = convo.thread.find(
+        (m) => m.id === moderation.useImagesFromMessageId
+      );
+      images = imageMsg?.images || [];
+    }
     if (images.length === 0) {
       images = submissionMsg?.images || [];
-    }
-
-    // Last resort: collect ALL user images in the thread
-    if (images.length === 0) {
-      images = convo.thread
-        .filter((m) => !m.isPage)
-        .flatMap((m) => m.images || []);
     }
 
     if (images.length > 0) {
@@ -158,6 +178,18 @@ export async function processNewMessages(client) {
       timestamp: submissionMsg?.timestamp || convo.updatedTime,
       pageName: client.pageName,
     };
+
+    // If the AI says this submission has an image but we couldn't bind one to the
+    // identified message, don't guess — flag for a human rather than post a wrong
+    // or missing image.
+    if (action === "POST" && moderation.hasImages && images.length === 0) {
+      console.warn(
+        `${tag} [WARN] hasImages=true but no image could be bound to the submission — flagging instead of posting`
+      );
+      await notifyFlagged(submission, moderation.reply, client);
+      saveConversation(convo, moderation, "FLAG", null);
+      continue;
+    }
 
     let postId = null;
 

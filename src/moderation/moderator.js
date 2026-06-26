@@ -33,6 +33,14 @@ IDENTIFYING SUBMISSIONS:
 - If someone sends JUST an image with no context, ASK what they'd like done with it
 - If someone sends a vague message, ASK for clarification
 
+ATTACHING IMAGES — this is critical, get it right:
+- Every message is annotated with its id and whether it has images, e.g. "(id: m_123) ... [2 image(s) attached]"
+- Set "submissionMessageId" to the message that holds the SUBMISSION (usually the text the person wants posted)
+- Set "useImagesFromMessageId" to the id of the message that actually CONTAINS the image(s) to post
+- People often send the photo in one message and the text in another (e.g. a photo, then "please post this"). In that case: submissionMessageId = the text message, useImagesFromMessageId = the photo message
+- CRITICAL: only attach an image that belongs to THIS submission. If the person sent an unrelated or OLDER image earlier in the thread (a previous submission, a profile photo, a sticker), do NOT reference it
+- A text-only submission MUST have useImagesFromMessageId = null and hasImages = false. Never attach a leftover image to text-only content
+
 WHEN TO ASK (decision = "ASK"):
 Use ASK when you genuinely need more information. Examples:
 - "Hi" / "Hello" with nothing else → greet them and ask how you can help
@@ -83,7 +91,7 @@ You MUST respond with valid JSON only, no other text:
   "submissionMessageId": "the id of the message to post (null if SKIP/ASK)",
   "submissionText": "the exact text of the submission to post (null if SKIP/ASK). For CORRECTION, use the corrected text.",
   "hasImages": true/false,
-  "useImagesFromMessageId": "for CORRECTION — the message id containing the correct images to use (null otherwise)",
+  "useImagesFromMessageId": "the message id whose attached image(s) should be posted with this submission. Set this WHENEVER the post includes an image — including when the photo was sent in a SEPARATE message from the text. For CORRECTION, point to the message with the corrected image. Use null if the submission has no image. NEVER point to an image from an earlier or unrelated submission.",
   "reason": "Brief one-sentence explanation of your decision",
   "confidence": 0.0 to 1.0 (see CONFIDENCE GUIDE below),
   "reply": "Your conversational reply to send back to the person. ALWAYS provide this — even for ASK. Be friendly and natural, like a real person running the page."
@@ -111,6 +119,8 @@ DECISION GUIDE:
  * Returns { decision, submissionMessageId, submissionText, hasImages, reason, confidence, reply }.
  */
 export async function moderateConversation(thread) {
+  const threadIds = new Set(thread.map((m) => m.id));
+
   // Format the thread for the AI
   const formatted = thread
     .map((msg) => {
@@ -152,6 +162,30 @@ export async function moderateConversation(thread) {
       typeof result.confidence !== "number"
     ) {
       throw new Error("Invalid response shape");
+    }
+
+    // Never let a post-type action proceed with a submissionMessageId that isn't
+    // a real message in this thread (hallucinated or scrolled out of view). Bind
+    // failures must FLAG for a human rather than fall through to a wrong image.
+    const postActions = ["APPROVE", "REJECT", "CORRECTION", "DELETE"];
+    if (postActions.includes(result.decision)) {
+      if (!result.submissionMessageId || !threadIds.has(result.submissionMessageId)) {
+        console.warn(
+          `[MODERATION] submissionMessageId ${result.submissionMessageId} not found in thread — downgrading ${result.decision} to FLAG`
+        );
+        result.decision = "FLAG";
+        result.reason =
+          "Submission message could not be located in the thread — flagged for manual review.";
+      }
+    }
+
+    // If the AI pointed at an image message that doesn't exist, drop it so we
+    // fall back to the submission message's own images — never a scavenged one.
+    if (result.useImagesFromMessageId && !threadIds.has(result.useImagesFromMessageId)) {
+      console.warn(
+        `[MODERATION] useImagesFromMessageId ${result.useImagesFromMessageId} not in thread — ignoring`
+      );
+      result.useImagesFromMessageId = null;
     }
 
     return result;

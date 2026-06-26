@@ -135,7 +135,15 @@ export function createPageClient(page) {
         const images = [];
         if (msg.attachments?.data) {
           for (const att of msg.attachments.data) {
-            if (att.type && att.type !== "image" && att.type !== "photo") {
+            // Allow-list real photos only. Explicit image/photo types pass; an
+            // untyped attachment is only treated as an image if it carries
+            // image_data. This keeps stickers, shares, reels and GIFs (which
+            // arrive untyped with just a payload URL) from posing as photos.
+            const isImage =
+              att.type === "image" ||
+              att.type === "photo" ||
+              (!att.type && !!att.image_data);
+            if (!isImage) {
               continue;
             }
 
