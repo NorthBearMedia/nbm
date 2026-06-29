@@ -164,6 +164,7 @@ let dashWaConfigs = [];
 async function loadDashboard() {
   renderDashGreeting();
   renderDashStats();
+  renderBattlePlan();
   renderControlBoard();
   // Integrations strip (preserved widgets, relocated below the board)
   renderDashUrgentTasks();
@@ -190,6 +191,81 @@ function clientControlData(c) {
   const risk = c.resolved_risk || c.computed_risk || 'low';
   const b = c.board || {};
   return { status, risk, b };
+}
+
+function daysSince(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d)) return null;
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  return Math.floor((now - d) / 864e5);
+}
+
+function lastContactLabel(dateStr) {
+  const n = daysSince(dateStr);
+  if (n === null) return 'Last contact: —';
+  if (n <= 0) return 'Last contact: today';
+  if (n === 1) return 'Last contact: yesterday';
+  return `Last contact: ${n} days ago`;
+}
+
+// One short recommended next action per client (rule-based).
+function clientNextAction(c) {
+  const today = localDateStr(new Date());
+  const open = (c.tasks || []).filter(isOpenTask);
+  const b = c.board || {};
+  if ((b.overdue || 0) > 0) return { text: `Finish ${b.overdue} overdue task${b.overdue > 1 ? 's' : ''}`, urgent: true };
+  const urgent = open.filter(t => t.task_type === 'urgent');
+  if (urgent.length) return { text: `Handle urgent: ${urgent[0].title}`, urgent: true };
+  const waitingMe = open.filter(t => t.task_status === 'waiting-on-me');
+  if (waitingMe.length) return { text: `Review waiting item${waitingMe.length > 1 ? 's' : ''}`, urgent: false };
+  if (open.length && open.every(t => t.task_status === 'waiting-on-client')) return { text: 'Chase client for assets', urgent: false };
+  const dueToday = open.filter(t => (t.planned_date || t.deadline) === today || t.task_band === 'today');
+  if (dueToday.length) return { text: `Do ${dueToday.length} task${dueToday.length > 1 ? 's' : ''} due today`, urgent: false };
+  if (c.client_type === 'retainer' && open.length && !c.next_scheduled_date) return { text: 'Schedule next work block', urgent: false };
+  const lc = daysSince(c.last_contact_date);
+  if (lc !== null && lc > 14) return { text: 'Reconnect — no recent contact', urgent: false };
+  if (open.length) return { text: `Progress ${open.length} open task${open.length > 1 ? 's' : ''}`, urgent: false };
+  if (c.client_type === 'prospect') return { text: 'Follow up to win the work', urgent: false };
+  return { text: 'No action needed', urgent: false };
+}
+
+// Today's Battle Plan — 3–7 rule-based priority actions for today.
+function renderBattlePlan() {
+  const el = document.getElementById('battlePlanBody');
+  const section = document.getElementById('battlePlan');
+  if (!el || !section) return;
+  const today = localDateStr(new Date());
+  const tasks = allTasksFlat().filter(isOpenTask);
+  const actions = [];
+  tasks.filter(t => t.deadline && t.deadline < today)
+    .forEach(t => actions.push({ icon: '🔴', text: `Overdue: ${t.title}`, sub: t.client_name, rank: 0, key: 't' + t.id, id: t.id }));
+  tasks.filter(t => t.task_type === 'urgent')
+    .forEach(t => actions.push({ icon: '🔥', text: `Urgent: ${t.title}`, sub: t.client_name, rank: 1, key: 't' + t.id, id: t.id }));
+  tasks.filter(t => (t.planned_date || t.deadline) === today || t.task_band === 'today')
+    .forEach(t => actions.push({ icon: '☼', text: t.title, sub: (t.client_name || '') + ' · due today', rank: 2, key: 't' + t.id, id: t.id }));
+  clients.filter(c => !c.is_system && !c.archived && clientControlData(c).status === 'red')
+    .forEach(c => actions.push({ icon: '⚠', text: `Attend to ${c.name}`, sub: 'high-risk client', rank: 3, key: 'c' + c.id, cid: c.id }));
+  tasks.filter(t => t.task_type === 'admin' && t.task_band === 'today')
+    .forEach(t => actions.push({ icon: '🗂', text: `Admin: ${t.title}`, sub: t.client_name, rank: 4, key: 't' + t.id, id: t.id }));
+
+  const seen = new Set(); const uniq = [];
+  for (const a of actions.sort((x, y) => x.rank - y.rank)) {
+    if (seen.has(a.key)) continue;
+    seen.add(a.key); uniq.push(a);
+    if (uniq.length >= 7) break;
+  }
+  section.style.display = '';
+  if (!uniq.length) {
+    el.innerHTML = '<div class="bp-empty">✓ Nothing on fire. Pick from the board below, or plan your week.</div>';
+    return;
+  }
+  el.innerHTML = uniq.map((a, i) => `<div class="bp-item" onclick="${a.id ? `editTask(${a.id})` : `openClientDetail(${a.cid})`}">
+      <span class="bp-num">${i + 1}</span>
+      <span class="bp-icon">${a.icon}</span>
+      <span class="bp-text">${esc(a.text)}</span>
+      <span class="bp-sub">${esc(a.sub || '')}</span>
+    </div>`).join('');
 }
 
 function renderControlBoard() {
@@ -234,16 +310,23 @@ function clientCardHTML(c) {
   const overrideTag = c.control_status ? '<span class="cb-override" title="Manual override">override</span>' : '';
   const due = b.next_due_date ? fmtDateShort(b.next_due_date) : '—';
   const logo = c.logo_url ? `<img src="${esc(c.logo_url)}" class="cb-logo" alt="">` : `<span class="cb-logo cb-logo-code">${esc(c.code || c.name.substring(0,3))}</span>`;
-  const recur = c.recurring_deliverables ? `<div class="cb-recur" title="Recurring deliverables">&#8635; ${esc(c.recurring_deliverables.split('\n')[0])}${c.recurring_deliverables.split('\n').length>1?' …':''}</div>` : '';
+  const na = clientNextAction(c);
+  const lcDays = daysSince(c.last_contact_date);
+  const lcStale = lcDays !== null && lcDays > 14;
+  const weekly = c.monthly_value ? Math.round(c.monthly_value / 4.345) : 0;
+  const valueChip = c.monthly_value
+    ? `<span class="cb-value-chip" title="Monthly value (≈ ${fmtMoney(weekly)}/wk)">${fmtMoney(c.monthly_value)}/mo</span>` : '';
   return `<div class="cb-card rag-border-${status}" onclick="openClientDetail(${c.id})">
     <div class="cb-card-top">
       ${logo}
       <div class="cb-card-name">
         <div class="cb-name">${esc(c.name)} ${c.is_private?'<span title="Private">🔒</span>':''}</div>
-        <div class="cb-sub">${esc(typeLabelClient(c.client_type))}${c.monthly_value?` · ${fmtMoney(c.monthly_value)}/mo`:''}</div>
+        <div class="cb-sub">${esc(typeLabelClient(c.client_type))}</div>
       </div>
+      ${valueChip}
       <span class="rag-dot ${sCfg.cls}" title="${sCfg.label}"></span>
     </div>
+    <div class="cb-next ${na.urgent?'cb-next-urgent':''}" title="Recommended next action"><span class="cb-next-arrow">➜</span> ${esc(na.text)}</div>
     <div class="cb-stats">
       <span class="cb-stat ${b.overdue?'cb-stat-bad':''}" title="Overdue">${b.overdue||0} overdue</span>
       <span class="cb-stat" title="Outstanding tasks">${b.outstanding||0} open</span>
@@ -254,7 +337,7 @@ function clientCardHTML(c) {
       <span title="Next scheduled work">Sched: ${c.next_scheduled_date?fmtDateShort(c.next_scheduled_date):'—'}</span>
       <span class="risk-badge risk-${risk}" title="Risk">${(RISK[risk]||'')} risk</span>
     </div>
-    ${recur}
+    <div class="cb-contact ${lcStale?'cb-contact-stale':''}" title="Last contact">${lastContactLabel(c.last_contact_date)}${lcStale?' ⚠':''}</div>
     <div class="cb-status-line"><span class="rag-pill ${sCfg.cls}">${sCfg.label}</span>${overrideTag}</div>
   </div>`;
 }

@@ -41,6 +41,8 @@ function computeControl(client, tasks, today) {
   const allWaitingClient = hasOpenWork && open.every(t => t.task_status === 'waiting-on-client');
 
   let status;
+  // Red = genuinely urgent/risky ONLY. A blank next_scheduled_date never makes a
+  // client Red — at most Amber (and only when there is open work to schedule).
   if (hasOverdue || hasUrgent || waitingMePastDue) status = 'red';
   else if (allWaitingClient) status = 'blue';
   else if ((noScheduled && hasOpenWork) || dueSoon || staleContact) status = 'amber';
