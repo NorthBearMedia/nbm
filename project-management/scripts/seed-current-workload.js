@@ -2,8 +2,11 @@
 //
 // One-time, safe import of the current real workload into the Client Control Board.
 //
-//   node scripts/seed-current-workload.js            # apply changes
-//   node scripts/seed-current-workload.js --dry-run  # preview only, write nothing
+//   node scripts/seed-current-workload.js                   # apply changes
+//   node scripts/seed-current-workload.js --dry-run         # preview only, write nothing
+//   node scripts/seed-current-workload.js --recompute-status # reset RAG overrides to the
+//        calm scheme (clears forced control_status so the rules drive each client's colour;
+//        keeps risk_level). Use once if an earlier seed painted clients red.
 //
 // Safety guarantees:
 //   • Never deletes anything. Only INSERTs and conditional UPDATEs.
@@ -25,6 +28,7 @@ import {
 } from '../lib/taskmap.js';
 
 const DRY = process.argv.includes('--dry-run');
+const RESET_STATUS = process.argv.includes('--recompute-status');
 
 // ─── Helpers ────────────────────────────────────────────
 function thisWeeksWednesday() {
@@ -101,6 +105,10 @@ function upsertClient(spec) {
     };
     ['client_type', 'agreement_summary', 'recurring_deliverables', 'control_status', 'risk_level', 'notes', 'important_contacts'].forEach(fillText);
     if (fields.monthly_value && !existing.monthly_value) { sets.push('monthly_value = ?'); vals.push(fields.monthly_value); changed.push('monthly_value'); }
+    // --recompute-status: force control_status to the spec value (calm scheme), overriding any earlier forced colour.
+    if (RESET_STATUS && existing.control_status !== fields.control_status && !changed.includes('control_status')) {
+      sets.push('control_status = ?'); vals.push(fields.control_status); changed.push('control_status→reset');
+    }
 
     if (sets.length && !DRY) {
       vals.push(existing.id);
@@ -163,7 +171,7 @@ const WED = thisWeeksWednesday();
 
 const WORKLOAD = [
   {
-    name: 'Arnold House', client_type: 'project', control_status: 'red', risk_level: 'high',
+    name: 'Arnold House', client_type: 'project', control_status: '', risk_level: 'high',
     agreement_summary: 'Filming project — London. One filming day completed; another upcoming.',
     notes: 'Filming coming up on Wednesday. One day already completed. Need to present existing footage to Charlie and Steph, prep & charge kit, travel to London, review shot list and schedule for a full filming day.',
     important_contacts: 'Charlie · Steph (clients)',
@@ -176,7 +184,7 @@ const WORKLOAD = [
     ],
   },
   {
-    name: 'Willis Cooper', client_type: 'retainer', control_status: 'red', risk_level: 'high',
+    name: 'Willis Cooper', client_type: 'retainer', control_status: '', risk_level: 'high',
     agreement_summary: 'Both our accountant and a customer. Meeting tomorrow.',
     notes: 'Willis Cooper are both my accountant and a customer. Seeing them tomorrow. Outstanding client tasks to finish before the meeting, then plan the next mission. Separate internal finance/admin items relate to PAYE/payroll/NI.',
     tasks: [
@@ -186,7 +194,7 @@ const WORKLOAD = [
     ],
   },
   {
-    name: 'North Bear Internal/Admin', client_type: 'ad-hoc', control_status: 'red', risk_level: 'high',
+    name: 'North Bear Internal/Admin', client_type: 'ad-hoc', control_status: '', risk_level: 'high',
     agreement_summary: 'Internal business admin, finance, recurring invoicing and reporting automation.',
     notes: 'Internal business admin, finance, recurring invoicing and reporting automation.',
     tasks: [
@@ -200,7 +208,7 @@ const WORKLOAD = [
   },
   {
     name: 'Keith Sims / Maxus', aliases: ['Maxus', 'Keith Sims'], client_type: 'retainer', monthly_value: 345,
-    control_status: 'amber', risk_level: 'medium',
+    control_status: '', risk_level: 'medium',
     agreement_summary: 'SEO retainer agreed at £345/month (not yet set up) + 7 blog posts requested.',
     notes: 'Maxus website built previously. Ian Barnes emailed: seven blog posts needed. New SEO agreement at £345/month but nothing set up yet. June newsletter proposal came back with typo feedback.',
     important_contacts: 'Ian Barnes · Keith Sims',
@@ -213,7 +221,7 @@ const WORKLOAD = [
   },
   {
     name: 'Sasha / Keto and Clarity', aliases: ['Keto and Clarity', 'Keto & Clarity', 'Sasha'], client_type: 'project',
-    control_status: 'amber', risk_level: 'medium',
+    control_status: '', risk_level: 'medium',
     agreement_summary: 'YouTube channel trial — filming & editing, hopefully ongoing.',
     notes: 'New YouTube channel trial. Doing filming and editing, hopefully leading to ongoing work. First cut done, Sasha liked it and sent edits. Edits are a relatively long job and need doing while momentum is good.',
     important_contacts: 'Sasha',
@@ -224,7 +232,7 @@ const WORKLOAD = [
     ],
   },
   {
-    name: 'Evergreen', client_type: 'prospect', control_status: 'amber', risk_level: 'medium',
+    name: 'Evergreen', client_type: 'prospect', control_status: '', risk_level: 'medium',
     agreement_summary: 'Potential longer-term opportunity — proposal to watch.',
     notes: 'Potential longer term opportunity. There is a proposal to look out for and someone wants to work with me on something longer term.',
     tasks: [
@@ -232,7 +240,7 @@ const WORKLOAD = [
     ],
   },
   {
-    name: 'Prime PR Marketing', client_type: 'project', control_status: 'red', risk_level: 'high',
+    name: 'Prime PR Marketing', client_type: 'project', control_status: '', risk_level: 'high',
     agreement_summary: 'Website updates outstanding for 12 days.',
     notes: 'Website updates have been waiting for 12 days and nothing has been done yet.',
     tasks: [
@@ -240,7 +248,7 @@ const WORKLOAD = [
     ],
   },
   {
-    name: 'Smartmove Homes', client_type: 'retainer', monthly_value: 500, control_status: 'amber', risk_level: 'medium',
+    name: 'Smartmove Homes', client_type: 'retainer', monthly_value: 500, control_status: '', risk_level: 'medium',
     agreement_summary: 'Estate agent — £125/week property video & content support.',
     recurring_deliverables: 'Weekly property video/content support.\nMonthly meeting.\nLast-minute edits may need triage/delegation.',
     notes: 'Estate agent client paying £125/week. Property video edits and related support. Scope has changed a little. Outstanding tasks from the last monthly meeting; next monthly meeting needs scheduling. Often sends last-minute video work needing quick turnaround. Hayley can help with overflow edits remotely.',
@@ -253,7 +261,7 @@ const WORKLOAD = [
     ],
   },
   {
-    name: 'Caring Places', client_type: 'retainer', monthly_value: 200, control_status: 'amber', risk_level: 'medium',
+    name: 'Caring Places', client_type: 'retainer', monthly_value: 200, control_status: '', risk_level: 'medium',
     agreement_summary: '£200/month — light social media and SEO support.',
     recurring_deliverables: 'Light social media and SEO support.',
     notes: 'Paying £200/month for a small amount of social media and SEO support. Not much done yet. Needs a regular schedule so it stays up to date.',
@@ -263,7 +271,7 @@ const WORKLOAD = [
     ],
   },
   {
-    name: 'CN Maintenance', client_type: 'project', control_status: 'blue', risk_level: 'low',
+    name: 'CN Maintenance', client_type: 'project', control_status: '', risk_level: 'low',
     agreement_summary: 'Website build — waiting on customer to go live & transfer domain.',
     notes: 'Website build in progress. Waiting for customer to come back. Need to transfer the domain and get the site live.',
     tasks: [
@@ -272,7 +280,7 @@ const WORKLOAD = [
     ],
   },
   {
-    name: 'Enzo HR', client_type: 'project', control_status: 'blue', risk_level: 'low',
+    name: 'Enzo HR', client_type: 'project', control_status: '', risk_level: 'low',
     agreement_summary: 'Website in production — awaiting customer response.',
     notes: 'Website in production. Waiting for customer to come back. No response yet.',
     tasks: [
@@ -281,7 +289,7 @@ const WORKLOAD = [
     ],
   },
   {
-    name: 'Ivy House', client_type: 'retainer', control_status: 'red', risk_level: 'high',
+    name: 'Ivy House', client_type: 'retainer', control_status: '', risk_level: 'high',
     agreement_summary: 'Residential care home — social support; not yet invoiced.',
     recurring_deliverables: 'Social support/content.',
     notes: 'Residential care home client. Doing a little social support. Not invoiced yet. Need to get on top of recurring invoices and a regular work rhythm.',
@@ -302,7 +310,7 @@ const WORKLOAD = [
     ],
   },
   {
-    name: 'Steadplan', client_type: 'retainer', monthly_value: 1200, control_status: 'amber', risk_level: 'high',
+    name: 'Steadplan', client_type: 'retainer', monthly_value: 1200, control_status: '', risk_level: 'high',
     agreement_summary: 'SEO setup at £1,200/month — awaiting details from Hal (MD).',
     notes: 'SEO setup at £1,200/month. Waiting for details from Hal, the MD. Big job — needs proper onboarding, planning and delivery.',
     important_contacts: 'Hal (MD)',
@@ -314,7 +322,7 @@ const WORKLOAD = [
     ],
   },
   {
-    name: 'Sales Pipeline', client_type: 'prospect', control_status: 'amber', risk_level: 'medium',
+    name: 'Sales Pipeline', client_type: 'prospect', control_status: '', risk_level: 'medium',
     agreement_summary: 'Live enquiries + cross-sell opportunities to follow up.',
     notes: 'Two or three enquiries on the bubble and some customers that could be cross sold to. These need follow up rather than sitting in my head.',
     tasks: [

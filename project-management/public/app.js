@@ -203,10 +203,30 @@ function daysSince(dateStr) {
 
 function lastContactLabel(dateStr) {
   const n = daysSince(dateStr);
-  if (n === null) return 'Last contact: —';
+  if (n === null) return 'Last contact: not set';
   if (n <= 0) return 'Last contact: today';
   if (n === 1) return 'Last contact: yesterday';
   return `Last contact: ${n} days ago`;
+}
+
+// Format estimated hours as 15m / 45m / 1h / 2h 30m. Empty string when none.
+function fmtEstTime(h) {
+  if (!h || h <= 0) return '';
+  const mins = Math.round(h * 60);
+  if (mins < 60) return mins + 'm';
+  const hh = Math.floor(mins / 60), mm = mins % 60;
+  return mm ? `${hh}h ${mm}m` : `${hh}h`;
+}
+
+// Total estimated time of a client's OPEN (active, canonical) tasks.
+function openWorkload(c) {
+  return (c.tasks || []).filter(isOpenTask).reduce((s, t) => s + (t.estimated_hours || 0), 0);
+}
+
+// Monthly value chip text. "£345/month" when populated, else the client type.
+function clientValueLabel(c) {
+  if (c.monthly_value) return `£${Number(c.monthly_value).toLocaleString('en-GB')}/month`;
+  return typeLabelClient(c.client_type);
 }
 
 // One short recommended next action per client (rule-based).
@@ -230,42 +250,86 @@ function clientNextAction(c) {
   return { text: 'No action needed', urgent: false };
 }
 
-// Today's Battle Plan — 3–7 rule-based priority actions for today.
+// Today's Battle Plan — short, rule-based, grouped Do now / Do next / Can wait.
+// Uses ONLY active canonical tasks: c.tasks is already non-archived (server-side),
+// isOpenTask() excludes done/cancelled, and overdue is computed from the deadline.
 function renderBattlePlan() {
   const el = document.getElementById('battlePlanBody');
   const section = document.getElementById('battlePlan');
   if (!el || !section) return;
   const today = localDateStr(new Date());
-  const tasks = allTasksFlat().filter(isOpenTask);
-  const actions = [];
-  tasks.filter(t => t.deadline && t.deadline < today)
-    .forEach(t => actions.push({ icon: '🔴', text: `Overdue: ${t.title}`, sub: t.client_name, rank: 0, key: 't' + t.id, id: t.id }));
-  tasks.filter(t => t.task_type === 'urgent')
-    .forEach(t => actions.push({ icon: '🔥', text: `Urgent: ${t.title}`, sub: t.client_name, rank: 1, key: 't' + t.id, id: t.id }));
-  tasks.filter(t => (t.planned_date || t.deadline) === today || t.task_band === 'today')
-    .forEach(t => actions.push({ icon: '☼', text: t.title, sub: (t.client_name || '') + ' · due today', rank: 2, key: 't' + t.id, id: t.id }));
-  clients.filter(c => !c.is_system && !c.archived && clientControlData(c).status === 'red')
-    .forEach(c => actions.push({ icon: '⚠', text: `Attend to ${c.name}`, sub: 'high-risk client', rank: 3, key: 'c' + c.id, cid: c.id }));
-  tasks.filter(t => t.task_type === 'admin' && t.task_band === 'today')
-    .forEach(t => actions.push({ icon: '🗂', text: `Admin: ${t.title}`, sub: t.client_name, rank: 4, key: 't' + t.id, id: t.id }));
+  const tasks = allTasksFlat().filter(t => !t.client_is_system && isOpenTask(t));
 
-  const seen = new Set(); const uniq = [];
-  for (const a of actions.sort((x, y) => x.rank - y.rank)) {
-    if (seen.has(a.key)) continue;
-    seen.add(a.key); uniq.push(a);
-    if (uniq.length >= 7) break;
+  const isOverdue = t => t.deadline && t.deadline < today;
+  const isUrgent = t => t.task_type === 'urgent';
+  const isToday = t => t.task_band === 'today' || (t.planned_date || t.deadline) === today;
+  const redClientIds = new Set(clients.filter(c => !c.is_system && !c.archived && clientControlData(c).status === 'red').map(c => c.id));
+  const isCrit = t => redClientIds.has(t.client_id);
+  const score = t => (isOverdue(t) ? -8 : 0) + (isUrgent(t) ? -4 : 0) + (isCrit(t) ? -2 : 0) + (isToday(t) ? -1 : 0);
+  const used = new Set();
+
+  // Do now: the 1–2 most pressing overdue/urgent items.
+  const doNow = tasks.filter(t => isOverdue(t) || isUrgent(t)).sort((a, b) => score(a) - score(b)).slice(0, 2);
+  doNow.forEach(t => used.add(t.id));
+  // Do next: remaining today / urgent / high-risk-client tasks (max 5).
+  const doNext = tasks.filter(t => !used.has(t.id) && (isToday(t) || isUrgent(t) || isCrit(t))).sort((a, b) => score(a) - score(b)).slice(0, 5);
+  doNext.forEach(t => used.add(t.id));
+  // Can wait: lower-priority overdue / this-week items that are not client-critical (max 4).
+  const canWait = tasks.filter(t => !used.has(t.id) && (isOverdue(t) || t.task_band === 'this-week') && !isCrit(t)).sort((a, b) => score(a) - score(b)).slice(0, 4);
+
+  function iconFor(t) {
+    if (isOverdue(t)) return '🔴';
+    if (isUrgent(t)) return '🔥';
+    if (t.task_type === 'admin') return '🗂';
+    if (isToday(t)) return '☼';
+    return '▸';
   }
+  function itemHtml(t) {
+    const est = fmtEstTime(t.estimated_hours);
+    return `<div class="bp-item">
+      <span class="bp-icon">${iconFor(t)}</span>
+      <span class="bp-text" onclick="editTask(${t.id})" title="Open task">${esc(t.title)}</span>
+      ${est ? `<span class="bp-est">${est}</span>` : ''}
+      <span class="bp-sub">${esc(t.client_name || '')}</span>
+      <span class="bp-actions">
+        <button class="bp-act bp-done" title="Mark done" onclick="event.stopPropagation();bpDone(${t.id})">&#10003;</button>
+        <select class="bp-resched" title="Reschedule" onchange="bpReschedule(${t.id}, this.value)" onclick="event.stopPropagation()">
+          <option value="">&#8986;</option>
+          <option value="tomorrow">Tomorrow</option>
+          <option value="this-week">Later this week</option>
+          <option value="next-week">Next week</option>
+        </select>
+        <button class="bp-act" title="Open" onclick="event.stopPropagation();editTask(${t.id})">&#8599;</button>
+      </span>
+    </div>`;
+  }
+  const group = (title, cls, arr) => arr.length
+    ? `<div class="bp-group ${cls}"><div class="bp-group-title">${title}</div>${arr.map(itemHtml).join('')}</div>` : '';
+
   section.style.display = '';
-  if (!uniq.length) {
+  if (!doNow.length && !doNext.length && !canWait.length) {
     el.innerHTML = '<div class="bp-empty">✓ Nothing on fire. Pick from the board below, or plan your week.</div>';
     return;
   }
-  el.innerHTML = uniq.map((a, i) => `<div class="bp-item" onclick="${a.id ? `editTask(${a.id})` : `openClientDetail(${a.cid})`}">
-      <span class="bp-num">${i + 1}</span>
-      <span class="bp-icon">${a.icon}</span>
-      <span class="bp-text">${esc(a.text)}</span>
-      <span class="bp-sub">${esc(a.sub || '')}</span>
-    </div>`).join('');
+  el.innerHTML =
+    group('Do now', 'bp-now', doNow) +
+    group('Do next', 'bp-next', doNext) +
+    group('Can wait', 'bp-wait', canWait);
+}
+
+async function bpDone(id) {
+  try { await api(`/api/tasks/${id}`, { method: 'PUT', body: { task_status: 'done' } }); await loadClients(); } catch (e) {}
+}
+
+async function bpReschedule(id, when) {
+  if (!when) return;
+  const d = new Date(); d.setHours(0, 0, 0, 0);
+  let band = 'this-week';
+  if (when === 'tomorrow') { d.setDate(d.getDate() + 1); }
+  else if (when === 'this-week') { const dow = d.getDay(); const toFri = (5 - dow + 7) % 7 || 3; d.setDate(d.getDate() + toFri); }
+  else if (when === 'next-week') { const dow = d.getDay(); const toMon = ((8 - dow) % 7) || 7; d.setDate(d.getDate() + toMon); band = 'scheduled'; }
+  const planned = d.toISOString().split('T')[0];
+  try { await api(`/api/tasks/${id}`, { method: 'PUT', body: { planned_date: planned, task_band: band } }); await loadClients(); } catch (e) {}
 }
 
 function renderControlBoard() {
@@ -315,7 +379,10 @@ function clientCardHTML(c) {
   const lcStale = lcDays !== null && lcDays > 14;
   const weekly = c.monthly_value ? Math.round(c.monthly_value / 4.345) : 0;
   const valueChip = c.monthly_value
-    ? `<span class="cb-value-chip" title="Monthly value (≈ ${fmtMoney(weekly)}/wk)">${fmtMoney(c.monthly_value)}/mo</span>` : '';
+    ? `<span class="cb-value-chip" title="≈ ${fmtMoney(weekly)}/week">${clientValueLabel(c)}</span>`
+    : `<span class="cb-value-chip cb-value-type">${esc(typeLabelClient(c.client_type))}</span>`;
+  const workload = openWorkload(c);
+  const workloadLine = workload > 0 ? `<span title="Total estimated time of open tasks">Open workload: ${fmtEstTime(workload)}</span>` : '';
   return `<div class="cb-card rag-border-${status}" onclick="openClientDetail(${c.id})">
     <div class="cb-card-top">
       ${logo}
@@ -331,6 +398,7 @@ function clientCardHTML(c) {
       <span class="cb-stat ${b.overdue?'cb-stat-bad':''}" title="Overdue">${b.overdue||0} overdue</span>
       <span class="cb-stat" title="Outstanding tasks">${b.outstanding||0} open</span>
       <span class="cb-stat" title="Waiting">${b.waiting||0} waiting</span>
+      ${workloadLine ? `<span class="cb-stat cb-stat-workload">${workloadLine}</span>` : ''}
     </div>
     <div class="cb-meta">
       <span title="Next due">Due: ${due}</span>
