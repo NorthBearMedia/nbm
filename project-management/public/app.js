@@ -66,11 +66,16 @@ async function loadClients() {
   clients = await api(`/api/clients${fp}`);
   updateClientFilterDropdown();
   renderStats();
+  updateInboxCount();
   if (currentView === 'clients') {
     renderClients();
     loadWorkloadSummary();
   } else if (currentView === 'dashboard') {
     loadDashboard();
+  } else if (currentView === 'inbox') {
+    loadInboxView();
+  } else if (currentView === 'planning') {
+    loadPlanningView();
   }
 }
 
@@ -126,12 +131,11 @@ function updatePersonFilter() {
 
 // ─── View Switching ─────────────────────────────────────
 function applyViewVisibility() {
-  document.getElementById('dashboardView').style.display = currentView === 'dashboard' ? '' : 'none';
-  document.getElementById('clientsView').style.display = currentView === 'clients' ? '' : 'none';
-  document.getElementById('todayView').style.display = currentView === 'today' ? '' : 'none';
-  document.getElementById('calendarView').style.display = currentView === 'calendar' ? '' : 'none';
-  document.getElementById('focusView').style.display = currentView === 'focus' ? '' : 'none';
-  document.getElementById('emailView').style.display = currentView === 'email' ? '' : 'none';
+  const views = { dashboard: 'dashboardView', inbox: 'inboxView', clients: 'clientsView', today: 'todayView', planning: 'planningView', calendar: 'calendarView', focus: 'focusView', email: 'emailView' };
+  for (const [v, id] of Object.entries(views)) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = currentView === v ? '' : 'none';
+  }
   document.getElementById('clientSubBar').style.display = currentView === 'clients' ? '' : 'none';
   document.getElementById('workloadSummary').style.display = currentView === 'clients' ? 'flex' : 'none';
 }
@@ -141,8 +145,10 @@ function switchView(view) {
   currentView = view;
   applyViewVisibility();
   if (view === 'dashboard') loadDashboard();
+  if (view === 'inbox') loadInboxView();
   if (view === 'clients') renderClients();
   if (view === 'today') loadTodayView();
+  if (view === 'planning') loadPlanningView();
   if (view === 'calendar') loadCalendarView();
   if (view === 'focus') loadFocusView();
   if (view === 'email') loadEmailView();
@@ -510,6 +516,138 @@ async function loadDashActivity() {
       return `<div class="dash-widget-row"><div class="dash-widget-row-title">${esc(e.details || e.action)}</div><div class="dash-widget-row-meta">${esc(e.display_name || '')} · ${time}</div></div>`;
     }).join('');
   } catch { body.innerHTML = '<div class="dash-widget-empty">Failed to load activity</div>'; }
+}
+
+// ─── Task Inbox ─────────────────────────────────────────
+function allTasksFlat() {
+  const out = [];
+  for (const c of clients) for (const t of (c.tasks || [])) {
+    out.push({ ...t, client_name: c.name, client_code: c.code, client_logo: c.logo_url, client_id: c.id, client_is_system: c.is_system });
+  }
+  return out;
+}
+
+function updateInboxCount() {
+  const n = allTasksFlat().filter(t => t.task_status === 'inbox').length;
+  const badge = document.getElementById('inboxCount');
+  if (badge) { badge.textContent = n; badge.style.display = n ? '' : 'none'; }
+}
+
+function clientSelectOptions(sel) {
+  const real = clients.filter(c => !c.is_system && !c.archived).sort((a, b) => a.name.localeCompare(b.name));
+  return '<option value="">No client</option>' + real.map(c => `<option value="${c.id}" ${sel === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+}
+
+function loadInboxView() {
+  document.getElementById('inboxClient').innerHTML = clientSelectOptions('');
+  const list = document.getElementById('inboxList');
+  const items = allTasksFlat().filter(t => t.task_status === 'inbox')
+    .sort((a, b) => (b.id - a.id));
+  if (!items.length) {
+    list.innerHTML = '<div class="inbox-empty">📥 Inbox zero. Capture a task above to get started.</div>';
+    return;
+  }
+  list.innerHTML = items.map(t => `<div class="inbox-row">
+    <span class="task-ref">${taskRef(t.id)}</span>
+    <span class="inbox-row-title" onclick="editTask(${t.id})" title="Open full edit">${esc(t.title)}</span>
+    <select class="inbox-sel" title="Band" onchange="inboxTriage(${t.id},'task_band',this.value)">${bandOptions(t.task_band)}</select>
+    <select class="inbox-sel" title="Type" onchange="inboxTriage(${t.id},'task_type',this.value)">${typeSelectOptions(t.task_type)}</select>
+    <select class="inbox-sel" title="Client" onchange="inboxTriage(${t.id},'client_id',this.value)">${clientSelectOptions(t.client_is_system ? '' : t.client_id)}</select>
+    <select class="inbox-sel" title="Status" onchange="inboxTriage(${t.id},'task_status',this.value)">${statusOptions(t.task_status)}</select>
+    <button class="btn-icon" onclick="archiveTask(${t.id})" title="Archive">&#128230;</button>
+  </div>`).join('');
+}
+
+async function inboxTriage(taskId, field, value) {
+  const body = {};
+  if (field === 'client_id') { if (!value) return; body.client_id = +value; }
+  else body[field] = value;
+  await api(`/api/tasks/${taskId}`, { method: 'PUT', body });
+  await loadClients();
+  loadInboxView();
+}
+
+async function quickAddInbox() {
+  const titleEl = document.getElementById('inboxTitle');
+  const title = titleEl.value.trim();
+  if (!title) return;
+  const body = {
+    title,
+    notes: document.getElementById('inboxNotes').value,
+    deadline: document.getElementById('inboxDue').value,
+    estimated_hours: parseFloat(document.getElementById('inboxEst').value) || 0,
+    task_status: 'inbox',
+  };
+  const cid = document.getElementById('inboxClient').value;
+  if (cid) body.client_id = +cid;
+  await api('/api/tasks', { method: 'POST', body });
+  titleEl.value = ''; document.getElementById('inboxNotes').value = '';
+  document.getElementById('inboxDue').value = ''; document.getElementById('inboxEst').value = '';
+  document.getElementById('inboxClient').value = '';
+  await loadClients();
+  loadInboxView();
+  titleEl.focus();
+}
+
+// ─── Weekly Planning ────────────────────────────────────
+function planningTaskRow(t) {
+  return `<div class="plan-row" onclick="editTask(${t.id})">
+    <span class="status-badge status-${t.task_status}">${statusLabel(t.task_status)}</span>
+    <span class="plan-title">${esc(t.title)}</span>
+    <span class="plan-meta">${esc(t.client_name || '')}${t.assignee ? ' · ' + esc(t.assignee) : ''}</span>
+    ${t.task_band ? `<span class="band-badge ${bandClass(t.task_band)}">${bandLabel(t.task_band)}</span>` : ''}
+    ${t.deadline ? `<span class="plan-due ${getDeadlineClass(t.deadline, t.progress)}">${fmtDateShort(t.deadline)}</span>` : ''}
+  </div>`;
+}
+
+function loadPlanningView() {
+  const today = localDateStr(new Date());
+  const now = new Date();
+  const dow = now.getDay();
+  const monOff = dow === 0 ? -6 : 1 - dow;
+  const ws = new Date(now); ws.setDate(now.getDate() + monOff);
+  const we = new Date(ws); we.setDate(ws.getDate() + 6);
+  const wsStr = localDateStr(ws), weStr = localDateStr(we);
+
+  const open = allTasksFlat().filter(isOpenTask);
+  const eff = t => t.planned_date || t.deadline || '';
+
+  const overdue = open.filter(t => t.deadline && t.deadline < today);
+  const todayTasks = open.filter(t => t.task_band === 'today' || eff(t) === today);
+  const thisWeek = open.filter(t => t.task_band === 'this-week' || (eff(t) >= wsStr && eff(t) <= weStr));
+  const waiting = open.filter(t => t.task_status === 'waiting-on-client' || t.task_status === 'waiting-on-me');
+  const sales = open.filter(t => t.task_type === 'sales');
+  const admin = open.filter(t => t.task_type === 'admin');
+
+  const realClients = clients.filter(c => !c.is_system && !c.archived);
+  const retainersNoSchedule = realClients.filter(c => (c.client_type === 'retainer') && !c.next_scheduled_date);
+  const highRisk = realClients.filter(c => (c.resolved_risk || c.computed_risk) === 'high' || (c.resolved_status || c.computed_status) === 'red');
+
+  const taskSection = (title, arr, emptyMsg) => `<div class="plan-section">
+    <h3 class="plan-heading">${title} <span class="plan-count">${arr.length}</span></h3>
+    ${arr.length ? arr.map(planningTaskRow).join('') : `<div class="plan-empty">${emptyMsg}</div>`}
+  </div>`;
+
+  const clientSection = (title, arr, emptyMsg) => `<div class="plan-section">
+    <h3 class="plan-heading">${title} <span class="plan-count">${arr.length}</span></h3>
+    ${arr.length ? arr.map(c => `<div class="plan-row" onclick="openClientDetail(${c.id})">
+        <span class="rag-dot ${(CONTROL_STATUS[c.resolved_status||c.computed_status]||CONTROL_STATUS.green).cls}"></span>
+        <span class="plan-title">${esc(c.name)}</span>
+        <span class="plan-meta">${typeLabelClient(c.client_type)}${c.monthly_value ? ' · ' + fmtMoney(c.monthly_value) + '/mo' : ''}</span>
+      </div>`).join('') : `<div class="plan-empty">${emptyMsg}</div>`}
+  </div>`;
+
+  document.getElementById('planningContent').innerHTML = `
+    <div class="plan-grid">
+      ${taskSection('🔴 Overdue', overdue, 'Nothing overdue — nice.')}
+      ${taskSection('☼ Today', todayTasks, 'Nothing flagged for today.')}
+      ${taskSection('🗓 This Week', thisWeek, 'Nothing due this week.')}
+      ${taskSection('⏳ Waiting', waiting, 'Nothing waiting.')}
+      ${clientSection('⚠ Retainers with no scheduled work', retainersNoSchedule, 'All retainers have work scheduled.')}
+      ${clientSection('🔥 High-risk clients', highRisk, 'No high-risk clients.')}
+      ${taskSection('💬 Sales follow-ups', sales, 'No sales tasks.')}
+      ${taskSection('🗂 Admin', admin, 'No admin tasks.')}
+    </div>`;
 }
 
 // ─── Stats ──────────────────────────────────────────────

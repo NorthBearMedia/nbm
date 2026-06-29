@@ -20,8 +20,10 @@
     </div>
     <div class="nav-center">
       <button class="nav-tab active" data-view="dashboard"><span class="nav-icon">&#9670;</span> Dashboard</button>
+      <button class="nav-tab" data-view="inbox"><span class="nav-icon">&#128229;</span> Inbox <span id="inboxCount" class="nav-count" style="display:none"></span></button>
       <button class="nav-tab" data-view="clients"><span class="nav-icon">&#9783;</span> Tasks</button>
       <button class="nav-tab" data-view="today"><span class="nav-icon">&#9788;</span> Today</button>
+      <button class="nav-tab" data-view="planning"><span class="nav-icon">&#128467;</span> Planning</button>
       <button class="nav-tab" data-view="calendar"><span class="nav-icon">&#128197;</span> Calendar</button>
       <button class="nav-tab" data-view="focus"><span class="nav-icon">&#9889;</span> Focus</button>
       <button class="nav-tab" data-view="email" id="emailNavTab" style="display:none"><span class="nav-icon">&#9993;</span> Email</button>
@@ -289,6 +291,33 @@
           <p style="color:var(--text-secondary);margin-bottom:20px;font-size:13px">Send and receive email directly in the Console</p>
           <a href="/auth/gmail/connect" class="btn btn-primary">Connect Gmail</a>
         </div>
+      </div>
+    </div>
+
+    <!-- Inbox View -->
+    <div id="inboxView" style="display:none">
+      <div class="inbox-wrap">
+        <div class="inbox-intro">
+          <h2>Task Inbox</h2>
+          <p>Dump anything here — sort it later. New tasks start as <strong>Inbox</strong>.</p>
+        </div>
+        <div class="inbox-quickadd">
+          <input type="text" id="inboxTitle" placeholder="What needs doing? (type and press Enter)" onkeydown="if(event.key==='Enter')quickAddInbox()">
+          <input type="text" id="inboxNotes" placeholder="Notes (optional)">
+          <select id="inboxClient" class="filter-select"><option value="">No client</option></select>
+          <input type="date" id="inboxDue" title="Due date (optional)">
+          <input type="number" id="inboxEst" min="0" step="0.5" placeholder="hrs" style="width:64px">
+          <button class="btn btn-primary" onclick="quickAddInbox()">Add</button>
+        </div>
+        <div id="inboxList"></div>
+      </div>
+    </div>
+
+    <!-- Planning View -->
+    <div id="planningView" style="display:none">
+      <div class="planning-wrap">
+        <div class="view-header"><h2>Weekly Planning</h2></div>
+        <div id="planningContent"></div>
       </div>
     </div>
 

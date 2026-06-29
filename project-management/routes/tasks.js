@@ -67,10 +67,21 @@ router.post('/', requireAuth, requireWrite, (req, res) => {
 router.put('/:id', requireAuth, requireWrite, (req, res) => {
   let { title, assignee, secondary_assignee, deadline, planned_date, estimated_hours,
     task_status, task_band, task_type, suggested_block, progress, priority,
-    references_text, notes, is_recurring, recur_interval, recur_unit } = req.body;
+    references_text, notes, is_recurring, recur_interval, recur_unit, client_id } = req.body;
   const old = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!old) return res.status(404).json({ error: 'Task not found' });
   if (!checkPrivateClient(req, res, old.client_id)) return;
+
+  // Reassign client (e.g. triaging an Inbox task to a client)
+  if (client_id !== undefined && client_id !== null && +client_id !== old.client_id) {
+    if (!checkPrivateClient(req, res, +client_id)) return;
+    let proj = db.prepare('SELECT id FROM projects WHERE client_id = ? ORDER BY id LIMIT 1').get(+client_id);
+    if (!proj) {
+      const pr = db.prepare('INSERT INTO projects (client_id, name, status) VALUES (?, ?, ?)').run(+client_id, 'General', 'active');
+      proj = { id: pr.lastInsertRowid };
+    }
+    db.prepare('UPDATE tasks SET client_id = ?, project_id = ? WHERE id = ?').run(+client_id, proj.id, req.params.id);
+  }
 
   // Reconcile canonical (task_status/task_band) with legacy shadow (progress/priority).
   // Whichever the caller sends, keep both columns consistent.
