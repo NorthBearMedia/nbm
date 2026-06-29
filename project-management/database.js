@@ -18,6 +18,7 @@ db.pragma('foreign_keys = ON');
 // SYNCHRONOUS file copy BEFORE any schema changes run.
 // This guarantees we always have a snapshot of the pre-migration state,
 // because db.backup() is async and wouldn't finish before CREATE TABLE runs.
+let preMigrationBackupPath = null;
 try {
   if (existsSync(dbPath)) {
     const backupDir = join(dataDir, 'backups');
@@ -27,6 +28,7 @@ try {
     // Checkpoint WAL so the .db file has all data, then copy synchronously
     db.pragma('wal_checkpoint(TRUNCATE)');
     copyFileSync(dbPath, backupPath);
+    preMigrationBackupPath = backupPath;
     console.log(`[DB] Pre-migration backup saved: ${backupPath}`);
     // Keep only last 10 pre-migration backups
     try {
@@ -166,6 +168,24 @@ try { db.exec("ALTER TABLE tasks ADD COLUMN completed_at TEXT DEFAULT ''"); } ca
 try { db.exec("ALTER TABLE tasks ADD COLUMN secondary_assignee TEXT DEFAULT ''"); } catch {}
 try { db.exec("ALTER TABLE tasks ADD COLUMN client_id INTEGER DEFAULT NULL"); } catch {}
 
+// ─── Client Control Board (Stage 1) — additive columns only, no CHECK constraints ──
+// New enums are validated in application code; legacy progress/priority CHECK columns
+// stay intact and are kept in sync as shadow values (see lib/taskmap.js).
+try { db.exec("ALTER TABLE clients ADD COLUMN monthly_value REAL DEFAULT 0"); } catch {}
+try { db.exec("ALTER TABLE clients ADD COLUMN client_type TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE clients ADD COLUMN agreement_summary TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE clients ADD COLUMN recurring_deliverables TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE clients ADD COLUMN last_contact_date TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE clients ADD COLUMN next_scheduled_date TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE clients ADD COLUMN control_status TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE clients ADD COLUMN risk_level TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE clients ADD COLUMN important_contacts TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE clients ADD COLUMN is_system INTEGER NOT NULL DEFAULT 0"); } catch {}
+try { db.exec("ALTER TABLE tasks ADD COLUMN task_status TEXT DEFAULT 'inbox'"); } catch {}
+try { db.exec("ALTER TABLE tasks ADD COLUMN task_band TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE tasks ADD COLUMN task_type TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE tasks ADD COLUMN suggested_block TEXT DEFAULT ''"); } catch {}
+
 // Gmail OAuth tokens per user
 db.exec(`CREATE TABLE IF NOT EXISTS gmail_tokens (
   user_id INTEGER PRIMARY KEY,
@@ -262,6 +282,80 @@ try {
   }
 } catch (err) {
   console.error('[DB] completed_at backfill error:', err.message);
+}
+
+// One-time migration flags
+db.exec(`CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT)`);
+
+// ─── Client Control Board one-time backfill (Stage 1) ──────────────────────────
+// Seeds the new task_status/task_band/task_type and client_type columns from the
+// legacy progress/priority/agreement_type values. Runs exactly once (guarded).
+try {
+  const done = db.prepare("SELECT value FROM app_meta WHERE key='ccb_backfill_v1'").get();
+  if (!done) {
+    const report = { tasksBackfilled: 0, clientsBackfilled: 0, assignedToUnassigned: 0, unmapped: [] };
+
+    // 1) Ensure the system "Unassigned" client exists (for clientless Inbox captures)
+    let unassigned = db.prepare("SELECT id FROM clients WHERE is_system=1 ORDER BY id LIMIT 1").get();
+    if (!unassigned) {
+      const r = db.prepare(
+        "INSERT INTO clients (name, code, agreement_type, client_type, is_system, sort_order) VALUES (?, 'UNA', 'ad-hoc', 'prospect', 1, 9999)"
+      ).run('📥 Unassigned');
+      unassigned = { id: r.lastInsertRowid };
+      console.log(`[DB] Created system "Unassigned" client #${unassigned.id}`);
+    }
+
+    // 2) Backfill tasks: task_status / task_band / task_type from legacy columns
+    const statusMap = {
+      'in-progress': 'in-progress',
+      'completed': 'done',
+      'ready-to-invoice': 'done',
+      'invoiced': 'done',
+      'stuck': 'waiting-on-me',
+      'awaiting-manager': 'waiting-on-me',
+      'awaiting-client': 'waiting-on-client',
+    };
+    const bandMap = { 'critical': 'today', 'high': 'this-week', 'medium': 'scheduled', 'low': 'someday' };
+    const tasks = db.prepare("SELECT id, progress, priority, deadline, planned_date, is_recurring FROM tasks").all();
+    const upd = db.prepare("UPDATE tasks SET task_status=?, task_band=?, task_type=? WHERE id=?");
+    for (const t of tasks) {
+      let ns = statusMap[t.progress];
+      if (!ns) {
+        if (t.progress === 'not-started') ns = (t.planned_date || t.deadline) ? 'scheduled' : 'inbox';
+        else { report.unmapped.push(t.id); ns = 'inbox'; }
+      }
+      const nb = bandMap[t.priority] || 'scheduled';
+      const tt = t.is_recurring ? 'recurring' : 'ad-hoc';
+      upd.run(ns, nb, tt, t.id);
+      report.tasksBackfilled++;
+    }
+
+    // 3) Backfill clients: client_type from agreement_type (skip the system client)
+    const clientsToFill = db.prepare("SELECT id, agreement_type FROM clients WHERE is_system=0").all();
+    const cupd = db.prepare("UPDATE clients SET client_type=? WHERE id=? AND (client_type IS NULL OR client_type='')");
+    for (const c of clientsToFill) {
+      cupd.run(c.agreement_type === 'recurring' ? 'retainer' : 'ad-hoc', c.id);
+      report.clientsBackfilled++;
+    }
+
+    // 4) Any tasks still without a client → system "Unassigned"
+    const noClient = db.prepare("SELECT id FROM tasks WHERE client_id IS NULL").all();
+    if (noClient.length) {
+      const au = db.prepare("UPDATE tasks SET client_id=? WHERE id=?");
+      for (const t of noClient) { au.run(unassigned.id, t.id); report.assignedToUnassigned++; }
+    }
+
+    db.prepare("INSERT INTO app_meta (key, value) VALUES ('ccb_backfill_v1', ?)").run(new Date().toISOString());
+
+    console.log('[DB] ── Client Control Board backfill complete ──');
+    console.log(`[DB]   pre-migration backup: ${preMigrationBackupPath || '(none — fresh DB, no prior data)'}`);
+    console.log(`[DB]   tasks backfilled: ${report.tasksBackfilled}`);
+    console.log(`[DB]   clients backfilled: ${report.clientsBackfilled}`);
+    console.log(`[DB]   tasks assigned to "Unassigned": ${report.assignedToUnassigned}`);
+    console.log(`[DB]   tasks with no clean status map (defaulted to inbox): ${report.unmapped.length}${report.unmapped.length ? ' — ids: ' + report.unmapped.join(',') : ''}`);
+  }
+} catch (err) {
+  console.error('[DB] Client Control Board backfill error:', err.message);
 }
 
 // Checklists table
