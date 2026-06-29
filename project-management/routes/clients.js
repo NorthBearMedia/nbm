@@ -2,6 +2,7 @@ import { Router } from 'express';
 import db from '../database.js';
 import { requireAuth, requireRole, requireWrite, logoUpload } from '../middleware.js';
 import { logActivity } from '../lib/activity.js';
+import { isValidClientType, isValidControlStatus, isValidRisk } from '../lib/taskmap.js';
 
 const router = Router();
 
@@ -10,6 +11,43 @@ function requireClientAccess(req, res) {
   if (!client) { res.status(404).json({ error: 'Client not found' }); return null; }
   if (client.is_private && req.user.role !== 'owner') { res.status(403).json({ error: 'Access denied' }); return null; }
   return client;
+}
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split('T')[0];
+}
+
+// Auto RAG status + risk from a client's tasks and dates.
+// Principle: Red = genuinely urgent/risky; Amber = needs attention or scheduling.
+// A retainer simply lacking a scheduled date is Amber, never Red.
+function computeControl(client, tasks, today) {
+  const open = tasks.filter(t => t.task_status !== 'done' && t.task_status !== 'cancelled');
+  const hasOpenWork = open.length > 0;
+  const soon = addDays(today, 3);
+
+  let hasOverdue = false, hasUrgent = false, waitingMePastDue = false, dueSoon = false;
+  for (const t of open) {
+    const dl = t.deadline || '';
+    if (dl && dl < today) hasOverdue = true;
+    if (t.task_type === 'urgent') hasUrgent = true;
+    if (t.task_status === 'waiting-on-me' && dl && dl < today) waitingMePastDue = true;
+    const eff = t.planned_date || t.deadline || '';
+    if (eff && eff >= today && eff <= soon) dueSoon = true;
+  }
+  const noScheduled = !client.next_scheduled_date;
+  const staleContact = !!client.last_contact_date && client.last_contact_date < addDays(today, -14);
+  const allWaitingClient = hasOpenWork && open.every(t => t.task_status === 'waiting-on-client');
+
+  let status;
+  if (hasOverdue || hasUrgent || waitingMePastDue) status = 'red';
+  else if (allWaitingClient) status = 'blue';
+  else if ((noScheduled && hasOpenWork) || dueSoon || staleContact) status = 'amber';
+  else status = 'green';
+
+  const risk = status === 'red' ? 'high' : status === 'amber' ? 'medium' : 'low';
+  return { status, risk };
 }
 
 router.get('/', requireAuth, (req, res) => {
@@ -53,20 +91,48 @@ router.get('/', requireAuth, (req, res) => {
       task.attachments = attachStmt.all(task.id);
     }
     client.stats = { totalTasks, completedTasks, overdueTasks, inProgressTasks, blockedTasks, awaitingManager, outstandingTasks: totalTasks - completedTasks };
+
+    // Control Board aggregates (canonical task_status driven)
+    let outstanding = 0, waiting = 0, overdue = 0, recurring = 0, nextDue = '';
+    for (const task of client.tasks) {
+      const open = task.task_status !== 'done' && task.task_status !== 'cancelled';
+      if (!open) continue;
+      outstanding++;
+      if (task.task_status === 'waiting-on-client' || task.task_status === 'waiting-on-me') waiting++;
+      if (task.deadline && task.deadline < now) overdue++;
+      if (task.task_type === 'recurring' || task.is_recurring) recurring++;
+      if (task.deadline && (!nextDue || task.deadline < nextDue)) nextDue = task.deadline;
+    }
+    const control = computeControl(client, client.tasks, now);
+    client.computed_status = control.status;
+    client.computed_risk = control.risk;
+    client.resolved_status = client.control_status || control.status;
+    client.resolved_risk = client.risk_level || control.risk;
+    client.board = { outstanding, waiting, overdue, recurring, next_due_date: nextDue };
   }
   res.json(clients);
 });
 
 router.post('/', requireAuth, requireWrite, (req, res) => {
-  const { name, code, agreement_type, notes, gmail_link, drive_link, is_private } = req.body;
+  const { name, code, agreement_type, notes, gmail_link, drive_link, is_private,
+    client_type, monthly_value, agreement_summary, recurring_deliverables,
+    last_contact_date, next_scheduled_date, control_status, risk_level, important_contacts } = req.body;
   if (!name) return res.status(400).json({ error: 'Client name is required' });
   if (code && code.length !== 3) return res.status(400).json({ error: 'Client code must be exactly 3 characters' });
   if (is_private && req.user.role !== 'owner') return res.status(403).json({ error: 'Only owners can create private clients' });
 
+  const ct = isValidClientType(client_type) ? client_type : (agreement_type === 'ad-hoc' ? 'ad-hoc' : 'retainer');
+  const cs = isValidControlStatus(control_status || '') ? (control_status || '') : '';
+  const rl = isValidRisk(risk_level || '') ? (risk_level || '') : '';
+
   const autoCode = name.split(' ').map(w => w[0]).join('').substring(0, 3).toUpperCase().padEnd(3, 'X');
   const clientCode = code || autoCode;
-  const result = db.prepare('INSERT INTO clients (name, code, agreement_type, notes, gmail_link, drive_link, is_private) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
-    name, clientCode, agreement_type || 'recurring', notes || '', gmail_link || '', drive_link || '', is_private ? 1 : 0
+  const result = db.prepare(
+    'INSERT INTO clients (name, code, agreement_type, notes, gmail_link, drive_link, is_private, client_type, monthly_value, agreement_summary, recurring_deliverables, last_contact_date, next_scheduled_date, control_status, risk_level, important_contacts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(
+    name, clientCode, agreement_type || 'recurring', notes || '', gmail_link || '', drive_link || '', is_private ? 1 : 0,
+    ct, monthly_value || 0, agreement_summary || '', recurring_deliverables || '',
+    last_contact_date || '', next_scheduled_date || '', cs, rl, important_contacts || ''
   );
   logActivity('client', result.lastInsertRowid, 'created', req.user.display_name, `Created client "${name}"`);
   res.json(db.prepare('SELECT * FROM clients WHERE id = ?').get(result.lastInsertRowid));
@@ -81,18 +147,27 @@ router.put('/reorder', requireAuth, requireWrite, (req, res) => {
 });
 
 router.put('/:id', requireAuth, requireWrite, (req, res) => {
-  const { name, code, agreement_type, notes, logo_url, gmail_link, drive_link, is_private } = req.body;
+  let { name, code, agreement_type, notes, logo_url, gmail_link, drive_link, is_private,
+    client_type, monthly_value, agreement_summary, recurring_deliverables,
+    last_contact_date, next_scheduled_date, control_status, risk_level, important_contacts } = req.body;
   const old = requireClientAccess(req, res);
   if (!old) return;
   if (is_private && req.user.role !== 'owner') return res.status(403).json({ error: 'Only owners can make clients private' });
+  if (client_type !== undefined && !isValidClientType(client_type)) return res.status(400).json({ error: 'Invalid client_type' });
+  if (control_status !== undefined && !isValidControlStatus(control_status)) return res.status(400).json({ error: 'Invalid control_status' });
+  if (risk_level !== undefined && !isValidRisk(risk_level)) return res.status(400).json({ error: 'Invalid risk_level' });
 
-  db.prepare('UPDATE clients SET name=COALESCE(?,name), code=COALESCE(?,code), agreement_type=COALESCE(?,agreement_type), notes=COALESCE(?,notes), logo_url=COALESCE(?,logo_url), gmail_link=COALESCE(?,gmail_link), drive_link=COALESCE(?,drive_link), is_private=COALESCE(?,is_private) WHERE id=?')
-    .run(name, code, agreement_type, notes, logo_url, gmail_link, drive_link, is_private !== undefined ? (is_private ? 1 : 0) : null, req.params.id);
+  db.prepare('UPDATE clients SET name=COALESCE(?,name), code=COALESCE(?,code), agreement_type=COALESCE(?,agreement_type), notes=COALESCE(?,notes), logo_url=COALESCE(?,logo_url), gmail_link=COALESCE(?,gmail_link), drive_link=COALESCE(?,drive_link), is_private=COALESCE(?,is_private), client_type=COALESCE(?,client_type), monthly_value=COALESCE(?,monthly_value), agreement_summary=COALESCE(?,agreement_summary), recurring_deliverables=COALESCE(?,recurring_deliverables), last_contact_date=COALESCE(?,last_contact_date), next_scheduled_date=COALESCE(?,next_scheduled_date), control_status=COALESCE(?,control_status), risk_level=COALESCE(?,risk_level), important_contacts=COALESCE(?,important_contacts) WHERE id=?')
+    .run(name, code, agreement_type, notes, logo_url, gmail_link, drive_link, is_private !== undefined ? (is_private ? 1 : 0) : null,
+      client_type, monthly_value, agreement_summary, recurring_deliverables,
+      last_contact_date, next_scheduled_date, control_status, risk_level, important_contacts, req.params.id);
 
   const changes = [];
   if (name && name !== old.name) changes.push(`name: "${old.name}" → "${name}"`);
   if (code !== undefined && code !== old.code) changes.push(`code: "${old.code}" → "${code}"`);
   if (agreement_type && agreement_type !== old.agreement_type) changes.push(`type: ${old.agreement_type} → ${agreement_type}`);
+  if (control_status !== undefined && control_status !== old.control_status) changes.push(`status override: ${old.control_status || 'auto'} → ${control_status || 'auto'}`);
+  if (risk_level !== undefined && risk_level !== old.risk_level) changes.push(`risk override: ${old.risk_level || 'auto'} → ${risk_level || 'auto'}`);
   if (notes !== undefined && notes !== old.notes) changes.push('updated notes');
   if (changes.length) logActivity('client', req.params.id, 'updated', req.user.display_name, changes.join(', '));
 

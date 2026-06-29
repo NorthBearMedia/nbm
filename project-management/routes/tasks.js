@@ -2,6 +2,10 @@ import { Router } from 'express';
 import db from '../database.js';
 import { requireAuth, requireRole, requireWrite, attachUpload } from '../middleware.js';
 import { logActivity } from '../lib/activity.js';
+import {
+  statusToProgress, bandToPriority, progressToStatus, priorityToBand,
+  isValidStatus, isValidBand, isValidType,
+} from '../lib/taskmap.js';
 
 const router = Router();
 
@@ -16,10 +20,34 @@ function checkPrivateClient(req, res, clientId) {
   return true;
 }
 
+// The system "Unassigned" client catches clientless Inbox captures.
+function getUnassignedClientId() {
+  let u = db.prepare("SELECT id FROM clients WHERE is_system=1 ORDER BY id LIMIT 1").get();
+  if (!u) {
+    const r = db.prepare(
+      "INSERT INTO clients (name, code, agreement_type, client_type, is_system, sort_order) VALUES ('📥 Unassigned','UNA','ad-hoc','prospect',1,9999)"
+    ).run();
+    u = { id: r.lastInsertRowid };
+  }
+  return u.id;
+}
+
 router.post('/', requireAuth, requireWrite, (req, res) => {
-  const { client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit } = req.body;
-  if (!client_id || !title) return res.status(400).json({ error: 'client_id and title required' });
+  let { client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours,
+    task_status, task_band, task_type, suggested_block, priority, references_text, notes,
+    is_recurring, recur_interval, recur_unit } = req.body;
+  if (!title) return res.status(400).json({ error: 'title required' });
+
+  // client_id is optional — clientless quick-captures land in the system "Unassigned" client
+  if (!client_id) client_id = getUnassignedClientId();
   if (!checkPrivateClient(req, res, client_id)) return;
+
+  // New canonical fields (validated); legacy progress/priority derived as shadows.
+  task_status = isValidStatus(task_status) ? task_status : 'inbox';
+  task_band = isValidBand(task_band) ? task_band : '';
+  task_type = isValidType(task_type) ? task_type : (is_recurring ? 'recurring' : 'ad-hoc');
+  const progress = statusToProgress(task_status);
+  const priorityShadow = task_band ? bandToPriority(task_band) : (priority || 'medium');
 
   let proj = db.prepare('SELECT id FROM projects WHERE client_id = ? ORDER BY id LIMIT 1').get(client_id);
   if (!proj) {
@@ -27,8 +55,8 @@ router.post('/', requireAuth, requireWrite, (req, res) => {
     proj = { id: pr.lastInsertRowid };
   }
   const result = db.prepare(
-    'INSERT INTO tasks (project_id, client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(proj.id, client_id, title, assignee || '', secondary_assignee || '', deadline || '', planned_date || '', estimated_hours || 0, priority || 'medium', references_text || '', notes || '', is_recurring ? 1 : 0, recur_interval || 0, recur_unit || '');
+    'INSERT INTO tasks (project_id, client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, progress, priority, task_status, task_band, task_type, suggested_block, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(proj.id, client_id, title, assignee || '', secondary_assignee || '', deadline || '', planned_date || '', estimated_hours || 0, progress, priorityShadow, task_status, task_band, task_type, suggested_block || '', references_text || '', notes || '', is_recurring ? 1 : 0, recur_interval || 0, recur_unit || '');
 
   logActivity('task', result.lastInsertRowid, 'created', req.user.display_name, `Created task "${title}"`);
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid);
@@ -37,49 +65,57 @@ router.post('/', requireAuth, requireWrite, (req, res) => {
 });
 
 router.put('/:id', requireAuth, requireWrite, (req, res) => {
-  let { title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, progress, priority, references_text, notes, is_recurring, recur_interval, recur_unit } = req.body;
+  let { title, assignee, secondary_assignee, deadline, planned_date, estimated_hours,
+    task_status, task_band, task_type, suggested_block, progress, priority,
+    references_text, notes, is_recurring, recur_interval, recur_unit } = req.body;
   const old = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!old) return res.status(404).json({ error: 'Task not found' });
   if (!checkPrivateClient(req, res, old.client_id)) return;
 
-  let completedAt = undefined;
-  if (progress && (progress === 'completed' || progress === 'invoiced') && old.progress !== 'completed' && old.progress !== 'invoiced') {
-    completedAt = new Date().toISOString().split('T')[0];
-  } else if (progress && progress !== 'completed' && progress !== 'invoiced' && (old.progress === 'completed' || old.progress === 'invoiced')) {
-    completedAt = '';
+  // Reconcile canonical (task_status/task_band) with legacy shadow (progress/priority).
+  // Whichever the caller sends, keep both columns consistent.
+  if (task_status !== undefined) {
+    if (!isValidStatus(task_status)) return res.status(400).json({ error: 'Invalid task_status' });
+    progress = statusToProgress(task_status);
+  } else if (progress !== undefined) {
+    task_status = progressToStatus(progress);
   }
+  if (task_band !== undefined) {
+    if (!isValidBand(task_band)) return res.status(400).json({ error: 'Invalid task_band' });
+    priority = bandToPriority(task_band);
+  } else if (priority !== undefined) {
+    task_band = priorityToBand(priority);
+  }
+  if (task_type !== undefined && !isValidType(task_type)) return res.status(400).json({ error: 'Invalid task_type' });
 
-  if (progress === 'awaiting-manager' && old.progress !== 'awaiting-manager') {
-    const owner = db.prepare("SELECT display_name FROM users WHERE role='owner' LIMIT 1").get();
-    if (owner && secondary_assignee === undefined) {
-      secondary_assignee = owner.display_name;
-    }
-  }
-  if (progress && progress !== 'awaiting-manager' && old.progress === 'awaiting-manager' && secondary_assignee === undefined) {
-    const owner = db.prepare("SELECT display_name FROM users WHERE role='owner' LIMIT 1").get();
-    if (owner && old.secondary_assignee === owner.display_name) {
-      secondary_assignee = '';
-    }
+  // completed_at tracks the canonical "done" transition (not cancelled).
+  const wasDone = old.task_status === 'done';
+  const nowDone = task_status === 'done';
+  let completedAt = undefined;
+  if (task_status !== undefined) {
+    if (nowDone && !wasDone) completedAt = new Date().toISOString().split('T')[0];
+    else if (!nowDone && wasDone) completedAt = '';
   }
 
   db.prepare(
-    'UPDATE tasks SET title=COALESCE(?,title), assignee=COALESCE(?,assignee), secondary_assignee=COALESCE(?,secondary_assignee), deadline=COALESCE(?,deadline), planned_date=COALESCE(?,planned_date), estimated_hours=COALESCE(?,estimated_hours), progress=COALESCE(?,progress), priority=COALESCE(?,priority), references_text=COALESCE(?,references_text), notes=COALESCE(?,notes), is_recurring=COALESCE(?,is_recurring), recur_interval=COALESCE(?,recur_interval), recur_unit=COALESCE(?,recur_unit), completed_at=COALESCE(?,completed_at) WHERE id=?'
-  ).run(title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, progress, priority, references_text, notes, is_recurring !== undefined ? (is_recurring ? 1 : 0) : null, recur_interval, recur_unit, completedAt, req.params.id);
+    'UPDATE tasks SET title=COALESCE(?,title), assignee=COALESCE(?,assignee), secondary_assignee=COALESCE(?,secondary_assignee), deadline=COALESCE(?,deadline), planned_date=COALESCE(?,planned_date), estimated_hours=COALESCE(?,estimated_hours), progress=COALESCE(?,progress), priority=COALESCE(?,priority), task_status=COALESCE(?,task_status), task_band=COALESCE(?,task_band), task_type=COALESCE(?,task_type), suggested_block=COALESCE(?,suggested_block), references_text=COALESCE(?,references_text), notes=COALESCE(?,notes), is_recurring=COALESCE(?,is_recurring), recur_interval=COALESCE(?,recur_interval), recur_unit=COALESCE(?,recur_unit), completed_at=COALESCE(?,completed_at) WHERE id=?'
+  ).run(title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, progress, priority, task_status, task_band, task_type, suggested_block, references_text, notes, is_recurring !== undefined ? (is_recurring ? 1 : 0) : null, recur_interval, recur_unit, completedAt, req.params.id);
 
   const changes = [];
   if (title && title !== old.title) changes.push('title changed');
   if (assignee !== undefined && assignee !== old.assignee) changes.push(`assignee: "${old.assignee || 'none'}" → "${assignee || 'none'}"`);
   if (secondary_assignee !== undefined && secondary_assignee !== old.secondary_assignee) changes.push(`also assigned: "${secondary_assignee || 'none'}"`);
-  if (progress && progress !== old.progress) changes.push(`progress: ${old.progress} → ${progress}`);
-  if (priority && priority !== old.priority) changes.push(`priority: ${old.priority} → ${priority}`);
+  if (task_status && task_status !== old.task_status) changes.push(`status: ${old.task_status} → ${task_status}`);
+  if (task_band && task_band !== old.task_band) changes.push(`band: ${old.task_band || 'none'} → ${task_band}`);
   if (deadline !== undefined && deadline !== old.deadline) changes.push('deadline changed');
   if (changes.length) logActivity('task', req.params.id, 'updated', req.user.display_name, changes.join(', '));
 
-  if (progress === 'completed' && old.progress !== 'completed' && old.is_recurring && old.recur_interval > 0) {
+  // Recurring auto-create fires on the canonical "done" transition.
+  if (nowDone && !wasDone && old.is_recurring && old.recur_interval > 0) {
     const nextDate = calculateNextDate(old.deadline || old.planned_date || new Date().toISOString().split('T')[0], old.recur_interval, old.recur_unit);
     const newTask = db.prepare(
-      'INSERT INTO tasks (project_id, client_id, title, assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(old.project_id, old.client_id, old.title, old.assignee, nextDate, nextDate, old.estimated_hours, old.priority, old.references_text, old.notes, 1, old.recur_interval, old.recur_unit);
+      "INSERT INTO tasks (project_id, client_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, task_status, task_band, task_type, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, 'not-started', ?, 'scheduled', ?, ?, ?, ?, 1, ?, ?)"
+    ).run(old.project_id, old.client_id, old.title, old.assignee, nextDate, nextDate, old.estimated_hours, old.priority, old.task_band || '', old.task_type || 'recurring', old.references_text, old.notes, old.recur_interval, old.recur_unit);
     logActivity('task', newTask.lastInsertRowid, 'created', 'System', `Auto-created recurring task "${old.title}" (next: ${nextDate})`);
   }
 
@@ -233,8 +269,8 @@ router.post('/:id/duplicate', requireAuth, requireWrite, (req, res) => {
   if (!checkPrivateClient(req, res, old.client_id)) return;
 
   const r = db.prepare(
-    'INSERT INTO tasks (project_id, client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, priority, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(old.project_id, old.client_id, old.title + ' (copy)', old.assignee, old.secondary_assignee || '', old.deadline, old.planned_date, old.estimated_hours, old.priority, old.references_text, old.notes, old.is_recurring, old.recur_interval, old.recur_unit);
+    'INSERT INTO tasks (project_id, client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, progress, priority, task_status, task_band, task_type, suggested_block, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(old.project_id, old.client_id, old.title + ' (copy)', old.assignee, old.secondary_assignee || '', old.deadline, old.planned_date, old.estimated_hours, old.progress, old.priority, old.task_status || 'inbox', old.task_band || '', old.task_type || '', old.suggested_block || '', old.references_text, old.notes, old.is_recurring, old.recur_interval, old.recur_unit);
 
   logActivity('task', r.lastInsertRowid, 'created', req.user.display_name, `Duplicated from "${old.title}"`);
   res.json(db.prepare('SELECT * FROM tasks WHERE id = ?').get(r.lastInsertRowid));

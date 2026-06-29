@@ -41,6 +41,27 @@ export function bandToPriority(band) {
   return BAND_TO_PRIORITY[band] || 'medium';
 }
 
+// Reverse maps — used when a legacy caller sends progress/priority and we need to
+// keep the canonical task_status/task_band consistent.
+const PROGRESS_TO_STATUS = {
+  'not-started': 'scheduled',
+  'in-progress': 'in-progress',
+  'completed': 'done',
+  'invoiced': 'done',
+  'ready-to-invoice': 'done',
+  'stuck': 'waiting-on-me',
+  'awaiting-manager': 'waiting-on-me',
+  'awaiting-client': 'waiting-on-client',
+};
+const PRIORITY_TO_BAND = { 'critical': 'today', 'high': 'this-week', 'medium': 'scheduled', 'low': 'someday' };
+
+export function progressToStatus(progress) {
+  return PROGRESS_TO_STATUS[progress] || 'inbox';
+}
+export function priorityToBand(priority) {
+  return PRIORITY_TO_BAND[priority] || 'scheduled';
+}
+
 export function isValidStatus(s) { return TASK_STATUSES.includes(s); }
 export function isValidBand(b) { return TASK_BANDS.includes(b); }
 export function isValidType(t) { return TASK_TYPES.includes(t); }

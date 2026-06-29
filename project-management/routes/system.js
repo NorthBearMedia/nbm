@@ -112,22 +112,23 @@ router.get('/api/export/excel', requireAuth, (req, res) => {
 
   const tasks = db.prepare(`
     SELECT t.id, t.title, t.assignee, t.secondary_assignee, t.deadline, t.planned_date,
-           t.estimated_hours, t.progress, t.priority, t.notes, t.references_text,
+           t.estimated_hours, t.task_status, t.task_band, t.task_type, t.notes, t.references_text,
            t.is_recurring, t.created_at,
-           c.name as client_name, c.code as client_code, c.agreement_type
+           c.name as client_name, c.code as client_code, c.client_type
     FROM tasks t
     JOIN clients c ON t.client_id = c.id
-    WHERE t.archived = 0 AND t.progress NOT IN ('completed', 'invoiced')
+    WHERE t.archived = 0 AND t.task_status NOT IN ('done', 'cancelled') AND c.is_system = 0
     ${priv}
-    ORDER BY c.name, t.priority, t.deadline
+    ORDER BY c.name, t.deadline
   `).all();
 
   const clientRows = db.prepare(`
-    SELECT c.id, c.name, c.code, c.agreement_type, c.notes, c.gmail_link, c.drive_link, c.created_at,
-           (SELECT count(*) FROM tasks t WHERE t.client_id = c.id AND t.archived = 0 AND t.progress NOT IN ('completed','invoiced')) as active_tasks,
-           (SELECT COALESCE(sum(t.estimated_hours), 0) FROM tasks t WHERE t.client_id = c.id AND t.archived = 0 AND t.progress NOT IN ('completed','invoiced')) as total_hours
+    SELECT c.id, c.name, c.code, c.client_type, c.monthly_value, c.control_status, c.risk_level,
+           c.next_scheduled_date, c.last_contact_date, c.notes, c.gmail_link, c.drive_link, c.created_at,
+           (SELECT count(*) FROM tasks t WHERE t.client_id = c.id AND t.archived = 0 AND t.task_status NOT IN ('done','cancelled')) as active_tasks,
+           (SELECT COALESCE(sum(t.estimated_hours), 0) FROM tasks t WHERE t.client_id = c.id AND t.archived = 0 AND t.task_status NOT IN ('done','cancelled')) as total_hours
     FROM clients c
-    WHERE c.archived = 0 ${priv}
+    WHERE c.archived = 0 AND c.is_system = 0 ${priv}
     ORDER BY c.name
   `).all();
 
@@ -140,8 +141,9 @@ router.get('/api/export/excel', requireAuth, (req, res) => {
     'Task': t.title,
     'Assigned To': t.assignee || '',
     'Also Assigned': t.secondary_assignee || '',
-    'Priority': t.priority,
-    'Status': t.progress,
+    'Status': t.task_status || '',
+    'Band': t.task_band || '',
+    'Type': t.task_type || '',
     'Deadline': t.deadline || '',
     'Planned Date': t.planned_date || '',
     'Est. Hours': t.estimated_hours || 0,
@@ -157,7 +159,12 @@ router.get('/api/export/excel', requireAuth, (req, res) => {
   const cRows = clientRows.map(c => ({
     'Client': c.name,
     'Code': c.code || '',
-    'Type': c.agreement_type,
+    'Type': c.client_type || '',
+    'Monthly Value': c.monthly_value || 0,
+    'Status': c.control_status || '(auto)',
+    'Risk': c.risk_level || '(auto)',
+    'Next Scheduled': c.next_scheduled_date || '',
+    'Last Contact': c.last_contact_date || '',
     'Active Tasks': c.active_tasks,
     'Total Hours (Active)': c.total_hours,
     'Notes': c.notes || '',

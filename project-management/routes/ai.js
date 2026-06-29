@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import db from '../database.js';
 import { requireAuth, requireWrite, aiMediaUpload } from '../middleware.js';
 import { logActivity } from '../lib/activity.js';
+import { statusToProgress, bandToPriority, isValidStatus, isValidBand, isValidType } from '../lib/taskmap.js';
 
 const router = Router();
 
@@ -26,7 +27,7 @@ const TOOLS = [
   },
   {
     name: 'create_task',
-    description: 'Create a new task for a client. Use YYYY-MM-DD for dates. priority must be critical/high/medium/low. Progress defaults to not-started.',
+    description: 'Create a new task for a client. Use YYYY-MM-DD for dates. status defaults to "inbox". band is when it needs doing (today/this-week/scheduled/waiting/someday). task_type categorises it.',
     input_schema: {
       type: 'object',
       properties: {
@@ -37,7 +38,9 @@ const TOOLS = [
         deadline: { type: 'string', description: 'YYYY-MM-DD' },
         planned_date: { type: 'string', description: 'YYYY-MM-DD — day you plan to work on it' },
         estimated_hours: { type: 'number' },
-        priority: { type: 'string', enum: ['critical', 'high', 'medium', 'low'] },
+        status: { type: 'string', enum: ['inbox', 'scheduled', 'in-progress', 'waiting-on-client', 'waiting-on-me', 'done', 'cancelled'], description: 'Defaults to inbox' },
+        band: { type: 'string', enum: ['today', 'this-week', 'scheduled', 'waiting', 'someday'], description: 'When it needs doing' },
+        task_type: { type: 'string', enum: ['recurring', 'ad-hoc', 'urgent', 'sales', 'admin', 'waiting', 'idea'] },
         notes: { type: 'string' },
         references_text: { type: 'string', description: 'URLs or reference info' }
       },
@@ -46,7 +49,7 @@ const TOOLS = [
   },
   {
     name: 'update_task',
-    description: 'Update fields on an existing task. Only pass fields you want to change.',
+    description: 'Update fields on an existing task. Only pass fields you want to change. Setting status to "done" completes it (and spawns the next occurrence if recurring).',
     input_schema: {
       type: 'object',
       properties: {
@@ -57,8 +60,9 @@ const TOOLS = [
         deadline: { type: 'string' },
         planned_date: { type: 'string' },
         estimated_hours: { type: 'number' },
-        priority: { type: 'string', enum: ['critical', 'high', 'medium', 'low'] },
-        progress: { type: 'string', enum: ['not-started', 'in-progress', 'completed', 'stuck', 'awaiting-client', 'awaiting-manager', 'ready-to-invoice', 'invoiced'] },
+        band: { type: 'string', enum: ['today', 'this-week', 'scheduled', 'waiting', 'someday'] },
+        status: { type: 'string', enum: ['inbox', 'scheduled', 'in-progress', 'waiting-on-client', 'waiting-on-me', 'done', 'cancelled'] },
+        task_type: { type: 'string', enum: ['recurring', 'ad-hoc', 'urgent', 'sales', 'admin', 'waiting', 'idea'] },
         notes: { type: 'string' }
       },
       required: ['task_id']
@@ -124,13 +128,19 @@ function executeTool(name, input, user) {
           const pr = db.prepare('INSERT INTO projects (client_id, name, status) VALUES (?, ?, ?)').run(input.client_id, 'General', 'active');
           proj = { id: pr.lastInsertRowid };
         }
+        const status = isValidStatus(input.status) ? input.status : 'inbox';
+        const band = isValidBand(input.band) ? input.band : '';
+        const ttype = isValidType(input.task_type) ? input.task_type : 'ad-hoc';
+        const progress = statusToProgress(status);
+        const priorityShadow = band ? bandToPriority(band) : 'medium';
         const r = db.prepare(
-          'INSERT INTO tasks (project_id, client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, priority, references_text, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          'INSERT INTO tasks (project_id, client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, progress, priority, task_status, task_band, task_type, references_text, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         ).run(
           proj.id, input.client_id, input.title,
           input.assignee || '', input.secondary_assignee || '',
           input.deadline || '', input.planned_date || '',
-          input.estimated_hours || 0, input.priority || 'medium',
+          input.estimated_hours || 0, progress, priorityShadow,
+          status, band, ttype,
           input.references_text || '', input.notes || ''
         );
         logActivity('task', r.lastInsertRowid, 'created', user.display_name, `Created task "${input.title}" (via AI assistant)`);
@@ -143,21 +153,45 @@ function executeTool(name, input, user) {
         if (!old) return { error: 'Task not found' };
         if (old.is_private && !isOwner) return { error: 'Access denied' };
 
+        // Canonical status/band drive the legacy progress/priority shadows.
+        let status = isValidStatus(input.status) ? input.status : null;
+        let band = isValidBand(input.band) ? input.band : null;
+        let ttype = isValidType(input.task_type) ? input.task_type : null;
+        const progress = status !== null ? statusToProgress(status) : null;
+        const priorityShadow = band !== null ? bandToPriority(band) : null;
+
+        const wasDone = old.task_status === 'done';
+        const nowDone = status === 'done';
         let completedAt = undefined;
-        if (input.progress && (input.progress === 'completed' || input.progress === 'invoiced') && old.progress !== 'completed' && old.progress !== 'invoiced') {
-          completedAt = new Date().toISOString().split('T')[0];
-        } else if (input.progress && input.progress !== 'completed' && input.progress !== 'invoiced' && (old.progress === 'completed' || old.progress === 'invoiced')) {
-          completedAt = '';
+        if (status !== null) {
+          if (nowDone && !wasDone) completedAt = new Date().toISOString().split('T')[0];
+          else if (!nowDone && wasDone) completedAt = '';
         }
 
         db.prepare(
-          'UPDATE tasks SET title=COALESCE(?,title), assignee=COALESCE(?,assignee), secondary_assignee=COALESCE(?,secondary_assignee), deadline=COALESCE(?,deadline), planned_date=COALESCE(?,planned_date), estimated_hours=COALESCE(?,estimated_hours), progress=COALESCE(?,progress), priority=COALESCE(?,priority), notes=COALESCE(?,notes), completed_at=COALESCE(?,completed_at) WHERE id=?'
+          'UPDATE tasks SET title=COALESCE(?,title), assignee=COALESCE(?,assignee), secondary_assignee=COALESCE(?,secondary_assignee), deadline=COALESCE(?,deadline), planned_date=COALESCE(?,planned_date), estimated_hours=COALESCE(?,estimated_hours), progress=COALESCE(?,progress), priority=COALESCE(?,priority), task_status=COALESCE(?,task_status), task_band=COALESCE(?,task_band), task_type=COALESCE(?,task_type), notes=COALESCE(?,notes), completed_at=COALESCE(?,completed_at) WHERE id=?'
         ).run(
           input.title ?? null, input.assignee ?? null, input.secondary_assignee ?? null,
           input.deadline ?? null, input.planned_date ?? null, input.estimated_hours ?? null,
-          input.progress ?? null, input.priority ?? null, input.notes ?? null,
+          progress, priorityShadow, status, band, ttype, input.notes ?? null,
           completedAt ?? null, input.task_id
         );
+
+        // Recurring auto-create on the canonical "done" transition.
+        if (nowDone && !wasDone && old.is_recurring && old.recur_interval > 0) {
+          const d = new Date((old.deadline || old.planned_date || new Date().toISOString().split('T')[0]) + 'T00:00:00');
+          const u = old.recur_unit, n = old.recur_interval;
+          if (u === 'days') d.setDate(d.getDate() + n);
+          else if (u === 'weeks') d.setDate(d.getDate() + n * 7);
+          else if (u === 'months') d.setMonth(d.getMonth() + n);
+          else if (u === 'years') d.setFullYear(d.getFullYear() + n);
+          const nextDate = d.toISOString().split('T')[0];
+          const nt = db.prepare(
+            "INSERT INTO tasks (project_id, client_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, task_status, task_band, task_type, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, 'not-started', ?, 'scheduled', ?, ?, ?, ?, 1, ?, ?)"
+          ).run(old.project_id, old.client_id, old.title, old.assignee, nextDate, nextDate, old.estimated_hours, old.priority, old.task_band || '', old.task_type || 'recurring', old.references_text, old.notes, old.recur_interval, old.recur_unit);
+          logActivity('task', nt.lastInsertRowid, 'created', 'System', `Auto-created recurring task "${old.title}" (next: ${nextDate})`);
+        }
+
         logActivity('task', input.task_id, 'updated', user.display_name, `Updated via AI assistant`);
         return { success: true, task_id: input.task_id };
       }
@@ -237,11 +271,14 @@ Guidelines:
 - After creating items, confirm briefly with the NB### reference number.
 - If a request is ambiguous (e.g. which client), ask a short clarifying question before acting.
 - Do not invent clients — always look them up first. If one doesn't exist, tell the user and suggest creating it.
-- Priority guide: "critical" = must-do-now blocker, "high" = time-sensitive, "medium" = default, "low" = nice-to-have.
+- Task status flow: inbox (just captured) → scheduled → in-progress → done. Use waiting-on-client or waiting-on-me when blocked, and cancelled to drop a task. New captures default to "inbox".
+- Task band = when it needs doing: today, this-week, scheduled, waiting, someday. Use this instead of urgency words.
+- Task type categorises work: recurring, ad-hoc, urgent, sales, admin, waiting, idea.
+- When the user dumps a quick task without detail, just capture it to the inbox (status inbox) — don't over-question.
 
 Voice / Image input:
 - When the user sends a voice transcription or an image, interpret the content and present your understanding as a clear summary BEFORE creating any tasks.
-- For voice notes: extract the tasks/intentions, list them out with proposed client, assignee, deadline, and priority, then ask "Shall I go ahead and create these?" Wait for confirmation before using create_task.
+- For voice notes: extract the tasks/intentions, list them out with proposed client, assignee, deadline, and band, then ask "Shall I go ahead and create these?" Wait for confirmation before using create_task.
 - For images (e.g. screenshots of briefs, whiteboards, task lists): describe what you see, extract actionable items, propose tasks, then ask for confirmation before creating them.
 - Only proceed to create tasks after the user confirms or says something like "yes", "go ahead", "do it", "looks good".`;
 }
