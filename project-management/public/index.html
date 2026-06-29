@@ -65,12 +65,13 @@
       </select>
       <select id="statusFilter" style="background:var(--bg-glass);border:1px solid var(--border);border-radius:var(--radius);padding:5px 10px;font-size:12px;color:var(--text);cursor:pointer;font-family:inherit">
         <option value="">All Statuses</option>
-        <option value="not-started">Not Started</option>
+        <option value="inbox">Inbox</option>
+        <option value="scheduled">Scheduled</option>
         <option value="in-progress">In Progress</option>
-        <option value="stuck">Stuck</option>
-        <option value="awaiting-client">Awaiting Client</option>
-        <option value="awaiting-manager">Awaiting Manager</option>
-        <option value="ready-to-invoice">Ready to Invoice</option>
+        <option value="waiting-on-client">Waiting on Client</option>
+        <option value="waiting-on-me">Waiting on Me</option>
+        <option value="done">Done</option>
+        <option value="cancelled">Cancelled</option>
       </select>
     </div>
     <div class="stats-bar" id="statsBar"></div>
@@ -307,15 +308,19 @@
       <div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr">
         <div class="form-group"><label>Assigned To</label><select id="taskAssignee"><option value="">Unassigned</option></select></div>
         <div class="form-group"><label>Also Assigned</label><select id="taskSecondaryAssignee"><option value="">None</option></select></div>
-        <div class="form-group"><label>Priority</label><select id="taskPriority"><option value="critical">&#128308; Critical</option><option value="high">&#128992; High</option><option value="medium" selected>&#128993; Medium</option><option value="low">&#128994; Low</option></select></div>
-        <div class="form-group"><label>Progress</label><select id="taskProgress"><option value="not-started">Not Started</option><option value="in-progress">In Progress</option><option value="completed">Completed</option><option value="stuck">Stuck</option><option value="awaiting-client">Awaiting Client</option><option value="awaiting-manager">Awaiting Manager</option><option value="ready-to-invoice">Ready to Invoice</option><option value="invoiced">Invoiced</option></select></div>
+        <div class="form-group"><label>When (band)</label><select id="taskBand"><option value="">—</option><option value="today">Today</option><option value="this-week">This Week</option><option value="scheduled">Scheduled</option><option value="waiting">Waiting</option><option value="someday">Someday</option></select></div>
+        <div class="form-group"><label>Status</label><select id="taskStatus"><option value="inbox">Inbox</option><option value="scheduled">Scheduled</option><option value="in-progress">In Progress</option><option value="waiting-on-client">Waiting on Client</option><option value="waiting-on-me">Waiting on Me</option><option value="done">Done</option><option value="cancelled">Cancelled</option></select></div>
       </div>
       <div class="form-row form-row-3">
+        <div class="form-group"><label>Type</label><select id="taskType"><option value="">—</option><option value="recurring">Recurring</option><option value="ad-hoc">Ad Hoc</option><option value="urgent">Urgent</option><option value="sales">Sales</option><option value="admin">Admin</option><option value="waiting">Waiting</option><option value="idea">Idea</option></select></div>
         <div class="form-group"><label>Deadline</label><input type="date" id="taskDeadline"></div>
         <div class="form-group"><label>Planned Date</label><input type="date" id="taskPlannedDate"></div>
-        <div class="form-group"><label>Est. Hours</label><input type="number" id="taskEstHours" min="0" step="0.5"></div>
       </div>
-      <div class="form-group"><label>References / Links</label><input type="text" id="taskReferences"></div>
+      <div class="form-row form-row-3">
+        <div class="form-group"><label>Est. Hours</label><input type="number" id="taskEstHours" min="0" step="0.5"></div>
+        <div class="form-group"><label>Suggested calendar block</label><input type="text" id="taskSuggestedBlock" placeholder="e.g. Tue AM, 2h"></div>
+        <div class="form-group"><label>References / Links</label><input type="text" id="taskReferences"></div>
+      </div>
       <div class="form-group"><label>Notes</label><textarea id="taskNotes" rows="2"></textarea></div>
       <div class="form-group">
         <label><input type="checkbox" id="taskRecurring"> Recurring task</label>

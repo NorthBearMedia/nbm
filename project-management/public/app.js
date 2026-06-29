@@ -575,6 +575,49 @@ function fmtDateShort(d){if(!d)return'';return new Date(d+'T00:00:00').toLocaleD
 function getDeadlineClass(dl,prog){if(!dl||prog==='completed'||prog==='invoiced')return'';const now=new Date();now.setHours(0,0,0,0);const diff=(new Date(dl+'T00:00:00')-now)/864e5;return diff<0?'overdue':diff<=3?'due-soon':'';}
 function progressLabel(p){return{'not-started':'Not Started','in-progress':'In Progress','completed':'Completed','stuck':'Stuck','awaiting-client':'Awaiting Client','awaiting-manager':'Awaiting Manager','ready-to-invoice':'Ready to Invoice','invoiced':'Invoiced'}[p]||p;}
 function priorityLabel(p){return{'critical':'Critical','high':'High','medium':'Medium','low':'Low'}[p]||p;}
+
+// ─── Client Control Board enums (canonical) ─────────────────────────────
+const TASK_STATUS = {
+  'inbox':             { label: 'Inbox',             cls: 'st-inbox' },
+  'scheduled':         { label: 'Scheduled',         cls: 'st-scheduled' },
+  'in-progress':       { label: 'In Progress',       cls: 'st-in-progress' },
+  'waiting-on-client': { label: 'Waiting on Client', cls: 'st-waiting-client' },
+  'waiting-on-me':     { label: 'Waiting on Me',     cls: 'st-waiting-me' },
+  'done':              { label: 'Done',              cls: 'st-done' },
+  'cancelled':         { label: 'Cancelled',         cls: 'st-cancelled' },
+};
+const TASK_BAND = {
+  'today':     { label: 'Today',     cls: 'bd-today' },
+  'this-week': { label: 'This Week', cls: 'bd-this-week' },
+  'scheduled': { label: 'Scheduled', cls: 'bd-scheduled' },
+  'waiting':   { label: 'Waiting',   cls: 'bd-waiting' },
+  'someday':   { label: 'Someday',   cls: 'bd-someday' },
+};
+const TASK_TYPE = {
+  'recurring': 'Recurring', 'ad-hoc': 'Ad Hoc', 'urgent': 'Urgent',
+  'sales': 'Sales', 'admin': 'Admin', 'waiting': 'Waiting', 'idea': 'Idea',
+};
+const CONTROL_STATUS = {
+  'green': { label: 'Under control',  cls: 'rag-green' },
+  'amber': { label: 'Needs attention', cls: 'rag-amber' },
+  'red':   { label: 'Urgent / overdue', cls: 'rag-red' },
+  'blue':  { label: 'Waiting on client', cls: 'rag-blue' },
+};
+const RISK = { 'low': 'Low', 'medium': 'Medium', 'high': 'High' };
+const STATUS_ORDER = ['inbox','scheduled','in-progress','waiting-on-client','waiting-on-me','done','cancelled'];
+const BAND_ORDER = ['today','this-week','scheduled','waiting','someday'];
+const BAND_RANK = { 'today':0,'this-week':1,'scheduled':2,'waiting':3,'someday':4 };
+const TYPE_ORDER = ['recurring','ad-hoc','urgent','sales','admin','waiting','idea'];
+
+function statusLabel(s){ return (TASK_STATUS[s]||{}).label || s || ''; }
+function statusClass(s){ return (TASK_STATUS[s]||{}).cls || ''; }
+function bandLabel(b){ return (TASK_BAND[b]||{}).label || ''; }
+function bandClass(b){ return (TASK_BAND[b]||{}).cls || ''; }
+function typeLabel(t){ return TASK_TYPE[t] || ''; }
+function isOpenTask(t){ return t.task_status !== 'done' && t.task_status !== 'cancelled'; }
+function statusOptions(sel){ return STATUS_ORDER.map(s=>`<option value="${s}" ${sel===s?'selected':''}>${statusLabel(s)}</option>`).join(''); }
+function bandOptions(sel){ return ['',...BAND_ORDER].map(b=>`<option value="${b}" ${sel===b?'selected':''}>${b?bandLabel(b):'—'}</option>`).join(''); }
+function typeSelectOptions(sel){ return ['',...TYPE_ORDER].map(t=>`<option value="${t}" ${sel===t?'selected':''}>${t?typeLabel(t):'—'}</option>`).join(''); }
 function timeAgo(ds){if(!ds)return'';const now=new Date(),d=new Date(ds.replace(' ','T')+(ds.includes('T')||ds.includes(' ')?'Z':'T00:00:00Z')),m=Math.floor((now-d)/6e4);if(isNaN(m))return'';if(m<1)return'just now';if(m<60)return m+'m ago';const h=Math.floor(m/60);if(h<24)return h+'h ago';const dd=Math.floor(h/24);if(dd<7)return dd+'d ago';return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
 function fmtDateTime(ds){if(!ds)return'';const d=new Date(ds.replace(' ','T')+(ds.includes('T')||ds.includes(' ')?'Z':'T00:00:00Z'));if(isNaN(d))return'';return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})+' at '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}
 function fmtFileSize(bytes){if(bytes<1024)return bytes+'B';if(bytes<1048576)return(bytes/1024).toFixed(1)+'KB';return(bytes/1048576).toFixed(1)+'MB';}
@@ -606,15 +649,14 @@ function renderClients() {
     for (const t of c.tasks) {
       if (myTasksFilter && t.assignee !== myName && t.secondary_assignee !== myName) continue;
       if (personFilterVal && t.assignee !== personFilterVal && t.secondary_assignee !== personFilterVal) continue;
-      if (statusFilterVal && t.progress !== statusFilterVal) continue;
+      if (statusFilterVal && t.task_status !== statusFilterVal) continue;
       allTasks.push({ ...t, client_name: c.name, client_code: c.code, client_logo: c.logo_url, client_id: c.id });
     }
   }
 
-  const active = allTasks.filter(t => t.progress !== 'completed' && t.progress !== 'invoiced');
-  const done = allTasks.filter(t => t.progress === 'completed' || t.progress === 'invoiced');
+  const active = allTasks.filter(isOpenTask);
+  const done = allTasks.filter(t => !isOpenTask(t));
 
-  const priOrder = { critical: 0, high: 1, medium: 2, low: 3 };
   active.sort((a, b) => {
     if ((b.is_pinned||0) !== (a.is_pinned||0)) return (b.is_pinned||0) - (a.is_pinned||0);
     const aDate = a.deadline || a.planned_date || '9999';
@@ -623,7 +665,7 @@ function renderClients() {
     const bOverdue = bDate < today ? 0 : 1;
     if (aOverdue !== bOverdue) return aOverdue - bOverdue;
     if (aDate !== bDate) return aDate < bDate ? -1 : 1;
-    return (priOrder[a.priority] || 2) - (priOrder[b.priority] || 2);
+    return (BAND_RANK[a.task_band] ?? 2) - (BAND_RANK[b.task_band] ?? 2);
   });
 
   const overdue = active.filter(t => { const d = t.deadline || t.planned_date; return d && d < today; });
@@ -666,8 +708,9 @@ function renderClients() {
       <div class="flat-task-info">
         <div style="display:flex;align-items:center;gap:6px">
           <span class="task-ref" title="Ref: ${taskRef(t.id)}">${taskRef(t.id)}</span>
-          <span class="priority-badge priority-${t.priority}" title="${priorityLabel(t.priority)}"></span>
+          ${t.task_band?`<span class="band-badge ${bandClass(t.task_band)}" title="When: ${bandLabel(t.task_band)}">${bandLabel(t.task_band)}</span>`:''}
           <span class="task-title" onclick="editTask(${t.id})">${esc(t.title)}</span>
+          ${t.task_type?`<span class="type-badge" title="Type">${typeLabel(t.task_type)}</span>`:''}
           ${t.is_pinned?'<span style="color:var(--primary);font-size:11px">&#9733;</span>':''}
           ${t.is_recurring?'<span class="recurring-badge" title="Recurring">&#8635;</span>':''}
         </div>
@@ -678,8 +721,8 @@ function renderClients() {
       <div style="min-width:110px"><input type="date" class="inline-date ${dc}" value="${t.deadline||''}" onchange="inlineFieldChange(${t.id},'deadline',this.value)" onclick="event.stopPropagation()" title="Deadline"></div>
       <div style="min-width:110px"><input type="date" class="inline-date" value="${t.planned_date||''}" onchange="inlineFieldChange(${t.id},'planned_date',this.value)" onclick="event.stopPropagation()" title="Planned date"></div>
       <div style="min-width:50px"><input type="number" class="inline-hours" value="${t.estimated_hours||''}" min="0" step="0.5" onchange="inlineFieldChange(${t.id},'estimated_hours',parseFloat(this.value)||0)" onclick="event.stopPropagation()" title="Est. hours"></div>
-      <div><select class="quick-status" onchange="quickStatusChange(${t.id},this.value)" onclick="event.stopPropagation()">
-        ${['not-started','in-progress','completed','stuck','awaiting-client','awaiting-manager','ready-to-invoice','invoiced'].map(s=>`<option value="${s}" ${t.progress===s?'selected':''}>${progressLabel(s)}</option>`).join('')}
+      <div><select class="quick-status status-${t.task_status}" onchange="quickStatusChange(${t.id},this.value)" onclick="event.stopPropagation()">
+        ${statusOptions(t.task_status)}
       </select></div>
       <div class="task-actions">
         <button class="btn-icon" onclick="editTask(${t.id})" title="Full edit">&#128196;</button>
@@ -739,11 +782,12 @@ async function inlineFieldChange(taskId, field, value) {
 
 async function quickStatusChange(taskId, newStatus) {
   const oldTask = findTaskById(taskId);
-  const wasComplete = oldTask && (oldTask.progress === 'completed' || oldTask.progress === 'invoiced');
-  await api(`/api/tasks/${taskId}`, {method:'PUT', body:{progress:newStatus}});
+  const wasDone = oldTask && oldTask.task_status === 'done';
+  await api(`/api/tasks/${taskId}`, {method:'PUT', body:{task_status:newStatus}});
   await loadClients();
+  if (currentView === 'dashboard') loadDashboard();
   // Celebrate when completing a task
-  if (!wasComplete && (newStatus === 'completed' || newStatus === 'invoiced')) celebrate();
+  if (!wasDone && newStatus === 'done') celebrate();
 }
 
 // ─── Archive ────────────────────────────────────────────
@@ -922,10 +966,11 @@ document.getElementById('clientForm').addEventListener('submit',async e=>{
 function openTaskModal(cid){
   document.getElementById('taskModalTitle').textContent='New Task';
   document.getElementById('taskFormError').style.display='none';
-  ['taskId','taskTitle','taskDeadline','taskPlannedDate','taskEstHours','taskReferences','taskNotes'].forEach(id=>document.getElementById(id).value='');
+  ['taskId','taskTitle','taskDeadline','taskPlannedDate','taskEstHours','taskReferences','taskNotes','taskSuggestedBlock'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('taskClientId').value=cid;
-  document.getElementById('taskProgress').value='not-started';
-  document.getElementById('taskPriority').value='medium';
+  document.getElementById('taskStatus').value='inbox';
+  document.getElementById('taskBand').value='';
+  document.getElementById('taskType').value='';
   document.getElementById('taskRecurring').checked=false;
   document.getElementById('recurOptions').style.display='none';
   document.getElementById('taskRecurInterval').value='1';
@@ -958,8 +1003,10 @@ function editTask(id){
   document.getElementById('taskDeadline').value=t.deadline||'';
   document.getElementById('taskPlannedDate').value=t.planned_date||'';
   document.getElementById('taskEstHours').value=t.estimated_hours||'';
-  document.getElementById('taskProgress').value=t.progress;
-  document.getElementById('taskPriority').value=t.priority||'medium';
+  document.getElementById('taskStatus').value=t.task_status||'inbox';
+  document.getElementById('taskBand').value=t.task_band||'';
+  document.getElementById('taskType').value=t.task_type||'';
+  document.getElementById('taskSuggestedBlock').value=t.suggested_block||'';
   document.getElementById('taskReferences').value=t.references_text||'';
   document.getElementById('taskNotes').value=t.notes||'';
   document.getElementById('taskRecurring').checked=!!t.is_recurring;
@@ -1001,8 +1048,10 @@ document.getElementById('taskForm').addEventListener('submit',async e=>{
     deadline:document.getElementById('taskDeadline').value,
     planned_date:document.getElementById('taskPlannedDate').value,
     estimated_hours:parseFloat(document.getElementById('taskEstHours').value)||0,
-    progress:document.getElementById('taskProgress').value,
-    priority:document.getElementById('taskPriority').value,
+    task_status:document.getElementById('taskStatus').value,
+    task_band:document.getElementById('taskBand').value,
+    task_type:document.getElementById('taskType').value,
+    suggested_block:document.getElementById('taskSuggestedBlock').value,
     references_text:document.getElementById('taskReferences').value,
     notes:document.getElementById('taskNotes').value,
     is_recurring:isRecurring,
@@ -1034,9 +1083,10 @@ document.getElementById('taskForm').addEventListener('submit',async e=>{
     // Refresh current view
     if (currentView === 'today') loadTodayView();
     if (currentView === 'focus') loadFocusView();
+    if (currentView === 'dashboard') loadDashboard();
     // Celebrate if task was just completed
-    const wasComplete = oldTask && (oldTask.progress === 'completed' || oldTask.progress === 'invoiced');
-    if (!wasComplete && (data.progress === 'completed' || data.progress === 'invoiced')) celebrate();
+    const wasDone = oldTask && oldTask.task_status === 'done';
+    if (!wasDone && data.task_status === 'done') celebrate();
   } catch(err) { errEl.textContent=err.message; errEl.style.display='block'; }
   finally { setSaving(btn, false); }
 });
@@ -1127,7 +1177,7 @@ function getMyActiveTasks() {
   const myName = currentUser?.display_name || '';
   const tasks = [];
   for (const c of clients) for (const t of c.tasks) {
-    if ((t.assignee === myName || t.secondary_assignee === myName) && t.progress !== 'completed' && t.progress !== 'invoiced') {
+    if ((t.assignee === myName || t.secondary_assignee === myName) && isOpenTask(t)) {
       tasks.push(t);
     }
   }
@@ -1239,12 +1289,12 @@ if (searchInput) {
           <div class="search-result-item" onclick="navigateToTaskFromSearch(${t.id})" style="cursor:pointer">
             <div style="display:flex;align-items:center;gap:8px">
               <span class="task-ref">${taskRef(t.id)}</span>
-              <span class="priority-badge priority-${t.priority}"></span>
+              ${t.task_band?`<span class="band-badge ${bandClass(t.task_band)}">${bandLabel(t.task_band)}</span>`:''}
               <span style="font-weight:600;font-size:13px">${esc(t.title)}</span>
               ${t.archived ? '<span style="font-size:10px;color:var(--text-muted)">(archived)</span>' : ''}
             </div>
             <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">
-              ${esc(t.client_name)} · ${esc(t.assignee || 'Unassigned')} · <span class="status-badge status-${t.progress}">${progressLabel(t.progress)}</span>
+              ${esc(t.client_name)} · ${esc(t.assignee || 'Unassigned')} · <span class="status-badge status-${t.task_status}">${statusLabel(t.task_status)}</span>
             </div>
           </div>
         `).join('');
@@ -1307,10 +1357,10 @@ async function loadTodayView(){
         <div style="font-size:11px;color:var(--text-secondary)">${t.client_code?'['+esc(t.client_code)+'] ':''}${esc(t.client_name)}</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-        <span class="priority-badge priority-${t.priority}"></span>
+        ${t.task_band?`<span class="band-badge ${bandClass(t.task_band)}">${bandLabel(t.task_band)}</span>`:''}
         <span style="font-size:12px;min-width:40px">${t.estimated_hours?t.estimated_hours+'h':''}</span>
-        <select class="quick-status" onchange="event.stopPropagation();quickStatusChange(${t.id},this.value).then(()=>loadTodayView())" onclick="event.stopPropagation()">
-          ${['not-started','in-progress','completed','stuck','awaiting-client','awaiting-manager','ready-to-invoice','invoiced'].map(s=>`<option value="${s}" ${t.progress===s?'selected':''}>${progressLabel(s)}</option>`).join('')}
+        <select class="quick-status status-${t.task_status}" onchange="event.stopPropagation();quickStatusChange(${t.id},this.value).then(()=>loadTodayView())" onclick="event.stopPropagation()">
+          ${statusOptions(t.task_status)}
         </select>
       </div>
     </div>`).join('');
@@ -1634,30 +1684,27 @@ async function loadFocusView() {
   // Include tasks where user is primary OR secondary assignee (sign-off tasks)
   const mine = myName ? allTasks.filter(t => t.assignee === myName || t.secondary_assignee === myName) : allTasks;
 
-  const now = mine.filter(t => t.progress === 'in-progress');
-  const blocked = mine.filter(t => t.progress === 'stuck' || t.progress === 'awaiting-client' || t.progress === 'awaiting-manager');
-  // Separate sign-off tasks (where I'm secondary and status is awaiting-manager)
-  const signOff = myName ? allTasks.filter(t => t.secondary_assignee === myName && t.progress === 'awaiting-manager' && t.assignee !== myName) : [];
-  const next = mine.filter(t => t.progress === 'not-started')
-    .sort((a, b) => {
-      const pa = { critical: 0, high: 1, medium: 2, low: 3 };
-      return (pa[a.priority] || 2) - (pa[b.priority] || 2);
-    }).slice(0, 8);
+  const now = mine.filter(t => t.task_status === 'in-progress');
+  const blocked = mine.filter(t => t.task_status === 'waiting-on-client' || t.task_status === 'waiting-on-me');
+  // Sign-off tasks (where I'm secondary and the task is waiting on me)
+  const signOff = myName ? allTasks.filter(t => t.secondary_assignee === myName && t.task_status === 'waiting-on-me' && t.assignee !== myName) : [];
+  const next = mine.filter(t => t.task_status === 'inbox' || t.task_status === 'scheduled')
+    .sort((a, b) => (BAND_RANK[a.task_band] ?? 2) - (BAND_RANK[b.task_band] ?? 2)).slice(0, 8);
 
   function focusCard(t, isSignOff) {
     const fromLabel = isSignOff ? `<span style="font-size:11px;background:var(--warning);color:#000;padding:1px 6px;border-radius:4px;font-weight:600">Sign-off from ${esc(t.assignee)}</span>` : '';
     return `<div class="focus-card" onclick="editTask(${t.id})" ${isSignOff ? 'style="border-left:3px solid var(--warning)"' : ''}>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:6px">
-          <span class="priority-badge priority-${t.priority}"></span>
+          ${t.task_band?`<span class="band-badge ${bandClass(t.task_band)}">${bandLabel(t.task_band)}</span>`:''}
           <span style="font-weight:600;font-size:14px">${esc(t.title)}</span>
           ${fromLabel}
         </div>
         <div class="focus-meta">${esc(t.client_code || '')} ${esc(t.client_name)}${t.deadline ? ' &middot; Due ' + fmtDateShort(t.deadline) : ''}${t.secondary_assignee && !isSignOff ? ' &middot; +' + esc(t.secondary_assignee) : ''}</div>
       </div>
       <div class="focus-actions">
-        <select class="quick-status" onchange="quickStatusChange(${t.id},this.value).then(()=>loadFocusView())" onclick="event.stopPropagation()">
-          ${['not-started','in-progress','completed','stuck','awaiting-client','awaiting-manager','ready-to-invoice','invoiced'].map(s => `<option value="${s}" ${t.progress === s ? 'selected' : ''}>${progressLabel(s)}</option>`).join('')}
+        <select class="quick-status status-${t.task_status}" onchange="quickStatusChange(${t.id},this.value).then(()=>loadFocusView())" onclick="event.stopPropagation()">
+          ${statusOptions(t.task_status)}
         </select>
         <button class="btn-icon" onclick="event.stopPropagation();toggleInlineComment(${t.id})" title="Quick comment">&#128172;</button>
       </div>
