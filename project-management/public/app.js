@@ -68,8 +68,10 @@ async function loadClients() {
   renderStats();
   if (currentView === 'clients') {
     renderClients();
+    loadWorkloadSummary();
+  } else if (currentView === 'dashboard') {
+    loadDashboard();
   }
-  loadWorkloadSummary();
 }
 
 async function loadTeam() {
@@ -123,25 +125,31 @@ function updatePersonFilter() {
 }
 
 // ─── View Switching ─────────────────────────────────────
+function applyViewVisibility() {
+  document.getElementById('dashboardView').style.display = currentView === 'dashboard' ? '' : 'none';
+  document.getElementById('clientsView').style.display = currentView === 'clients' ? '' : 'none';
+  document.getElementById('todayView').style.display = currentView === 'today' ? '' : 'none';
+  document.getElementById('calendarView').style.display = currentView === 'calendar' ? '' : 'none';
+  document.getElementById('focusView').style.display = currentView === 'focus' ? '' : 'none';
+  document.getElementById('emailView').style.display = currentView === 'email' ? '' : 'none';
+  document.getElementById('clientSubBar').style.display = currentView === 'clients' ? '' : 'none';
+  document.getElementById('workloadSummary').style.display = currentView === 'clients' ? 'flex' : 'none';
+}
+
+function switchView(view) {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
+  currentView = view;
+  applyViewVisibility();
+  if (view === 'dashboard') loadDashboard();
+  if (view === 'clients') renderClients();
+  if (view === 'today') loadTodayView();
+  if (view === 'calendar') loadCalendarView();
+  if (view === 'focus') loadFocusView();
+  if (view === 'email') loadEmailView();
+}
+
 document.querySelectorAll('.nav-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    currentView = tab.dataset.view;
-    document.getElementById('dashboardView').style.display = currentView === 'dashboard' ? '' : 'none';
-    document.getElementById('clientsView').style.display = currentView === 'clients' ? '' : 'none';
-    document.getElementById('todayView').style.display = currentView === 'today' ? '' : 'none';
-    document.getElementById('calendarView').style.display = currentView === 'calendar' ? '' : 'none';
-    document.getElementById('focusView').style.display = currentView === 'focus' ? '' : 'none';
-    document.getElementById('emailView').style.display = currentView === 'email' ? '' : 'none';
-    document.getElementById('clientSubBar').style.display = currentView === 'clients' ? '' : 'none';
-    document.getElementById('workloadSummary').style.display = currentView === 'clients' ? 'flex' : 'none';
-    if (currentView === 'dashboard') loadDashboard();
-    if (currentView === 'today') loadTodayView();
-    if (currentView === 'calendar') loadCalendarView();
-    if (currentView === 'focus') loadFocusView();
-    if (currentView === 'email') loadEmailView();
-  });
+  tab.addEventListener('click', () => switchView(tab.dataset.view));
 });
 
 // ─── Dashboard ─────────────────────────────────────────
@@ -150,6 +158,8 @@ let dashWaConfigs = [];
 async function loadDashboard() {
   renderDashGreeting();
   renderDashStats();
+  renderControlBoard();
+  // Integrations strip (preserved widgets, relocated below the board)
   renderDashUrgentTasks();
   renderDashSchedule();
   loadDashEmails();
@@ -158,6 +168,145 @@ async function loadDashboard() {
   loadDashAnalytics();
   renderDashSocial();
   loadDashActivity();
+}
+
+function toggleIntegrationsStrip() {
+  const strip = document.getElementById('integrationsStrip');
+  const tog = document.getElementById('stripToggle');
+  const open = strip.style.display !== 'none';
+  strip.style.display = open ? 'none' : '';
+  tog.innerHTML = open ? '&#9654;' : '&#9660;';
+}
+
+// ─── Client Control Board ───────────────────────────────
+function clientControlData(c) {
+  const status = c.resolved_status || c.computed_status || 'green';
+  const risk = c.resolved_risk || c.computed_risk || 'low';
+  const b = c.board || {};
+  return { status, risk, b };
+}
+
+function renderControlBoard() {
+  const board = document.getElementById('controlBoard');
+  if (!board) return;
+  const statusF = document.getElementById('cbStatusFilter')?.value || '';
+  const typeF = document.getElementById('cbTypeFilter')?.value || '';
+  const sortBy = document.getElementById('cbSort')?.value || 'risk';
+
+  // Real clients only (exclude the system "Unassigned" bucket and archived)
+  let list = clients.filter(c => !c.is_system && !c.archived);
+  if (statusF) list = list.filter(c => clientControlData(c).status === statusF);
+  if (typeF) list = list.filter(c => (c.client_type || '') === typeF);
+
+  const riskRank = { red: 0, amber: 1, blue: 2, green: 3 };
+  list.sort((a, b) => {
+    if (sortBy === 'name') return a.name.localeCompare(b.name);
+    if (sortBy === 'value') return (b.monthly_value || 0) - (a.monthly_value || 0);
+    if (sortBy === 'outstanding') return ((b.board?.outstanding) || 0) - ((a.board?.outstanding) || 0);
+    // default: risk (red first), then by monthly value
+    const ra = riskRank[clientControlData(a).status] ?? 3;
+    const rb = riskRank[clientControlData(b).status] ?? 3;
+    if (ra !== rb) return ra - rb;
+    return (b.monthly_value || 0) - (a.monthly_value || 0);
+  });
+
+  if (!list.length) {
+    board.innerHTML = '<div class="dash-widget-empty" style="grid-column:1/-1">No clients match these filters.</div>';
+    return;
+  }
+  board.innerHTML = list.map(clientCardHTML).join('');
+}
+
+function fmtMoney(n) {
+  if (!n) return '£0';
+  return '£' + Number(n).toLocaleString('en-GB');
+}
+
+function clientCardHTML(c) {
+  const { status, risk, b } = clientControlData(c);
+  const sCfg = CONTROL_STATUS[status] || CONTROL_STATUS.green;
+  const overrideTag = c.control_status ? '<span class="cb-override" title="Manual override">override</span>' : '';
+  const due = b.next_due_date ? fmtDateShort(b.next_due_date) : '—';
+  const logo = c.logo_url ? `<img src="${esc(c.logo_url)}" class="cb-logo" alt="">` : `<span class="cb-logo cb-logo-code">${esc(c.code || c.name.substring(0,3))}</span>`;
+  const recur = c.recurring_deliverables ? `<div class="cb-recur" title="Recurring deliverables">&#8635; ${esc(c.recurring_deliverables.split('\n')[0])}${c.recurring_deliverables.split('\n').length>1?' …':''}</div>` : '';
+  return `<div class="cb-card rag-border-${status}" onclick="openClientDetail(${c.id})">
+    <div class="cb-card-top">
+      ${logo}
+      <div class="cb-card-name">
+        <div class="cb-name">${esc(c.name)} ${c.is_private?'<span title="Private">🔒</span>':''}</div>
+        <div class="cb-sub">${esc(typeLabelClient(c.client_type))}${c.monthly_value?` · ${fmtMoney(c.monthly_value)}/mo`:''}</div>
+      </div>
+      <span class="rag-dot ${sCfg.cls}" title="${sCfg.label}"></span>
+    </div>
+    <div class="cb-stats">
+      <span class="cb-stat ${b.overdue?'cb-stat-bad':''}" title="Overdue">${b.overdue||0} overdue</span>
+      <span class="cb-stat" title="Outstanding tasks">${b.outstanding||0} open</span>
+      <span class="cb-stat" title="Waiting">${b.waiting||0} waiting</span>
+    </div>
+    <div class="cb-meta">
+      <span title="Next due">Due: ${due}</span>
+      <span title="Next scheduled work">Sched: ${c.next_scheduled_date?fmtDateShort(c.next_scheduled_date):'—'}</span>
+      <span class="risk-badge risk-${risk}" title="Risk">${(RISK[risk]||'')} risk</span>
+    </div>
+    ${recur}
+    <div class="cb-status-line"><span class="rag-pill ${sCfg.cls}">${sCfg.label}</span>${overrideTag}</div>
+  </div>`;
+}
+
+function typeLabelClient(t) {
+  return { retainer: 'Retainer', project: 'Project', 'ad-hoc': 'Ad hoc', prospect: 'Prospect' }[t] || (t || '—');
+}
+
+function openClientDetail(id) {
+  const c = clients.find(x => x.id === id);
+  if (!c) return;
+  const { status, risk, b } = clientControlData(c);
+  const sCfg = CONTROL_STATUS[status] || CONTROL_STATUS.green;
+  document.getElementById('clientDetailTitle').textContent = c.name;
+  const tasks = c.tasks || [];
+  const isWaiting = t => t.task_status === 'waiting-on-client' || t.task_status === 'waiting-on-me';
+  const recurring = tasks.filter(t => isOpenTask(t) && (t.task_type === 'recurring' || t.is_recurring));
+  const waiting = tasks.filter(isWaiting);
+  const adhoc = tasks.filter(t => isOpenTask(t) && !isWaiting(t) && t.task_type !== 'recurring' && !t.is_recurring);
+  const completed = tasks.filter(t => t.task_status === 'done');
+  const taskLine = t => `<div class="cd-task" onclick="closeModal('clientDetailModal');editTask(${t.id})">
+      <span class="status-badge status-${t.task_status}">${statusLabel(t.task_status)}</span>
+      <span class="cd-task-title">${esc(t.title)}</span>
+      ${t.task_band ? `<span class="band-badge ${bandClass(t.task_band)}">${bandLabel(t.task_band)}</span>` : ''}
+      ${t.deadline ? `<span class="cd-task-due ${getDeadlineClass(t.deadline, t.progress)}">${fmtDateShort(t.deadline)}</span>` : ''}
+    </div>`;
+  const section = (title, arr) => arr.length ? `<div class="cd-section"><h4>${title} (${arr.length})</h4>${arr.map(taskLine).join('')}</div>` : '';
+  const links = [];
+  if (c.gmail_link) links.push(`<a href="${esc(c.gmail_link)}" target="_blank" class="btn btn-ghost btn-sm">✉ Gmail</a>`);
+  if (c.drive_link) links.push(`<a href="${esc(c.drive_link)}" target="_blank" class="btn btn-ghost btn-sm">📁 Drive</a>`);
+  document.getElementById('clientDetailBody').innerHTML = `
+    <div class="cd-head">
+      <span class="rag-pill ${sCfg.cls}">${sCfg.label}</span>
+      <span class="risk-badge risk-${risk}">${RISK[risk] || ''} risk</span>
+      <span class="cd-type">${typeLabelClient(c.client_type)}</span>
+      ${c.monthly_value ? `<span class="cd-value">${fmtMoney(c.monthly_value)}/mo</span>` : ''}
+      <span style="flex:1"></span>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('clientDetailModal');editClient(${c.id})">Edit client</button>
+      <button class="btn btn-primary btn-sm" onclick="closeModal('clientDetailModal');openTaskModal(${c.id})">+ Task</button>
+    </div>
+    <div class="cd-grid">
+      <div>
+        ${c.agreement_summary ? `<div class="cd-block"><h4>Agreement</h4><p>${esc(c.agreement_summary)}</p></div>` : ''}
+        ${c.recurring_deliverables ? `<div class="cd-block"><h4>Recurring deliverables</h4><p style="white-space:pre-wrap">${esc(c.recurring_deliverables)}</p></div>` : ''}
+        ${c.notes ? `<div class="cd-block"><h4>Notes</h4><p style="white-space:pre-wrap">${esc(c.notes)}</p></div>` : ''}
+        ${c.important_contacts ? `<div class="cd-block"><h4>Important contacts</h4><p style="white-space:pre-wrap">${esc(c.important_contacts)}</p></div>` : ''}
+        ${links.length ? `<div class="cd-block"><h4>Links</h4><div style="display:flex;gap:8px">${links.join('')}</div></div>` : ''}
+        <div class="cd-block"><h4>Key dates</h4><p>Last contact: ${c.last_contact_date || '—'}<br>Next scheduled: ${c.next_scheduled_date || '—'}<br>Next due: ${b.next_due_date ? fmtDateShort(b.next_due_date) : '—'}</p></div>
+      </div>
+      <div>
+        ${section('Waiting', waiting)}
+        ${section('Recurring', recurring)}
+        ${section('Ad hoc / open', adhoc)}
+        ${section('Completed', completed.slice(0, 10))}
+        ${tasks.length === 0 ? '<div class="dash-widget-empty">No tasks yet.</div>' : ''}
+      </div>
+    </div>`;
+  openModal('clientDetailModal');
 }
 
 function renderDashGreeting() {
@@ -171,23 +320,24 @@ function renderDashGreeting() {
 
 function renderDashStats() {
   const today = new Date().toISOString().split('T')[0];
-  let urgent = 0, overdue = 0, dueToday = 0, totalActive = 0;
+  let overdue = 0, dueToday = 0, waiting = 0, inbox = 0;
   for (const c of clients) {
     for (const t of (c.tasks || [])) {
-      if (['completed', 'invoiced'].includes(t.progress)) continue;
-      totalActive++;
+      if (!isOpenTask(t)) continue;
+      if (t.task_status === 'inbox') inbox++;
+      if (t.task_status === 'waiting-on-client' || t.task_status === 'waiting-on-me') waiting++;
       const d = t.planned_date || t.deadline || '';
-      if (d && d < today) overdue++;
+      if (t.deadline && t.deadline < today) overdue++;
       if (d === today) dueToday++;
-      if (t.priority === 'critical' || t.priority === 'high') urgent++;
     }
   }
+  const atRisk = clients.filter(c => !c.is_system && !c.archived && ['red','amber'].includes(clientControlData(c).status)).length;
   document.getElementById('dashStats').innerHTML = `
     <div class="dash-stat dash-stat--danger"><div class="dash-stat-icon">&#9888;</div><div class="dash-stat-value">${overdue}</div><div class="dash-stat-label">Overdue</div></div>
-    <div class="dash-stat dash-stat--warning"><div class="dash-stat-icon">&#128293;</div><div class="dash-stat-value">${urgent}</div><div class="dash-stat-label">Urgent</div></div>
+    <div class="dash-stat dash-stat--warning"><div class="dash-stat-icon">&#9888;</div><div class="dash-stat-value">${atRisk}</div><div class="dash-stat-label">At-risk Clients</div></div>
     <div class="dash-stat dash-stat--blue"><div class="dash-stat-icon">&#128197;</div><div class="dash-stat-value">${dueToday}</div><div class="dash-stat-label">Due Today</div></div>
-    <div class="dash-stat dash-stat--teal"><div class="dash-stat-icon">&#9783;</div><div class="dash-stat-value">${totalActive}</div><div class="dash-stat-label">Active Tasks</div></div>
-    <div class="dash-stat dash-stat--purple" id="dashStatEmails"><div class="dash-stat-icon">&#9993;</div><div class="dash-stat-value">—</div><div class="dash-stat-label">Unread</div></div>
+    <div class="dash-stat dash-stat--teal"><div class="dash-stat-icon">&#9203;</div><div class="dash-stat-value">${waiting}</div><div class="dash-stat-label">Waiting</div></div>
+    <div class="dash-stat dash-stat--purple" id="dashStatInbox"><div class="dash-stat-icon">&#128229;</div><div class="dash-stat-value">${inbox}</div><div class="dash-stat-label">Inbox</div></div>
     <div class="dash-stat dash-stat--orange" id="dashStatMessages"><div class="dash-stat-icon">&#128172;</div><div class="dash-stat-value">—</div><div class="dash-stat-label">Messages</div></div>
   `;
 }
@@ -196,20 +346,20 @@ function renderDashUrgentTasks() {
   const today = new Date().toISOString().split('T')[0];
   const tasks = [];
   for (const c of clients) {
+    if (c.is_system) continue;
     for (const t of (c.tasks || [])) {
-      if (['completed', 'invoiced'].includes(t.progress)) continue;
-      const d = t.planned_date || t.deadline || '';
-      const isOverdue = d && d < today;
-      const isCritical = t.priority === 'critical' || t.priority === 'high';
-      if (isOverdue || isCritical) tasks.push({ ...t, client_name: c.name, client_code: c.code, overdue: isOverdue });
+      if (!isOpenTask(t)) continue;
+      const isOverdue = t.deadline && t.deadline < today;
+      const isUrgent = t.task_type === 'urgent' || t.task_band === 'today';
+      if (isOverdue || isUrgent) tasks.push({ ...t, client_name: c.name, client_code: c.code, overdue: isOverdue });
     }
   }
   tasks.sort((a, b) => (a.overdue === b.overdue ? 0 : a.overdue ? -1 : 1));
   const body = document.getElementById('dashUrgentBody');
   if (!tasks.length) { body.innerHTML = '<div class="dash-widget-empty">No urgent tasks right now</div>'; return; }
   body.innerHTML = tasks.slice(0, 8).map(t => {
-    const badge = t.overdue ? '<span class="badge badge-danger">Overdue</span>' : `<span class="badge badge-warning">${t.priority}</span>`;
-    return `<div class="dash-widget-row" onclick="openTaskModal(${t.id})"><div class="dash-widget-row-title">${esc(t.title)}</div><div class="dash-widget-row-meta">${esc(t.client_name)}</div>${badge}</div>`;
+    const badge = t.overdue ? '<span class="badge badge-danger">Overdue</span>' : `<span class="badge badge-warning">${bandLabel(t.task_band) || typeLabel(t.task_type)}</span>`;
+    return `<div class="dash-widget-row" onclick="editTask(${t.id})"><div class="dash-widget-row-title">${esc(t.title)}</div><div class="dash-widget-row-meta">${esc(t.client_name)}</div>${badge}</div>`;
   }).join('');
 }
 
@@ -217,17 +367,18 @@ function renderDashSchedule() {
   const today = new Date().toISOString().split('T')[0];
   const tasks = [];
   for (const c of clients) {
+    if (c.is_system) continue;
     for (const t of (c.tasks || [])) {
-      if (['completed', 'invoiced'].includes(t.progress)) continue;
+      if (!isOpenTask(t)) continue;
       const d = t.planned_date || t.deadline || '';
-      if (d === today) tasks.push({ ...t, client_name: c.name });
+      if (d === today || t.task_band === 'today') tasks.push({ ...t, client_name: c.name });
     }
   }
   const body = document.getElementById('dashScheduleBody');
   if (!tasks.length) { body.innerHTML = '<div class="dash-widget-empty">Nothing scheduled today</div>'; return; }
   body.innerHTML = tasks.map(t => {
     const hours = t.estimated_hours ? `<span class="dash-widget-row-meta">${t.estimated_hours}h</span>` : '';
-    return `<div class="dash-widget-row" onclick="openTaskModal(${t.id})"><div class="dash-widget-row-title">${esc(t.title)}</div><div class="dash-widget-row-meta">${esc(t.assignee || 'Unassigned')} · ${esc(t.client_name)}</div>${hours}</div>`;
+    return `<div class="dash-widget-row" onclick="editTask(${t.id})"><div class="dash-widget-row-title">${esc(t.title)}</div><div class="dash-widget-row-meta">${esc(t.assignee || 'Unassigned')} · ${esc(t.client_name)}</div>${hours}</div>`;
   }).join('');
 }
 
@@ -360,9 +511,6 @@ async function loadDashActivity() {
     }).join('');
   } catch { body.innerHTML = '<div class="dash-widget-empty">Failed to load activity</div>'; }
 }
-
-// Load dashboard on initial page load
-setTimeout(() => { if (currentView === 'dashboard') loadDashboard(); }, 700);
 
 // ─── Stats ──────────────────────────────────────────────
 function renderStats() {
@@ -919,8 +1067,11 @@ async function showArchiveModal(){
 document.getElementById('addClientBtn').addEventListener('click',()=>{
   document.getElementById('clientModalTitle').textContent='New Client';
   document.getElementById('clientFormError').style.display='none';
-  ['clientId','clientName','clientCode','clientNotes','clientGmail','clientDrive'].forEach(id=>document.getElementById(id).value='');
+  ['clientId','clientName','clientCode','clientNotes','clientGmail','clientDrive','clientMonthlyValue','clientAgreementSummary','clientRecurringDeliverables','clientLastContact','clientNextScheduled','clientContacts'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('clientType').value='recurring';
+  document.getElementById('clientTypeBand').value='retainer';
+  document.getElementById('clientControlStatus').value='';
+  document.getElementById('clientRiskLevel').value='';
   document.getElementById('clientLogo').value='';
   document.getElementById('clientPrivate').checked=false;
   document.getElementById('privateClientGroup').style.display=currentUser?.role==='owner'?'':'none';
@@ -935,6 +1086,15 @@ function editClient(id){
   document.getElementById('clientName').value=c.name;
   document.getElementById('clientCode').value=c.code||'';
   document.getElementById('clientType').value=c.agreement_type;
+  document.getElementById('clientTypeBand').value=c.client_type||'retainer';
+  document.getElementById('clientMonthlyValue').value=c.monthly_value||'';
+  document.getElementById('clientAgreementSummary').value=c.agreement_summary||'';
+  document.getElementById('clientRecurringDeliverables').value=c.recurring_deliverables||'';
+  document.getElementById('clientLastContact').value=c.last_contact_date||'';
+  document.getElementById('clientNextScheduled').value=c.next_scheduled_date||'';
+  document.getElementById('clientControlStatus').value=c.control_status||'';
+  document.getElementById('clientRiskLevel').value=c.risk_level||'';
+  document.getElementById('clientContacts').value=c.important_contacts||'';
   document.getElementById('clientNotes').value=c.notes||'';
   document.getElementById('clientGmail').value=c.gmail_link||'';
   document.getElementById('clientDrive').value=c.drive_link||'';
@@ -948,7 +1108,16 @@ document.getElementById('clientForm').addEventListener('submit',async e=>{
   const errEl=document.getElementById('clientFormError');
   errEl.style.display='none';
   const id=document.getElementById('clientId').value;
-  const data={name:document.getElementById('clientName').value,code:document.getElementById('clientCode').value,agreement_type:document.getElementById('clientType').value,notes:document.getElementById('clientNotes').value,gmail_link:document.getElementById('clientGmail').value,drive_link:document.getElementById('clientDrive').value,is_private:document.getElementById('clientPrivate').checked};
+  const data={name:document.getElementById('clientName').value,code:document.getElementById('clientCode').value,agreement_type:document.getElementById('clientType').value,notes:document.getElementById('clientNotes').value,gmail_link:document.getElementById('clientGmail').value,drive_link:document.getElementById('clientDrive').value,is_private:document.getElementById('clientPrivate').checked,
+    client_type:document.getElementById('clientTypeBand').value,
+    monthly_value:parseFloat(document.getElementById('clientMonthlyValue').value)||0,
+    agreement_summary:document.getElementById('clientAgreementSummary').value,
+    recurring_deliverables:document.getElementById('clientRecurringDeliverables').value,
+    last_contact_date:document.getElementById('clientLastContact').value,
+    next_scheduled_date:document.getElementById('clientNextScheduled').value,
+    control_status:document.getElementById('clientControlStatus').value,
+    risk_level:document.getElementById('clientRiskLevel').value,
+    important_contacts:document.getElementById('clientContacts').value};
   if (!data.name.trim()) { errEl.textContent='Client name is required.'; errEl.style.display='block'; return; }
   if (!data.code || data.code.length !== 3) { errEl.textContent='Client code must be exactly 3 letters.'; errEl.style.display='block'; return; }
   data.code = data.code.toUpperCase();
@@ -1951,10 +2120,10 @@ async function toggleTaskPin(taskId, event) {
 // ─── Init ───────────────────────────────────────────────
 (async function(){
   try {
+    applyViewVisibility();            // hide Tasks-view chrome on the default Dashboard landing
     await loadCurrentUser();
     await loadTeam();
-    await loadClients();
-    await loadWorkloadSummary();
+    await loadClients();              // populates clients + renders the Control Board (currentView==='dashboard')
     await loadPins();
     document.getElementById('todayDate').value=localDateStr(new Date());
   } catch(e) {

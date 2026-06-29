@@ -78,7 +78,12 @@
   </div>
 
   <main class="main">
-    <!-- Dashboard View -->
+    <!-- Dashboard View = CLIENT CONTROL BOARD (landing page)
+         REVERT NOTE: To restore the previous integrations-only dashboard,
+         hide #controlBoardSection, default #integrationsStrip to display:flex,
+         and in app.js make loadDashboard() skip renderControlBoard(). No widget
+         logic was deleted — every integration widget below is preserved, just
+         relocated into the collapsible Workspace strip. -->
     <div id="dashboardView">
       <div class="dashboard">
         <div class="dash-greeting">
@@ -86,13 +91,54 @@
           <p id="dashDate" class="dash-date"></p>
         </div>
         <div class="dash-stats" id="dashStats"></div>
-        <div class="dash-grid">
+
+        <!-- CLIENT CONTROL BOARD (hero) -->
+        <div id="controlBoardSection">
+          <div class="cb-header">
+            <h3 class="cb-title">Client Control Board</h3>
+            <div class="cb-controls">
+              <select id="cbStatusFilter" class="filter-select" onchange="renderControlBoard()">
+                <option value="">All statuses</option>
+                <option value="red">🔴 Red</option>
+                <option value="amber">🟠 Amber</option>
+                <option value="blue">🔵 Waiting on client</option>
+                <option value="green">🟢 Green</option>
+              </select>
+              <select id="cbTypeFilter" class="filter-select" onchange="renderControlBoard()">
+                <option value="">All types</option>
+                <option value="retainer">Retainer</option>
+                <option value="project">Project</option>
+                <option value="ad-hoc">Ad hoc</option>
+                <option value="prospect">Prospect</option>
+              </select>
+              <select id="cbSort" class="filter-select" onchange="renderControlBoard()">
+                <option value="risk">Sort: Risk</option>
+                <option value="name">Sort: Name</option>
+                <option value="value">Sort: Monthly value</option>
+                <option value="outstanding">Sort: Outstanding</option>
+              </select>
+            </div>
+          </div>
+          <div id="controlBoard" class="cb-grid"></div>
+        </div>
+
+        <!-- INTEGRATIONS STRIP (collapsible) -->
+        <div class="strip-header" onclick="toggleIntegrationsStrip()">
+          <span id="stripToggle">&#9654;</span> Workspace — your day, email, Xero, WhatsApp &amp; activity
+        </div>
+        <div id="integrationsStrip" class="dash-grid" style="display:none">
           <div class="dash-widget" id="dashUrgentTasks">
             <div class="dash-widget-header">
               <span class="dash-widget-title">Urgent Tasks</span>
               <button class="btn btn-ghost btn-sm" onclick="document.querySelector('[data-view=clients]').click()">View all</button>
             </div>
             <div class="dash-widget-body" id="dashUrgentBody"></div>
+          </div>
+          <div class="dash-widget" id="dashSchedule">
+            <div class="dash-widget-header">
+              <span class="dash-widget-title">Today's Schedule</span>
+            </div>
+            <div class="dash-widget-body" id="dashScheduleBody"></div>
           </div>
           <div class="dash-widget" id="dashEmails">
             <div class="dash-widget-header">
@@ -106,24 +152,6 @@
               <span class="dash-widget-title">Xero — Invoices &amp; Revenue</span>
             </div>
             <div class="dash-widget-body" id="dashXeroBody"></div>
-          </div>
-          <div class="dash-widget" id="dashSchedule">
-            <div class="dash-widget-header">
-              <span class="dash-widget-title">Today's Schedule</span>
-            </div>
-            <div class="dash-widget-body" id="dashScheduleBody"></div>
-          </div>
-          <div class="dash-widget" id="dashAnalytics">
-            <div class="dash-widget-header">
-              <span class="dash-widget-title">Web Analytics</span>
-            </div>
-            <div class="dash-widget-body" id="dashAnalyticsBody"></div>
-          </div>
-          <div class="dash-widget" id="dashSocial">
-            <div class="dash-widget-header">
-              <span class="dash-widget-title">Social Analytics</span>
-            </div>
-            <div class="dash-widget-body" id="dashSocialBody"></div>
           </div>
           <div class="dash-widget" id="dashWhatsapp1">
             <div class="dash-widget-header">
@@ -146,6 +174,18 @@
               <input type="text" id="wa2Msg" placeholder="Message..." class="wa-msg-input" onkeydown="if(event.key==='Enter')sendDashWa(2)">
               <button class="btn btn-primary btn-sm" onclick="sendDashWa(2)">Send</button>
             </div>
+          </div>
+          <div class="dash-widget" id="dashAnalytics">
+            <div class="dash-widget-header">
+              <span class="dash-widget-title">Web Analytics</span>
+            </div>
+            <div class="dash-widget-body" id="dashAnalyticsBody"></div>
+          </div>
+          <div class="dash-widget" id="dashSocial">
+            <div class="dash-widget-header">
+              <span class="dash-widget-title">Social Analytics</span>
+            </div>
+            <div class="dash-widget-body" id="dashSocialBody"></div>
           </div>
           <div class="dash-widget dash-widget-full" id="dashActivity">
             <div class="dash-widget-header">
@@ -289,13 +329,34 @@
       <div class="form-error" id="clientFormError"></div>
       <input type="hidden" id="clientId">
       <div class="form-row"><div class="form-group"><label>Client Name</label><input type="text" id="clientName" required></div><div class="form-group"><label>Code (exactly 3 letters)</label><input type="text" id="clientCode" minlength="3" maxlength="3" pattern="[A-Za-z]{3}" placeholder="e.g. NBM" required style="text-transform:uppercase"></div></div>
-      <div class="form-group"><label>Agreement Type</label><select id="clientType"><option value="recurring">Recurring</option><option value="ad-hoc">Ad Hoc / One-off</option></select></div>
+      <div class="form-row">
+        <div class="form-group"><label>Client Type</label><select id="clientTypeBand"><option value="retainer">Retainer</option><option value="project">Project</option><option value="ad-hoc">Ad hoc</option><option value="prospect">Prospect</option></select></div>
+        <div class="form-group"><label>Monthly Value (£)</label><input type="number" id="clientMonthlyValue" min="0" step="50" placeholder="0"></div>
+      </div>
+      <div class="form-group"><label>Agreement Summary</label><input type="text" id="clientAgreementSummary" placeholder="e.g. 12-mo retainer — 4 reels + 8 posts / month"></div>
+      <div class="form-group"><label>Recurring Deliverables</label><textarea id="clientRecurringDeliverables" rows="2" placeholder="One per line"></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label>Last Contact</label><input type="date" id="clientLastContact"></div>
+        <div class="form-group"><label>Next Scheduled Work</label><input type="date" id="clientNextScheduled"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Status override</label><select id="clientControlStatus"><option value="">Auto</option><option value="green">🟢 Green</option><option value="amber">🟠 Amber</option><option value="red">🔴 Red</option><option value="blue">🔵 Waiting on client</option></select></div>
+        <div class="form-group"><label>Risk override</label><select id="clientRiskLevel"><option value="">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
+      </div>
+      <div class="form-group"><label>Important Contacts</label><textarea id="clientContacts" rows="2" placeholder="Name · role · email / phone"></textarea></div>
+      <div class="form-group"><label>Agreement Type (legacy)</label><select id="clientType"><option value="recurring">Recurring</option><option value="ad-hoc">Ad Hoc / One-off</option></select></div>
       <div class="form-group"><label>Notes</label><textarea id="clientNotes" rows="2"></textarea></div>
       <div class="form-row"><div class="form-group"><label>Gmail Link</label><input type="url" id="clientGmail" placeholder="https://mail.google.com/..."></div><div class="form-group"><label>Google Drive Link</label><input type="url" id="clientDrive" placeholder="https://drive.google.com/..."></div></div>
       <div class="form-group"><label>Logo</label><input type="file" id="clientLogo" accept="image/*"></div>
       <div class="form-group" id="privateClientGroup" style="display:none"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="clientPrivate"> <span>Private Client</span> <span style="font-size:11px;color:var(--text-secondary)">(only visible to you)</span></label></div>
       <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="closeModal('clientModal')">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
     </form>
+  </div>
+
+  <!-- Client Detail Modal -->
+  <div class="modal modal-lg" id="clientDetailModal">
+    <div class="modal-header"><h2 id="clientDetailTitle">Client</h2><button class="modal-close" onclick="closeModal('clientDetailModal')">&times;</button></div>
+    <div id="clientDetailBody"></div>
   </div>
 
   <!-- Task Modal -->
