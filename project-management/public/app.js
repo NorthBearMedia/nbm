@@ -1729,7 +1729,21 @@ async function loadTodayView(){
   const person=document.getElementById('todayPerson').value;
   const params=new URLSearchParams({date});
   if(person)params.set('assignee',person);
-  const tasks=await api(`/api/tasks/by-date?${params}`);
+  let tasks=await api(`/api/tasks/by-date?${params}`);
+  // For "today" also include band=today, overdue and due-today tasks (which may carry
+  // no planned_date), per the Today spec — merged from loaded clients, deduped by id.
+  const todayStr=localDateStr(new Date());
+  if(date===todayStr){
+    const ids=new Set(tasks.map(t=>t.id));
+    const extra=allTasksFlat().filter(t=>{
+      if(!isOpenTask(t)||ids.has(t.id)) return false;
+      if(person && t.assignee!==person && t.secondary_assignee!==person) return false;
+      const overdue=t.deadline && t.deadline<todayStr;
+      const dueToday=(t.planned_date||t.deadline)===todayStr;
+      return t.task_band==='today'||overdue||dueToday;
+    });
+    tasks=tasks.concat(extra);
+  }
   const d=new Date(date+'T00:00:00');
   document.getElementById('todayTitle').textContent=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   const ct=document.getElementById('todayContent');
