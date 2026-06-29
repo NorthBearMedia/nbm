@@ -70,23 +70,56 @@ users           id, username, email, password_hash, password_salt,
 
 clients         id, name, code (3 letters), agreement_type (recurring|ad-hoc),
                 logo_url, gmail_link, drive_link, notes, sort_order,
-                is_private (owner-only), archived, created_at
+                is_private (owner-only), archived, created_at,
+                -- Client Control Board (Stage 1):
+                client_type (retainer|project|ad-hoc|prospect), monthly_value,
+                agreement_summary, recurring_deliverables, last_contact_date,
+                next_scheduled_date, control_status (''=auto|green|amber|red|blue),
+                risk_level (''=auto|low|medium|high), important_contacts,
+                is_system (1 = the "📥 Unassigned" inbox bucket client)
 
 projects        id, client_id, name, status, notes, sort_order, archived
                 (LEGACY — table still exists but UI uses client_id on tasks directly)
 
 tasks           id, client_id, project_id (legacy), title, assignee, secondary_assignee,
                 deadline, planned_date, completed_at, estimated_hours,
-                progress (not-started|in-progress|completed|stuck|
+                -- CANONICAL (Client Control Board):
+                task_status (inbox|scheduled|in-progress|waiting-on-client|
+                  waiting-on-me|done|cancelled),
+                task_band (today|this-week|scheduled|waiting|someday),
+                task_type (recurring|ad-hoc|urgent|sales|admin|waiting|idea),
+                suggested_block,
+                -- LEGACY SHADOW (kept in sync, do not surface in UI):
+                progress (CHECK: not-started|in-progress|completed|stuck|
                   awaiting-client|awaiting-manager|ready-to-invoice|invoiced),
-                priority (critical|high|medium|low),
+                priority (CHECK: critical|high|medium|low),
                 references_text, notes, is_recurring, recur_interval, recur_unit,
                 is_pinned, sort_order, archived, created_at
 
-comments, task_attachments, checklist_items, team_members, pinned_items, activity_log
+comments, task_attachments, checklist_items, team_members, pinned_items, activity_log,
+gmail_tokens, xero_tokens, whatsapp_config, whatsapp_messages, analytics_config, app_meta
 ```
 
 Tasks display as `NB###` (zero-padded id). Search supports `NB123` lookups.
+
+### Task status/priority — CANONICAL vs SHADOW (critical to understand)
+
+`tasks.progress` and `tasks.priority` have **locked SQLite CHECK constraints** that cannot be
+altered without table recreation (forbidden — caused past data loss). So the Client Control Board
+introduced **new columns** `task_status` / `task_band` / `task_type` as the **canonical** fields used
+everywhere in the UI. `progress` / `priority` are kept as **synced shadow values** so legacy logic
+(Excel export, recurring auto-create, completed_at, anything querying progress) keeps working.
+
+- The mapping lives in **`lib/taskmap.js`** (`statusToProgress`, `bandToPriority`, reverse maps, validators).
+- `routes/tasks.js` + `routes/ai.js` reconcile both directions on every write — whichever field a
+  caller sends, both columns stay consistent. **When adding task writes, always set the canonical
+  field and let the shadow follow (or call the taskmap helper).**
+- "done" + "cancelled" both shadow to `progress='completed'`, so `progress NOT IN ('completed','invoiced')`
+  still correctly means "open". `completed_at` and recurring auto-create fire on `task_status='done'`.
+- Frontend `app.js` mirrors this via the `TASK_STATUS` / `TASK_BAND` / `TASK_TYPE` / `CONTROL_STATUS` /
+  `RISK` config objects + `statusLabel`/`bandLabel`/`statusOptions`/`isOpenTask` helpers.
+- Clientless quick-captures (Inbox) land on the system **"📥 Unassigned"** client (`is_system=1`),
+  which is excluded from the Control Board and Excel export.
 
 ### Privacy model
 
@@ -96,7 +129,16 @@ Tasks display as `NB###` (zero-padded id). Search supports `NB123` lookups.
 
 ## Existing features (post-Apr 2026)
 
-- **Flat home:** Clients → expand to see tasks directly (no project layer). Drag-and-drop reorder. Manual / alpha / recent / outstanding sort.
+- **Client Control Board (landing page):** The Dashboard is now the Control Board — greeting + global
+  stat strip, RAG client cards (auto status green/amber/red/blue + risk, manual override wins), filter/
+  sort, and a client detail modal. Auto-RAG logic lives in `routes/clients.js#computeControl`
+  (Red = overdue/urgent/past-deadline-on-us; Amber = no schedule/due-soon/stale-contact; Blue = all
+  waiting on client). Integrations (email/Xero/WhatsApp/activity) are preserved in a collapsible
+  "Workspace" strip below — see the REVERT NOTE in `index.html`.
+- **Task Inbox:** Fast quick-capture (defaults `task_status='inbox'`, client optional) + triage list.
+- **Weekly Planning:** Overdue / Today / This Week / Waiting / retainers-with-no-scheduled-work /
+  high-risk clients / sales / admin — computed client-side.
+- **Tasks (flat list):** the former flat home, now driven by task_status/task_band/task_type.
 - **Today view:** All tasks for a date, grouped by assignee.
 - **Calendar view:** Monthly grid, per-person filter.
 - **Focus view:** Working Now / Up Next / Blocked / Needs Your Sign-off (when manager).
@@ -107,8 +149,11 @@ Tasks display as `NB###` (zero-padded id). Search supports `NB123` lookups.
 - **Recurring tasks:** Auto-create next occurrence on completion.
 - **Activity log:** Cascade-proof audit trail. Owner-only Global History view.
 - **Hourly + pre-migration backups + restore-from-backup.**
-- **Excel export:** `/api/export/excel` — Tasks + Clients sheets, excludes completed/invoiced.
-- **The Bear (AI assistant):** Floating chat panel in bottom-right. Tools: list_clients, list_team_members, create_task, update_task, search_tasks, get_workload_summary, list_tasks_for_user. All actions log activity with "(via AI assistant)". Hidden when `ANTHROPIC_API_KEY` unset.
+- **Excel export:** `/api/export/excel` — Tasks + Clients sheets; Tasks excludes done/cancelled and the
+  system Unassigned client; Clients sheet includes monthly value, RAG status, risk, next/last dates.
+- **The Bear (AI assistant):** Floating chat panel in bottom-right. Tools: list_clients, list_team_members, create_task, update_task, search_tasks, get_workload_summary, list_tasks_for_user. create/update speak the new status/band/type vocabulary (mapped to shadows). All actions log activity with "(via AI assistant)". Hidden when `ANTHROPIC_API_KEY` unset.
+- **Integrations:** Gmail (`routes/gmail.js`), Xero (`routes/xero.js`), WhatsApp Cloud API
+  (`routes/whatsapp.js`) — env-gated; surfaced in the dashboard Workspace strip.
 
 ## Conventions
 

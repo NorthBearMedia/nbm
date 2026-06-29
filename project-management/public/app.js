@@ -652,37 +652,37 @@ function loadPlanningView() {
 
 // ─── Stats ──────────────────────────────────────────────
 function renderStats() {
-  const t = { total: 0, outstanding: 0, inProgress: 0, overdue: 0, stuck: 0, completed: 0, awaitingManager: 0 };
-  for (const c of clients) {
-    t.total += c.stats.totalTasks;
-    t.outstanding += c.stats.outstandingTasks;
-    t.inProgress += c.stats.inProgressTasks;
-    t.overdue += c.stats.overdueTasks;
-    t.stuck += c.stats.blockedTasks;
-    t.completed += c.stats.completedTasks;
-    t.awaitingManager += c.stats.awaitingManager || 0;
+  const today = localDateStr(new Date());
+  let outstanding = 0, inProgress = 0, overdue = 0, waiting = 0, inbox = 0;
+  for (const c of clients) for (const t of (c.tasks || [])) {
+    if (!isOpenTask(t)) continue;
+    outstanding++;
+    if (t.task_status === 'in-progress') inProgress++;
+    if (t.task_status === 'waiting-on-client' || t.task_status === 'waiting-on-me') waiting++;
+    if (t.task_status === 'inbox') inbox++;
+    if (t.deadline && t.deadline < today) overdue++;
   }
   document.getElementById('statsBar').innerHTML = `
-    <div class="stat-card" onclick="showStatPopup('outstanding')"><div class="stat-number">${t.outstanding}</div><div class="stat-label">Outstanding</div></div>
-    <div class="stat-card" onclick="showStatPopup('in-progress')"><div class="stat-number">${t.inProgress}</div><div class="stat-label">In Progress</div></div>
-    <div class="stat-card" onclick="showStatPopup('overdue')"><div class="stat-number">${t.overdue}</div><div class="stat-label">Overdue</div></div>
-    <div class="stat-card" onclick="showStatPopup('stuck')"><div class="stat-number">${t.stuck}</div><div class="stat-label">Stuck</div></div>
-    <div class="stat-card ${t.awaitingManager?'stat-awaiting':''}" onclick="showStatPopup('awaiting-manager')"><div class="stat-number" style="color:${t.awaitingManager?'var(--danger)':'var(--text-secondary)'}">${t.awaitingManager}</div><div class="stat-label" style="color:${t.awaitingManager?'var(--danger)':'var(--text-secondary)'}">Awaiting You</div></div>`;
+    <div class="stat-card" onclick="showStatPopup('outstanding')"><div class="stat-number">${outstanding}</div><div class="stat-label">Outstanding</div></div>
+    <div class="stat-card" onclick="showStatPopup('in-progress')"><div class="stat-number">${inProgress}</div><div class="stat-label">In Progress</div></div>
+    <div class="stat-card" onclick="showStatPopup('overdue')"><div class="stat-number" style="color:${overdue?'var(--danger)':'var(--text-secondary)'}">${overdue}</div><div class="stat-label">Overdue</div></div>
+    <div class="stat-card" onclick="showStatPopup('waiting')"><div class="stat-number">${waiting}</div><div class="stat-label">Waiting</div></div>
+    <div class="stat-card" onclick="showStatPopup('inbox')"><div class="stat-number">${inbox}</div><div class="stat-label">Inbox</div></div>`;
 }
 
 function showStatPopup(type) {
-  const titles = {'outstanding':'Outstanding Tasks','in-progress':'In Progress','overdue':'Overdue Tasks','stuck':'Stuck Tasks','completed':'Completed Tasks','awaiting-manager':'Awaiting Your Sign-off'};
+  const titles = {'outstanding':'Outstanding Tasks','in-progress':'In Progress','overdue':'Overdue Tasks','waiting':'Waiting','inbox':'Inbox','completed':'Completed Tasks'};
   document.getElementById('statsModalTitle').textContent = titles[type]||'Tasks';
   const now = localDateStr(new Date());
   const items = [];
   for (const c of clients) for (const task of c.tasks) {
     let m = false;
-    if (type==='outstanding' && task.progress!=='completed' && task.progress!=='invoiced') m=true;
-    if (type==='in-progress' && task.progress==='in-progress') m=true;
-    if (type==='completed' && (task.progress==='completed'||task.progress==='invoiced')) m=true;
-    if (type==='overdue' && task.deadline && task.deadline<now && task.progress!=='completed' && task.progress!=='invoiced') m=true;
-    if (type==='stuck' && task.progress==='stuck') m=true;
-    if (type==='awaiting-manager' && task.progress==='awaiting-manager') m=true;
+    if (type==='outstanding' && isOpenTask(task)) m=true;
+    if (type==='in-progress' && task.task_status==='in-progress') m=true;
+    if (type==='completed' && task.task_status==='done') m=true;
+    if (type==='overdue' && task.deadline && task.deadline<now && isOpenTask(task)) m=true;
+    if (type==='waiting' && (task.task_status==='waiting-on-client'||task.task_status==='waiting-on-me')) m=true;
+    if (type==='inbox' && task.task_status==='inbox') m=true;
     if (m) items.push({task,client:c});
   }
   const ct = document.getElementById('statsModalContent');
@@ -694,7 +694,7 @@ function showStatPopup(type) {
           <div style="font-size:11px;color:var(--text-secondary)">${esc(client.name)}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
-          <span class="status-badge status-${task.progress}">${progressLabel(task.progress)}</span>
+          <span class="status-badge status-${task.task_status}">${statusLabel(task.task_status)}</span>
           ${task.deadline?`<span style="font-size:11px" class="${getDeadlineClass(task.deadline,task.progress)}">${fmtDate(task.deadline)}</span>`:''}
         </div>
       </div>`).join('');
@@ -819,14 +819,14 @@ function renderWorkloadDetailTasks(data, ct, category) {
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer" onclick="closeModal('workloadDetailModal');setTimeout(()=>editTask(${t.id}),200)">
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:6px">
-            <span class="priority-badge priority-${t.priority}"></span>
+            ${t.task_band?`<span class="band-badge ${bandClass(t.task_band)}">${bandLabel(t.task_band)}</span>`:''}
             <span style="font-weight:600;font-size:13px">${esc(t.title)}</span>
           </div>
           <div style="font-size:11px;color:var(--text-secondary)">${t.client_code ? '[' + esc(t.client_code) + '] ' : ''}${esc(t.client_name)}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
           ${t.estimated_hours ? `<span style="font-size:12px;color:var(--text-secondary)">${t.estimated_hours}h</span>` : ''}
-          <span class="status-badge status-${t.progress}">${progressLabel(t.progress)}</span>
+          <span class="status-badge status-${t.task_status}">${statusLabel(t.task_status)}</span>
           ${t.deadline || t.planned_date ? `<span style="font-size:11px;color:var(--text-secondary)">${fmtDate(t.planned_date || t.deadline)}</span>` : ''}
         </div>
       </div>
