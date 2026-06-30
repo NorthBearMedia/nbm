@@ -2312,6 +2312,38 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .cb-stat-workload { background:rgba(62,175,132,0.10); color:var(--primary); }
 .cb-value-type { color:var(--text-secondary); background:var(--bg-glass); border-color:var(--border); }
 
+/* ─── FOCUS TIMER ─────────────────────────────────────── */
+.focus-timer { display:flex; align-items:center; gap:6px; background:rgba(62,175,132,0.12); border:1px solid rgba(62,175,132,0.4); border-radius:999px; padding:4px 6px 4px 12px; }
+.focus-timer .ft-task { font-size:11px; color:var(--text-secondary); max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.focus-timer .ft-time { font-family:var(--font-heading); font-weight:700; font-size:15px; color:var(--primary); font-variant-numeric:tabular-nums; min-width:46px; text-align:center; }
+.ft-btn { width:22px; height:22px; border:none; border-radius:50%; background:rgba(255,255,255,0.08); color:var(--text-secondary); font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.ft-btn:hover { background:rgba(255,255,255,0.18); color:var(--text); }
+.ft-done:hover { background:rgba(62,175,132,0.3); color:var(--primary); }
+.ft-stop:hover { background:rgba(220,50,50,0.25); color:#e44; }
+.focus-timer.ft-paused { background:rgba(255,255,255,0.06); border-color:var(--border); }
+.focus-timer.ft-paused .ft-time { color:var(--text-secondary); }
+.focus-timer.ft-warn { background:rgba(230,160,30,0.15); border-color:rgba(230,160,30,0.5); }
+.focus-timer.ft-warn .ft-time { color:#e6a020; }
+.focus-timer.ft-urgent { background:rgba(220,50,50,0.18); border-color:rgba(220,50,50,0.6); animation:ft-pulse 1s ease-in-out infinite; }
+.focus-timer.ft-urgent .ft-time { color:#ff6b6b; }
+.focus-timer.ft-over { background:rgba(220,50,50,0.28); border-color:#e4484a; animation:ft-pulse 0.7s ease-in-out infinite; }
+.focus-timer.ft-over .ft-time { color:#fff; }
+@keyframes ft-pulse { 0%,100%{ box-shadow:0 0 0 0 rgba(220,50,50,0.5); } 50%{ box-shadow:0 0 0 6px rgba(220,50,50,0); } }
+
+.focus-start { position:absolute; top:calc(100% + 8px); right:0; width:240px; background:rgba(30,28,29,0.98); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); padding:14px; z-index:1000; display:none; }
+.focus-start.open { display:block; }
+.fs-title { font-weight:700; font-size:13px; margin-bottom:10px; color:var(--text); }
+.focus-start input[type=text], .focus-start input[type=number] { width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); padding:8px 10px; color:var(--text); font-size:13px; font-family:inherit; outline:none; }
+.fs-presets { display:flex; gap:6px; margin:10px 0; }
+.fs-presets button { flex:1; background:var(--bg-glass); border:1px solid var(--border); border-radius:var(--radius); padding:6px 0; color:var(--text-secondary); font-size:12px; cursor:pointer; font-family:inherit; }
+.fs-presets button:hover { border-color:rgba(62,175,132,0.5); color:var(--text); }
+.fs-custom { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+.fs-custom label { font-size:12px; color:var(--text-secondary); }
+.fs-custom input { flex:1; }
+.fs-go { width:100%; }
+.bp-focus:hover { background:rgba(62,175,132,0.2); color:var(--primary); }
+@media (max-width:700px){ .focus-timer .ft-task { display:none; } }
+
 /* ─── Dark filter dropdowns ───────────────────────────── */
 .filter-select, select.filter-select {
   background:var(--bg-glass);

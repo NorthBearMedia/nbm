@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>North Bear Console</title>
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=61">
+  <link rel="stylesheet" href="styles.css?v=62">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -29,6 +29,31 @@
       <button class="nav-tab" data-view="email" id="emailNavTab" style="display:none"><span class="nav-icon">&#9993;</span> Email</button>
     </div>
     <div class="nav-right">
+      <!-- Focus countdown pill (hidden until a session starts) -->
+      <div id="focusTimer" class="focus-timer" style="display:none">
+        <span class="ft-task" id="ftTask" onclick="focusOpenTask()" title="Open the task you're focusing on"></span>
+        <span class="ft-time" id="ftTime">25:00</span>
+        <button class="ft-btn" id="ftPause" onclick="focusTogglePause()" title="Pause / resume">&#10073;&#10073;</button>
+        <button class="ft-btn" onclick="focusAdd(5)" title="Add 5 minutes">+5</button>
+        <button class="ft-btn ft-done" onclick="focusComplete()" title="Mark done &amp; stop">&#10003;</button>
+        <button class="ft-btn ft-stop" onclick="focusStop()" title="Stop timer">&times;</button>
+      </div>
+      <!-- Focus launcher -->
+      <div class="focus-wrap" style="position:relative">
+        <button class="nav-action" id="focusBtn" title="Start a focus timer" onclick="toggleFocusStart(event)">&#9201;</button>
+        <div class="focus-start" id="focusStartPanel">
+          <div class="fs-title">&#9201; Focus timer</div>
+          <input type="text" id="fsLabel" placeholder="What are you working on?">
+          <div class="fs-presets">
+            <button type="button" onclick="fsSetMins(15)">15m</button>
+            <button type="button" onclick="fsSetMins(25)">25m</button>
+            <button type="button" onclick="fsSetMins(45)">45m</button>
+            <button type="button" onclick="fsSetMins(60)">60m</button>
+          </div>
+          <div class="fs-custom"><label for="fsMins">Minutes</label><input type="number" id="fsMins" min="1" max="240" value="25"></div>
+          <button class="btn btn-primary btn-sm fs-go" onclick="focusStartFromPanel()">Start focus &#9654;</button>
+        </div>
+      </div>
       <div class="search-container" style="position:relative">
         <input type="text" id="taskSearch" placeholder="Search tasks (e.g. NB001)..." style="background:var(--bg-glass);border:1px solid var(--border);border-radius:var(--radius);padding:8px 14px;font-size:12px;color:var(--text);width:200px;outline:none;font-family:inherit">
         <div id="searchResults" style="display:none;position:absolute;top:100%;right:0;margin-top:8px;width:450px;max-height:400px;overflow-y:auto;background:rgba(45,41,42,0.97);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);z-index:999"></div>
@@ -582,6 +607,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=61"></script>
+  <script src="app.js?v=62"></script>
 </body>
 </html>

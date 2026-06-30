@@ -115,6 +115,165 @@ document.addEventListener('click', (e) => {
   }
 });
 
+// ─── Focus Timer ────────────────────────────────────────
+// A persistent top-bar countdown. Set a duration, watch it tick down (with
+// escalating urgency colours), survives view switches and page reloads.
+let focusState = null;          // { label, taskId, endTs, paused, remainingMs, dinged }
+let focusInterval = null;
+let focusPendingTaskId = null;
+let focusAudioCtx = null;
+
+function focusFmt(ms) {
+  const neg = ms < 0;
+  let s = Math.round(Math.abs(ms) / 1000);
+  const m = Math.floor(s / 60);
+  return (neg ? '+' : '') + m + ':' + String(s % 60).padStart(2, '0');
+}
+
+function focusRemaining() {
+  if (!focusState) return 0;
+  return focusState.paused ? focusState.remainingMs : focusState.endTs - Date.now();
+}
+
+function persistFocus() {
+  if (focusState) localStorage.setItem('nbm_focus', JSON.stringify(focusState));
+  else localStorage.removeItem('nbm_focus');
+}
+
+function startFocus(label, minutes, taskId) {
+  const total = Math.max(1, Math.min(240, minutes || 25)) * 60000;
+  focusState = { label: label || 'Focus session', taskId: taskId || null, endTs: Date.now() + total, paused: false, remainingMs: total, dinged: false };
+  persistFocus();
+  // Unlock audio on this user gesture so the end chime can play later.
+  try { focusAudioCtx = focusAudioCtx || new (window.AudioContext || window.webkitAudioContext)(); } catch {}
+  // Focusing a task moves it to In Progress (single-tasking reinforcement).
+  if (taskId) {
+    api(`/api/tasks/${taskId}`, { method: 'PUT', body: { task_status: 'in-progress' } })
+      .then(() => { if (currentView === 'dashboard') loadDashboard(); }).catch(() => {});
+  }
+  document.getElementById('focusStartPanel')?.classList.remove('open');
+  renderFocusPill();
+  clearInterval(focusInterval);
+  focusInterval = setInterval(focusTick, 250);
+  focusTick();
+}
+
+function renderFocusPill() {
+  const pill = document.getElementById('focusTimer');
+  if (!pill) return;
+  if (!focusState) { pill.style.display = 'none'; return; }
+  pill.style.display = '';
+  const taskEl = document.getElementById('ftTask');
+  taskEl.textContent = focusState.label;
+  taskEl.style.cursor = focusState.taskId ? 'pointer' : 'default';
+  document.getElementById('ftPause').innerHTML = focusState.paused ? '&#9654;' : '&#10073;&#10073;';
+}
+
+function focusTick() {
+  if (!focusState) return;
+  const rem = focusRemaining();
+  const pill = document.getElementById('focusTimer');
+  document.getElementById('ftTime').textContent = focusFmt(rem);
+  pill.classList.toggle('ft-paused', focusState.paused);
+  pill.classList.toggle('ft-warn', !focusState.paused && rem <= 300000 && rem > 60000);
+  pill.classList.toggle('ft-urgent', !focusState.paused && rem <= 60000 && rem > 0);
+  pill.classList.toggle('ft-over', rem <= 0);
+  document.title = (rem <= 0 ? '⏰ ' : '⏱ ') + focusFmt(rem) + ' · ' + (focusState.label || 'Focus');
+  if (rem <= 0 && !focusState.dinged) { focusState.dinged = true; persistFocus(); focusChime(); }
+}
+
+function focusTogglePause() {
+  if (!focusState) return;
+  if (focusState.paused) { focusState.endTs = Date.now() + focusState.remainingMs; focusState.paused = false; }
+  else { focusState.remainingMs = focusRemaining(); focusState.paused = true; }
+  persistFocus(); renderFocusPill(); focusTick();
+}
+
+function focusAdd(mins) {
+  if (!focusState) return;
+  if (focusState.paused) focusState.remainingMs += mins * 60000;
+  else focusState.endTs += mins * 60000;
+  focusState.dinged = false;
+  persistFocus(); focusTick();
+}
+
+function focusStop() {
+  clearInterval(focusInterval); focusInterval = null;
+  focusState = null; persistFocus();
+  document.getElementById('focusTimer').style.display = 'none';
+  document.title = 'North Bear Console';
+}
+
+function focusComplete() {
+  const id = focusState?.taskId;
+  if (id) {
+    api(`/api/tasks/${id}`, { method: 'PUT', body: { task_status: 'done' } })
+      .then(() => { try { celebrate(); } catch {} ; loadClients(); }).catch(() => {});
+  }
+  focusStop();
+}
+
+function focusOpenTask() { if (focusState?.taskId) editTask(focusState.taskId); }
+
+function focusChime() {
+  try {
+    const ctx = focusAudioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.25, 0.5].forEach((t, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = 880 - i * 110; o.type = 'sine';
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + t);
+      g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.22);
+      o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.24);
+    });
+  } catch {}
+}
+
+// Start panel
+function toggleFocusStart(e) {
+  if (e) e.stopPropagation();
+  const p = document.getElementById('focusStartPanel');
+  p.classList.toggle('open');
+  if (p.classList.contains('open')) { focusPendingTaskId = null; setTimeout(() => document.getElementById('fsLabel').focus(), 30); }
+}
+function fsSetMins(m) { document.getElementById('fsMins').value = m; document.getElementById('fsMins').focus(); }
+function focusStartFromPanel() {
+  const label = document.getElementById('fsLabel').value.trim() || 'Focus session';
+  const mins = parseInt(document.getElementById('fsMins').value) || 25;
+  startFocus(label, mins, focusPendingTaskId);
+  focusPendingTaskId = null;
+}
+// Launch the start panel pre-filled for a specific task (e.g. from the Battle Plan).
+function focusForTask(id) {
+  const t = findTaskById(id);
+  if (!t) return;
+  focusPendingTaskId = id;
+  document.getElementById('fsLabel').value = t.title;
+  const est = t.estimated_hours ? Math.round(t.estimated_hours * 60) : 25;
+  document.getElementById('fsMins').value = est || 25;
+  document.getElementById('focusStartPanel').classList.add('open');
+  setTimeout(() => document.getElementById('fsMins').focus(), 30);
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.focus-wrap') && !e.target.closest('.focus-start')) {
+    document.getElementById('focusStartPanel')?.classList.remove('open');
+  }
+});
+
+function restoreFocus() {
+  try {
+    const s = JSON.parse(localStorage.getItem('nbm_focus'));
+    if (!s) return;
+    focusState = s;
+    renderFocusPill();
+    clearInterval(focusInterval);
+    focusInterval = setInterval(focusTick, 250);
+    focusTick();
+  } catch {}
+}
+restoreFocus();
+
 function updateClientFilterDropdown() {
   const sel = document.getElementById('clientFilter');
   if (!sel) return;
@@ -292,6 +451,7 @@ function renderBattlePlan() {
       ${est ? `<span class="bp-est">${est}</span>` : ''}
       <span class="bp-sub">${esc(t.client_name || '')}</span>
       <span class="bp-actions">
+        <button class="bp-act bp-focus" title="Start focus timer" onclick="event.stopPropagation();focusForTask(${t.id})">&#9201;</button>
         <button class="bp-act bp-done" title="Mark done" onclick="event.stopPropagation();bpDone(${t.id})">&#10003;</button>
         <select class="bp-resched" title="Reschedule" onchange="bpReschedule(${t.id}, this.value)" onclick="event.stopPropagation()">
           <option value="">&#8986;</option>
