@@ -70,10 +70,20 @@ export function buildInjectorScript(rootDir, snippet) {
   );
 }
 
-// The short cron command: fetch the injector script from Pulse and run it.
-// Well under Hostinger's 255-char limit. Tries curl, falls back to wget.
-export function buildCronCommand(scriptUrl) {
-  return `curl -fsSL '${scriptUrl}' 2>/dev/null | sh || wget -qO- '${scriptUrl}' 2>/dev/null | sh`;
+// Where the fetched injector script is staged on the host — the account's
+// home directory (always writable), never inside public_html.
+export const stagePathFor = domain => `/home/${HOSTINGER_USER}/nbm-ix-${domain}.sh`;
+
+// The cron commands. Hostinger runs cron commands WITHOUT a shell — a
+// pipeline here reached curl as literal argv ("option -qO-: is unknown")
+// and stderr redirects were ignored — so each command must be a single
+// program invocation with zero shell metacharacters: no pipes, quotes,
+// redirects or ||. Two crons per site: one downloads the injector script,
+// the other runs it. sh fails harmlessly for the minute or two until the
+// download lands; both crons are deleted once the tag verifies.
+export function buildCronCommands(scriptUrl, domain) {
+  const stage = stagePathFor(domain);
+  return [`curl -fsS -o ${stage} ${scriptUrl}`, `sh ${stage}`];
 }
 
 export async function listCrons(username) {
@@ -81,10 +91,12 @@ export async function listCrons(username) {
   return Array.isArray(list) ? list : (list.data || []);
 }
 
-// An injector cron is recognisable by the /ix/ script URL and its domain.
+// An injector cron is recognisable by the /ix/ script URL (downloader) or
+// the nbm-ix- staging path (runner), plus its domain.
 function isInjectCron(job, domain) {
   const cmd = job.command || '';
-  return cmd.includes('/ix/') && (!domain || cmd.includes(`/${domain}`));
+  if (!cmd.includes('/ix/') && !cmd.includes('nbm-ix-')) return false;
+  return !domain || cmd.includes(domain);
 }
 
 export async function deleteInjectCrons(username, domain = null) {
@@ -99,25 +111,44 @@ export async function deleteInjectCrons(username, domain = null) {
   return removed;
 }
 
-// Ensure a one-shot-ish injector cron exists for this site. We DON'T wait
-// for it here — Hostinger can take several minutes to activate a new cron.
+// Ensure the injector cron pair exists for this site. We DON'T wait for
+// them here — Hostinger can take several minutes to activate a new cron.
 // A background pass (verifyPendingInjections) confirms via the live page and
-// then removes the cron. Returns immediately after ensuring the cron exists.
+// then removes the crons. Returns immediately after ensuring they exist.
 export async function ensureInjectCron({ username, domain, scriptUrl }) {
-  const command = buildCronCommand(scriptUrl);
-  const existing = (await listCrons(username).catch(() => [])).find(j => isInjectCron(j, domain));
-  if (existing) return { uid: existing.uid || existing.id, created: false };
-  const created = await hg(`/api/hosting/v1/accounts/${username}/cron-jobs`, 'POST', { time: '* * * * *', command });
-  return { uid: created?.uid || created?.id || created?.data?.uid || null, created: true };
+  const existing = await listCrons(username).catch(() => []);
+  let created = 0;
+  for (const command of buildCronCommands(scriptUrl, domain)) {
+    // Dedupe by program + staging path rather than the exact string, in
+    // case Hostinger normalizes whitespace when storing commands.
+    const prog = command.split(' ')[0];
+    const dup = existing.some(j => {
+      const c = (j.command || '').trim();
+      return c.startsWith(prog + ' ') && c.includes(`nbm-ix-${domain}.sh`);
+    });
+    if (dup) continue;
+    await hg(`/api/hosting/v1/accounts/${username}/cron-jobs`, 'POST', { time: '* * * * *', command });
+    created++;
+  }
+  return { created };
 }
 
-// Best-effort read of an inject cron's last captured output (diagnostics).
+// Best-effort read of the inject crons' last captured output (diagnostics).
+// Labels each piece with the program it came from ([curl] download step,
+// [sh] injector run).
 export async function injectCronOutput(username, domain) {
   try {
-    const job = (await listCrons(username)).find(j => isInjectCron(j, domain));
-    if (!job) return '(no inject cron present)';
-    const out = await hg(`/api/hosting/v1/accounts/${username}/cron-jobs/${job.uid || job.id}/output`);
-    return (typeof out === 'string' ? out : (out.output || out.data || JSON.stringify(out))) || '(empty)';
+    const jobs = (await listCrons(username)).filter(j => isInjectCron(j, domain));
+    if (!jobs.length) return '(no inject cron present)';
+    const parts = [];
+    for (const job of jobs) {
+      try {
+        const out = await hg(`/api/hosting/v1/accounts/${username}/cron-jobs/${job.uid || job.id}/output`);
+        const text = (typeof out === 'string' ? out : (out.output || out.data || JSON.stringify(out))) || '(empty)';
+        parts.push(`[${(job.command || '?').split(' ')[0]}] ${text.trim() || '(empty)'}`);
+      } catch { /* ignore */ }
+    }
+    return parts.join(' • ') || '(no output captured)';
   } catch (e) { return '(output unavailable: ' + e.message.slice(0, 80) + ')'; }
 }
 
