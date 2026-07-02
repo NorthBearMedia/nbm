@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>North Bear Console</title>
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=64">
+  <link rel="stylesheet" href="styles.css?v=65">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&family=Caveat:wght@500;600&display=swap" rel="stylesheet">
 </head>
 <body>
   <nav class="navbar">
@@ -20,6 +20,7 @@
     </div>
     <div class="nav-center">
       <button class="nav-tab active" data-view="dashboard"><span class="nav-icon">&#9670;</span> Dashboard</button>
+      <button class="nav-tab" data-view="notebook"><span class="nav-icon">&#128211;</span> Notebook</button>
       <button class="nav-tab" data-view="inbox"><span class="nav-icon">&#128229;</span> Inbox <span id="inboxCount" class="nav-count" style="display:none"></span></button>
       <button class="nav-tab" data-view="clients"><span class="nav-icon">&#9783;</span> Tasks</button>
       <button class="nav-tab" data-view="planning"><span class="nav-icon">&#128467;</span> Planning</button>
@@ -351,6 +352,22 @@
       </div>
     </div>
 
+    <!-- Notebook View — the paper day-book -->
+    <div id="notebookView" style="display:none">
+      <div class="nb-paper">
+        <div class="nb-header">
+          <span class="nb-title">day book</span>
+          <span id="nbDate" class="nb-date"></span>
+        </div>
+        <div id="notebookLines"></div>
+        <div class="nb-line nb-new">
+          <span class="nb-bullet" style="opacity:.35">&bull;</span>
+          <input id="nbNewTask" type="text" placeholder="write a task, press Enter..." autocomplete="off" onkeydown="if(event.key==='Enter'){nbQuickAdd()}">
+        </div>
+        <div class="nb-legend">tap &bull; to tick off &middot; tap the marker to highlight for today</div>
+      </div>
+    </div>
+
     <!-- Planning View -->
     <div id="planningView" style="display:none">
       <div class="planning-wrap">
@@ -626,6 +643,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=64"></script>
+  <script src="app.js?v=65"></script>
 </body>
 </html>

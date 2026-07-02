@@ -76,6 +76,8 @@ async function loadClients() {
     loadInboxView();
   } else if (currentView === 'planning') {
     loadPlanningView();
+  } else if (currentView === 'notebook') {
+    loadNotebookView();
   }
 }
 
@@ -290,7 +292,7 @@ function updatePersonFilter() {
 
 // ─── View Switching ─────────────────────────────────────
 function applyViewVisibility() {
-  const views = { dashboard: 'dashboardView', inbox: 'inboxView', clients: 'clientsView', today: 'todayView', planning: 'planningView', calendar: 'calendarView', focus: 'focusView', email: 'emailView' };
+  const views = { dashboard: 'dashboardView', notebook: 'notebookView', inbox: 'inboxView', clients: 'clientsView', today: 'todayView', planning: 'planningView', calendar: 'calendarView', focus: 'focusView', email: 'emailView' };
   for (const [v, id] of Object.entries(views)) {
     const el = document.getElementById(id);
     if (el) el.style.display = currentView === v ? '' : 'none';
@@ -310,6 +312,7 @@ function switchView(view) {
   try { localStorage.setItem('nbm_view', view); } catch {}
   applyViewVisibility();
   if (view === 'dashboard') loadDashboard();
+  if (view === 'notebook') loadNotebookView();
   if (view === 'inbox') loadInboxView();
   if (view === 'clients') renderClients();
   if (view === 'today') loadTodayView();
@@ -999,6 +1002,65 @@ async function quickAddInbox() {
   await loadClients();
   loadInboxView();
   titleEl.focus();
+}
+
+// ─── Notebook (paper day-book) ──────────────────────────
+// A faithful skin over the same tasks: bullets in ink, tick = done,
+// highlighter = today band. Lines appear in the order they were written.
+function loadNotebookView() {
+  const el = document.getElementById('notebookLines');
+  if (!el) return;
+  const today = localDateStr(new Date());
+  document.getElementById('nbDate').textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  const items = allTasksFlat()
+    .filter(t => isOpenTask(t) || (t.task_status === 'done' && (t.completed_at || '') === today))
+    .sort((a, b) => a.id - b.id);
+  if (!items.length) {
+    el.innerHTML = '<div class="nb-empty">a blank page. write something below&hellip;</div>';
+    return;
+  }
+  el.innerHTML = items.map(t => {
+    const done = t.task_status === 'done';
+    const hl = t.task_band === 'today' && !done;
+    const client = t.client_name && !t.client_is_system ? `<span class="nb-client">&nbsp;&mdash; ${esc(t.client_name)}</span>` : '';
+    return `<div class="nb-line ${done ? 'nb-done' : ''}">
+      <button class="nb-bullet ${done ? 'nb-ticked' : ''}" onclick="nbTick(${t.id})" title="${done ? 'Untick' : 'Tick off'}">${done ? '&#10003;' : '&bull;'}</button>
+      <span class="nb-text"><span class="${hl ? 'nb-hl' : ''}" onclick="editTask(${t.id})" title="Open task">${esc(t.title)}</span>${client}</span>
+      <button class="nb-marker ${hl ? 'nb-marker-on' : ''}" onclick="nbHighlight(${t.id})" title="${hl ? 'Remove today highlight' : 'Highlight for today'}"></button>
+    </div>`;
+  }).join('');
+}
+
+async function nbTick(id) {
+  const t = findTaskById(id);
+  if (!t) return;
+  const done = t.task_status === 'done';
+  try {
+    await api(`/api/tasks/${id}`, { method: 'PUT', body: { task_status: done ? 'scheduled' : 'done' } });
+    if (!done) { try { celebrate(); } catch {} }
+    await loadClients();
+  } catch {}
+}
+
+async function nbHighlight(id) {
+  const t = findTaskById(id);
+  if (!t) return;
+  try {
+    await api(`/api/tasks/${id}`, { method: 'PUT', body: { task_band: t.task_band === 'today' ? 'scheduled' : 'today' } });
+    await loadClients();
+  } catch {}
+}
+
+async function nbQuickAdd() {
+  const inp = document.getElementById('nbNewTask');
+  const title = inp.value.trim();
+  if (!title) return;
+  try {
+    await api('/api/tasks', { method: 'POST', body: { title, task_status: 'inbox' } });
+    inp.value = '';
+    await loadClients();
+    inp.focus();
+  } catch {}
 }
 
 // ─── Weekly Planning ────────────────────────────────────
