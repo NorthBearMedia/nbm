@@ -3029,3 +3029,56 @@ select { color-scheme:dark; }
   .nb-paper::before { left:38px; }
   .nb-marker { opacity:.45; } /* no hover on touch — keep the marker reachable */
 }
+
+/* ─── NOTEBOOK v2: self-hosted ink + pages/tabs ──────── */
+@font-face { font-family:'Caveat'; font-style:normal; font-weight:500; font-display:swap; src:url('/fonts/caveat-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family:'Caveat'; font-style:normal; font-weight:600; font-display:swap; src:url('/fonts/caveat-latin-600-normal.woff2') format('woff2'); }
+
+.nb-wrap { max-width: 860px; margin: 0 auto; }
+
+/* Phase-shift the ruled lines so the ink baseline sits ON the rule
+   (tuned to Caveat metrics at 23px type in a 34px line). */
+.nb-paper { background-position: 0 25px, 0 0; }
+
+/* sticky index tabs peeking over the page edge */
+.nb-tabs { display:flex; gap:6px; padding: 0 24px 0 70px; overflow-x:auto; scrollbar-width:none; }
+.nb-tabs::-webkit-scrollbar { display:none; }
+.nb-tab {
+  font-family:'Caveat',cursive; font-size:17px; font-weight:600; color:rgba(28,28,28,.75);
+  border:1px solid rgba(28,28,28,.18); border-bottom:none; border-radius:7px 7px 0 0;
+  padding:5px 14px 9px; cursor:pointer; white-space:nowrap;
+  transform:translateY(5px); opacity:.72; transition:transform .12s, opacity .12s;
+}
+.nb-tab:nth-child(1) { background:#efe3bd; }
+.nb-tab:nth-child(2) { background:#f6e08a; }
+.nb-tab:nth-child(3) { background:#cfe3c2; }
+.nb-tab:nth-child(4) { background:#d9d2ec; }
+.nb-tab:nth-child(5) { background:#e9c9c0; }
+.nb-tab:hover { transform:translateY(2px); opacity:.9; }
+.nb-tab-active { transform:translateY(0); opacity:1; box-shadow:0 -3px 8px rgba(0,0,0,.18); font-weight:600; }
+
+.nb-filedunder { font-family:'Caveat',cursive; font-size:19px; color:rgba(28,28,28,.55); line-height:34px; }
+.nb-client-select {
+  font-family:'Caveat',cursive; font-size:20px; font-weight:600; color:#1c1c1c;
+  background:transparent; border:none; border-bottom:1px dashed rgba(28,28,28,.4);
+  outline:none; cursor:pointer; padding:0 2px; max-width:220px;
+}
+.nb-client-select option { font-family:inherit; font-size:15px; color:#1c1c1c; background:#faf6ec; }
+
+.nb-subheader { display:flex; justify-content:space-between; align-items:baseline; line-height:34px; height:34px; }
+.nb-page-title { font-family:'Caveat',cursive; font-size:23px; font-weight:600; color:#1c1c1c; text-decoration:underline wavy rgba(28,28,28,.25) 1px; text-underline-offset:6px; }
+.nb-order {
+  font-family:'Caveat',cursive; font-size:17px; color:rgba(28,28,28,.5);
+  background:transparent; border:none; border-bottom:1px dashed rgba(28,28,28,.3);
+  cursor:pointer; padding:0 2px; line-height:26px;
+}
+.nb-order:hover { color:#1c1c1c; }
+
+.nb-client { line-height:inherit; }
+.nb-due { font-size:17px; color:#b3372f; line-height:inherit; }
+.nb-footer { font-family:'Caveat',cursive; font-size:18px; color:rgba(28,28,28,.45); line-height:34px; margin-top:34px; }
+
+@media (max-width:600px) {
+  .nb-tabs { padding-left:52px; }
+  .nb-client-select { max-width:150px; }
+}

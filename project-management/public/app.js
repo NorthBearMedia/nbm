@@ -1006,26 +1006,100 @@ async function quickAddInbox() {
 
 // ─── Notebook (paper day-book) ──────────────────────────
 // A faithful skin over the same tasks: bullets in ink, tick = done,
-// highlighter = today band. Lines appear in the order they were written.
+// highlighter = today band. Pages (tabs), a client filter and a written/due
+// ordering toggle — all persisted, all still the same canonical data.
+let nbTab = localStorage.getItem('nbm_nb_tab') || 'all';
+let nbClient = localStorage.getItem('nbm_nb_client') || '';
+let nbOrder = localStorage.getItem('nbm_nb_order') || 'written';
+
+function nbSetTab(t) { nbTab = t; try { localStorage.setItem('nbm_nb_tab', t); } catch {} loadNotebookView(); }
+function nbSetClient(v) { nbClient = v; try { localStorage.setItem('nbm_nb_client', v); } catch {} loadNotebookView(); }
+function nbToggleOrder() {
+  nbOrder = nbOrder === 'written' ? 'due' : 'written';
+  try { localStorage.setItem('nbm_nb_order', nbOrder); } catch {}
+  loadNotebookView();
+}
+
+const NB_PAGE_TITLES = {
+  all: 'everything on my plate',
+  today: "today's page",
+  week: 'this week',
+  waiting: 'waiting on people',
+  done: 'ticked off lately',
+};
+
 function loadNotebookView() {
   const el = document.getElementById('notebookLines');
   if (!el) return;
   const today = localDateStr(new Date());
   document.getElementById('nbDate').textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
-  const items = allTasksFlat()
-    .filter(t => isOpenTask(t) || (t.task_status === 'done' && (t.completed_at || '') === today))
-    .sort((a, b) => a.id - b.id);
+
+  // Tabs + client dropdown state
+  document.querySelectorAll('#nbTabs .nb-tab').forEach(b => b.classList.toggle('nb-tab-active', b.dataset.nbtab === nbTab));
+  const sel = document.getElementById('nbClientFilter');
+  const realClients = clients.filter(c => !c.is_system && !c.archived).sort((a, b) => a.name.localeCompare(b.name));
+  sel.innerHTML = '<option value="">everyone</option>' + realClients.map(c => `<option value="${c.id}" ${String(c.id) === nbClient ? 'selected' : ''}>${esc(c.name.toLowerCase())}</option>`).join('');
+  document.getElementById('nbPageTitle').textContent = NB_PAGE_TITLES[nbTab] || '';
+  document.getElementById('nbOrderBtn').textContent = nbOrder === 'written' ? 'in the order i wrote them' : 'soonest first';
+
+  // Monday-anchored week window for the "this week" page
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const dow = now.getDay();
+  const ws = new Date(now); ws.setDate(now.getDate() + (dow === 0 ? -6 : 1 - dow));
+  const we = new Date(ws); we.setDate(ws.getDate() + 6);
+  const wsStr = localDateStr(ws), weStr = localDateStr(we);
+  const weekAgo = localDateStr(new Date(now.getTime() - 7 * 864e5));
+  const eff = t => t.planned_date || t.deadline || '';
+
+  let items = allTasksFlat();
+  if (nbClient) items = items.filter(t => String(t.client_id) === nbClient);
+
+  if (nbTab === 'today') {
+    items = items.filter(t =>
+      (isOpenTask(t) && (t.task_band === 'today' || eff(t) === today || (t.deadline && t.deadline < today))) ||
+      (t.task_status === 'done' && (t.completed_at || '') === today));
+  } else if (nbTab === 'week') {
+    items = items.filter(t => isOpenTask(t) &&
+      (t.task_band === 'today' || t.task_band === 'this-week' || (eff(t) >= wsStr && eff(t) <= weStr) || (t.deadline && t.deadline < today)));
+  } else if (nbTab === 'waiting') {
+    items = items.filter(t => t.task_status === 'waiting-on-client' || t.task_status === 'waiting-on-me');
+  } else if (nbTab === 'done') {
+    items = items.filter(t => t.task_status === 'done' && (t.completed_at || '') >= weekAgo);
+  } else {
+    items = items.filter(t => isOpenTask(t) || (t.task_status === 'done' && (t.completed_at || '') === today));
+  }
+
+  if (nbOrder === 'due') {
+    items.sort((a, b) => (eff(a) || '9999') < (eff(b) || '9999') ? -1 : (eff(a) || '9999') > (eff(b) || '9999') ? 1 : a.id - b.id);
+  } else {
+    items.sort((a, b) => a.id - b.id);
+  }
+
+  // Footer note in pencil
+  const openCount = items.filter(isOpenTask).length;
+  const tickedToday = allTasksFlat().filter(t => t.task_status === 'done' && (t.completed_at || '') === today && (!nbClient || String(t.client_id) === nbClient)).length;
+  document.getElementById('nbFooter').textContent =
+    `${openCount} thing${openCount === 1 ? '' : 's'} on this page${tickedToday ? ` · ${tickedToday} ticked off today` : ''}`;
+
+  // Quick-add hint follows the client filter ("writing on that client's page")
+  document.getElementById('nbNewTask').placeholder = nbClient
+    ? `write a task for ${(realClients.find(c => String(c.id) === nbClient)?.name || '').toLowerCase()}, press Enter...`
+    : 'write a task, press Enter...';
+  document.getElementById('nbNewRow').style.display = nbTab === 'done' ? 'none' : '';
+
   if (!items.length) {
-    el.innerHTML = '<div class="nb-empty">a blank page. write something below&hellip;</div>';
+    el.innerHTML = `<div class="nb-empty">${nbTab === 'done' ? 'nothing ticked off yet — go tick something' : 'a blank page. write something below…'}</div>`;
     return;
   }
   el.innerHTML = items.map(t => {
     const done = t.task_status === 'done';
     const hl = t.task_band === 'today' && !done;
+    const overdue = !done && t.deadline && t.deadline < today;
     const client = t.client_name && !t.client_is_system ? `<span class="nb-client">&nbsp;&mdash; ${esc(t.client_name)}</span>` : '';
+    const due = overdue ? `<span class="nb-due">&nbsp;(${relDate(t.deadline)}!)</span>` : '';
     return `<div class="nb-line ${done ? 'nb-done' : ''}">
       <button class="nb-bullet ${done ? 'nb-ticked' : ''}" onclick="nbTick(${t.id})" title="${done ? 'Untick' : 'Tick off'}">${done ? '&#10003;' : '&bull;'}</button>
-      <span class="nb-text"><span class="${hl ? 'nb-hl' : ''}" onclick="editTask(${t.id})" title="Open task">${esc(t.title)}</span>${client}</span>
+      <span class="nb-text"><span class="${hl ? 'nb-hl' : ''}" onclick="editTask(${t.id})" title="Open task">${esc(t.title)}</span>${client}${due}</span>
       <button class="nb-marker ${hl ? 'nb-marker-on' : ''}" onclick="nbHighlight(${t.id})" title="${hl ? 'Remove today highlight' : 'Highlight for today'}"></button>
     </div>`;
   }).join('');
@@ -1055,8 +1129,13 @@ async function nbQuickAdd() {
   const inp = document.getElementById('nbNewTask');
   const title = inp.value.trim();
   if (!title) return;
+  const body = { title, task_status: 'inbox' };
+  // Writing while filtered to a client = writing on that client's page.
+  if (nbClient) body.client_id = +nbClient;
+  // Writing on the "today" page = it's for today.
+  if (nbTab === 'today') body.task_band = 'today';
   try {
-    await api('/api/tasks', { method: 'POST', body: { title, task_status: 'inbox' } });
+    await api('/api/tasks', { method: 'POST', body });
     inp.value = '';
     await loadClients();
     inp.focus();

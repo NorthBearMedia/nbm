@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>North Bear Console</title>
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=65">
+  <link rel="stylesheet" href="styles.css?v=66">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&family=Caveat:wght@500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <nav class="navbar">
@@ -354,17 +354,34 @@
 
     <!-- Notebook View — the paper day-book -->
     <div id="notebookView" style="display:none">
-      <div class="nb-paper">
-        <div class="nb-header">
-          <span class="nb-title">day book</span>
-          <span id="nbDate" class="nb-date"></span>
+      <div class="nb-wrap">
+        <!-- sticky index tabs along the top edge of the page -->
+        <div class="nb-tabs" id="nbTabs">
+          <button class="nb-tab" data-nbtab="all" onclick="nbSetTab('all')">everything</button>
+          <button class="nb-tab" data-nbtab="today" onclick="nbSetTab('today')">today</button>
+          <button class="nb-tab" data-nbtab="week" onclick="nbSetTab('week')">this week</button>
+          <button class="nb-tab" data-nbtab="waiting" onclick="nbSetTab('waiting')">waiting</button>
+          <button class="nb-tab" data-nbtab="done" onclick="nbSetTab('done')">ticked off</button>
         </div>
-        <div id="notebookLines"></div>
-        <div class="nb-line nb-new">
-          <span class="nb-bullet" style="opacity:.35">&bull;</span>
-          <input id="nbNewTask" type="text" placeholder="write a task, press Enter..." autocomplete="off" onkeydown="if(event.key==='Enter'){nbQuickAdd()}">
+        <div class="nb-paper">
+          <div class="nb-header">
+            <span class="nb-filedunder">filed under:
+              <select id="nbClientFilter" class="nb-client-select" onchange="nbSetClient(this.value)"></select>
+            </span>
+            <span id="nbDate" class="nb-date"></span>
+          </div>
+          <div class="nb-subheader">
+            <span id="nbPageTitle" class="nb-page-title"></span>
+            <button id="nbOrderBtn" class="nb-order" onclick="nbToggleOrder()" title="Change ordering"></button>
+          </div>
+          <div id="notebookLines"></div>
+          <div class="nb-line nb-new" id="nbNewRow">
+            <span class="nb-bullet" style="opacity:.35">&bull;</span>
+            <input id="nbNewTask" type="text" placeholder="write a task, press Enter..." autocomplete="off" onkeydown="if(event.key==='Enter'){nbQuickAdd()}">
+          </div>
+          <div class="nb-footer" id="nbFooter"></div>
+          <div class="nb-legend">tap &bull; to tick off &middot; tap the marker to highlight for today</div>
         </div>
-        <div class="nb-legend">tap &bull; to tick off &middot; tap the marker to highlight for today</div>
       </div>
     </div>
 
@@ -643,6 +660,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=65"></script>
+  <script src="app.js?v=66"></script>
 </body>
 </html>
