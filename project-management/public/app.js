@@ -1156,6 +1156,20 @@ function loadNotebookView() {
     : 'Write a task, press Enter…';
   document.getElementById('nbNewRow').style.display = nbTab === 'done' ? 'none' : '';
 
+  // Inline "for: <customer>" picker on the write line. When a client filter is
+  // active the task is already filed under them, so the picker hides; otherwise
+  // it lets you allocate as you write, remembering the last pick for batching.
+  const forWrap = document.getElementById('nbNewForWrap');
+  const newSel = document.getElementById('nbNewClient');
+  if (nbClient) {
+    forWrap.style.display = 'none';
+  } else {
+    forWrap.style.display = '';
+    const remembered = localStorage.getItem('nbm_nb_newclient') || '';
+    newSel.innerHTML = '<option value="">no customer</option>' +
+      realClients.map(c => `<option value="${c.id}" ${String(c.id) === remembered ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+  }
+
   if (!items.length) {
     document.getElementById('nbPageNav').style.display = 'none';
     document.getElementById('nbFooter').textContent = '';
@@ -1219,8 +1233,15 @@ async function nbQuickAdd() {
   const title = inp.value.trim();
   if (!title) return;
   const body = { title, task_status: 'inbox' };
-  // Writing while filtered to a client = writing on that client's page.
-  if (nbClient) body.client_id = +nbClient;
+  // Filter wins ("writing on that client's page"); otherwise use the inline
+  // "for: <customer>" picker and remember it so back-to-back tasks stay allocated.
+  if (nbClient) {
+    body.client_id = +nbClient;
+  } else {
+    const chosen = document.getElementById('nbNewClient')?.value || '';
+    if (chosen) { body.client_id = +chosen; try { localStorage.setItem('nbm_nb_newclient', chosen); } catch {} }
+    else { try { localStorage.removeItem('nbm_nb_newclient'); } catch {} }
+  }
   // Writing on the "today" page = it's for today.
   if (nbTab === 'today') body.task_band = 'today';
   try {

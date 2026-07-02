@@ -3144,3 +3144,12 @@ select { color-scheme:dark; }
 .nb-menu-sep { height:1px; background:rgba(28,28,28,.15); margin:5px 10px; }
 .nb-menu-delete { color:#b3372f; text-decoration:line-through; text-decoration-color:rgba(179,55,47,.5); }
 .nb-menu-delete:hover { background:rgba(179,55,47,.12); }
+
+/* ─── NOTEBOOK v5: inline "for: <customer>" on the write line ── */
+.nb-new-for {
+  flex-shrink:0; display:inline-flex; align-items:baseline; gap:4px;
+  font-family:var(--nb-font,'Caveat'),cursive; font-size:var(--nb-small,17px);
+  color:rgba(28,28,28,.5); white-space:nowrap;
+}
+.nb-new-for .nb-client-select { max-width:170px; font-size:var(--nb-small,17px); }
+@media (max-width:600px){ .nb-new-for .nb-client-select { max-width:110px; } }
