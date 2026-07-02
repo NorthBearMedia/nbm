@@ -59,6 +59,11 @@ export function buildInjectorScript(rootDir, snippet) {
   const awkProg = 'BEGIN{d=0}{if(!d&&index($0,"</head>")>0){sub(/<\\/head>/,s"</head>");d=1}print}';
   return (
     `D='${rootDir}'\n` +
+    // Diagnostic lines land in the captured cron output: distinguish
+    // "no docroot" (builder-hosted site, nothing to edit) and "no .html
+    // files" from a genuine injection pass.
+    `if [ ! -d "$D" ]; then echo "NBM-NO-DOCROOT $D"; exit 0; fi\n` +
+    `echo "NBM-HTML-COUNT $(find "$D" -type f -name '*.html' 2>/dev/null | wc -l)"\n` +
     `S=$(printf %s '${b64}' | base64 -d)\n` +
     `find "$D" -type f -name '*.html' 2>/dev/null | while read f; do\n` +
     `  if grep -q '</head>' "$f" && ! grep -q 'NBM-GA-TAG' "$f"; then\n` +
@@ -89,6 +94,38 @@ export function buildCronCommands(scriptUrl, domain) {
 export async function listCrons(username) {
   const list = await hg(`/api/hosting/v1/accounts/${username}/cron-jobs`);
   return Array.isArray(list) ? list : (list.data || []);
+}
+
+// Generic cron helpers (used by diagnostics like the docroot survey).
+export async function ensureCron(username, command) {
+  const existing = (await listCrons(username).catch(() => [])).find(j => (j.command || '').trim() === command);
+  if (existing) return { uid: existing.uid || existing.id, created: false };
+  const created = await hg(`/api/hosting/v1/accounts/${username}/cron-jobs`, 'POST', { time: '* * * * *', command });
+  return { uid: created?.uid || created?.id || created?.data?.uid || null, created: true };
+}
+
+// Last captured output of the first cron whose command contains `substr`,
+// or null if the cron is missing / has produced no output yet.
+export async function cronOutputMatching(username, substr) {
+  try {
+    const job = (await listCrons(username)).find(j => (j.command || '').includes(substr));
+    if (!job) return null;
+    const out = await hg(`/api/hosting/v1/accounts/${username}/cron-jobs/${job.uid || job.id}/output`);
+    const text = typeof out === 'string' ? out : (out.output || out.data || '');
+    return text && String(text).trim() ? String(text) : null;
+  } catch { return null; }
+}
+
+export async function deleteCronsMatching(username, substr) {
+  let removed = 0;
+  try {
+    for (const job of await listCrons(username)) {
+      if ((job.command || '').includes(substr) && (job.uid || job.id)) {
+        try { await hg(`/api/hosting/v1/accounts/${username}/cron-jobs/${job.uid || job.id}`, 'DELETE'); removed++; } catch { /* ignore */ }
+      }
+    }
+  } catch { /* ignore */ }
+  return removed;
 }
 
 // An injector cron is recognisable by the /ix/ script URL (downloader) or
