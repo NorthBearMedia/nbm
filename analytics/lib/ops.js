@@ -18,12 +18,17 @@ import { googleClient } from './google.js';
 import { getGscReaderEmail, getHostingerToken, getEmailBcc, getSmtp } from './runtime-config.js';
 import { mailer } from './email.js';
 import { getEmailFrom } from './runtime-config.js';
-import { installTag } from './inject.js';
+import { randomBytes } from 'crypto';
+import { installTag, HOSTINGER_USER, rootDirFor } from './inject.js';
+import { getAppUrl } from './runtime-config.js';
 
-// Every North Bear site sits under this Hostinger account; public_html
-// paths follow a fixed shape, confirmed by the website inventory.
-const HOSTINGER_USER = 'u275789987';
-export const rootDirFor = domain => `/home/${HOSTINGER_USER}/domains/${domain}/public_html`;
+// Per-install secret guarding the injector-script endpoint. Created once.
+function injectToken() {
+  let t = getSetting('inject_script_token');
+  if (!t) { t = randomBytes(18).toString('hex'); setSetting('inject_script_token', t); }
+  return t;
+}
+const scriptUrlFor = domain => `${getAppUrl()}/ix/${injectToken()}/${domain}`;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -243,7 +248,7 @@ export async function runInjectionTest() {
   const measurementId = 'G-MS3V4KS3PB';
   let r, err = null;
   try {
-    r = await installTag({ username: HOSTINGER_USER, rootDir: rootDirFor(domain), domain, measurementId });
+    r = await installTag({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain), measurementId });
   } catch (e) { err = e.message; }
   setSetting('inject_demo_done', r?.verified ? 'true' : 'attempted');
   try {
@@ -262,18 +267,37 @@ export async function runInjectionTest() {
 }
 
 // Roll the GA (+ Clarity) tag out to real client sites. Explicit trigger
-// only — never automatic. measurementId per site comes from the DB.
+// only — never automatic. Ensures each site's measurement ID is known
+// (resolved from Google and persisted) before injecting.
 export async function runInjectionRollout({ onlyDomain = null } = {}) {
   const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND domain != ''").all()
     .filter(s => !onlyDomain || (s.domain || '').toLowerCase() === onlyDomain.toLowerCase());
+
+  // Fill any missing measurement IDs from GA4 discovery so both this loop
+  // and the /ix script endpoint have them.
+  let scan = null;
+  try { const { discoverAll } = await import('./discovery.js'); scan = await discoverAll(); } catch { /* offline */ }
+  if (scan) {
+    const { matchForDomain } = await import('./discovery.js');
+    for (const site of sites) {
+      if (site.ga4_measurement_id) continue;
+      const m = matchForDomain(site.domain, scan);
+      if (m.ga4?.measurementId) {
+        db.prepare('UPDATE sites SET ga4_measurement_id = ?, ga4_property_id = CASE WHEN ga4_property_id = "" THEN ? ELSE ga4_property_id END WHERE id = ?')
+          .run(m.ga4.measurementId, m.ga4.propertyId || '', site.id);
+        site.ga4_measurement_id = m.ga4.measurementId;
+      }
+    }
+  }
+
   const results = [];
   for (const site of sites) {
     const domain = (site.domain || '').toLowerCase().replace(/^www\./, '');
     if (!site.ga4_measurement_id) { results.push({ domain, skipped: 'no GA measurement ID on file' }); continue; }
     try {
       const r = await installTag({
-        username: HOSTINGER_USER, rootDir: rootDirFor(domain), domain,
-        measurementId: site.ga4_measurement_id, clarityId: site.clarity_project_id || null,
+        username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain),
+        measurementId: site.ga4_measurement_id,
       });
       results.push({ domain, ran: r.ran, verified: r.verified });
     } catch (e) { results.push({ domain, error: e.message.slice(0, 160) }); }
