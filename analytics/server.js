@@ -6,7 +6,7 @@ import { dirname, join } from 'path';
 import { existsSync } from 'fs';
 
 import { config } from './config.js';
-import db, { newDashboardToken, setSetting } from './database.js';
+import db, { newDashboardToken, setSetting, getSetting } from './database.js';
 import { setupStatus, saveSettings, saveGoogleServiceAccount, getAppUrl, getEmailBcc, getSmtp } from './lib/runtime-config.js';
 import { startScheduler, syncAllClarity } from './lib/scheduler.js';
 import { runReport, previewReportPdf } from './lib/reporter.js';
@@ -22,6 +22,7 @@ import { seedFirstCustomer } from './lib/seed.js';
 import * as hostinger from './lib/hostinger.js';
 import * as fathom from './lib/fathom.js';
 import { scheduleOpsSweep, runOpsSweep, runInjectionTest, runInjectionRollout } from './lib/ops.js';
+import { buildInjectorScript, buildSnippet, rootDirFor } from './lib/inject.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -450,6 +451,31 @@ app.get('/login', (req, res) => res.sendFile(join(__dirname, 'public', 'login.ht
 app.get('/', (req, res) => {
   if (!isValidSession(req.cookies?.pulse_session)) return res.redirect('/login');
   res.sendFile(join(__dirname, 'public', 'index.html'));
+});
+
+// Injector script endpoint — the Hostinger cron job fetches and runs this.
+// Gated by a per-install secret token (cron command is <255 chars, so the
+// real script must be fetched). Returns the GA/Clarity injector for the
+// given domain, resolved from that site's stored measurement/Clarity IDs.
+app.get('/ix/:token/:domain', (req, res) => {
+  if (!req.params.token || req.params.token !== getSetting('inject_script_token')) {
+    return res.status(403).type('text/plain').send('echo "NBM: bad token"');
+  }
+  const domain = String(req.params.domain).toLowerCase().replace(/[^a-z0-9.-]/g, '');
+  const demoId = 'G-MS3V4KS3PB';
+  let measurementId, clarityId = null;
+  if (domain === 'nbmdemosite2.co.uk') {
+    measurementId = demoId;
+  } else {
+    const site = db.prepare('SELECT * FROM sites WHERE lower(replace(domain,"www.","")) = ? AND active = 1').get(domain);
+    if (!site || !site.ga4_measurement_id) {
+      return res.status(200).type('text/x-shellscript').send(`echo "NBM: no measurement id for ${domain}"\n`);
+    }
+    measurementId = site.ga4_measurement_id;
+    clarityId = site.clarity_project_id || null;
+  }
+  const script = buildInjectorScript(rootDirFor(domain), buildSnippet(measurementId, clarityId));
+  res.type('text/x-shellscript').send(script);
 });
 
 app.get('/healthz', (req, res) => res.json({ ok: true }));
