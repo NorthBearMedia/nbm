@@ -17,8 +17,12 @@ export async function runReport(site, { trigger = 'scheduled', period } = {}) {
   const periodText = p.label || `${formatDate(p.start)} – ${formatDate(p.end)}`;
   try {
     const data = await gatherReportData(site, p.start, p.end);
-    if (!data.ga4 && !data.search && !data.clarity) {
-      throw new Error(`No data sources returned anything. ${data.warnings.join(' | ') || 'No sources configured.'}`);
+    // Never send a client an empty report: search-only reports must have
+    // at least some search presence to be worth anyone's inbox.
+    const searchMeaningless = !data.search ||
+      (!(data.search.summary?.impressions > 0) && !(data.search.summary?.clicks > 0));
+    if (!data.ga4 && !data.clarity && searchMeaningless) {
+      throw new Error(`No meaningful data for this period. ${data.warnings.join(' | ') || 'No sources configured or nothing recorded yet.'}`);
     }
     const pdf = await generateReportPdf(data);
     const filename = `${slug(site.client_name)}-report-${p.start}-to-${p.end}.pdf`;
