@@ -110,9 +110,33 @@ const CLIENT_EMAILS = {
   'richfordvehiclesales.co.uk': 'phil@richfordmotors.com, csaunders@richfordmotors.com',
 };
 
+// Microsoft Clarity project IDs, keyed by domain — provided by the owner
+// (2 Jul 2026). These are public tracking identifiers (they appear in each
+// site's page source), not secrets. The GA injector installs the Clarity
+// tag wherever one is set. (Caring Places pending.)
+const CLARITY_PROJECTS = {
+  'alphashunt.co.uk': 'xg3mss4msy',
+  'ivyhouseresidentialhome.co.uk': 'xg3sbc4p1t',
+  'rcmhomeimprovements.co.uk': 'xg3sombkfn',
+  'maxus-evc.co.uk': 'xg3sy563qa',
+  'richfordvehiclesales.co.uk': 'xg3t6nahb6',
+  'evccitysprint.co.uk': 'xg3tgboqkv',
+  'melanieparker.co.uk': 'xg3tpasvaj',
+  'rmbgarage.co.uk': 'xg3twf08g5',
+  'greenpathgardencare.co.uk': 'xg3u59bi4w',
+  'muskengineering.co.uk': 'xg3udlsbmh',
+  'swanwickkidsclub.co.uk': 'xg3utf6jha',
+  'iwpg.co.uk': 'xg3v5sa9io',
+  'northbearmedia.co.uk': 'xg3vog45d2',
+  'woodlandwalkdaycare.co.uk': 'xg3vy1okig',
+  'pslimited.uk': 'xg3w5kwwni',
+  'primeprandmarketing.co.uk': 'xg3wcloljd',
+  'wowstays.co.uk': 'xg3wjoxrm0',
+};
+
 // Runs on every boot: cheap, offline, idempotent.
 export function loadClientContacts() {
-  const sites = db.prepare('SELECT id, client_name, domain, contact_emails FROM sites WHERE active = 1').all();
+  const sites = db.prepare('SELECT id, client_name, domain, contact_emails, clarity_project_id FROM sites WHERE active = 1').all();
   const loaded = [];
   for (const site of sites) {
     const d = (site.domain || '').toLowerCase().replace(/^www\./, '');
@@ -121,6 +145,11 @@ export function loadClientContacts() {
       db.prepare('UPDATE sites SET contact_emails = ? WHERE id = ?').run(email, site.id);
       loaded.push(`${site.client_name} → ${email}`);
       console.log(`[ops] contact loaded: ${site.client_name} → ${email}`);
+    }
+    const clarity = CLARITY_PROJECTS[d];
+    if (clarity && !site.clarity_project_id) {
+      db.prepare('UPDATE sites SET clarity_project_id = ? WHERE id = ?').run(clarity, site.id);
+      console.log(`[ops] Clarity project loaded: ${site.client_name} → ${clarity}`);
     }
   }
   return loaded;
