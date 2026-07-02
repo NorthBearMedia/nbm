@@ -3153,3 +3153,45 @@ select { color-scheme:dark; }
 }
 .nb-new-for .nb-client-select { max-width:170px; font-size:var(--nb-small,17px); }
 @media (max-width:600px){ .nb-new-for .nb-client-select { max-width:110px; } }
+
+/* ─── NOTEBOOK v6: rules ARE row borders (bulletproof alignment) ──────
+   Every content row is exactly one line tall with its own bottom rule, so
+   text can never drift from the line regardless of font/OS. The page keeps a
+   faint background rule (same lh) for the empty area below the writing. */
+.nb-wrap { --nb-drop: 0.12em; }
+.nb-paper {
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 calc(var(--nb-lh) - 1px), rgba(112,146,190,.42) calc(var(--nb-lh) - 1px) var(--nb-lh)),
+    linear-gradient(#fbf7ec, #f5f0e2) !important;
+  background-position: 0 0, 0 0 !important;
+}
+.nb-header, .nb-subheader { border-bottom: 1px solid rgba(112,146,190,.4); }
+
+.nb-line, .nb-new, .nb-empty {
+  height: var(--nb-lh); min-height: var(--nb-lh); box-sizing: border-box;
+  border-bottom: 1px solid rgba(112,146,190,.55);
+  display: flex; align-items: flex-end; gap: 10px;
+  line-height: 1.02; overflow: hidden;
+}
+.nb-line .nb-text {
+  flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  line-height: 1.02; transform: translateY(var(--nb-drop));
+}
+.nb-line .nb-bullet {
+  align-self: flex-end; height: auto; line-height: 1; padding-bottom: 2px;
+  transform: translateY(var(--nb-drop));
+}
+.nb-line .nb-marker { align-self: center; margin-bottom: 6px; }
+.nb-new input { line-height: 1.02; transform: translateY(var(--nb-drop)); align-self: flex-end; padding-bottom: 2px; }
+.nb-empty { color: rgba(28,28,28,.5); }
+
+/* size + hide-done controls */
+.nb-size { display: inline-flex; gap: 3px; align-items: center; }
+.nb-size-btn {
+  font-family: var(--nb-font,'Caveat'),cursive; font-size: 16px; line-height: 1;
+  background: transparent; color: rgba(28,28,28,.6); border: 1px solid rgba(28,28,28,.25);
+  border-radius: 4px; width: 24px; height: 22px; cursor: pointer; padding: 0;
+}
+.nb-size-btn:hover { color: #1c1c1c; border-color: rgba(28,28,28,.5); }
+#nbHideDoneBtn { color: rgba(28,28,28,.5); }
+#nbHideDoneBtn:hover { color: #b3372f; }

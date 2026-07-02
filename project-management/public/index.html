@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>North Bear Console</title>
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=69">
+  <link rel="stylesheet" href="styles.css?v=70">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -373,6 +373,11 @@
           <div class="nb-subheader">
             <span id="nbPageTitle" class="nb-page-title"></span>
             <span class="nb-sub-right">
+              <button id="nbHideDoneBtn" class="nb-order" onclick="nbToggleHideDone()" title="Show/hide ticked-off tasks"></button>
+              <span class="nb-size" title="Handwriting size">
+                <button class="nb-size-btn" onclick="nbSetSize(-0.1)">A&minus;</button>
+                <button class="nb-size-btn nb-size-plus" onclick="nbSetSize(0.1)">A+</button>
+              </span>
               <select id="nbPenSelect" class="nb-pen-select" onchange="nbSetFont(this.value)" title="Choose your pen"></select>
               <button id="nbOrderBtn" class="nb-order" onclick="nbToggleOrder()" title="Change ordering"></button>
             </span>
@@ -484,7 +489,10 @@
       <div class="form-error" id="taskFormError"></div>
       <input type="hidden" id="taskId"><input type="hidden" id="taskClientId">
       <!-- Essentials only — everything else folds behind "More options" -->
-      <div class="form-group"><label>Task Title</label><input type="text" id="taskTitle" required></div>
+      <div class="form-row">
+        <div class="form-group" style="flex:2"><label>Task Title</label><input type="text" id="taskTitle" required></div>
+        <div class="form-group" style="flex:1"><label>Customer</label><select id="taskClientSelect"></select></div>
+      </div>
       <div class="form-row form-row-3">
         <div class="form-group"><label>Status</label><select id="taskStatus"><option value="inbox">Inbox</option><option value="scheduled">Scheduled</option><option value="in-progress">In Progress</option><option value="waiting-on-client">Waiting on Client</option><option value="waiting-on-me">Waiting on Me</option><option value="done">Done</option><option value="cancelled">Cancelled</option></select></div>
         <div class="form-group"><label>When (band)</label><select id="taskBand"><option value="">—</option><option value="today">Today</option><option value="this-week">This Week</option><option value="scheduled">Scheduled</option><option value="waiting">Waiting</option><option value="someday">Someday</option></select></div>
@@ -671,6 +679,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=69"></script>
+  <script src="app.js?v=70"></script>
 </body>
 </html>

@@ -1012,6 +1012,8 @@ let nbTab = localStorage.getItem('nbm_nb_tab') || 'all';
 let nbClient = localStorage.getItem('nbm_nb_client') || '';
 let nbOrder = localStorage.getItem('nbm_nb_order') || 'written';
 let nbFont = localStorage.getItem('nbm_nb_font') || 'Caveat';
+let nbSize = parseFloat(localStorage.getItem('nbm_nb_size')) || 1;
+let nbHideDone = localStorage.getItem('nbm_nb_hidedone') === '1';
 let nbPage = 0;                 // current page index for long lists
 const NB_PAGE_SIZE = 22;        // lines per notebook page
 
@@ -1027,22 +1029,6 @@ const NB_PENS = {
   'Indie Flower':       { label: 'Indie Flower (bubbly)',size: 21, small: 16 },
 };
 
-// Measure where this browser ACTUALLY draws the text baseline for a given
-// pen (font metrics differ across platforms — hand-tuned constants drift).
-// Trick: a zero-height inline-block sits its box exactly on the baseline.
-function nbMeasureBaseline(family, sizePx) {
-  const probe = document.createElement('div');
-  probe.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;font-family:'${family}',cursive;font-size:${sizePx}px;line-height:${NB_LINE_H}px;`;
-  const marker = document.createElement('span');
-  marker.style.cssText = 'display:inline-block;width:0;height:0;';
-  probe.appendChild(document.createTextNode('Hgy'));
-  probe.appendChild(marker);
-  document.body.appendChild(probe);
-  const b = marker.getBoundingClientRect().top - probe.getBoundingClientRect().top;
-  document.body.removeChild(probe);
-  return b;
-}
-
 function nbSetTab(t) { nbTab = t; nbPage = 0; try { localStorage.setItem('nbm_nb_tab', t); } catch {} loadNotebookView(); }
 function nbSetClient(v) { nbClient = v; nbPage = 0; try { localStorage.setItem('nbm_nb_client', v); } catch {} loadNotebookView(); }
 function nbToggleOrder() {
@@ -1057,28 +1043,28 @@ function nbSetFont(f) {
   applyNbFont();
   loadNotebookView();
 }
+// Rules are drawn as a bottom border on every row (see CSS), so alignment is
+// structural and can't drift with font metrics. This just sets the ink vars;
+// each row's fixed height == --nb-lh keeps text welded to its line.
 function applyNbFont() {
   const wrap = document.querySelector('.nb-wrap');
   if (!wrap) return;
   const pen = NB_PENS[nbFont] || NB_PENS.Caveat;
+  const scale = Math.max(0.7, Math.min(1.5, nbSize || 1));
   wrap.style.setProperty('--nb-font', `'${nbFont}', cursive`);
-  wrap.style.setProperty('--nb-size', pen.size + 'px');
-  wrap.style.setProperty('--nb-small', pen.small + 'px');
-  wrap.style.setProperty('--nb-lh', NB_LINE_H + 'px');
-  const paper = wrap.querySelector('.nb-paper');
-  if (!paper) return;
-  const draw = () => {
-    // Generate the rules at the measured baseline: rule top ≈ baseline + 1px,
-    // so descenders cross the line exactly like real handwriting.
-    const baseline = nbMeasureBaseline(nbFont, pen.size);
-    const phase = ((Math.round(baseline) + 2) % NB_LINE_H + NB_LINE_H) % NB_LINE_H;
-    paper.style.backgroundImage =
-      `repeating-linear-gradient(to bottom, transparent 0 ${NB_LINE_H - 1}px, rgba(112,146,190,.5) ${NB_LINE_H - 1}px ${NB_LINE_H}px), linear-gradient(#fbf7ec, #f5f0e2)`;
-    paper.style.backgroundPosition = `0 ${phase}px, 0 0`;
-  };
-  draw();
-  // Metrics change once the webfont finishes loading — re-measure then.
-  try { document.fonts.load(`${pen.size}px '${nbFont}'`).then(draw); } catch {}
+  wrap.style.setProperty('--nb-size', Math.round(pen.size * scale) + 'px');
+  wrap.style.setProperty('--nb-small', Math.round(pen.small * scale) + 'px');
+  wrap.style.setProperty('--nb-lh', Math.round(NB_LINE_H * scale) + 'px');
+}
+function nbSetSize(delta) {
+  nbSize = Math.max(0.7, Math.min(1.5, Math.round(((nbSize || 1) + delta) * 100) / 100));
+  try { localStorage.setItem('nbm_nb_size', String(nbSize)); } catch {}
+  applyNbFont();
+}
+function nbToggleHideDone() {
+  nbHideDone = !nbHideDone;
+  try { localStorage.setItem('nbm_nb_hidedone', nbHideDone ? '1' : '0'); } catch {}
+  loadNotebookView();
 }
 function nbFlip(dir) { nbPage += dir; loadNotebookView(); }
 
@@ -1110,6 +1096,11 @@ function loadNotebookView() {
   sel.innerHTML = '<option value="">everyone</option>' + realClients.map(c => `<option value="${c.id}" ${String(c.id) === nbClient ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
   document.getElementById('nbPageTitle').textContent = NB_PAGE_TITLES[nbTab] || '';
   document.getElementById('nbOrderBtn').textContent = nbOrder === 'written' ? 'in the order I wrote them' : 'soonest first';
+  const hideBtn = document.getElementById('nbHideDoneBtn');
+  if (hideBtn) {
+    hideBtn.textContent = nbHideDone ? 'show ticked off' : 'hide ticked off';
+    hideBtn.style.display = nbTab === 'done' ? 'none' : '';
+  }
 
   // Monday-anchored week window for the "this week" page
   const now = new Date(); now.setHours(0, 0, 0, 0);
@@ -1137,6 +1128,10 @@ function loadNotebookView() {
   } else {
     items = items.filter(t => isOpenTask(t) || (t.task_status === 'done' && (t.completed_at || '') === today));
   }
+
+  // "Hide ticked off" cleans the page down to only what's still open (the
+  // dedicated "Ticked off" tab always shows completed regardless).
+  if (nbHideDone && nbTab !== 'done') items = items.filter(isOpenTask);
 
   if (nbOrder === 'due') {
     items.sort((a, b) => (eff(a) || '9999') < (eff(b) || '9999') ? -1 : (eff(a) || '9999') > (eff(b) || '9999') ? 1 : a.id - b.id);
@@ -1677,7 +1672,7 @@ let taskFormSnapshot = '';
 let taskModalOrigin = null;   // client id when the modal was opened from a client detail view
 
 function taskFormSerialize() {
-  const ids = ['taskTitle','taskStatus','taskBand','taskDeadline','taskNotes','taskAssignee','taskSecondaryAssignee','taskType','taskPlannedDate','taskEstHours','taskSuggestedBlock','taskReferences'];
+  const ids = ['taskTitle','taskClientSelect','taskStatus','taskBand','taskDeadline','taskNotes','taskAssignee','taskSecondaryAssignee','taskType','taskPlannedDate','taskEstHours','taskSuggestedBlock','taskReferences'];
   return ids.map(id => document.getElementById(id)?.value ?? '').join('|') + '|' + (document.getElementById('taskRecurring')?.checked ? 1 : 0);
 }
 function taskFormDirty() {
@@ -2079,6 +2074,7 @@ function openTaskModal(cid){
   document.getElementById('taskFormError').style.display='none';
   ['taskId','taskTitle','taskDeadline','taskPlannedDate','taskEstHours','taskReferences','taskNotes','taskSuggestedBlock'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('taskClientId').value=cid;
+  document.getElementById('taskClientSelect').innerHTML = clientSelectOptions(cid ? +cid : '');
   document.getElementById('taskStatus').value='inbox';
   document.getElementById('taskBand').value='';
   document.getElementById('taskType').value='';
@@ -2114,6 +2110,7 @@ function editTask(id){
   document.getElementById('taskFormError').style.display='none';
   document.getElementById('taskId').value=t.id;
   document.getElementById('taskClientId').value=t.client_id;
+  document.getElementById('taskClientSelect').innerHTML = clientSelectOptions(t.client_id);
   document.getElementById('taskTitle').value=t.title;
   document.getElementById('taskDeadline').value=t.deadline||'';
   document.getElementById('taskPlannedDate').value=t.planned_date||'';
@@ -2181,8 +2178,10 @@ document.getElementById('taskForm').addEventListener('submit',async e=>{
   const isRecurring=document.getElementById('taskRecurring').checked;
   const title=document.getElementById('taskTitle').value.trim();
   if (!title) { errEl.textContent='Task title is required.'; errEl.style.display='block'; return; }
+  // Customer picker wins; fall back to the hidden field it was opened with.
+  const pickedClient = document.getElementById('taskClientSelect').value;
   const data={
-    client_id:+document.getElementById('taskClientId').value,
+    client_id: pickedClient ? +pickedClient : +document.getElementById('taskClientId').value,
     title,
     assignee:document.getElementById('taskAssignee').value,
     secondary_assignee:document.getElementById('taskSecondaryAssignee').value,
