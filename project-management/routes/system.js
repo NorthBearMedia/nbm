@@ -19,6 +19,30 @@ router.get('/api/health', (req, res) => {
   }
 });
 
+// ─── Per-user UI preferences (syncs notebook/format across devices) ──
+router.get('/api/prefs', requireAuth, (req, res) => {
+  const row = db.prepare('SELECT prefs FROM users WHERE id = ?').get(req.user.id);
+  try { res.json(row?.prefs ? JSON.parse(row.prefs) : {}); }
+  catch { res.json({}); }
+});
+
+router.put('/api/prefs', requireAuth, (req, res) => {
+  const incoming = req.body;
+  if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) {
+    return res.status(400).json({ error: 'Prefs must be an object' });
+  }
+  // Merge into what's stored so a partial save from one device never wipes
+  // keys written by another.
+  let current = {};
+  const row = db.prepare('SELECT prefs FROM users WHERE id = ?').get(req.user.id);
+  try { current = row?.prefs ? JSON.parse(row.prefs) : {}; } catch {}
+  const merged = { ...current, ...incoming };
+  const json = JSON.stringify(merged);
+  if (json.length > 8192) return res.status(400).json({ error: 'Prefs too large' });
+  db.prepare('UPDATE users SET prefs = ? WHERE id = ?').run(json, req.user.id);
+  res.json({ success: true });
+});
+
 // ─── Global History (owner only) ──────────────────────
 router.get('/api/history', requireAuth, (req, res) => {
   if (req.user.role !== 'owner') return res.status(403).json({ error: 'Owner only' });
