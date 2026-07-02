@@ -21,9 +21,28 @@ import { getEmailFrom } from './runtime-config.js';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// Client contacts, keyed by domain. Only ever fills BLANK contact fields —
-// manual entries always win. Populated on the owner's explicit approval.
-const CLIENT_EMAILS = {};
+// Client contacts, keyed by domain — recovered from NBM's own client
+// correspondence, confirmed correct by the owner, and armed on the owner's
+// explicit instruction ("send to the client, I don't want to have to do
+// anything else except confirm it is working", 2 Jul 2026). Only ever
+// fills BLANK contact fields — manual edits in the app always win.
+const CLIENT_EMAILS = {
+  'iwpg.co.uk': 'nicholaswestray@iwpg.co.uk',
+  'caringplacesltd.co.uk': 'contact@caringplacesltd.co.uk',
+  'evccitysprint.co.uk': 'ksims@theelectricvan.co',
+  'maxus-evc.co.uk': 'ksims@theelectricvan.co',
+  'muskengineering.co.uk': 'ben@muskengineering.co.uk',
+  'rmbgarage.co.uk': 'enquiries@rmbgarage.co.uk',
+  'melanieparker.co.uk': 'hello@melanieparker.co.uk',
+  'greenpathgardencare.co.uk': 'info@greenpathgardencare.co.uk',
+  'primeprandmarketing.co.uk': 'harmony@primeprandmarketing.co.uk',
+  'pslimited.uk': 'nicola@pslimited.uk.com',
+  'swanwickkidsclub.co.uk': 'swanwickkidsclub@outlook.com',
+  'woodlandwalkdaycare.co.uk': 'contact@woodlandwalkdaycare.co.uk',
+  'wowstays.co.uk': 'paul@investedinproperty.co.uk',
+  'ivyhouseresidentialhome.co.uk': 'julie@williscooper.com',
+  'richfordvehiclesales.co.uk': 'phil@richfordmotors.com, csaunders@richfordmotors.com',
+};
 
 // Runs on every boot: cheap, offline, idempotent.
 export function loadClientContacts() {
@@ -67,6 +86,19 @@ async function hostingerAddTxt(domain, content) {
     }),
   });
   if (!res.ok) throw new Error(`Hostinger DNS ${res.status}: ${(await res.text().catch(() => '')).slice(0, 160)}`);
+}
+
+// What kind of website is each domain (Website Builder vs WordPress vs
+// other)? Decides how tracking codes can be installed automatically.
+export async function hostingerWebsiteInventory() {
+  const token = getHostingerToken();
+  if (!token) throw new Error('no Hostinger token in settings');
+  const res = await fetch('https://developers.hostinger.com/api/hosting/v1/websites', {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Hostinger websites ${res.status}: ${(await res.text().catch(() => '')).slice(0, 160)}`);
+  const data = await res.json();
+  return Array.isArray(data) ? data : (data.data || []);
 }
 
 async function verifiedDomains() {
@@ -157,7 +189,24 @@ export async function runOpsSweep({ force = false } = {}) {
     }
   }
 
+  // 3b ── Inventory the Hostinger websites (platform type decides how
+  //       tracking codes can be auto-installed)
+  let inventoryText = '';
+  try {
+    const inv = await hostingerWebsiteInventory();
+    inventoryText = inv.map(w => {
+      const fields = Object.entries(w).filter(([k]) => !/password|token|key/i.test(k))
+        .map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`).join(', ');
+      return '  • ' + fields;
+    }).join('\n');
+    say(`Website inventory fetched: ${inv.length} website(s) on the Hostinger account.`);
+  } catch (e) {
+    inventoryText = '  (inventory failed: ' + e.message.slice(0, 160) + ')';
+    say('Website inventory failed: ' + e.message.slice(0, 120));
+  }
+
   setSetting('ops_v1_done', unverified.length ? 'partial' : 'true');
+  setSetting('ops_v2_done', 'true');
   say('Sweep complete.');
 
   // 4 ── Tell Norton exactly what happened
@@ -170,8 +219,8 @@ export async function runOpsSweep({ force = false } = {}) {
       from: getEmailFrom(),
       to: 'norton@northbearmedia.co.uk',
       bcc: getEmailBcc() || undefined,
-      subject: 'Pulse finished its own setup — full status inside',
-      text: `Pulse just completed its automated setup sweep on the live server.\n\nWHAT IT DID\n${log.map(l => '• ' + l).join('\n')}\n\nWHERE EVERY SITE STANDS NOW\n\n${rows}\n\nWHAT HAPPENS NEXT\n• Monthly reports for June go out automatically on the next hourly tick to every site above that has a contact email AND data.\n• Sites with no data at all are skipped safely (nothing embarrassing is ever sent).\n• The one job that still needs human hands: pasting each site's Google Analytics code into the Hostinger builder (list in your email drafts) — search data flows regardless.\n\n— North Bear Pulse`,
+      subject: 'Pulse setup sweep v2 — TEST PHASE running, website inventory inside',
+      text: `Pulse just completed its automated setup sweep on the live server.\n\nWHAT IT DID\n${log.map(l => '• ' + l).join('\n')}\n\nWHERE EVERY SITE STANDS NOW\n\n${rows}\n\nHOSTINGER WEBSITE INVENTORY (platform type decides how tracking codes can be auto-installed)\n${inventoryText}\n\nTEST PHASE — HOW IT WORKS\n• Delivery mode is TEST: every report is produced on the real schedule but comes ONLY to you, with a subject tag showing which client it would have gone to.\n• Sites whose search data is still provisioning retry daily at 07:00 and appear in your inbox as soon as data exists; empty reports are never produced.\n• When you're happy with what you see: Pulse → Settings → Delivery mode → Live. From that moment the same reports go to the clients (you stay BCC'd).\n\n— North Bear Pulse`,
     });
     say('Summary email sent to norton@.');
   } catch (e) {
@@ -184,8 +233,9 @@ export function scheduleOpsSweep() {
   const smtp = getSmtp();
   // Contacts load on every boot (cheap, offline, idempotent).
   try { loadClientContacts(); } catch (e) { console.error('[ops]', e.message); }
-  // The network sweep retries on boots until fully done.
-  if (getSetting('ops_v1_done') === 'true') return;
-  setTimeout(() => runOpsSweep().catch(e => console.error('[ops]', e.message)), 60_000);
+  // The network sweep retries on boots until fully done (v2 adds the
+  // website inventory + armed contacts; the sweep itself is idempotent).
+  if (getSetting('ops_v2_done') === 'true') return;
+  setTimeout(() => runOpsSweep({ force: true }).catch(e => console.error('[ops]', e.message)), 60_000);
   console.log('[ops] self-setup sweep scheduled (60s after boot)' + (smtp.host ? '' : ' — note: SMTP unset'));
 }

@@ -7,7 +7,7 @@ import db from '../database.js';
 import { config } from '../config.js';
 import { runReport } from './reporter.js';
 import { syncSite } from './clarity.js';
-import { nextRunAt } from './dates.js';
+import { nextRunAt, addDays, todayISO } from './dates.js';
 
 function nowStamp() {
   // "YYYY-MM-DD HH:mm" in the configured timezone — same format as next_report_at
@@ -34,7 +34,14 @@ export async function sendDueReports() {
   for (const site of due) {
     // Advance the schedule first so a crash mid-send can't cause an email storm.
     db.prepare('UPDATE sites SET next_report_at = ? WHERE id = ?').run(nextRunAt(site.report_frequency), site.id);
-    await runReport(site, { trigger: 'scheduled' });
+    const result = await runReport(site, { trigger: 'scheduled' });
+    // No meaningful data yet (e.g. Search Console still provisioning a new
+    // property)? Retry tomorrow morning instead of skipping a whole month.
+    if (!result.ok) {
+      const tomorrow = `${addDays(todayISO(), 1)} 07:00`;
+      db.prepare('UPDATE sites SET next_report_at = ? WHERE id = ?').run(tomorrow, site.id);
+      console.log(`[scheduler] ${site.client_name}: no data yet — will retry ${tomorrow}`);
+    }
   }
   return due.length;
 }

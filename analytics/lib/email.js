@@ -4,7 +4,7 @@
 import nodemailer from 'nodemailer';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { getSmtp, getEmailFrom, getEmailBcc, getAppUrl } from './runtime-config.js';
+import { getSmtp, getEmailFrom, getEmailBcc, getAppUrl, getDeliveryMode } from './runtime-config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LOGO = join(__dirname, '..', 'public', 'assets', 'nbm-logo-light-trimmed.png');
@@ -84,20 +84,27 @@ export function reportEmailHtml(site, data, periodText) {
 }
 
 export async function sendReportEmail(site, data, pdfBuffer, periodText, filename) {
-  const to = site.contact_emails.split(',').map(e => e.trim()).filter(Boolean);
-  if (!to.length) throw new Error('No contact email set for this client');
+  const realTo = site.contact_emails.split(',').map(e => e.trim()).filter(Boolean);
+  if (!realTo.length) throw new Error('No contact email set for this client');
+  // Test mode (default): the full report is produced on the real schedule
+  // but delivered ONLY to the owner, tagged with its intended recipients.
+  // Flipping Settings → Delivery mode to Live is the owner's arming action.
+  const test = getDeliveryMode() !== 'live';
+  const to = test ? ['norton@northbearmedia.co.uk'] : realTo;
+  const subject = (test ? `[TEST — would send to ${realTo.join(', ')}] ` : '')
+    + `Your website report — ${site.client_name} (${periodText})`;
   await mailer().sendMail({
     from: getEmailFrom(),
     to,
-    bcc: getEmailBcc() || undefined,
-    subject: `Your website report — ${site.client_name} (${periodText})`,
+    bcc: test ? undefined : (getEmailBcc() || undefined),
+    subject,
     html: reportEmailHtml(site, data, periodText),
     attachments: [
       { filename, content: pdfBuffer, contentType: 'application/pdf' },
       { filename: 'nbm-logo.png', path: LOGO, cid: 'nbmlogo' },
     ],
   });
-  return to;
+  return test ? realTo.map(e => `TEST→${e}`) : realTo;
 }
 
 export async function testSmtp() {
