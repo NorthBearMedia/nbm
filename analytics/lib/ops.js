@@ -20,7 +20,7 @@ import { googleClient } from './google.js';
 import { getGscReaderEmail, getHostingerToken, getEmailBcc, getSmtp, getEmailFrom, getAppUrl } from './runtime-config.js';
 import { mailer } from './email.js';
 import { randomBytes } from 'crypto';
-import { ensureInjectCron, deleteInjectCrons, injectCronOutput, verifyTag, HOSTINGER_USER, rootDirFor } from './inject.js';
+import { ensureInjectCron, deleteInjectCrons, injectCronOutput, verifyTag, ensureCron, cronOutputMatching, deleteCronsMatching, HOSTINGER_USER, rootDirFor } from './inject.js';
 
 // Per-install secret guarding the injector-script endpoint. Created once.
 function injectToken() {
@@ -42,7 +42,7 @@ async function beginInjection(domain, measurementId) {
   await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
   const s = injectState();
   // tries resets to 0: this is a fresh attempt, whatever happened before.
-  s[domain] = { status: 'pending', tries: 0, measurementId };
+  s[domain] = { status: 'pending', tries: 0, measurementId, at: Date.now() };
   saveInjectState(s);
 }
 
@@ -408,6 +408,40 @@ export async function runInjectionRollout({ onlyDomain = null } = {}) {
   return results;
 }
 
+// Survey command: lists every index.html under the domains tree (depth:
+// domains/<domain>/public_html/index.html). Single program invocation,
+// no shell metacharacters (Hostinger execs cron commands without a shell)
+// and no wildcards.
+const SURVEY_CMD = `find /home/${HOSTINGER_USER}/domains -maxdepth 3 -name index.html`;
+
+async function runDocrootSurvey() {
+  if (getSetting('docroot_survey_done') === 'true') return;
+  await ensureCron(HOSTINGER_USER, SURVEY_CMD);
+  await sleep(8 * 60_000); // give Hostinger time to activate + run it
+  const out = await cronOutputMatching(HOSTINGER_USER, '-name index.html');
+  if (!out) return; // not captured yet — leave the cron, retry next boot
+  setSetting('docroot_survey_done', 'true');
+  await deleteCronsMatching(HOSTINGER_USER, '-name index.html');
+  const found = out.split('\n').map(l => l.trim()).filter(l => l.includes('/domains/'));
+  const domainsWithFiles = [...new Set(found.map(l => (l.match(/\/domains\/([^/]+)\//) || [])[1]).filter(Boolean))];
+  const sites = db.prepare("SELECT domain FROM sites WHERE active = 1 AND domain != ''").all()
+    .map(s => s.domain.toLowerCase().replace(/^www\./, ''));
+  const injectable = sites.filter(d => domainsWithFiles.includes(d));
+  const builderHosted = sites.filter(d => !domainsWithFiles.includes(d));
+  try {
+    await mailer().sendMail({
+      from: getEmailFrom(), to: 'norton@northbearmedia.co.uk', bcc: getEmailBcc() || undefined,
+      subject: 'Pulse — website file survey (which sites can be auto-tagged)',
+      text: `Pulse surveyed the hosting server for editable website files.\n\n`
+        + `AUTO-TAGGABLE (HTML files on the server — Pulse installs GA + Clarity itself):\n`
+        + (injectable.length ? injectable.map(d => `  ✅ ${d}`).join('\n') : '  (none)') + '\n\n'
+        + `BUILDER-HOSTED (no editable files — e.g. Hostinger Horizons; the tag must be added in the site's builder settings):\n`
+        + (builderHosted.length ? builderHosted.map(d => `  🔧 ${d}`).join('\n') : '  (none)') + '\n\n'
+        + `Raw survey output:\n${out.slice(0, 1500)}\n\n— North Bear Pulse`,
+    });
+  } catch (e) { console.error('[ops] survey email failed:', e.message); }
+}
+
 // Bumped whenever the cron/injection mechanism changes. A mismatch on boot
 // wipes non-verified injection state, removes stale crons built with the
 // old mechanism, and re-runs the demo proof — no human involvement.
@@ -431,32 +465,46 @@ export function scheduleOpsSweep() {
     deleteInjectCrons(HOSTINGER_USER).catch(() => {});
     console.log('[inject] mechanism v' + INJECT_MECH_VERSION + ' — state reset, demo proof will re-run');
   }
-  // Retry the demo proof on every boot until it actually VERIFIES (the
-  // done-flag only means "attempted"). A fresh attempt resets the try
-  // counter, so each deploy gets a full verification window.
-  const demoStatus = injectState()['nbmdemosite2.co.uk']?.status;
-  if (demoStatus !== 'verified' && getSetting('auto_rollout_done') !== 'true') {
+  // Retry the demo proof until it actually VERIFIES (the done-flag only
+  // means "attempted") — but never restart a LIVE attempt: frequent
+  // deploys were resetting the try counter every boot, so the verifier
+  // could neither finish nor report. Only begin fresh when there's no
+  // attempt, the last one failed, or a pending one has gone stale.
+  const demoRec = injectState()['nbmdemosite2.co.uk'];
+  const demoStale = !demoRec || demoRec.status === 'failed'
+    || (demoRec.status === 'pending' && Date.now() - (demoRec.at || 0) > 3 * 3600_000);
+  if (demoRec?.status !== 'verified' && getSetting('auto_rollout_done') !== 'true' && demoStale) {
     const retry = getSetting('inject_demo_done') === 'true'; // not first attempt
     if (retry) setSetting('inject_demo_done', 'false');
     setTimeout(() => runInjectionTest({ quiet: retry }).catch(e => console.error('[inject]', e.message)), 120_000);
   }
   // Boot status email: proof the deploy is alive + where the install
-  // pipeline stands. Sent once per boot, after the demo kick above —
-  // rate-limited so a crash-looping container can't flood the inbox.
-  setTimeout(() => {
+  // pipeline stands, including the demo crons' captured output so a
+  // failing install is diagnosable without waiting for the ❌ email.
+  // Rate-limited so a crash-looping container can't flood the inbox.
+  setTimeout(async () => {
     const last = Number(getSetting('boot_email_at') || 0);
     if (Date.now() - last < 30 * 60_000) return;
     setSetting('boot_email_at', String(Date.now()));
     const state = injectState();
     const lines = Object.entries(state).map(([d, r]) => `  ${d}: ${r.status}${r.tries ? ` (${r.tries} checks)` : ''}`);
+    const cronOut = await injectCronOutput(HOSTINGER_USER, 'nbmdemosite2.co.uk').catch(e => '(unavailable: ' + e.message.slice(0, 80) + ')');
     mailer().sendMail({
       from: getEmailFrom(), to: 'norton@northbearmedia.co.uk', bcc: getEmailBcc() || undefined,
       subject: 'Pulse status — deploy is live',
       text: `Pulse booted OK on the live server (mechanism v${INJECT_MECH_VERSION}, delivery mode: ${getSetting('delivery_mode') || 'test'}).\n\n`
         + `Tag-install pipeline:\n${lines.length ? lines.join('\n') : '  (demo proof starting — placement email follows if it is the first attempt)'}\n\n`
+        + `Demo install cron output (diagnostics):\n  ${String(cronOut).slice(0, 800)}\n\n`
         + `Pulse re-checks pending installs every 10 minutes and emails on every change. If you ever stop hearing from Pulse entirely, the app or its email is down — check Railway.\n\n— North Bear Pulse`,
     }).catch(e => console.error('[ops] boot status email failed:', e.message));
-  }, 180_000);
+  }, 240_000);
+  // One-shot docroot survey: which domains actually have editable HTML
+  // files on the hosting (injectable) vs builder-hosted sites (Horizons
+  // etc.) that need the tag added in their builder settings. Places a
+  // single metacharacter-free find cron, reads its captured output a few
+  // minutes later, emails the inventory and cleans up. Retries on later
+  // boots until output is captured.
+  setTimeout(() => runDocrootSurvey().catch(e => console.error('[ops] docroot survey:', e.message)), 300_000);
   try {
     cron.schedule('*/10 * * * *', () => verifyPendingInjections().catch(e => console.error('[inject]', e.message)), { timezone: config.timezone });
   } catch (e) { console.error('[inject] schedule failed:', e.message); }
