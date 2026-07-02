@@ -319,6 +319,12 @@ function showSettingsModal() {
     <form id="settingsForm">
       ${emailFormFields(s)}
       <div class="form-grid" style="margin-top:14px">
+        <div class="field full"><label>Delivery mode</label>
+          <select name="delivery_mode">
+            <option value="test" ${s.delivery_mode !== 'live' ? 'selected' : ''}>Test — every report comes to me only (tagged with its intended client)</option>
+            <option value="live" ${s.delivery_mode === 'live' ? 'selected' : ''}>Live — reports go to clients (I'm BCC'd)</option>
+          </select>
+          <div class="help">Start in Test, review the reports landing in your inbox, then switch to Live when happy — that's the moment clients start receiving them.</div></div>
         <div class="field full"><label>App address (used in email links)</label>
           <input name="app_url" value="${esc(s.app_url)}" placeholder="${esc(location.origin)}"></div>
         <div class="field full"><label>Search Console reader (optional)</label>

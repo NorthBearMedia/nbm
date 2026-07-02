@@ -60,6 +60,13 @@ export function getFathomToken() {
   return pick('fathom_api_token', process.env.FATHOM_API_TOKEN || '');
 }
 
+// 'test' (default): every report delivers ONLY to the owner, tagged with
+// who it would have gone to. 'live': reports go to clients. The owner
+// flips this in Settings when happy — that flip is the arming action.
+export function getDeliveryMode() {
+  return pick('delivery_mode', 'test') === 'live' ? 'live' : 'test';
+}
+
 export function saveGoogleServiceAccount(json) {
   let parsed;
   try { parsed = typeof json === 'string' ? JSON.parse(json) : json; }
@@ -71,7 +78,7 @@ export function saveGoogleServiceAccount(json) {
   return parsed;
 }
 
-const SETTING_KEYS = ['smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'email_from', 'email_bcc', 'app_url', 'gsc_reader_email', 'hostinger_api_token', 'fathom_api_token'];
+const SETTING_KEYS = ['smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'email_from', 'email_bcc', 'app_url', 'gsc_reader_email', 'hostinger_api_token', 'fathom_api_token', 'delivery_mode'];
 const KEEP_IF_BLANK = new Set(['smtp_pass', 'hostinger_api_token', 'fathom_api_token']);
 
 export function saveSettings(body) {
@@ -108,6 +115,7 @@ export function setupStatus() {
       gsc_reader_email: getGscReaderEmail(),
       hostinger_token_set: Boolean(getHostingerToken()),
       fathom_token_set: Boolean(getFathomToken()),
+      delivery_mode: getDeliveryMode(),
     },
   };
 }
