@@ -4,58 +4,248 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>North Bear Console</title>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="stylesheet" href="styles.css?v=3">
+  <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
+  <link rel="stylesheet" href="styles.css?v=71">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <!-- Clean navigation bar -->
   <nav class="navbar">
     <div class="nav-brand">
-      <img src="/favicon.svg" alt="NB" class="logo-mark" style="width:38px;height:38px;border-radius:12px">
+      <img src="/NBM%20Logo%20Black%20BG.png" alt="North Bear Media" class="logo-mark" style="width:44px;height:44px;border-radius:12px;object-fit:cover">
       <div>
         <h1>North Bear Console</h1>
       </div>
     </div>
     <div class="nav-center">
-      <button class="nav-tab active" data-view="clients"><span class="nav-icon">&#9783;</span> Clients</button>
-      <button class="nav-tab" data-view="today"><span class="nav-icon">&#9788;</span> Today</button>
-      <button class="nav-tab" data-view="calendar"><span class="nav-icon">&#128197;</span> Calendar</button>
+      <button class="nav-tab active" data-view="dashboard"><span class="nav-icon">&#9670;</span> Dashboard</button>
+      <button class="nav-tab" data-view="notebook"><span class="nav-icon">&#128211;</span> Notebook</button>
+      <button class="nav-tab" data-view="inbox"><span class="nav-icon">&#128229;</span> Inbox <span id="inboxCount" class="nav-count" style="display:none"></span></button>
+      <button class="nav-tab" data-view="clients"><span class="nav-icon">&#9783;</span> Tasks</button>
+      <button class="nav-tab" data-view="planning"><span class="nav-icon">&#128467;</span> Planning</button>
+      <div class="nav-more-wrap" style="position:relative">
+        <button class="nav-tab" id="navMoreBtn" onclick="toggleNavMore(event)">More &#9662;</button>
+        <div class="nav-dropdown" id="navMoreDropdown">
+          <button class="nav-dropdown-item" data-view="today">&#9788; Today</button>
+          <button class="nav-dropdown-item" data-view="calendar">&#128197; Calendar</button>
+          <button class="nav-dropdown-item" data-view="focus">&#9889; Focus</button>
+          <button class="nav-dropdown-item" data-view="email" id="emailNavTab" style="display:none">&#9993; Email</button>
+        </div>
+      </div>
     </div>
     <div class="nav-right">
-      <div class="user-selector">
-        <select id="currentUser"><option>Loading...</option></select>
+      <!-- Focus countdown pill (hidden until a session starts) -->
+      <div id="focusTimer" class="focus-timer" style="display:none">
+        <span class="ft-task" id="ftTask" onclick="focusOpenTask()" title="Open the task you're focusing on"></span>
+        <span class="ft-time" id="ftTime">25:00</span>
+        <button class="ft-btn" id="ftPause" onclick="focusTogglePause()" title="Pause / resume">&#10073;&#10073;</button>
+        <button class="ft-btn" onclick="focusAdd(5)" title="Add 5 minutes">+5</button>
+        <button class="ft-btn ft-done" onclick="focusComplete()" title="Mark done &amp; stop">&#10003;</button>
+        <button class="ft-btn ft-stop" onclick="focusStop()" title="Stop timer">&times;</button>
+      </div>
+      <!-- Focus launcher -->
+      <div class="focus-wrap" style="position:relative">
+        <button class="nav-action" id="focusBtn" title="Start a focus timer" onclick="toggleFocusStart(event)">&#9201;</button>
+        <div class="focus-start" id="focusStartPanel">
+          <div class="fs-title">&#9201; Focus timer</div>
+          <input type="text" id="fsLabel" placeholder="What are you working on?">
+          <div class="fs-presets">
+            <button type="button" onclick="fsSetMins(15)">15m</button>
+            <button type="button" onclick="fsSetMins(25)">25m</button>
+            <button type="button" onclick="fsSetMins(45)">45m</button>
+            <button type="button" onclick="fsSetMins(60)">60m</button>
+          </div>
+          <div class="fs-custom"><label for="fsMins">Minutes</label><input type="number" id="fsMins" min="1" max="240" value="25"></div>
+          <button class="btn btn-primary btn-sm fs-go" onclick="focusStartFromPanel()">Start focus &#9654;</button>
+        </div>
+      </div>
+      <div class="search-container" style="position:relative">
+        <input type="text" id="taskSearch" placeholder="Search tasks (e.g. NB001)..." style="background:var(--bg-glass);border:1px solid var(--border);border-radius:var(--radius);padding:8px 14px;font-size:12px;color:var(--text);width:200px;outline:none;font-family:inherit">
+        <div id="searchResults" style="display:none;position:absolute;top:100%;right:0;margin-top:8px;width:450px;max-height:400px;overflow-y:auto;background:rgba(45,41,42,0.97);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);z-index:999"></div>
       </div>
       <button class="nav-action" id="addClientBtn" title="New Client">+</button>
-      <button class="nav-action" id="manageTeamBtn" title="Team">&#128101;</button>
-      <button class="nav-action" id="viewArchiveBtn" title="Archive">&#128230;</button>
-      <button class="nav-action" onclick="logout()" title="Sign Out">&#9211;</button>
+      <div class="nav-menu-wrap" style="position:relative">
+        <button class="nav-action" id="navMenuBtn" title="Menu" onclick="toggleNavMenu()">&#9776;</button>
+        <div class="nav-dropdown" id="navDropdown">
+          <button class="nav-dropdown-item" id="manageTeamBtn">&#128101; Team</button>
+          <button class="nav-dropdown-item" id="manageUsersBtn">&#9881; Users &amp; Permissions</button>
+          <button class="nav-dropdown-item" id="manageBackupsBtn" style="display:none">&#128190; Backups</button>
+          <button class="nav-dropdown-item" id="globalHistoryBtn" style="display:none">&#128337; Activity Log</button>
+          <div class="nav-dropdown-sep"></div>
+          <button class="nav-dropdown-item" onclick="exportExcel()">&#128202; Export to Excel</button>
+          <button class="nav-dropdown-item" id="viewArchiveBtn">&#128230; Archive</button>
+          <div class="nav-dropdown-sep"></div>
+          <button class="nav-dropdown-item" onclick="logout()" style="color:var(--text-secondary)">&#9211; Sign Out</button>
+        </div>
+      </div>
     </div>
   </nav>
 
-  <!-- Sub-bar for filters (clients view only) -->
   <div class="sub-bar" id="clientSubBar">
     <div class="filter-group">
-      <button class="filter-btn active" data-filter="all">All Clients</button>
+      <button class="filter-btn active" data-filter="all">All</button>
       <button class="filter-btn" data-filter="recurring">Recurring</button>
       <button class="filter-btn" data-filter="ad-hoc">Ad Hoc</button>
+      <span style="width:1px;height:20px;background:var(--border);margin:0 4px"></span>
+      <button class="filter-btn" id="myTasksBtn" onclick="toggleMyTasks()">My Tasks</button>
+      <span style="width:1px;height:20px;background:var(--border);margin:0 4px"></span>
+      <select id="clientFilter" class="filter-select">
+        <option value="">All Clients</option>
+      </select>
+      <select id="personFilter" class="filter-select">
+        <option value="">All People</option>
+      </select>
+      <select id="statusFilter" class="filter-select">
+        <option value="">All Statuses</option>
+        <option value="inbox">Inbox</option>
+        <option value="scheduled">Scheduled</option>
+        <option value="in-progress">In Progress</option>
+        <option value="waiting-on-client">Waiting on Client</option>
+        <option value="waiting-on-me">Waiting on Me</option>
+        <option value="done">Done</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
     </div>
     <div class="stats-bar" id="statsBar"></div>
   </div>
 
   <main class="main">
-    <!-- Clients View -->
-    <div id="clientsView">
-      <div class="table-container">
-        <div class="table-header">
-          <div>Client</div><div>Type</div><div>Projects</div><div>Outstanding</div><div>Progress</div><div></div>
+    <!-- Dashboard View = CLIENT CONTROL BOARD (landing page)
+         REVERT NOTE: To restore the previous integrations-only dashboard,
+         hide #controlBoardSection, default #integrationsStrip to display:flex,
+         and in app.js make loadDashboard() skip renderControlBoard(). No widget
+         logic was deleted — every integration widget below is preserved, just
+         relocated into the collapsible Workspace strip. -->
+    <div id="dashboardView">
+      <div class="dashboard">
+        <div class="dash-greeting">
+          <h2 id="dashGreeting"></h2>
+          <p id="dashDate" class="dash-date"></p>
+          <p id="dashMomentum" class="dash-momentum"></p>
         </div>
-        <div id="clientList" class="client-list"><div class="empty-state"><p>Loading...</p></div></div>
+        <div class="dash-stats" id="dashStats"></div>
+
+        <!-- TODAY'S BATTLE PLAN (rule-based priority actions) -->
+        <div id="battlePlan" class="battle-plan">
+          <div class="bp-header"><span class="bp-title">&#9876; Today's Battle Plan</span><span class="bp-hint">Your top priorities right now</span></div>
+          <div id="battlePlanBody" class="bp-body"></div>
+        </div>
+
+        <!-- CLIENT CONTROL BOARD (hero) -->
+        <div id="controlBoardSection">
+          <div class="cb-header">
+            <h3 class="cb-title">Client Control Board</h3>
+            <div class="cb-controls">
+              <select id="cbStatusFilter" class="filter-select" onchange="renderControlBoard()">
+                <option value="">All statuses</option>
+                <option value="red">🔴 Red</option>
+                <option value="amber">🟠 Amber</option>
+                <option value="blue">🔵 Waiting on client</option>
+                <option value="green">🟢 Green</option>
+              </select>
+              <select id="cbTypeFilter" class="filter-select" onchange="renderControlBoard()">
+                <option value="">All types</option>
+                <option value="retainer">Retainer</option>
+                <option value="project">Project</option>
+                <option value="ad-hoc">Ad hoc</option>
+                <option value="prospect">Prospect</option>
+              </select>
+              <select id="cbSort" class="filter-select" onchange="renderControlBoard()">
+                <option value="risk">Sort: Risk</option>
+                <option value="name">Sort: Name</option>
+                <option value="value">Sort: Monthly value</option>
+                <option value="outstanding">Sort: Outstanding</option>
+              </select>
+              <button type="button" id="cbDensity" class="filter-select cb-density" onclick="toggleBoardDensity()" title="Toggle cards / compact rows">&#9776;</button>
+            </div>
+          </div>
+          <div id="controlBoard" class="cb-grid"></div>
+        </div>
+
+        <!-- INTEGRATIONS STRIP (collapsible) -->
+        <div class="strip-header" onclick="toggleIntegrationsStrip()">
+          <span id="stripToggle">&#9654;</span> Workspace — your day, email, Xero, WhatsApp &amp; activity
+        </div>
+        <div id="integrationsStrip" class="dash-grid" style="display:none">
+          <div class="dash-widget" id="dashUrgentTasks">
+            <div class="dash-widget-header">
+              <span class="dash-widget-title">Urgent Tasks</span>
+              <button class="btn btn-ghost btn-sm" onclick="document.querySelector('[data-view=clients]').click()">View all</button>
+            </div>
+            <div class="dash-widget-body" id="dashUrgentBody"></div>
+          </div>
+          <div class="dash-widget" id="dashSchedule">
+            <div class="dash-widget-header">
+              <span class="dash-widget-title">Today's Schedule</span>
+            </div>
+            <div class="dash-widget-body" id="dashScheduleBody"></div>
+          </div>
+          <div class="dash-widget" id="dashEmails">
+            <div class="dash-widget-header">
+              <span class="dash-widget-title">Latest Emails</span>
+              <button class="btn btn-ghost btn-sm" onclick="document.querySelector('[data-view=email]').click()">Inbox</button>
+            </div>
+            <div class="dash-widget-body" id="dashEmailBody"></div>
+          </div>
+          <div class="dash-widget" id="dashXero">
+            <div class="dash-widget-header">
+              <span class="dash-widget-title">Xero — Invoices &amp; Revenue</span>
+            </div>
+            <div class="dash-widget-body" id="dashXeroBody"></div>
+          </div>
+          <div class="dash-widget" id="dashWhatsapp1">
+            <div class="dash-widget-header">
+              <span class="dash-widget-title" id="dashWa1Title">WhatsApp — Line 1</span>
+            </div>
+            <div class="dash-widget-body" id="dashWa1Body"></div>
+            <div class="wa-input-row" id="dashWa1Input" style="display:none">
+              <input type="text" id="wa1To" placeholder="Phone (e.g. 447...)" class="wa-to-input">
+              <input type="text" id="wa1Msg" placeholder="Message..." class="wa-msg-input" onkeydown="if(event.key==='Enter')sendDashWa(1)">
+              <button class="btn btn-primary btn-sm" onclick="sendDashWa(1)">Send</button>
+            </div>
+          </div>
+          <div class="dash-widget" id="dashWhatsapp2">
+            <div class="dash-widget-header">
+              <span class="dash-widget-title" id="dashWa2Title">WhatsApp — Line 2</span>
+            </div>
+            <div class="dash-widget-body" id="dashWa2Body"></div>
+            <div class="wa-input-row" id="dashWa2Input" style="display:none">
+              <input type="text" id="wa2To" placeholder="Phone (e.g. 447...)" class="wa-to-input">
+              <input type="text" id="wa2Msg" placeholder="Message..." class="wa-msg-input" onkeydown="if(event.key==='Enter')sendDashWa(2)">
+              <button class="btn btn-primary btn-sm" onclick="sendDashWa(2)">Send</button>
+            </div>
+          </div>
+          <div class="dash-widget" id="dashAnalytics">
+            <div class="dash-widget-header">
+              <span class="dash-widget-title">Web Analytics</span>
+            </div>
+            <div class="dash-widget-body" id="dashAnalyticsBody"></div>
+          </div>
+          <div class="dash-widget" id="dashSocial">
+            <div class="dash-widget-header">
+              <span class="dash-widget-title">Social Analytics</span>
+            </div>
+            <div class="dash-widget-body" id="dashSocialBody"></div>
+          </div>
+          <div class="dash-widget dash-widget-full" id="dashActivity">
+            <div class="dash-widget-header">
+              <span class="dash-widget-title">Recent Activity</span>
+            </div>
+            <div class="dash-widget-body" id="dashActivityBody"></div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Today View -->
+    <div id="workloadSummary" class="workload-summary" style="display:none"></div>
+    <div id="clientsView" style="display:none">
+      <div class="table-container">
+        <div id="clientList" class="client-list"><div class="empty-state"><img src="/NBM%20Logo%20No%20NG%20Light%20Lines.png" alt="" style="width:80px;opacity:0.3;margin-bottom:16px"><p>Loading...</p></div></div>
+        <div id="filterNotice" style="display:none"></div>
+      </div>
+    </div>
+
     <div id="todayView" style="display:none">
       <div class="view-header">
         <h2 id="todayTitle">Today's Tasks</h2>
@@ -67,7 +257,6 @@
       <div id="todayContent" class="today-content"></div>
     </div>
 
-    <!-- Calendar View -->
     <div id="calendarView" style="display:none">
       <div class="view-header">
         <div style="display:flex;align-items:center;gap:12px">
@@ -81,7 +270,193 @@
       </div>
       <div id="calendarGrid" class="calendar-grid"></div>
     </div>
+
+    <div id="focusView" style="display:none">
+      <div class="focus-container">
+        <div class="focus-section" id="focusSignOffSection" style="display:none">
+          <h3 class="focus-heading" style="color:var(--warning)">Needs Your Sign-off</h3>
+          <div id="focusSignOff" class="focus-list"></div>
+        </div>
+        <div class="focus-section">
+          <h3 class="focus-heading">Working On Now</h3>
+          <div id="focusNow" class="focus-list"></div>
+        </div>
+        <div class="focus-section">
+          <h3 class="focus-heading">Up Next</h3>
+          <div id="focusNext" class="focus-list"></div>
+        </div>
+        <div class="focus-section">
+          <h3 class="focus-heading">Blocked</h3>
+          <div id="focusBlocked" class="focus-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Email View -->
+    <div id="emailView" style="display:none">
+      <div class="email-container">
+        <div class="email-toolbar">
+          <div class="email-toolbar-left">
+            <select id="emailLabelFilter" class="filter-select" onchange="loadGmailInbox()"></select>
+            <div class="email-search-wrap">
+              <input type="text" id="emailSearchInput" placeholder="Search emails..." onkeydown="if(event.key==='Enter'){searchGmail()}">
+              <button class="btn btn-ghost btn-sm" onclick="searchGmail()">Search</button>
+            </div>
+          </div>
+          <div class="email-toolbar-right">
+            <button class="btn btn-primary btn-sm" onclick="openComposeModal()">&#9998; Compose</button>
+            <button class="btn btn-ghost btn-sm" onclick="loadGmailInbox()" title="Refresh">&#8635;</button>
+            <span id="emailConnectedAs" class="email-connected-as"></span>
+            <button class="btn btn-ghost btn-sm" onclick="disconnectGmail()" title="Disconnect Gmail" style="font-size:11px;opacity:0.6">Disconnect</button>
+          </div>
+        </div>
+        <div id="emailThreadView" style="display:none">
+          <button class="btn btn-ghost btn-sm email-back-btn" onclick="closeEmailThread()">&larr; Back to inbox</button>
+          <div id="emailThreadContent"></div>
+          <div id="emailReplyBox" class="email-reply-box">
+            <textarea id="emailReplyText" placeholder="Write a reply..." rows="4"></textarea>
+            <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px">
+              <button class="btn btn-primary btn-sm" onclick="sendReply()">Send Reply</button>
+            </div>
+          </div>
+        </div>
+        <div id="emailList"></div>
+        <div id="emailLoadMore" style="display:none;text-align:center;padding:16px">
+          <button class="btn btn-ghost" onclick="loadGmailInbox(true)">Load more</button>
+        </div>
+        <div id="emailConnect" style="display:none;text-align:center;padding:60px 20px">
+          <div style="font-size:40px;margin-bottom:16px">&#9993;</div>
+          <h3 style="margin-bottom:8px">Connect your Gmail</h3>
+          <p style="color:var(--text-secondary);margin-bottom:20px;font-size:13px">Send and receive email directly in the Console</p>
+          <a href="/auth/gmail/connect" class="btn btn-primary">Connect Gmail</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inbox View -->
+    <div id="inboxView" style="display:none">
+      <div class="inbox-wrap">
+        <div class="inbox-intro">
+          <h2>Task Inbox</h2>
+          <p>Dump anything here — sort it later. New tasks start as <strong>Inbox</strong>.</p>
+        </div>
+        <div class="inbox-quickadd">
+          <input type="text" id="inboxTitle" placeholder="What needs doing? (type and press Enter)" onkeydown="if(event.key==='Enter')quickAddInbox()">
+          <input type="text" id="inboxNotes" placeholder="Notes (optional)">
+          <select id="inboxClient" class="filter-select"><option value="">No client</option></select>
+          <input type="date" id="inboxDue" title="Due date (optional)">
+          <input type="number" id="inboxEst" min="0" step="0.5" placeholder="hrs" style="width:64px">
+          <button class="btn btn-primary" onclick="quickAddInbox()">Add</button>
+        </div>
+        <div id="inboxList"></div>
+      </div>
+    </div>
+
+    <!-- Notebook View — the paper day-book -->
+    <div id="notebookView" style="display:none">
+      <div class="nb-wrap">
+        <!-- sticky index tabs along the top edge of the page -->
+        <div class="nb-tabs" id="nbTabs">
+          <button class="nb-tab" data-nbtab="all" onclick="nbSetTab('all')">Everything</button>
+          <button class="nb-tab" data-nbtab="today" onclick="nbSetTab('today')">Today</button>
+          <button class="nb-tab" data-nbtab="week" onclick="nbSetTab('week')">This week</button>
+          <button class="nb-tab" data-nbtab="waiting" onclick="nbSetTab('waiting')">Waiting</button>
+          <button class="nb-tab" data-nbtab="done" onclick="nbSetTab('done')">Ticked off</button>
+        </div>
+        <div class="nb-paper">
+          <div class="nb-header">
+            <span class="nb-filedunder">Filed under:
+              <select id="nbClientFilter" class="nb-client-select" onchange="nbSetClient(this.value)"></select>
+            </span>
+            <span id="nbDate" class="nb-date"></span>
+          </div>
+          <div class="nb-subheader">
+            <span id="nbPageTitle" class="nb-page-title"></span>
+          </div>
+          <!-- dog-eared corner: all notebook options live under the fold -->
+          <button class="nb-dogear" id="nbDogear" onclick="nbToggleOptions(event)" title="Notebook options"></button>
+          <div class="nb-options" id="nbOptions">
+            <div class="nb-opt-title">This notebook</div>
+            <div class="nb-opt-row"><span class="nb-opt-label">Pen</span>
+              <select id="nbPenSelect" class="nb-pen-select" onchange="nbSetFont(this.value)"></select>
+            </div>
+            <div class="nb-opt-row"><span class="nb-opt-label">Size</span>
+              <span class="nb-size">
+                <button class="nb-size-btn" onclick="nbSetSize(-0.1)">A&minus;</button>
+                <button class="nb-size-btn" onclick="nbSetSize(0.1)">A+</button>
+              </span>
+            </div>
+            <div class="nb-opt-row"><span class="nb-opt-label">Highlighter</span>
+              <span class="nb-swatches" id="nbSwatches">
+                <button class="nb-swatch" data-hl="yellow" onclick="nbSetHl('yellow')" title="Yellow"></button>
+                <button class="nb-swatch" data-hl="green" onclick="nbSetHl('green')" title="Green"></button>
+                <button class="nb-swatch" data-hl="pink" onclick="nbSetHl('pink')" title="Pink"></button>
+                <button class="nb-swatch" data-hl="blue" onclick="nbSetHl('blue')" title="Blue"></button>
+                <button class="nb-swatch" data-hl="orange" onclick="nbSetHl('orange')" title="Orange"></button>
+              </span>
+            </div>
+            <div class="nb-opt-sep"></div>
+            <div class="nb-opt-row"><span class="nb-opt-label">Order</span>
+              <button id="nbOrderBtn" class="nb-order" onclick="nbToggleOrder()"></button>
+            </div>
+            <div class="nb-opt-row"><span class="nb-opt-label">Page</span>
+              <button id="nbHideDoneBtn" class="nb-order" onclick="nbToggleHideDone()"></button>
+            </div>
+          </div>
+          <div id="notebookLines"></div>
+          <div class="nb-pagenav" id="nbPageNav" style="display:none">
+            <button class="nb-pagebtn" id="nbPrevPage" onclick="nbFlip(-1)">&#10229; earlier page</button>
+            <span class="nb-pagenum" id="nbPageNum"></span>
+            <button class="nb-pagebtn" id="nbNextPage" onclick="nbFlip(1)">later page &#10230;</button>
+          </div>
+          <div class="nb-line nb-new" id="nbNewRow">
+            <span class="nb-bullet" style="opacity:.35">&bull;</span>
+            <input id="nbNewTask" type="text" placeholder="write a task, press Enter..." autocomplete="off" onkeydown="if(event.key==='Enter'){nbQuickAdd()}">
+            <span class="nb-new-for" id="nbNewForWrap">for:
+              <select id="nbNewClient" class="nb-client-select" title="Allocate to a customer"></select>
+            </span>
+          </div>
+          <div class="nb-footer" id="nbFooter"></div>
+          <div class="nb-legend">tap &bull; to tick off &middot; tap the marker to highlight for today</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Planning View -->
+    <div id="planningView" style="display:none">
+      <div class="planning-wrap">
+        <div class="view-header"><h2>Weekly Planning</h2></div>
+        <div id="planningContent"></div>
+      </div>
+    </div>
+
+    <!-- Compose Email Modal -->
+    <div id="composeModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeComposeModal()">
+      <div class="modal" style="max-width:600px">
+        <div class="modal-header">
+          <h2>New Email</h2>
+          <button class="modal-close" onclick="closeComposeModal()">&times;</button>
+        </div>
+        <form id="composeForm" onsubmit="event.preventDefault();sendComposedEmail()">
+          <div style="display:flex;flex-direction:column;gap:10px;padding:0 0 16px">
+            <input type="email" id="composeTo" placeholder="To" required style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;color:var(--text);font-size:13px;outline:none;font-family:inherit">
+            <input type="text" id="composeSubject" placeholder="Subject" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;color:var(--text);font-size:13px;outline:none;font-family:inherit">
+            <textarea id="composeBody" placeholder="Write your message..." rows="10" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;color:var(--text);font-size:13px;outline:none;font-family:inherit;resize:vertical"></textarea>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px">
+            <button type="button" class="btn btn-ghost" onclick="closeComposeModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="composeSendBtn">Send</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </main>
+
+  <!-- Pinned Dashboard -->
+  <div id="pinnedDashboard" style="display:none"></div>
+
+  <!-- Celebration overlay -->
+  <div id="celebrationOverlay" class="celebration-overlay"></div>
 
   <div class="modal-backdrop" id="modalBackdrop"></div>
 
@@ -89,61 +464,99 @@
   <div class="modal" id="clientModal">
     <div class="modal-header"><h2 id="clientModalTitle">New Client</h2><button class="modal-close" onclick="closeModal('clientModal')">&times;</button></div>
     <form id="clientForm">
+      <div class="form-error" id="clientFormError"></div>
       <input type="hidden" id="clientId">
-      <div class="form-row"><div class="form-group"><label>Client Name</label><input type="text" id="clientName" required></div><div class="form-group"><label>Code (3 letters)</label><input type="text" id="clientCode" maxlength="5" placeholder="e.g. NBM"></div></div>
-      <div class="form-group"><label>Agreement Type</label><select id="clientType"><option value="recurring">Recurring</option><option value="ad-hoc">Ad Hoc / One-off</option></select></div>
+      <div class="form-row"><div class="form-group"><label>Client Name</label><input type="text" id="clientName" required></div><div class="form-group"><label>Code (exactly 3 letters)</label><input type="text" id="clientCode" minlength="3" maxlength="3" pattern="[A-Za-z]{3}" placeholder="e.g. NBM" required style="text-transform:uppercase"></div></div>
+      <div class="form-row">
+        <div class="form-group"><label>Client Type</label><select id="clientTypeBand"><option value="retainer">Retainer</option><option value="project">Project</option><option value="ad-hoc">Ad hoc</option><option value="prospect">Prospect</option></select></div>
+        <div class="form-group"><label>Monthly Value (£)</label><input type="number" id="clientMonthlyValue" min="0" step="50" placeholder="0"></div>
+      </div>
+      <div class="form-group"><label>Agreement Summary</label><input type="text" id="clientAgreementSummary" placeholder="e.g. 12-mo retainer — 4 reels + 8 posts / month"></div>
+      <div class="form-group"><label>Recurring Deliverables</label><textarea id="clientRecurringDeliverables" rows="2" placeholder="One per line"></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label>Last Contact</label><input type="date" id="clientLastContact"></div>
+        <div class="form-group"><label>Next Scheduled Work</label><input type="date" id="clientNextScheduled"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Status override</label><select id="clientControlStatus"><option value="">Auto</option><option value="green">🟢 Green</option><option value="amber">🟠 Amber</option><option value="red">🔴 Red</option><option value="blue">🔵 Waiting on client</option></select></div>
+        <div class="form-group"><label>Risk override</label><select id="clientRiskLevel"><option value="">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
+      </div>
+      <div class="form-group"><label>Important Contacts</label><textarea id="clientContacts" rows="2" placeholder="Name · role · email / phone"></textarea></div>
+      <div class="form-group"><label>Agreement Type (legacy)</label><select id="clientType"><option value="recurring">Recurring</option><option value="ad-hoc">Ad Hoc / One-off</option></select></div>
       <div class="form-group"><label>Notes</label><textarea id="clientNotes" rows="2"></textarea></div>
       <div class="form-row"><div class="form-group"><label>Gmail Link</label><input type="url" id="clientGmail" placeholder="https://mail.google.com/..."></div><div class="form-group"><label>Google Drive Link</label><input type="url" id="clientDrive" placeholder="https://drive.google.com/..."></div></div>
       <div class="form-group"><label>Logo</label><input type="file" id="clientLogo" accept="image/*"></div>
+      <div class="form-group" id="privateClientGroup" style="display:none"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="clientPrivate"> <span>Private Client</span> <span style="font-size:11px;color:var(--text-secondary)">(only visible to you)</span></label></div>
       <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="closeModal('clientModal')">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
     </form>
   </div>
 
-  <!-- Project Modal -->
-  <div class="modal" id="projectModal">
-    <div class="modal-header"><h2 id="projectModalTitle">New Project</h2><button class="modal-close" onclick="closeModal('projectModal')">&times;</button></div>
-    <form id="projectForm">
-      <input type="hidden" id="projectId"><input type="hidden" id="projectClientId">
-      <div class="form-group"><label>Project Name</label><input type="text" id="projectName" required></div>
-      <div class="form-group"><label>Status</label><select id="projectStatus"><option value="active">Active</option><option value="on-hold">On Hold</option><option value="completed">Completed</option><option value="ready-to-invoice">Ready to Invoice</option><option value="invoiced">Invoiced</option></select></div>
-      <div class="form-group"><label>Notes</label><textarea id="projectNotes" rows="2"></textarea></div>
-      <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="closeModal('projectModal')">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
-    </form>
+  <!-- Client Detail Modal -->
+  <div class="modal modal-lg" id="clientDetailModal">
+    <div class="modal-header"><h2 id="clientDetailTitle">Client</h2><button class="modal-close" onclick="closeModal('clientDetailModal')">&times;</button></div>
+    <div id="clientDetailBody"></div>
   </div>
 
   <!-- Task Modal -->
   <div class="modal modal-lg" id="taskModal">
-    <div class="modal-header"><h2 id="taskModalTitle">New Task</h2><button class="modal-close" onclick="closeModal('taskModal')">&times;</button></div>
+    <div class="modal-header">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0">
+        <button type="button" class="btn btn-ghost btn-sm" id="taskBackCrumb" style="display:none" onclick="closeModal('taskModal')">&larr; <span id="taskBackName"></span></button>
+        <h2 id="taskModalTitle">New Task</h2>
+      </div>
+      <button class="modal-close" onclick="closeModal('taskModal')">&times;</button>
+    </div>
     <form id="taskForm">
-      <input type="hidden" id="taskId"><input type="hidden" id="taskProjectId">
-      <div class="form-group"><label>Task Title</label><input type="text" id="taskTitle" required></div>
-      <div class="form-row form-row-3">
-        <div class="form-group"><label>Assigned To</label><select id="taskAssignee"><option value="">Unassigned</option></select></div>
-        <div class="form-group"><label>Priority</label><select id="taskPriority"><option value="critical">&#128308; Critical</option><option value="high">&#128992; High</option><option value="medium" selected>&#128993; Medium</option><option value="low">&#128994; Low</option></select></div>
-        <div class="form-group"><label>Progress</label><select id="taskProgress"><option value="not-started">Not Started</option><option value="in-progress">In Progress</option><option value="completed">Completed</option><option value="stuck">Stuck</option><option value="awaiting-client">Awaiting Client</option><option value="awaiting-manager">Awaiting Manager</option><option value="ready-to-invoice">Ready to Invoice</option><option value="invoiced">Invoiced</option></select></div>
+      <div class="form-error" id="taskFormError"></div>
+      <input type="hidden" id="taskId"><input type="hidden" id="taskClientId">
+      <!-- Essentials only — everything else folds behind "More options" -->
+      <div class="form-row">
+        <div class="form-group" style="flex:2"><label>Task Title</label><input type="text" id="taskTitle" required></div>
+        <div class="form-group" style="flex:1"><label>Customer</label><select id="taskClientSelect"></select></div>
       </div>
       <div class="form-row form-row-3">
+        <div class="form-group"><label>Status</label><select id="taskStatus"><option value="inbox">Inbox</option><option value="scheduled">Scheduled</option><option value="in-progress">In Progress</option><option value="waiting-on-client">Waiting on Client</option><option value="waiting-on-me">Waiting on Me</option><option value="done">Done</option><option value="cancelled">Cancelled</option></select></div>
+        <div class="form-group"><label>When (band)</label><select id="taskBand"><option value="">—</option><option value="today">Today</option><option value="this-week">This Week</option><option value="scheduled">Scheduled</option><option value="waiting">Waiting</option><option value="someday">Someday</option></select></div>
         <div class="form-group"><label>Deadline</label><input type="date" id="taskDeadline"></div>
-        <div class="form-group"><label>Planned Date</label><input type="date" id="taskPlannedDate"></div>
-        <div class="form-group"><label>Est. Hours</label><input type="number" id="taskEstHours" min="0" step="0.5"></div>
       </div>
-      <div class="form-group"><label>References / Links</label><input type="text" id="taskReferences"></div>
       <div class="form-group"><label>Notes</label><textarea id="taskNotes" rows="2"></textarea></div>
-      <!-- Recurring -->
-      <div class="form-group">
-        <label><input type="checkbox" id="taskRecurring"> Recurring task</label>
-        <div id="recurOptions" style="display:none;margin-top:8px">
-          <div class="form-row" style="max-width:300px">
-            <div class="form-group"><label>Every</label><input type="number" id="taskRecurInterval" min="1" value="1" style="width:70px"></div>
-            <div class="form-group"><label>Period</label><select id="taskRecurUnit"><option value="days">Days</option><option value="weeks">Weeks</option><option value="months" selected>Months</option><option value="years">Years</option></select></div>
+      <button type="button" class="task-more-toggle" id="taskMoreToggle" onclick="toggleTaskMore()"><span id="taskMoreArrow">&#9656;</span> More options <span id="taskMoreHint" class="task-more-hint"></span></button>
+      <div id="taskMoreSection" style="display:none">
+        <div class="form-row">
+          <div class="form-group"><label>Assigned To</label><select id="taskAssignee"><option value="">Unassigned</option></select></div>
+          <div class="form-group"><label>Also Assigned</label><select id="taskSecondaryAssignee"><option value="">None</option></select></div>
+        </div>
+        <div class="form-row form-row-3">
+          <div class="form-group"><label>Type</label><select id="taskType"><option value="">—</option><option value="recurring">Recurring</option><option value="ad-hoc">Ad Hoc</option><option value="urgent">Urgent</option><option value="sales">Sales</option><option value="admin">Admin</option><option value="waiting">Waiting</option><option value="idea">Idea</option></select></div>
+          <div class="form-group"><label>Planned Date</label><input type="date" id="taskPlannedDate"></div>
+          <div class="form-group"><label>Est. Hours</label><input type="number" id="taskEstHours" min="0" step="0.5"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Suggested calendar block</label><input type="text" id="taskSuggestedBlock" placeholder="e.g. Tue AM, 2h"></div>
+          <div class="form-group"><label>References / Links</label><input type="text" id="taskReferences"></div>
+        </div>
+        <div class="form-group">
+          <label><input type="checkbox" id="taskRecurring"> Recurring task</label>
+          <div id="recurOptions" style="display:none;margin-top:8px">
+            <div class="form-row" style="max-width:300px">
+              <div class="form-group"><label>Every</label><input type="number" id="taskRecurInterval" min="1" value="1" style="width:70px"></div>
+              <div class="form-group"><label>Period</label><select id="taskRecurUnit"><option value="days">Days</option><option value="weeks">Weeks</option><option value="months" selected>Months</option><option value="years">Years</option></select></div>
+            </div>
           </div>
         </div>
-      </div>
-      <!-- Attachments -->
-      <div class="form-group">
-        <label>Attachments</label>
-        <div id="taskAttachmentsList"></div>
-        <input type="file" id="taskFiles" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip" style="margin-top:6px">
+        <div class="form-group">
+          <label>Checklist</label>
+          <div id="taskChecklist" class="checklist-container"></div>
+          <div class="checklist-add">
+            <input type="text" id="checklistNewItem" placeholder="Add checklist item..." style="flex:1">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="addChecklistItem()">+ Add</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Attachments</label>
+          <div id="taskAttachmentsList"></div>
+          <input type="file" id="taskFiles" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip" style="margin-top:6px">
+        </div>
       </div>
       <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="closeModal('taskModal')">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
     </form>
@@ -151,9 +564,29 @@
 
   <!-- Team Modal -->
   <div class="modal" id="teamModal">
-    <div class="modal-header"><h2>Team Members</h2><button class="modal-close" onclick="closeModal('teamModal')">&times;</button></div>
+    <div class="modal-header"><h2>Team</h2><button class="modal-close" onclick="closeModal('teamModal')">&times;</button></div>
     <div id="teamList" class="team-list"></div>
-    <form id="teamForm" class="team-form"><input type="text" id="teamMemberName" placeholder="Name" required><input type="text" id="teamMemberRole" placeholder="Role"><input type="color" id="teamMemberColor" value="#6366f1"><button type="submit" class="btn btn-primary btn-sm">Add</button></form>
+  </div>
+
+  <!-- Users & Permissions Modal -->
+  <div class="modal modal-lg" id="usersModal">
+    <div class="modal-header"><h2>Users &amp; Permissions</h2><button class="modal-close" onclick="closeModal('usersModal')">&times;</button></div>
+    <div id="usersList" style="padding:28px 36px"></div>
+    <div id="addUserSection" style="display:none;padding:0 36px 28px">
+      <h3 style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:16px;font-family:'Montserrat',sans-serif">Add New User</h3>
+      <form id="addUserForm">
+        <div class="form-row">
+          <div class="form-group"><label>Display Name</label><input type="text" id="newUserName" required></div>
+          <div class="form-group"><label>Username</label><input type="text" id="newUserUsername" required></div>
+        </div>
+        <div class="form-row form-row-3">
+          <div class="form-group"><label>Email</label><input type="email" id="newUserEmail" required></div>
+          <div class="form-group"><label>Password</label><input type="password" id="newUserPassword" required minlength="8"></div>
+          <div class="form-group"><label>Role</label><select id="newUserRole"><option value="editor">Editor</option><option value="viewer">Viewer</option><option value="owner">Owner</option></select></div>
+        </div>
+        <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="document.getElementById('addUserSection').style.display='none'">Cancel</button><button type="submit" class="btn btn-primary">Create User</button></div>
+      </form>
+    </div>
   </div>
 
   <!-- History Modal -->
@@ -168,12 +601,105 @@
     <div id="statsModalContent" style="max-height:450px;overflow-y:auto"></div>
   </div>
 
+  <!-- Workload Detail Popup -->
+  <div class="modal modal-lg" id="workloadDetailModal" style="max-width:800px">
+    <div class="modal-header">
+      <h2 id="workloadDetailTitle">Tasks</h2>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="date" id="workloadDatePicker" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:12px;color:var(--text);font-family:inherit">
+        <button class="modal-close" onclick="closeModal('workloadDetailModal')">&times;</button>
+      </div>
+    </div>
+    <div id="workloadDetailContent" style="max-height:500px;overflow-y:auto;padding:0 4px"></div>
+  </div>
+
   <!-- Archive Modal -->
   <div class="modal" id="archiveModal" style="max-width:600px">
     <div class="modal-header"><h2>Archived Items</h2><button class="modal-close" onclick="closeModal('archiveModal')">&times;</button></div>
     <div id="archiveContent" style="max-height:450px;overflow-y:auto"></div>
   </div>
 
-  <script src="app.js?v=3"></script>
+  <!-- Timeline Modal -->
+  <div class="modal modal-lg" id="timelineModal" style="max-width:700px">
+    <div class="modal-header"><h2 id="timelineModalTitle">Timeline</h2><button class="modal-close" onclick="closeModal('timelineModal')">&times;</button></div>
+    <div id="timelineContent" style="max-height:500px;overflow-y:auto;padding:20px 28px"></div>
+  </div>
+
+  <!-- Backups Modal -->
+  <div class="modal modal-lg" id="backupsModal" style="max-width:650px">
+    <div class="modal-header"><h2>Database Backups</h2><button class="modal-close" onclick="closeModal('backupsModal')">&times;</button></div>
+    <div style="padding:20px 28px">
+      <div style="display:flex;gap:10px;margin-bottom:16px">
+        <button class="btn btn-primary btn-sm" onclick="triggerBackup()">Create Backup Now</button>
+      </div>
+      <div id="backupsList" style="max-height:400px;overflow-y:auto"></div>
+    </div>
+  </div>
+
+  <footer class="app-footer">
+    <img src="/NBM%20Logo%20No%20NG%20Light%20Lines.png" alt="" style="width:28px;opacity:0.4">
+    <span>&copy; 2026 North Bear Media. All rights reserved.</span>
+    <span class="app-version">v5.0</span>
+  </footer>
+
+  <!-- Crop Modal -->
+  <div id="cropModalBackdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;align-items:center;justify-content:center">
+    <div style="background:var(--bg-card);border-radius:var(--radius-lg);padding:24px;width:90%;max-width:500px;max-height:90vh;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h3 id="cropModalTitle" style="margin:0;font-family:var(--font-heading)">Crop Image</h3>
+        <button onclick="closeCropModal()" style="background:none;border:none;color:var(--text);font-size:20px;cursor:pointer">&times;</button>
+      </div>
+      <div style="max-height:350px;overflow:hidden;background:#1a1a1a;border-radius:var(--radius)">
+        <img id="cropImage" style="max-width:100%;display:block">
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-size:12px;color:var(--text-secondary)">Zoom</span>
+        <input type="range" id="cropZoom" min="0.1" max="3" step="0.05" value="1" style="flex:1" oninput="if(window._cropper)window._cropper.zoomTo(parseFloat(this.value))">
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-ghost" onclick="closeCropModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="applyCrop()">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Assistant Launcher + Panel -->
+  <button id="aiLauncher" class="ai-launcher" onclick="toggleAI()" title="The Bear" style="display:none">
+    <span class="ai-launcher-icon">&#128059;</span>
+    <span class="ai-launcher-label">Ask The Bear</span>
+  </button>
+
+  <div id="aiPanel" class="ai-panel" style="display:none">
+    <div class="ai-header">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">&#128059;</span>
+        <div>
+          <div class="ai-title">The Bear</div>
+          <div class="ai-subtitle">Your North Bear assistant</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button class="ai-icon-btn" onclick="resetAIChat()" title="New conversation">&#8634;</button>
+        <button class="ai-icon-btn" onclick="toggleAI()" title="Close">&times;</button>
+      </div>
+    </div>
+    <div id="aiMessages" class="ai-messages"></div>
+    <div class="ai-suggestions" id="aiSuggestions">
+      <button class="ai-chip" onclick="sendAIPrompt('What do I have on this week?')">What's on this week?</button>
+      <button class="ai-chip" onclick="sendAIPrompt('Give me a workload summary for the team.')">Team workload</button>
+      <button class="ai-chip" onclick="sendAIPrompt('Create a task for me: ')">Create a task...</button>
+    </div>
+    <div id="aiMediaPreview" class="ai-media-preview" style="display:none"></div>
+    <form id="aiForm" class="ai-input-row" onsubmit="event.preventDefault();sendAIMessage()">
+      <input type="file" id="aiImageInput" accept="image/*" style="display:none" onchange="handleAIImageSelect(this)">
+      <button type="button" class="ai-media-btn" id="aiImageBtn" onclick="document.getElementById('aiImageInput').click()" title="Send image">&#128247;</button>
+      <button type="button" class="ai-media-btn" id="aiMicBtn" onclick="toggleVoiceRecording()" title="Voice note">&#127908;</button>
+      <textarea id="aiInput" placeholder="Ask The Bear to create tasks, plan your week, find something..." rows="1"></textarea>
+      <button type="submit" class="ai-send" id="aiSendBtn" title="Send">&#10148;</button>
+    </form>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+  <script src="app.js?v=71"></script>
 </body>
 </html>
