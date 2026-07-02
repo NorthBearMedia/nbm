@@ -3246,3 +3246,53 @@ select { color-scheme:dark; }
 .nb-swatch[data-hl=pink]   { background: linear-gradient(180deg,#ff9ecb,#f77fb4); }
 .nb-swatch[data-hl=blue]   { background: linear-gradient(180deg,#8fd0ff,#6cb8f2); }
 .nb-swatch[data-hl=orange] { background: linear-gradient(180deg,#ffb45e,#f29b3f); }
+
+/* ─── MOBILE / iPHONE PASS ───────────────────────────── */
+/* Notch + home-bar safe areas (standalone PWA draws edge-to-edge) */
+.navbar { padding-top: calc(env(safe-area-inset-top, 0px)); height: calc(var(--navbar-h) + env(safe-area-inset-top, 0px)); }
+.main { padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px)); }
+.ai-launcher { bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
+.ai-panel { bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
+
+/* Long-press on notebook lines shouldn't trigger text-selection/callout */
+.nb-line { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.nb-new input { -webkit-user-select: text; user-select: text; }
+
+@media (max-width: 700px) {
+  /* iOS zooms the page when focusing any input under 16px — hold the floor
+     on form controls (the notebook's handwriting inputs are already larger). */
+  .modal input, .modal select, .modal textarea,
+  .inbox-quickadd input, .inbox-quickadd select,
+  .filter-select, .email-search-wrap input, .focus-start input { font-size: 16px !important; }
+
+  /* Flat task rows: drop the inline planned-date/hours editors, keep the
+     essentials (deadline + status) so a row fits a phone width. */
+  .flat-task-row input.inline-date[title="Planned date"],
+  .flat-task-row input.inline-hours { display: none; }
+  .flat-task-row { flex-wrap: wrap; row-gap: 4px; }
+  .flat-task-client { min-width: 100px; }
+
+  /* Notebook touch targets: fingers, not cursors */
+  .nb-bullet { width: 34px; }
+  .nb-marker { width: 32px; height: 16px; }
+  .nb-dogear { width: 54px; height: 54px; }
+  .nb-options { right: 6px; width: min(260px, calc(100vw - 40px)); }
+  .nb-menu { width: min(250px, calc(100vw - 30px)); }
+
+  /* Modals: never taller than the visible viewport, always scrollable */
+  .modal { max-height: 90dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Client detail + battle plan breathing room */
+  .cd-head { gap: 6px; }
+  .bp-item { padding: 9px 8px; }
+  .bp-act { width: 32px; height: 32px; }
+}
+
+/* iPhone header fix: the big date collides with the page title at 390px —
+   the phone already tells you the date. Client suffixes yield to titles. */
+@media (max-width: 600px) {
+  .nb-date { display: none; }
+  .nb-client { display: none; }
+  .nb-paper { padding-left: 56px; padding-right: 12px; }
+  .nb-paper::before { left: 40px; }
+}

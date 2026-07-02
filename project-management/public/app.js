@@ -306,6 +306,8 @@ const OVERFLOW_VIEWS = ['today', 'calendar', 'focus', 'email'];
 
 function switchView(view) {
   document.querySelectorAll('.nav-tab[data-view], .nav-dropdown-item[data-view]').forEach(t => t.classList.toggle('active', t.dataset.view === view));
+  // On phones the nav scrolls — keep the active tab in view.
+  try { document.querySelector(`.nav-tab[data-view="${view}"]`)?.scrollIntoView({ inline: 'center', block: 'nearest' }); } catch {}
   document.getElementById('navMoreBtn')?.classList.toggle('active', OVERFLOW_VIEWS.includes(view));
   document.getElementById('navMoreDropdown')?.classList.remove('open');
   currentView = view;
@@ -1365,6 +1367,30 @@ document.getElementById('notebookLines').addEventListener('contextmenu', (e) => 
   e.preventDefault();
   nbOpenMenu(+line.dataset.id, e.clientX, e.clientY);
 });
+
+// iOS Safari never fires contextmenu — emulate it with a 550ms long-press.
+// Cancels if the finger moves (scrolling) or lifts early.
+let nbPressTimer = null;
+let nbPressStart = null;
+document.getElementById('notebookLines').addEventListener('touchstart', (e) => {
+  const line = e.target.closest('.nb-line');
+  if (!line || !line.dataset.id || e.touches.length !== 1) return;
+  const t = e.touches[0];
+  nbPressStart = { x: t.clientX, y: t.clientY };
+  nbPressTimer = setTimeout(() => {
+    nbPressTimer = null;
+    nbOpenMenu(+line.dataset.id, nbPressStart.x, nbPressStart.y);
+  }, 550);
+}, { passive: true });
+document.getElementById('notebookLines').addEventListener('touchmove', (e) => {
+  if (!nbPressTimer || !nbPressStart) return;
+  const t = e.touches[0];
+  if (Math.abs(t.clientX - nbPressStart.x) > 10 || Math.abs(t.clientY - nbPressStart.y) > 10) {
+    clearTimeout(nbPressTimer); nbPressTimer = null;
+  }
+}, { passive: true });
+['touchend', 'touchcancel'].forEach(ev =>
+  document.getElementById('notebookLines').addEventListener(ev, () => { if (nbPressTimer) { clearTimeout(nbPressTimer); nbPressTimer = null; } }));
 document.addEventListener('click', (e) => { if (!e.target.closest('#nbMenu')) nbCloseMenu(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') nbCloseMenu(); });
 
