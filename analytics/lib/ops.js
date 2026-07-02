@@ -18,6 +18,12 @@ import { googleClient } from './google.js';
 import { getGscReaderEmail, getHostingerToken, getEmailBcc, getSmtp } from './runtime-config.js';
 import { mailer } from './email.js';
 import { getEmailFrom } from './runtime-config.js';
+import { installTag } from './inject.js';
+
+// Every North Bear site sits under this Hostinger account; public_html
+// paths follow a fixed shape, confirmed by the website inventory.
+const HOSTINGER_USER = 'u275789987';
+export const rootDirFor = domain => `/home/${HOSTINGER_USER}/domains/${domain}/public_html`;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -229,10 +235,60 @@ export async function runOpsSweep({ force = false } = {}) {
   return log;
 }
 
+// One-time proof that automated GA install works, run against a demo site
+// (never a client site). Emails Norton the result.
+export async function runInjectionTest() {
+  if (getSetting('inject_demo_done') === 'true') return null;
+  const domain = 'nbmdemosite2.co.uk';
+  const measurementId = 'G-MS3V4KS3PB';
+  let r, err = null;
+  try {
+    r = await installTag({ username: HOSTINGER_USER, rootDir: rootDirFor(domain), domain, measurementId });
+  } catch (e) { err = e.message; }
+  setSetting('inject_demo_done', r?.verified ? 'true' : 'attempted');
+  try {
+    await mailer().sendMail({
+      from: getEmailFrom(),
+      to: 'norton@northbearmedia.co.uk',
+      bcc: getEmailBcc() || undefined,
+      subject: r?.verified ? 'GA auto-install TEST PASSED on demo site ✓' : 'GA auto-install test ran — please look',
+      text: `Automated Google Analytics install test on the demo site ${domain} (tag ${measurementId}).\n\n`
+        + (err ? `ERROR: ${err}\n\n` : `Result: ${r.verified ? 'VERIFIED — the tag is live on the page ✓' : 'tag not confirmed on the live page yet'}\n`
+        + `Cron executed on server: ${r.ran}\nChecked URL: ${r.url || 'n/a'}\n\nServer output:\n${r.output}\n\n`)
+        + `WHAT THIS PROVES\nYour sites are on standard Hostinger hosting, so Pulse can install the GA (and Clarity) tag on EVERY site automatically via a server-side script — no Website Builder pasting, no hands.\n\nNEXT\nIf this shows VERIFIED, reply "roll it out" and Pulse will install GA on all client sites the same way (each file backed up first, idempotent). Nothing touches a client site until you say go.\n\n— North Bear Pulse`,
+    });
+  } catch (e) { console.error('[inject] test email failed:', e.message); }
+  return r;
+}
+
+// Roll the GA (+ Clarity) tag out to real client sites. Explicit trigger
+// only — never automatic. measurementId per site comes from the DB.
+export async function runInjectionRollout({ onlyDomain = null } = {}) {
+  const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND domain != ''").all()
+    .filter(s => !onlyDomain || (s.domain || '').toLowerCase() === onlyDomain.toLowerCase());
+  const results = [];
+  for (const site of sites) {
+    const domain = (site.domain || '').toLowerCase().replace(/^www\./, '');
+    if (!site.ga4_measurement_id) { results.push({ domain, skipped: 'no GA measurement ID on file' }); continue; }
+    try {
+      const r = await installTag({
+        username: HOSTINGER_USER, rootDir: rootDirFor(domain), domain,
+        measurementId: site.ga4_measurement_id, clarityId: site.clarity_project_id || null,
+      });
+      results.push({ domain, ran: r.ran, verified: r.verified });
+    } catch (e) { results.push({ domain, error: e.message.slice(0, 160) }); }
+  }
+  return results;
+}
+
 export function scheduleOpsSweep() {
   const smtp = getSmtp();
   // Contacts load on every boot (cheap, offline, idempotent).
   try { loadClientContacts(); } catch (e) { console.error('[ops]', e.message); }
+  // One-time GA auto-install proof on the demo site (never a client site).
+  if (getSetting('inject_demo_done') !== 'true') {
+    setTimeout(() => runInjectionTest().catch(e => console.error('[inject]', e.message)), 120_000);
+  }
   // The network sweep retries on boots until fully done (v2 adds the
   // website inventory + armed contacts; the sweep itself is idempotent).
   if (getSetting('ops_v2_done') === 'true') return;
