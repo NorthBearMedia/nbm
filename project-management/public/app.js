@@ -299,9 +299,15 @@ function applyViewVisibility() {
   document.getElementById('workloadSummary').style.display = currentView === 'clients' ? 'flex' : 'none';
 }
 
+// Views tucked into the "More" overflow — same functions, less shopfront.
+const OVERFLOW_VIEWS = ['today', 'calendar', 'focus', 'email'];
+
 function switchView(view) {
-  document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
+  document.querySelectorAll('.nav-tab[data-view], .nav-dropdown-item[data-view]').forEach(t => t.classList.toggle('active', t.dataset.view === view));
+  document.getElementById('navMoreBtn')?.classList.toggle('active', OVERFLOW_VIEWS.includes(view));
+  document.getElementById('navMoreDropdown')?.classList.remove('open');
   currentView = view;
+  try { localStorage.setItem('nbm_view', view); } catch {}
   applyViewVisibility();
   if (view === 'dashboard') loadDashboard();
   if (view === 'inbox') loadInboxView();
@@ -313,8 +319,18 @@ function switchView(view) {
   if (view === 'email') loadEmailView();
 }
 
-document.querySelectorAll('.nav-tab').forEach(tab => {
+document.querySelectorAll('.nav-tab[data-view], .nav-dropdown-item[data-view]').forEach(tab => {
   tab.addEventListener('click', () => switchView(tab.dataset.view));
+});
+
+function toggleNavMore(e) {
+  if (e) e.stopPropagation();
+  document.getElementById('navMoreDropdown').classList.toggle('open');
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.nav-more-wrap')) {
+    document.getElementById('navMoreDropdown')?.classList.remove('open');
+  }
 });
 
 // ─── Dashboard ─────────────────────────────────────────
@@ -2646,6 +2662,11 @@ async function toggleTaskPin(taskId, event) {
     await loadClients();              // populates clients + renders the Control Board (currentView==='dashboard')
     await loadPins();
     document.getElementById('todayDate').value=localDateStr(new Date());
+    // Interruption insurance: reopen where you left off, not back at square one.
+    try {
+      const savedView = localStorage.getItem('nbm_view');
+      if (savedView && savedView !== 'dashboard' && document.querySelector(`[data-view="${savedView}"]`)) switchView(savedView);
+    } catch {}
   } catch(e) {
     console.error('Init error:', e);
     document.getElementById('clientList').innerHTML='<div class="empty-state"><p>Error loading data. Please refresh.</p></div>';

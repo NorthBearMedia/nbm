@@ -22,11 +22,16 @@
       <button class="nav-tab active" data-view="dashboard"><span class="nav-icon">&#9670;</span> Dashboard</button>
       <button class="nav-tab" data-view="inbox"><span class="nav-icon">&#128229;</span> Inbox <span id="inboxCount" class="nav-count" style="display:none"></span></button>
       <button class="nav-tab" data-view="clients"><span class="nav-icon">&#9783;</span> Tasks</button>
-      <button class="nav-tab" data-view="today"><span class="nav-icon">&#9788;</span> Today</button>
       <button class="nav-tab" data-view="planning"><span class="nav-icon">&#128467;</span> Planning</button>
-      <button class="nav-tab" data-view="calendar"><span class="nav-icon">&#128197;</span> Calendar</button>
-      <button class="nav-tab" data-view="focus"><span class="nav-icon">&#9889;</span> Focus</button>
-      <button class="nav-tab" data-view="email" id="emailNavTab" style="display:none"><span class="nav-icon">&#9993;</span> Email</button>
+      <div class="nav-more-wrap" style="position:relative">
+        <button class="nav-tab" id="navMoreBtn" onclick="toggleNavMore(event)">More &#9662;</button>
+        <div class="nav-dropdown" id="navMoreDropdown">
+          <button class="nav-dropdown-item" data-view="today">&#9788; Today</button>
+          <button class="nav-dropdown-item" data-view="calendar">&#128197; Calendar</button>
+          <button class="nav-dropdown-item" data-view="focus">&#9889; Focus</button>
+          <button class="nav-dropdown-item" data-view="email" id="emailNavTab" style="display:none">&#9993; Email</button>
+        </div>
+      </div>
     </div>
     <div class="nav-right">
       <!-- Focus countdown pill (hidden until a session starts) -->

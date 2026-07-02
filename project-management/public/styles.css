@@ -2901,3 +2901,29 @@ select { color-scheme:dark; }
   .ai-launcher-label { display: none; }
   .ai-launcher { padding: 14px; }
 }
+
+/* ─── ADHD UX: nav overflow + mobile refinements ────── */
+.nav-more-wrap .nav-dropdown { right: auto; left: 0; }
+#navMoreBtn.active { color: var(--text); background: var(--bg-glass); }
+
+@media (max-width: 860px) {
+  .nav-center {
+    flex: 1; min-width: 0; overflow-x: auto; justify-content: flex-start;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent);
+    mask-image: linear-gradient(90deg, #000 88%, transparent);
+  }
+  .nav-center::-webkit-scrollbar { display: none; }
+  .nav-tab { flex-shrink: 0; }
+}
+@media (max-width: 600px) {
+  .dash-stats { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .dash-stat { padding: 10px 12px; }
+  .dash-stat-icon { display: none; }
+  .dash-stat-value { font-size: 18px; }
+  /* Battle Plan: give the words the width — meta and secondary actions step back */
+  .bp-sub, .bp-est, .bp-why { display: none; }
+  .bp-actions .bp-resched, .bp-actions .bp-focus { display: none; }
+  .bp-text { white-space: normal; line-height: 1.35; }
+  .battle-plan { padding: 12px; }
+}
