@@ -1011,21 +1011,53 @@ async function quickAddInbox() {
 let nbTab = localStorage.getItem('nbm_nb_tab') || 'all';
 let nbClient = localStorage.getItem('nbm_nb_client') || '';
 let nbOrder = localStorage.getItem('nbm_nb_order') || 'written';
+let nbFont = localStorage.getItem('nbm_nb_font') || 'Caveat';
+let nbPage = 0;                 // current page index for long lists
+const NB_PAGE_SIZE = 22;        // lines per notebook page
 
-function nbSetTab(t) { nbTab = t; try { localStorage.setItem('nbm_nb_tab', t); } catch {} loadNotebookView(); }
-function nbSetClient(v) { nbClient = v; try { localStorage.setItem('nbm_nb_client', v); } catch {} loadNotebookView(); }
+// Available "pens" — self-hosted handwriting fonts, each with its own size
+// tuning so the ink sits on the ruled lines regardless of the font's metrics.
+const NB_PENS = {
+  'Caveat':             { label: 'Caveat (flowing)',     size: 23, small: 17, base: 25 },
+  'Kalam':              { label: 'Kalam (biro)',         size: 19, small: 15, base: 23 },
+  'Patrick Hand':       { label: 'Patrick Hand (neat)',  size: 20, small: 15, base: 24 },
+  'Shadows Into Light': { label: 'Shadows (fine liner)', size: 20, small: 15, base: 24 },
+  'Indie Flower':       { label: 'Indie Flower (bubbly)',size: 19, small: 15, base: 23 },
+};
+
+function nbSetTab(t) { nbTab = t; nbPage = 0; try { localStorage.setItem('nbm_nb_tab', t); } catch {} loadNotebookView(); }
+function nbSetClient(v) { nbClient = v; nbPage = 0; try { localStorage.setItem('nbm_nb_client', v); } catch {} loadNotebookView(); }
 function nbToggleOrder() {
   nbOrder = nbOrder === 'written' ? 'due' : 'written';
+  nbPage = 0;
   try { localStorage.setItem('nbm_nb_order', nbOrder); } catch {}
   loadNotebookView();
 }
+function nbSetFont(f) {
+  nbFont = NB_PENS[f] ? f : 'Caveat';
+  try { localStorage.setItem('nbm_nb_font', nbFont); } catch {}
+  applyNbFont();
+  loadNotebookView();
+}
+function applyNbFont() {
+  const wrap = document.querySelector('.nb-wrap');
+  if (!wrap) return;
+  const pen = NB_PENS[nbFont] || NB_PENS.Caveat;
+  wrap.style.setProperty('--nb-font', `'${nbFont}', cursive`);
+  wrap.style.setProperty('--nb-size', pen.size + 'px');
+  wrap.style.setProperty('--nb-small', pen.small + 'px');
+  // Re-phase the ruled lines so this pen's baseline lands on the rule.
+  const paper = wrap.querySelector('.nb-paper');
+  if (paper) paper.style.backgroundPosition = `0 ${pen.base}px, 0 0`;
+}
+function nbFlip(dir) { nbPage += dir; loadNotebookView(); }
 
 const NB_PAGE_TITLES = {
-  all: 'everything on my plate',
-  today: "today's page",
-  week: 'this week',
-  waiting: 'waiting on people',
-  done: 'ticked off lately',
+  all: 'Everything on my plate',
+  today: "Today's page",
+  week: 'This week',
+  waiting: 'Waiting on people',
+  done: 'Ticked off lately',
 };
 
 function loadNotebookView() {
@@ -1034,13 +1066,20 @@ function loadNotebookView() {
   const today = localDateStr(new Date());
   document.getElementById('nbDate').textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
+  applyNbFont();
+  // Pen picker
+  const penSel = document.getElementById('nbPenSelect');
+  if (penSel && !penSel.options.length) {
+    penSel.innerHTML = Object.entries(NB_PENS).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('');
+  }
+  if (penSel) penSel.value = nbFont;
   // Tabs + client dropdown state
   document.querySelectorAll('#nbTabs .nb-tab').forEach(b => b.classList.toggle('nb-tab-active', b.dataset.nbtab === nbTab));
   const sel = document.getElementById('nbClientFilter');
   const realClients = clients.filter(c => !c.is_system && !c.archived).sort((a, b) => a.name.localeCompare(b.name));
-  sel.innerHTML = '<option value="">everyone</option>' + realClients.map(c => `<option value="${c.id}" ${String(c.id) === nbClient ? 'selected' : ''}>${esc(c.name.toLowerCase())}</option>`).join('');
+  sel.innerHTML = '<option value="">everyone</option>' + realClients.map(c => `<option value="${c.id}" ${String(c.id) === nbClient ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
   document.getElementById('nbPageTitle').textContent = NB_PAGE_TITLES[nbTab] || '';
-  document.getElementById('nbOrderBtn').textContent = nbOrder === 'written' ? 'in the order i wrote them' : 'soonest first';
+  document.getElementById('nbOrderBtn').textContent = nbOrder === 'written' ? 'in the order I wrote them' : 'soonest first';
 
   // Monday-anchored week window for the "this week" page
   const now = new Date(); now.setHours(0, 0, 0, 0);
@@ -1075,23 +1114,43 @@ function loadNotebookView() {
     items.sort((a, b) => a.id - b.id);
   }
 
-  // Footer note in pencil
+  // Footer note in pencil (counts across the whole filtered set, not just this page)
   const openCount = items.filter(isOpenTask).length;
   const tickedToday = allTasksFlat().filter(t => t.task_status === 'done' && (t.completed_at || '') === today && (!nbClient || String(t.client_id) === nbClient)).length;
   document.getElementById('nbFooter').textContent =
-    `${openCount} thing${openCount === 1 ? '' : 's'} on this page${tickedToday ? ` · ${tickedToday} ticked off today` : ''}`;
+    `${openCount} thing${openCount === 1 ? '' : 's'} to do here${tickedToday ? ` · ${tickedToday} ticked off today` : ''}`;
 
   // Quick-add hint follows the client filter ("writing on that client's page")
   document.getElementById('nbNewTask').placeholder = nbClient
-    ? `write a task for ${(realClients.find(c => String(c.id) === nbClient)?.name || '').toLowerCase()}, press Enter...`
-    : 'write a task, press Enter...';
+    ? `Write a task for ${realClients.find(c => String(c.id) === nbClient)?.name || 'this client'}, press Enter…`
+    : 'Write a task, press Enter…';
   document.getElementById('nbNewRow').style.display = nbTab === 'done' ? 'none' : '';
 
   if (!items.length) {
-    el.innerHTML = `<div class="nb-empty">${nbTab === 'done' ? 'nothing ticked off yet — go tick something' : 'a blank page. write something below…'}</div>`;
+    document.getElementById('nbPageNav').style.display = 'none';
+    document.getElementById('nbFooter').textContent = '';
+    el.innerHTML = `<div class="nb-empty">${nbTab === 'done' ? 'Nothing ticked off yet — go tick something.' : 'A blank page. Write something below…'}</div>`;
     return;
   }
-  el.innerHTML = items.map(t => {
+
+  // Pagination — a long list becomes real notebook pages you flip through.
+  const totalPages = Math.max(1, Math.ceil(items.length / NB_PAGE_SIZE));
+  if (nbPage > totalPages - 1) nbPage = totalPages - 1;
+  if (nbPage < 0) nbPage = 0;
+  const nav = document.getElementById('nbPageNav');
+  if (totalPages > 1) {
+    nav.style.display = '';
+    document.getElementById('nbPageNum').textContent = `page ${nbPage + 1} of ${totalPages}`;
+    document.getElementById('nbPrevPage').disabled = nbPage === 0;
+    document.getElementById('nbNextPage').disabled = nbPage === totalPages - 1;
+    // On earlier pages the "write" line would be misleading — only show it on the last page.
+    document.getElementById('nbNewRow').style.display = (nbTab === 'done' || nbPage !== totalPages - 1) ? 'none' : '';
+  } else {
+    nav.style.display = 'none';
+  }
+  const pageItems = items.slice(nbPage * NB_PAGE_SIZE, (nbPage + 1) * NB_PAGE_SIZE);
+
+  el.innerHTML = pageItems.map(t => {
     const done = t.task_status === 'done';
     const hl = t.task_band === 'today' && !done;
     const overdue = !done && t.deadline && t.deadline < today;

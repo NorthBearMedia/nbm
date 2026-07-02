@@ -3082,3 +3082,33 @@ select { color-scheme:dark; }
   .nb-tabs { padding-left:52px; }
   .nb-client-select { max-width:150px; }
 }
+
+/* ─── NOTEBOOK v3: pens, pages, proper capitals ──────── */
+@font-face { font-family:'Kalam'; font-style:normal; font-weight:400; font-display:swap; src:url('/fonts/kalam-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family:'Patrick Hand'; font-style:normal; font-weight:400; font-display:swap; src:url('/fonts/patrick-hand-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family:'Shadows Into Light'; font-style:normal; font-weight:400; font-display:swap; src:url('/fonts/shadows-into-light-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family:'Indie Flower'; font-style:normal; font-weight:400; font-display:swap; src:url('/fonts/indie-flower-latin-400-normal.woff2') format('woff2'); }
+
+/* Ink family/size flow from CSS variables so the pen can change */
+.nb-wrap { --nb-font:'Caveat',cursive; --nb-size:23px; --nb-small:17px; }
+.nb-line, .nb-new input, .nb-bullet, .nb-empty { font-family:var(--nb-font); }
+.nb-line { font-size:var(--nb-size); }
+.nb-new input { font-size:var(--nb-size); }
+.nb-bullet { font-size:calc(var(--nb-size) - 1px); }
+.nb-client, .nb-due { font-size:var(--nb-small); }
+.nb-date { text-transform:none; }   /* capitals belong to the writer, not the CSS */
+
+.nb-pen-select {
+  font-family:var(--nb-font); font-size:17px; color:rgba(28,28,28,.6);
+  background:transparent; border:none; border-bottom:1px dashed rgba(28,28,28,.3);
+  outline:none; cursor:pointer; padding:0 2px;
+}
+.nb-pen-select option { font-size:14px; color:#1c1c1c; background:#faf6ec; }
+.nb-sub-right { display:flex; gap:16px; align-items:baseline; }
+
+/* page-flip navigation, written in ink */
+.nb-pagenav { display:flex; justify-content:space-between; align-items:baseline; line-height:34px; font-family:var(--nb-font); font-size:18px; color:rgba(28,28,28,.55); }
+.nb-pagebtn { font-family:inherit; font-size:inherit; color:#1c1c1c; background:transparent; border:none; border-bottom:1px dashed rgba(28,28,28,.35); cursor:pointer; padding:0 2px; }
+.nb-pagebtn:disabled { opacity:.25; cursor:default; border-bottom-color:transparent; }
+.nb-pagebtn:hover:not(:disabled) { color:#2d6a4f; }
+.nb-pagenum { font-size:17px; }

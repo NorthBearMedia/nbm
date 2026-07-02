@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>North Bear Console</title>
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=66">
+  <link rel="stylesheet" href="styles.css?v=67">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -357,24 +357,32 @@
       <div class="nb-wrap">
         <!-- sticky index tabs along the top edge of the page -->
         <div class="nb-tabs" id="nbTabs">
-          <button class="nb-tab" data-nbtab="all" onclick="nbSetTab('all')">everything</button>
-          <button class="nb-tab" data-nbtab="today" onclick="nbSetTab('today')">today</button>
-          <button class="nb-tab" data-nbtab="week" onclick="nbSetTab('week')">this week</button>
-          <button class="nb-tab" data-nbtab="waiting" onclick="nbSetTab('waiting')">waiting</button>
-          <button class="nb-tab" data-nbtab="done" onclick="nbSetTab('done')">ticked off</button>
+          <button class="nb-tab" data-nbtab="all" onclick="nbSetTab('all')">Everything</button>
+          <button class="nb-tab" data-nbtab="today" onclick="nbSetTab('today')">Today</button>
+          <button class="nb-tab" data-nbtab="week" onclick="nbSetTab('week')">This week</button>
+          <button class="nb-tab" data-nbtab="waiting" onclick="nbSetTab('waiting')">Waiting</button>
+          <button class="nb-tab" data-nbtab="done" onclick="nbSetTab('done')">Ticked off</button>
         </div>
         <div class="nb-paper">
           <div class="nb-header">
-            <span class="nb-filedunder">filed under:
+            <span class="nb-filedunder">Filed under:
               <select id="nbClientFilter" class="nb-client-select" onchange="nbSetClient(this.value)"></select>
             </span>
             <span id="nbDate" class="nb-date"></span>
           </div>
           <div class="nb-subheader">
             <span id="nbPageTitle" class="nb-page-title"></span>
-            <button id="nbOrderBtn" class="nb-order" onclick="nbToggleOrder()" title="Change ordering"></button>
+            <span class="nb-sub-right">
+              <select id="nbPenSelect" class="nb-pen-select" onchange="nbSetFont(this.value)" title="Choose your pen"></select>
+              <button id="nbOrderBtn" class="nb-order" onclick="nbToggleOrder()" title="Change ordering"></button>
+            </span>
           </div>
           <div id="notebookLines"></div>
+          <div class="nb-pagenav" id="nbPageNav" style="display:none">
+            <button class="nb-pagebtn" id="nbPrevPage" onclick="nbFlip(-1)">&#10229; earlier page</button>
+            <span class="nb-pagenum" id="nbPageNum"></span>
+            <button class="nb-pagebtn" id="nbNextPage" onclick="nbFlip(1)">later page &#10230;</button>
+          </div>
           <div class="nb-line nb-new" id="nbNewRow">
             <span class="nb-bullet" style="opacity:.35">&bull;</span>
             <input id="nbNewTask" type="text" placeholder="write a task, press Enter..." autocomplete="off" onkeydown="if(event.key==='Enter'){nbQuickAdd()}">
@@ -660,6 +668,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=66"></script>
+  <script src="app.js?v=67"></script>
 </body>
 </html>
