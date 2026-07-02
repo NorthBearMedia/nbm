@@ -58,6 +58,14 @@ export async function verifyPendingInjections() {
       rec.status = 'verified';
       await deleteInjectCrons(HOSTINGER_USER, domain);
       transitions.push(`✅ ${domain} — tag confirmed live, cron cleaned up`);
+      // The demo site proving the mechanism triggers the full client
+      // rollout automatically (once). No manual "roll it out" needed.
+      if (domain === 'nbmdemosite2.co.uk' && getSetting('auto_rollout_done') !== 'true') {
+        setSetting('auto_rollout_done', 'true');
+        transitions.push('▶ Demo verified — rolling out GA to every client site now.');
+        saveInjectState(s);
+        runInjectionRollout().catch(e => console.error('[inject] auto-rollout:', e.message));
+      }
     } else if (rec.tries >= 12) {
       rec.status = 'failed';
       const out = await injectCronOutput(HOSTINGER_USER, domain);
