@@ -1014,6 +1014,7 @@ let nbOrder = localStorage.getItem('nbm_nb_order') || 'written';
 let nbFont = localStorage.getItem('nbm_nb_font') || 'Caveat';
 let nbSize = parseFloat(localStorage.getItem('nbm_nb_size')) || 1;
 let nbHideDone = localStorage.getItem('nbm_nb_hidedone') === '1';
+let nbHl = localStorage.getItem('nbm_nb_hl') || 'yellow';
 let nbPage = 0;                 // current page index for long lists
 const NB_PAGE_SIZE = 22;        // lines per notebook page
 
@@ -1055,6 +1056,9 @@ function applyNbFont() {
   wrap.style.setProperty('--nb-size', Math.round(pen.size * scale) + 'px');
   wrap.style.setProperty('--nb-small', Math.round(pen.small * scale) + 'px');
   wrap.style.setProperty('--nb-lh', Math.round(NB_LINE_H * scale) + 'px');
+  const hl = NB_HLS[nbHl] || NB_HLS.yellow;
+  wrap.style.setProperty('--nb-hl', hl.light);
+  wrap.style.setProperty('--nb-hl-deep', hl.deep);
 }
 function nbSetSize(delta) {
   nbSize = Math.max(0.7, Math.min(1.5, Math.round(((nbSize || 1) + delta) * 100) / 100));
@@ -1066,6 +1070,34 @@ function nbToggleHideDone() {
   try { localStorage.setItem('nbm_nb_hidedone', nbHideDone ? '1' : '0'); } catch {}
   loadNotebookView();
 }
+
+// One highlighter in hand at a time, like real life — the colour applies to
+// every highlighted line and to the little marker swatches on each row.
+const NB_HLS = {
+  yellow: { light: 'rgba(255,228,58,.85)', deep: '#f6cf22' },
+  green:  { light: 'rgba(142,226,125,.8)', deep: '#6fcf5e' },
+  pink:   { light: 'rgba(255,158,203,.75)', deep: '#f77fb4' },
+  blue:   { light: 'rgba(143,208,255,.8)', deep: '#6cb8f2' },
+  orange: { light: 'rgba(255,180,94,.8)',  deep: '#f29b3f' },
+};
+function nbSetHl(c) {
+  nbHl = NB_HLS[c] ? c : 'yellow';
+  try { localStorage.setItem('nbm_nb_hl', nbHl); } catch {}
+  applyNbFont();
+  nbMarkActiveSwatch();
+}
+function nbMarkActiveSwatch() {
+  document.querySelectorAll('.nb-swatch').forEach(b => b.classList.toggle('nb-swatch-on', b.dataset.hl === nbHl));
+}
+function nbToggleOptions(e) {
+  if (e) e.stopPropagation();
+  document.getElementById('nbOptions').classList.toggle('open');
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#nbOptions') && !e.target.closest('#nbDogear')) {
+    document.getElementById('nbOptions')?.classList.remove('open');
+  }
+});
 function nbFlip(dir) { nbPage += dir; loadNotebookView(); }
 
 const NB_PAGE_TITLES = {
@@ -1089,6 +1121,7 @@ function loadNotebookView() {
     penSel.innerHTML = Object.entries(NB_PENS).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('');
   }
   if (penSel) penSel.value = nbFont;
+  nbMarkActiveSwatch();
   // Tabs + client dropdown state
   document.querySelectorAll('#nbTabs .nb-tab').forEach(b => b.classList.toggle('nb-tab-active', b.dataset.nbtab === nbTab));
   const sel = document.getElementById('nbClientFilter');

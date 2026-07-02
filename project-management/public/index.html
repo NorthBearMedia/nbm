@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>North Bear Console</title>
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=70">
+  <link rel="stylesheet" href="styles.css?v=71">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -372,15 +372,36 @@
           </div>
           <div class="nb-subheader">
             <span id="nbPageTitle" class="nb-page-title"></span>
-            <span class="nb-sub-right">
-              <button id="nbHideDoneBtn" class="nb-order" onclick="nbToggleHideDone()" title="Show/hide ticked-off tasks"></button>
-              <span class="nb-size" title="Handwriting size">
+          </div>
+          <!-- dog-eared corner: all notebook options live under the fold -->
+          <button class="nb-dogear" id="nbDogear" onclick="nbToggleOptions(event)" title="Notebook options"></button>
+          <div class="nb-options" id="nbOptions">
+            <div class="nb-opt-title">This notebook</div>
+            <div class="nb-opt-row"><span class="nb-opt-label">Pen</span>
+              <select id="nbPenSelect" class="nb-pen-select" onchange="nbSetFont(this.value)"></select>
+            </div>
+            <div class="nb-opt-row"><span class="nb-opt-label">Size</span>
+              <span class="nb-size">
                 <button class="nb-size-btn" onclick="nbSetSize(-0.1)">A&minus;</button>
-                <button class="nb-size-btn nb-size-plus" onclick="nbSetSize(0.1)">A+</button>
+                <button class="nb-size-btn" onclick="nbSetSize(0.1)">A+</button>
               </span>
-              <select id="nbPenSelect" class="nb-pen-select" onchange="nbSetFont(this.value)" title="Choose your pen"></select>
-              <button id="nbOrderBtn" class="nb-order" onclick="nbToggleOrder()" title="Change ordering"></button>
-            </span>
+            </div>
+            <div class="nb-opt-row"><span class="nb-opt-label">Highlighter</span>
+              <span class="nb-swatches" id="nbSwatches">
+                <button class="nb-swatch" data-hl="yellow" onclick="nbSetHl('yellow')" title="Yellow"></button>
+                <button class="nb-swatch" data-hl="green" onclick="nbSetHl('green')" title="Green"></button>
+                <button class="nb-swatch" data-hl="pink" onclick="nbSetHl('pink')" title="Pink"></button>
+                <button class="nb-swatch" data-hl="blue" onclick="nbSetHl('blue')" title="Blue"></button>
+                <button class="nb-swatch" data-hl="orange" onclick="nbSetHl('orange')" title="Orange"></button>
+              </span>
+            </div>
+            <div class="nb-opt-sep"></div>
+            <div class="nb-opt-row"><span class="nb-opt-label">Order</span>
+              <button id="nbOrderBtn" class="nb-order" onclick="nbToggleOrder()"></button>
+            </div>
+            <div class="nb-opt-row"><span class="nb-opt-label">Page</span>
+              <button id="nbHideDoneBtn" class="nb-order" onclick="nbToggleHideDone()"></button>
+            </div>
           </div>
           <div id="notebookLines"></div>
           <div class="nb-pagenav" id="nbPageNav" style="display:none">
@@ -679,6 +700,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=70"></script>
+  <script src="app.js?v=71"></script>
 </body>
 </html>
