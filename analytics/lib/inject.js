@@ -76,37 +76,49 @@ export function buildCronCommand(scriptUrl) {
   return `curl -fsSL '${scriptUrl}' 2>/dev/null | sh || wget -qO- '${scriptUrl}' 2>/dev/null | sh`;
 }
 
-async function findCronUid(username, command) {
+export async function listCrons(username) {
   const list = await hg(`/api/hosting/v1/accounts/${username}/cron-jobs`);
-  const jobs = Array.isArray(list) ? list : (list.data || []);
-  const match = jobs.find(j => (j.command || '') === command) || jobs[jobs.length - 1];
-  return match?.uid || match?.id || null;
+  return Array.isArray(list) ? list : (list.data || []);
 }
 
-// Runs the injector on one site via a one-shot cron job that fetches the
-// script from Pulse. Returns the captured server output (or a timeout note).
-export async function injectViaCron({ username, scriptUrl }, { pollMs = 150_000 } = {}) {
-  const command = buildCronCommand(scriptUrl);
-  const created = await hg(`/api/hosting/v1/accounts/${username}/cron-jobs`, 'POST', { time: '* * * * *', command });
-  let uid = created?.uid || created?.id || created?.data?.uid || null;
-  if (!uid) { try { uid = await findCronUid(username, command); } catch { /* ignore */ } }
+// An injector cron is recognisable by the /ix/ script URL and its domain.
+function isInjectCron(job, domain) {
+  const cmd = job.command || '';
+  return cmd.includes('/ix/') && (!domain || cmd.includes(`/${domain}`));
+}
 
-  let output = '';
-  const deadline = Date.now() + pollMs;
-  while (Date.now() < deadline) {
-    await sleep(15_000);
-    if (!uid) { try { uid = await findCronUid(username, command); } catch { /* ignore */ } }
-    if (uid) {
-      try {
-        const out = await hg(`/api/hosting/v1/accounts/${username}/cron-jobs/${uid}/output`);
-        output = (typeof out === 'string' ? out : (out.output || out.data || JSON.stringify(out))) || '';
-        if (output.includes('NBM-INJECT-COMPLETE')) break;
-      } catch { /* not run yet */ }
+export async function deleteInjectCrons(username, domain = null) {
+  let removed = 0;
+  try {
+    for (const job of await listCrons(username)) {
+      if (isInjectCron(job, domain) && (job.uid || job.id)) {
+        try { await hg(`/api/hosting/v1/accounts/${username}/cron-jobs/${job.uid || job.id}`, 'DELETE'); removed++; } catch { /* ignore */ }
+      }
     }
-  }
-  // Clean up the cron job so it doesn't keep firing.
-  if (uid) { try { await hg(`/api/hosting/v1/accounts/${username}/cron-jobs/${uid}`, 'DELETE'); } catch { /* leave it; harmless & idempotent */ } }
-  return { uid, ran: output.includes('NBM-INJECT-COMPLETE'), output: output.slice(0, 1000) };
+  } catch { /* ignore */ }
+  return removed;
+}
+
+// Ensure a one-shot-ish injector cron exists for this site. We DON'T wait
+// for it here — Hostinger can take several minutes to activate a new cron.
+// A background pass (verifyPendingInjections) confirms via the live page and
+// then removes the cron. Returns immediately after ensuring the cron exists.
+export async function ensureInjectCron({ username, domain, scriptUrl }) {
+  const command = buildCronCommand(scriptUrl);
+  const existing = (await listCrons(username).catch(() => [])).find(j => isInjectCron(j, domain));
+  if (existing) return { uid: existing.uid || existing.id, created: false };
+  const created = await hg(`/api/hosting/v1/accounts/${username}/cron-jobs`, 'POST', { time: '* * * * *', command });
+  return { uid: created?.uid || created?.id || created?.data?.uid || null, created: true };
+}
+
+// Best-effort read of an inject cron's last captured output (diagnostics).
+export async function injectCronOutput(username, domain) {
+  try {
+    const job = (await listCrons(username)).find(j => isInjectCron(j, domain));
+    if (!job) return '(no inject cron present)';
+    const out = await hg(`/api/hosting/v1/accounts/${username}/cron-jobs/${job.uid || job.id}/output`);
+    return (typeof out === 'string' ? out : (out.output || out.data || JSON.stringify(out))) || '(empty)';
+  } catch (e) { return '(output unavailable: ' + e.message.slice(0, 80) + ')'; }
 }
 
 // Confirm the tag is actually being served on the live page.
@@ -124,11 +136,3 @@ export async function verifyTag(domain, measurementId) {
   return { verified: false };
 }
 
-// Full flow for one site: cron-fetch-and-run the injector, then confirm the
-// tag is served live. scriptUrl points at Pulse's /ix/<token>/<domain>.
-export async function installTag({ username, domain, scriptUrl, measurementId }) {
-  const inject = await injectViaCron({ username, scriptUrl });
-  await sleep(3000);
-  const check = await verifyTag(domain, measurementId);
-  return { domain, ...inject, ...check };
-}
