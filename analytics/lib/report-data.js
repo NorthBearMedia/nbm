@@ -72,6 +72,15 @@ export async function gatherReportData(site, start, end) {
     data.clarity = clarity.aggregate(site.id, start, end);
   }
 
+  // AI-written (or rules-based) insights, computed once the data is in.
+  try {
+    const { generateInsights } = await import('./insights.js');
+    data.insights = await generateInsights(data);
+  } catch (err) {
+    warnings.push(`Insights: ${err.message}`);
+    data.insights = null;
+  }
+
   return data;
 }
 

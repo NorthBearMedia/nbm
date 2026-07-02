@@ -14,6 +14,7 @@
   "author": "North Bear Media",
   "license": "UNLICENSED",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
     "better-sqlite3": "^11.7.0",
     "cookie-parser": "^1.4.7",
     "dotenv": "^16.4.7",
