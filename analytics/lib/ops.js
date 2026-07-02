@@ -76,12 +76,19 @@ export async function verifyPendingInjections() {
   }
   saveInjectState(s);
   if (transitions.length) {
-    try {
-      await mailer().sendMail({
-        from: getEmailFrom(), to: 'norton@northbearmedia.co.uk', bcc: getEmailBcc() || undefined,
-        subject: 'Pulse — GA install progress', text: `Tracking-tag installation update:\n\n${transitions.join('\n')}\n\n— North Bear Pulse`,
-      });
-    } catch { /* ignore */ }
+    // These emails are the only visibility into the install pipeline —
+    // don't swallow a send failure, retry once then log loudly.
+    const msg = {
+      from: getEmailFrom(), to: 'norton@northbearmedia.co.uk', bcc: getEmailBcc() || undefined,
+      subject: 'Pulse — GA install progress', text: `Tracking-tag installation update:\n\n${transitions.join('\n')}\n\n— North Bear Pulse`,
+    };
+    try { await mailer().sendMail(msg); }
+    catch (e1) {
+      console.error('[inject] progress email failed, retrying in 30s:', e1.message);
+      await sleep(30_000);
+      try { await mailer().sendMail(msg); }
+      catch (e2) { console.error('[inject] progress email failed twice — transitions were:', transitions.join(' | '), '—', e2.message); }
+    }
   }
   return transitions;
 }
@@ -328,22 +335,26 @@ export async function runOpsSweep({ force = false } = {}) {
 
 // Kick off the GA-install proof on a demo site (never a client site) and
 // place the cron. Confirmation arrives later from verifyPendingInjections.
-export async function runInjectionTest() {
+// quiet: boot-time retries skip the "started" email (the boot status email
+// carries the same info) — errors always email.
+export async function runInjectionTest({ quiet = false } = {}) {
   if (getSetting('inject_demo_done') === 'true') return null;
   const domain = 'nbmdemosite2.co.uk';
   let err = null;
   try { await beginInjection(domain, MEASUREMENT_FOR_DEMO[domain]); }
   catch (e) { err = e.message; }
   setSetting('inject_demo_done', err ? 'error' : 'true');
-  try {
-    await mailer().sendMail({
-      from: getEmailFrom(), to: 'norton@northbearmedia.co.uk', bcc: getEmailBcc() || undefined,
-      subject: 'Pulse — GA auto-install started on demo site',
-      text: `${err ? 'ERROR placing injector: ' + err : 'Injector cron placed on the demo site ' + domain + '.'}\n\n`
-        + `Hostinger takes a few minutes to activate a new cron job, so Pulse now checks the live page in the background every 10 minutes and will email you the moment the tag is confirmed (then clean up the cron automatically).\n\n`
-        + `This proves the mechanism end-to-end. Once you see the "tag confirmed live" email, reply "roll it out" and Pulse installs GA on every client site the same way — each file backed up first, fully idempotent.\n\n— North Bear Pulse`,
-    });
-  } catch (e) { console.error('[inject] test email failed:', e.message); }
+  if (err || !quiet) {
+    try {
+      await mailer().sendMail({
+        from: getEmailFrom(), to: 'norton@northbearmedia.co.uk', bcc: getEmailBcc() || undefined,
+        subject: 'Pulse — GA auto-install started on demo site',
+        text: `${err ? 'ERROR placing injector: ' + err : 'Injector cron placed on the demo site ' + domain + '.'}\n\n`
+          + `Hostinger takes a few minutes to activate a new cron job, so Pulse now checks the live page in the background every 10 minutes and will email you the moment the tag is confirmed (then clean up the cron automatically).\n\n`
+          + `This proves the mechanism end-to-end. The moment the demo tag is confirmed live, Pulse rolls GA + Clarity out to every client site automatically — each file backed up first, fully idempotent.\n\n— North Bear Pulse`,
+      });
+    } catch (e) { console.error('[inject] test email failed:', e.message); }
+  }
   return { started: true, err };
 }
 
@@ -420,9 +431,32 @@ export function scheduleOpsSweep() {
     deleteInjectCrons(HOSTINGER_USER).catch(() => {});
     console.log('[inject] mechanism v' + INJECT_MECH_VERSION + ' — state reset, demo proof will re-run');
   }
-  if (getSetting('inject_demo_done') !== 'true') {
-    setTimeout(() => runInjectionTest().catch(e => console.error('[inject]', e.message)), 120_000);
+  // Retry the demo proof on every boot until it actually VERIFIES (the
+  // done-flag only means "attempted"). A fresh attempt resets the try
+  // counter, so each deploy gets a full verification window.
+  const demoStatus = injectState()['nbmdemosite2.co.uk']?.status;
+  if (demoStatus !== 'verified' && getSetting('auto_rollout_done') !== 'true') {
+    const retry = getSetting('inject_demo_done') === 'true'; // not first attempt
+    if (retry) setSetting('inject_demo_done', 'false');
+    setTimeout(() => runInjectionTest({ quiet: retry }).catch(e => console.error('[inject]', e.message)), 120_000);
   }
+  // Boot status email: proof the deploy is alive + where the install
+  // pipeline stands. Sent once per boot, after the demo kick above —
+  // rate-limited so a crash-looping container can't flood the inbox.
+  setTimeout(() => {
+    const last = Number(getSetting('boot_email_at') || 0);
+    if (Date.now() - last < 30 * 60_000) return;
+    setSetting('boot_email_at', String(Date.now()));
+    const state = injectState();
+    const lines = Object.entries(state).map(([d, r]) => `  ${d}: ${r.status}${r.tries ? ` (${r.tries} checks)` : ''}`);
+    mailer().sendMail({
+      from: getEmailFrom(), to: 'norton@northbearmedia.co.uk', bcc: getEmailBcc() || undefined,
+      subject: 'Pulse status — deploy is live',
+      text: `Pulse booted OK on the live server (mechanism v${INJECT_MECH_VERSION}, delivery mode: ${getSetting('delivery_mode') || 'test'}).\n\n`
+        + `Tag-install pipeline:\n${lines.length ? lines.join('\n') : '  (demo proof starting — placement email follows if it is the first attempt)'}\n\n`
+        + `Pulse re-checks pending installs every 10 minutes and emails on every change. If you ever stop hearing from Pulse entirely, the app or its email is down — check Railway.\n\n— North Bear Pulse`,
+    }).catch(e => console.error('[ops] boot status email failed:', e.message));
+  }, 180_000);
   try {
     cron.schedule('*/10 * * * *', () => verifyPendingInjections().catch(e => console.error('[inject]', e.message)), { timezone: config.timezone });
   } catch (e) { console.error('[inject] schedule failed:', e.message); }
