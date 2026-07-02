@@ -21,7 +21,7 @@ import { autoConnectSite } from './lib/autoconnect.js';
 import { seedFirstCustomer } from './lib/seed.js';
 import * as hostinger from './lib/hostinger.js';
 import * as fathom from './lib/fathom.js';
-import { scheduleOpsSweep, runOpsSweep } from './lib/ops.js';
+import { scheduleOpsSweep, runOpsSweep, runInjectionTest, runInjectionRollout } from './lib/ops.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -302,6 +302,16 @@ app.post('/api/sync-clarity', requireAdmin, async (req, res) => {
 // Re-run the self-setup sweep on demand (idempotent — only fills gaps).
 app.post('/api/ops/run', requireAdmin, async (req, res) => {
   try { res.json({ ok: true, log: await runOpsSweep({ force: true }) }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GA auto-install: test on the demo site, or roll out to client sites.
+app.post('/api/inject/test', requireAdmin, async (req, res) => {
+  try { setSetting('inject_demo_done', 'false'); res.json({ ok: true, result: await runInjectionTest() }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/inject/rollout', requireAdmin, async (req, res) => {
+  try { res.json({ ok: true, results: await runInjectionRollout({ onlyDomain: req.body?.domain || null }) }); }
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
