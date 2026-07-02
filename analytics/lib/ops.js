@@ -116,6 +116,7 @@ const CLIENT_EMAILS = {
 // tag wherever one is set. (Caring Places pending.)
 const CLARITY_PROJECTS = {
   'alphashunt.co.uk': 'xg3mss4msy',
+  'caringplacesltd.co.uk': 'wc1ztw49v3',
   'ivyhouseresidentialhome.co.uk': 'xg3sbc4p1t',
   'rcmhomeimprovements.co.uk': 'xg3sombkfn',
   'maxus-evc.co.uk': 'xg3sy563qa',
