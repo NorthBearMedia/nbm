@@ -2927,3 +2927,41 @@ select { color-scheme:dark; }
   .bp-text { white-space: normal; line-height: 1.35; }
   .battle-plan { padding: 12px; }
 }
+
+/* ─── ADHD UX: slim task modal + compact board rows ─── */
+.task-more-toggle {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  background: var(--bg-glass); border: 1px dashed var(--border); border-radius: var(--radius);
+  padding: 9px 12px; margin: 4px 0 14px; color: var(--text-secondary);
+  font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; text-align: left;
+}
+.task-more-toggle:hover { color: var(--text); border-color: rgba(62,175,132,0.4); }
+.task-more-hint { font-weight: 400; color: var(--text-muted); }
+#taskBackCrumb { flex-shrink: 0; white-space: nowrap; }
+
+.cb-list { display: flex; flex-direction: column; gap: 4px; }
+.cb-row {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+  border-left: 4px solid var(--border); border-radius: var(--radius);
+  padding: 9px 14px; cursor: pointer; transition: background .12s;
+}
+.cb-row:hover { background: rgba(255,255,255,0.06); }
+.cb-row-name { font-weight: 600; font-size: 13px; color: var(--text); min-width: 140px; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-row-next { flex: 1; min-width: 0; font-size: 12px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-row-next-urgent { color: #f0a0a0; font-weight: 600; }
+.cb-row-stale { font-size: 11px; color: #e6a020; font-weight: 600; flex-shrink: 0; }
+.cb-row-value { font-size: 11px; font-weight: 700; color: var(--primary); flex-shrink: 0; }
+.cb-density { min-width: 36px; text-align: center; }
+@media (max-width: 600px) {
+  .cb-row-value { display: none; }
+  .cb-row-name { min-width: 100px; }
+}
+
+/* Mobile: the fixed-width search box was squeezing the nav tabs out entirely.
+   Collapse it to an icon-sized field that expands on focus. */
+@media (max-width: 700px) {
+  #taskSearch { width: 46px !important; transition: width .15s; }
+  #taskSearch:focus { width: 150px !important; }
+  #taskSearch::placeholder { color: transparent; }
+}

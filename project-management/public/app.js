@@ -571,7 +571,35 @@ function renderControlBoard() {
     board.innerHTML = '<div class="dash-widget-empty" style="grid-column:1/-1">No clients match these filters.</div>';
     return;
   }
-  board.innerHTML = list.map(clientCardHTML).join('');
+  const compact = boardDensity === 'rows';
+  board.className = compact ? 'cb-list' : 'cb-grid';
+  const densBtn = document.getElementById('cbDensity');
+  if (densBtn) densBtn.innerHTML = compact ? '&#9638;' : '&#9776;';
+  board.innerHTML = list.map(compact ? clientRowHTML : clientCardHTML).join('');
+}
+
+// Compact one-line-per-client mode: scanning becomes linear instead of grid-hopping.
+let boardDensity = localStorage.getItem('nbm_board_density') || 'cards';
+function toggleBoardDensity() {
+  boardDensity = boardDensity === 'cards' ? 'rows' : 'cards';
+  try { localStorage.setItem('nbm_board_density', boardDensity); } catch {}
+  renderControlBoard();
+}
+
+function clientRowHTML(c) {
+  const { status, risk, b } = clientControlData(c);
+  const sCfg = CONTROL_STATUS[status] || CONTROL_STATUS.green;
+  const na = clientNextAction(c);
+  const lcDays = daysSince(c.last_contact_date);
+  const lcStale = lcDays !== null && lcDays > 14;
+  return `<div class="cb-row rag-border-${status}" onclick="openClientDetail(${c.id})">
+    <span class="rag-dot ${sCfg.cls}" title="${sCfg.label}"></span>
+    <span class="cb-row-name">${esc(c.name)}</span>
+    <span class="cb-row-next ${na.urgent ? 'cb-row-next-urgent' : ''}">➜ ${esc(na.text)}</span>
+    ${b.overdue ? `<span class="cb-stat cb-stat-bad">${b.overdue} overdue</span>` : ''}
+    ${lcStale ? `<span class="cb-row-stale" title="${lastContactLabel(c.last_contact_date)}">⚠ ${lcDays}d</span>` : ''}
+    <span class="cb-row-value">${c.monthly_value ? clientValueLabel(c) : typeLabelClient(c.client_type)}</span>
+  </div>`;
 }
 
 function fmtMoney(n) {
@@ -636,7 +664,7 @@ function openClientDetail(id) {
   const waiting = tasks.filter(isWaiting);
   const adhoc = tasks.filter(t => isOpenTask(t) && !isWaiting(t) && t.task_type !== 'recurring' && !t.is_recurring);
   const completed = tasks.filter(t => t.task_status === 'done');
-  const taskLine = t => `<div class="cd-task" onclick="closeModal('clientDetailModal');editTask(${t.id})">
+  const taskLine = t => `<div class="cd-task" onclick="openTaskFromClient(${c.id},${t.id})">
       <span class="status-badge status-${t.task_status}">${statusLabel(t.task_status)}</span>
       <span class="cd-task-title">${esc(t.title)}</span>
       ${t.task_band ? `<span class="band-badge ${bandClass(t.task_band)}">${bandLabel(t.task_band)}</span>` : ''}
@@ -654,7 +682,7 @@ function openClientDetail(id) {
       ${c.monthly_value ? `<span class="cd-value">${fmtMoney(c.monthly_value)}/mo</span>` : ''}
       <span style="flex:1"></span>
       <button class="btn btn-ghost btn-sm" onclick="closeModal('clientDetailModal');editClient(${c.id})">Edit client</button>
-      <button class="btn btn-primary btn-sm" onclick="closeModal('clientDetailModal');openTaskModal(${c.id})">+ Task</button>
+      <button class="btn btn-primary btn-sm" onclick="newTaskFromClient(${c.id})">+ Task</button>
     </div>
     <div class="cd-grid">
       <div>
@@ -1297,8 +1325,39 @@ function toggleCompletedTasks(key){showCompletedTasks.has(key)?showCompletedTask
 
 // ─── Modal ──────────────────────────────────────────────
 function openModal(id){document.getElementById(id).classList.add('active');document.getElementById('modalBackdrop').classList.add('active');}
-function closeModal(id){document.getElementById(id).classList.remove('active');if(!document.querySelector('.modal.active'))document.getElementById('modalBackdrop').classList.remove('active');}
-function closeAllModals(){document.querySelectorAll('.modal.active').forEach(m=>m.classList.remove('active'));document.getElementById('modalBackdrop').classList.remove('active');}
+// Unsaved-edit protection for the task modal: an interruption (Esc, backdrop
+// click, X) shouldn't silently throw away half-entered work.
+let taskFormSnapshot = '';
+let taskModalOrigin = null;   // client id when the modal was opened from a client detail view
+
+function taskFormSerialize() {
+  const ids = ['taskTitle','taskStatus','taskBand','taskDeadline','taskNotes','taskAssignee','taskSecondaryAssignee','taskType','taskPlannedDate','taskEstHours','taskSuggestedBlock','taskReferences'];
+  return ids.map(id => document.getElementById(id)?.value ?? '').join('|') + '|' + (document.getElementById('taskRecurring')?.checked ? 1 : 0);
+}
+function taskFormDirty() {
+  return taskFormSnapshot !== '' && document.getElementById('taskModal').classList.contains('active') && taskFormSerialize() !== taskFormSnapshot;
+}
+
+function closeModal(id){
+  if (id === 'taskModal') {
+    if (taskFormDirty() && !confirm('Discard unsaved changes to this task?')) return;
+    taskFormSnapshot = '';
+    const origin = taskModalOrigin; taskModalOrigin = null;
+    document.getElementById(id).classList.remove('active');
+    if(!document.querySelector('.modal.active'))document.getElementById('modalBackdrop').classList.remove('active');
+    // Breadcrumb behaviour: return to the client you came from.
+    if (origin) setTimeout(() => openClientDetail(origin), 80);
+    return;
+  }
+  document.getElementById(id).classList.remove('active');
+  if(!document.querySelector('.modal.active'))document.getElementById('modalBackdrop').classList.remove('active');
+}
+function closeAllModals(){
+  if (taskFormDirty() && !confirm('Discard unsaved changes to this task?')) return;
+  taskFormSnapshot = ''; taskModalOrigin = null;
+  document.querySelectorAll('.modal.active').forEach(m=>m.classList.remove('active'));
+  document.getElementById('modalBackdrop').classList.remove('active');
+}
 document.getElementById('modalBackdrop').addEventListener('click',closeAllModals);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAllModals();});
 
@@ -1654,7 +1713,22 @@ document.getElementById('clientForm').addEventListener('submit',async e=>{
 });
 
 // ─── Task CRUD ──────────────────────────────────────────
+function setTaskMore(open) {
+  document.getElementById('taskMoreSection').style.display = open ? '' : 'none';
+  document.getElementById('taskMoreArrow').innerHTML = open ? '&#9662;' : '&#9656;';
+}
+function toggleTaskMore() {
+  setTaskMore(document.getElementById('taskMoreSection').style.display === 'none');
+}
+function updateTaskCrumb() {
+  const crumb = document.getElementById('taskBackCrumb');
+  const c = taskModalOrigin ? clients.find(x => x.id === taskModalOrigin) : null;
+  crumb.style.display = c ? '' : 'none';
+  if (c) document.getElementById('taskBackName').textContent = c.name;
+}
+
 function openTaskModal(cid){
+  taskModalOrigin = null; updateTaskCrumb();
   document.getElementById('taskModalTitle').textContent='New Task';
   document.getElementById('taskFormError').style.display='none';
   ['taskId','taskTitle','taskDeadline','taskPlannedDate','taskEstHours','taskReferences','taskNotes','taskSuggestedBlock'].forEach(id=>document.getElementById(id).value='');
@@ -1671,7 +1745,10 @@ function openTaskModal(cid){
   currentChecklist = [];
   renderChecklist();
   populateAssigneeDropdown('', '');
+  setTaskMore(false);
+  document.getElementById('taskMoreHint').textContent = '';
   openModal('taskModal');
+  taskFormSnapshot = taskFormSerialize();
 }
 
 function findTaskById(id) {
@@ -1686,6 +1763,7 @@ function findTaskById(id) {
 function editTask(id){
   const t=findTaskById(id);
   if(!t)return;
+  taskModalOrigin = null; updateTaskCrumb();
   document.getElementById('taskModalTitle').textContent = 'Edit Task — ' + taskRef(t.id);
   document.getElementById('taskFormError').style.display='none';
   document.getElementById('taskId').value=t.id;
@@ -1710,7 +1788,33 @@ function editTask(id){
   al.innerHTML=(t.attachments||[]).map(a=>`<div class="attachment-item"><span>&#128206; ${esc(a.original_name)} (${fmtFileSize(a.file_size)})</span><button type="button" class="btn-icon" onclick="deleteAttachment(${a.id})" title="Remove">&times;</button></div>`).join('');
   populateAssigneeDropdown(t.assignee||'', t.secondary_assignee||'');
   loadChecklist(t.id);
+  // Auto-expand "More options" only when it holds something relevant — otherwise stay slim.
+  const advancedSet = !!(t.assignee || t.secondary_assignee || t.task_type || t.planned_date ||
+    t.estimated_hours || t.suggested_block || t.references_text || t.is_recurring || (t.attachments||[]).length);
+  setTaskMore(advancedSet);
+  const hints = [];
+  if (t.assignee) hints.push(t.assignee);
+  if (t.task_type) hints.push(typeLabel(t.task_type));
+  if (t.is_recurring) hints.push('recurring');
+  if ((t.attachments||[]).length) hints.push(`${t.attachments.length} file${t.attachments.length>1?'s':''}`);
+  document.getElementById('taskMoreHint').textContent = advancedSet && hints.length ? `(${hints.slice(0,3).join(' · ')})` : '';
   openModal('taskModal');
+  taskFormSnapshot = taskFormSerialize();
+}
+
+// Open a task with a breadcrumb back to the client detail it came from —
+// interruption recovery: saving/closing returns you to where you were.
+function openTaskFromClient(clientId, taskId) {
+  document.getElementById('clientDetailModal').classList.remove('active');
+  editTask(taskId);
+  taskModalOrigin = clientId;
+  updateTaskCrumb();
+}
+function newTaskFromClient(clientId) {
+  document.getElementById('clientDetailModal').classList.remove('active');
+  openTaskModal(clientId);
+  taskModalOrigin = clientId;
+  updateTaskCrumb();
 }
 
 function populateAssigneeDropdown(cur, secondaryCur){
@@ -1770,11 +1874,16 @@ document.getElementById('taskForm').addEventListener('submit',async e=>{
       for(let i=0;i<files.length;i++) fd.append('files',files[i]);
       await fetch(`/api/tasks/${taskId}/attachments`,{method:'POST',body:fd});
     }
+    // Saving is a clean close: clear the dirty snapshot and handle the breadcrumb
+    // ourselves after data reloads (so the reopened client detail shows fresh state).
+    taskFormSnapshot = '';
+    const origin = taskModalOrigin; taskModalOrigin = null;
     closeModal('taskModal');await loadClients();
     // Refresh current view
     if (currentView === 'today') loadTodayView();
     if (currentView === 'focus') loadFocusView();
     if (currentView === 'dashboard') loadDashboard();
+    if (origin) openClientDetail(origin);
     // Celebrate if task was just completed
     const wasDone = oldTask && oldTask.task_status === 'done';
     if (!wasDone && data.task_status === 'done') celebrate();
@@ -2049,13 +2158,16 @@ async function loadTodayView(){
   document.getElementById('todayTitle').textContent=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   const ct=document.getElementById('todayContent');
   if(!tasks.length){ct.innerHTML='<div class="empty-state"><img src="/NBM%20Logo%20No%20NG%20Light%20Lines.png" alt="" style="width:60px;opacity:0.25;margin-bottom:12px"><p>No tasks planned for this date</p></div>';return;}
+  // Solo mode: when everything belongs to one person, an assignee header is noise —
+  // group by client instead so the day reads as "what, for whom".
+  const soloMode = new Set(tasks.map(t=>t.assignee||'')).size <= 1;
   const groups={};
-  for(const t of tasks){const a=t.assignee||'Unassigned';if(!groups[a])groups[a]=[];groups[a].push(t);}
+  for(const t of tasks){const k=soloMode?(t.client_name||'No client'):(t.assignee||'Unassigned');if(!groups[k])groups[k]=[];groups[k].push(t);}
   let html='';
-  for(const [assignee,gTasks] of Object.entries(groups)){
-    const mem=findUser(assignee);
+  for(const [groupName,gTasks] of Object.entries(groups)){
+    const mem=soloMode?null:findUser(groupName);
     const totalH=gTasks.reduce((s,t)=>s+(t.estimated_hours||0),0);
-    html+=`<div class="today-group"><div class="today-group-header">${userAvatar(mem,28)}<span style="font-weight:600">${esc(assignee)}</span><span style="font-size:12px;color:var(--text-secondary);margin-left:auto">${totalH}h planned</span></div>`;
+    html+=`<div class="today-group"><div class="today-group-header">${mem?userAvatar(mem,28):''}<span style="font-weight:600">${esc(groupName)}</span><span style="font-size:12px;color:var(--text-secondary);margin-left:auto">${totalH?totalH+'h planned':gTasks.length+' task'+(gTasks.length>1?'s':'')}</span></div>`;
     html+=gTasks.map(t=>`<div class="today-task" onclick="editTask(${t.id})" style="cursor:pointer">
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:13px">${esc(t.title)}</div>

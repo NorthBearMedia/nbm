@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>North Bear Console</title>
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=62">
+  <link rel="stylesheet" href="styles.css?v=63">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -156,6 +156,7 @@
                 <option value="value">Sort: Monthly value</option>
                 <option value="outstanding">Sort: Outstanding</option>
               </select>
+              <button type="button" id="cbDensity" class="filter-select cb-density" onclick="toggleBoardDensity()" title="Toggle cards / compact rows">&#9776;</button>
             </div>
           </div>
           <div id="controlBoard" class="cb-grid"></div>
@@ -427,49 +428,61 @@
 
   <!-- Task Modal -->
   <div class="modal modal-lg" id="taskModal">
-    <div class="modal-header"><h2 id="taskModalTitle">New Task</h2><button class="modal-close" onclick="closeModal('taskModal')">&times;</button></div>
+    <div class="modal-header">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0">
+        <button type="button" class="btn btn-ghost btn-sm" id="taskBackCrumb" style="display:none" onclick="closeModal('taskModal')">&larr; <span id="taskBackName"></span></button>
+        <h2 id="taskModalTitle">New Task</h2>
+      </div>
+      <button class="modal-close" onclick="closeModal('taskModal')">&times;</button>
+    </div>
     <form id="taskForm">
       <div class="form-error" id="taskFormError"></div>
       <input type="hidden" id="taskId"><input type="hidden" id="taskClientId">
+      <!-- Essentials only — everything else folds behind "More options" -->
       <div class="form-group"><label>Task Title</label><input type="text" id="taskTitle" required></div>
-      <div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr">
-        <div class="form-group"><label>Assigned To</label><select id="taskAssignee"><option value="">Unassigned</option></select></div>
-        <div class="form-group"><label>Also Assigned</label><select id="taskSecondaryAssignee"><option value="">None</option></select></div>
-        <div class="form-group"><label>When (band)</label><select id="taskBand"><option value="">—</option><option value="today">Today</option><option value="this-week">This Week</option><option value="scheduled">Scheduled</option><option value="waiting">Waiting</option><option value="someday">Someday</option></select></div>
+      <div class="form-row form-row-3">
         <div class="form-group"><label>Status</label><select id="taskStatus"><option value="inbox">Inbox</option><option value="scheduled">Scheduled</option><option value="in-progress">In Progress</option><option value="waiting-on-client">Waiting on Client</option><option value="waiting-on-me">Waiting on Me</option><option value="done">Done</option><option value="cancelled">Cancelled</option></select></div>
-      </div>
-      <div class="form-row form-row-3">
-        <div class="form-group"><label>Type</label><select id="taskType"><option value="">—</option><option value="recurring">Recurring</option><option value="ad-hoc">Ad Hoc</option><option value="urgent">Urgent</option><option value="sales">Sales</option><option value="admin">Admin</option><option value="waiting">Waiting</option><option value="idea">Idea</option></select></div>
+        <div class="form-group"><label>When (band)</label><select id="taskBand"><option value="">—</option><option value="today">Today</option><option value="this-week">This Week</option><option value="scheduled">Scheduled</option><option value="waiting">Waiting</option><option value="someday">Someday</option></select></div>
         <div class="form-group"><label>Deadline</label><input type="date" id="taskDeadline"></div>
-        <div class="form-group"><label>Planned Date</label><input type="date" id="taskPlannedDate"></div>
-      </div>
-      <div class="form-row form-row-3">
-        <div class="form-group"><label>Est. Hours</label><input type="number" id="taskEstHours" min="0" step="0.5"></div>
-        <div class="form-group"><label>Suggested calendar block</label><input type="text" id="taskSuggestedBlock" placeholder="e.g. Tue AM, 2h"></div>
-        <div class="form-group"><label>References / Links</label><input type="text" id="taskReferences"></div>
       </div>
       <div class="form-group"><label>Notes</label><textarea id="taskNotes" rows="2"></textarea></div>
-      <div class="form-group">
-        <label><input type="checkbox" id="taskRecurring"> Recurring task</label>
-        <div id="recurOptions" style="display:none;margin-top:8px">
-          <div class="form-row" style="max-width:300px">
-            <div class="form-group"><label>Every</label><input type="number" id="taskRecurInterval" min="1" value="1" style="width:70px"></div>
-            <div class="form-group"><label>Period</label><select id="taskRecurUnit"><option value="days">Days</option><option value="weeks">Weeks</option><option value="months" selected>Months</option><option value="years">Years</option></select></div>
+      <button type="button" class="task-more-toggle" id="taskMoreToggle" onclick="toggleTaskMore()"><span id="taskMoreArrow">&#9656;</span> More options <span id="taskMoreHint" class="task-more-hint"></span></button>
+      <div id="taskMoreSection" style="display:none">
+        <div class="form-row">
+          <div class="form-group"><label>Assigned To</label><select id="taskAssignee"><option value="">Unassigned</option></select></div>
+          <div class="form-group"><label>Also Assigned</label><select id="taskSecondaryAssignee"><option value="">None</option></select></div>
+        </div>
+        <div class="form-row form-row-3">
+          <div class="form-group"><label>Type</label><select id="taskType"><option value="">—</option><option value="recurring">Recurring</option><option value="ad-hoc">Ad Hoc</option><option value="urgent">Urgent</option><option value="sales">Sales</option><option value="admin">Admin</option><option value="waiting">Waiting</option><option value="idea">Idea</option></select></div>
+          <div class="form-group"><label>Planned Date</label><input type="date" id="taskPlannedDate"></div>
+          <div class="form-group"><label>Est. Hours</label><input type="number" id="taskEstHours" min="0" step="0.5"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Suggested calendar block</label><input type="text" id="taskSuggestedBlock" placeholder="e.g. Tue AM, 2h"></div>
+          <div class="form-group"><label>References / Links</label><input type="text" id="taskReferences"></div>
+        </div>
+        <div class="form-group">
+          <label><input type="checkbox" id="taskRecurring"> Recurring task</label>
+          <div id="recurOptions" style="display:none;margin-top:8px">
+            <div class="form-row" style="max-width:300px">
+              <div class="form-group"><label>Every</label><input type="number" id="taskRecurInterval" min="1" value="1" style="width:70px"></div>
+              <div class="form-group"><label>Period</label><select id="taskRecurUnit"><option value="days">Days</option><option value="weeks">Weeks</option><option value="months" selected>Months</option><option value="years">Years</option></select></div>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="form-group">
-        <label>Checklist</label>
-        <div id="taskChecklist" class="checklist-container"></div>
-        <div class="checklist-add">
-          <input type="text" id="checklistNewItem" placeholder="Add checklist item..." style="flex:1">
-          <button type="button" class="btn btn-ghost btn-sm" onclick="addChecklistItem()">+ Add</button>
+        <div class="form-group">
+          <label>Checklist</label>
+          <div id="taskChecklist" class="checklist-container"></div>
+          <div class="checklist-add">
+            <input type="text" id="checklistNewItem" placeholder="Add checklist item..." style="flex:1">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="addChecklistItem()">+ Add</button>
+          </div>
         </div>
-      </div>
-      <div class="form-group">
-        <label>Attachments</label>
-        <div id="taskAttachmentsList"></div>
-        <input type="file" id="taskFiles" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip" style="margin-top:6px">
+        <div class="form-group">
+          <label>Attachments</label>
+          <div id="taskAttachmentsList"></div>
+          <input type="file" id="taskFiles" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip" style="margin-top:6px">
+        </div>
       </div>
       <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="closeModal('taskModal')">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
     </form>
@@ -613,6 +626,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=62"></script>
+  <script src="app.js?v=63"></script>
 </body>
 </html>
