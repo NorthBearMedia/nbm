@@ -33,7 +33,9 @@ export function verifyPassword(pw, storedHash, salt) {
 // ─── Sessions ─────────────────────────────────────────
 export function createSession(userId) {
   const token = randomBytes(32).toString('hex');
-  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  // 30 days: this is a personal-device tool — daily re-login kills quick capture
+  // on mobile. Password changes still revoke all other sessions.
+  const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
   db.prepare('INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, ?)').run(userId, token, expires);
   return token;
 }
