@@ -447,10 +447,27 @@ async function runDocrootSurvey() {
 // old mechanism, and re-runs the demo proof — no human involvement.
 // v2: shell-free cron pair (Hostinger execs cron commands without a shell,
 // so the v1 curl|sh pipeline reached curl as literal arguments and failed).
-const INJECT_MECH_VERSION = '2';
+// v3: script URL self-healed from RAILWAY_PUBLIC_DOMAIN — the download
+// cron was fetching app_url/ix/…, and a wrong app_url serves an HTML page
+// (the staged "script" began with <!DOCTYPE html>, which sh can't run).
+// Old crons embed the bad URL, so they must be recreated.
+const INJECT_MECH_VERSION = '3';
 
 export function scheduleOpsSweep() {
   const smtp = getSmtp();
+  // Self-heal app_url: Railway tells this container its real public
+  // domain. If the stored app_url points anywhere else (and isn't a
+  // railway.app URL someone set deliberately), correct it — this is what
+  // the injector script URL and every email's dashboard link build on.
+  const rwDomain = process.env.RAILWAY_PUBLIC_DOMAIN || process.env.RAILWAY_STATIC_URL || '';
+  if (rwDomain) {
+    const want = 'https://' + rwDomain.replace(/^https?:\/\//, '');
+    const cur = getAppUrl();
+    if (cur !== want && !cur.includes('railway.app')) {
+      setSetting('app_url', want);
+      console.log('[ops] app_url self-healed:', cur || '(blank)', '→', want);
+    }
+  }
   // Contacts load on every boot (cheap, offline, idempotent).
   try { loadClientContacts(); } catch (e) { console.error('[ops]', e.message); }
   // GA auto-install proof on the demo site (never a client site), then a
@@ -495,6 +512,8 @@ export function scheduleOpsSweep() {
       text: `Pulse booted OK on the live server (mechanism v${INJECT_MECH_VERSION}, delivery mode: ${getSetting('delivery_mode') || 'test'}).\n\n`
         + `Tag-install pipeline:\n${lines.length ? lines.join('\n') : '  (demo proof starting — placement email follows if it is the first attempt)'}\n\n`
         + `Demo install cron output (diagnostics):\n  ${String(cronOut).slice(0, 800)}\n\n`
+        + `Injector script URL in use: ${scriptUrlFor('nbmdemosite2.co.uk')}\n`
+        + `Railway domain for this container: ${process.env.RAILWAY_PUBLIC_DOMAIN || process.env.RAILWAY_STATIC_URL || '(not set)'}\n\n`
         + `Pulse re-checks pending installs every 10 minutes and emails on every change. If you ever stop hearing from Pulse entirely, the app or its email is down — check Railway.\n\n— North Bear Pulse`,
     }).catch(e => console.error('[ops] boot status email failed:', e.message));
   }, 240_000);
