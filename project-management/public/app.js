@@ -290,6 +290,45 @@ function updatePersonFilter() {
   sel.innerHTML = '<option value="">All People</option>' + appUsers.map(u => `<option value="${esc(u.display_name)}" ${u.display_name===cur?'selected':''}>${esc(u.display_name)}</option>`).join('');
 }
 
+// ─── Per-user preferences (server-synced) ───────────────
+// localStorage is per-device and iOS can purge it — the server copy is the
+// source of truth so the notebook/format looks identical on every device.
+let appPrefs = {};
+let prefsSaveTimer = null;
+
+function setPref(key, value) {
+  appPrefs[key] = value;
+  try {
+    if (value === null || value === undefined) localStorage.removeItem(key);
+    else localStorage.setItem(key, String(value));
+  } catch {}
+  clearTimeout(prefsSaveTimer);
+  prefsSaveTimer = setTimeout(() => {
+    api('/api/prefs', { method: 'PUT', body: appPrefs }).catch(() => {});
+  }, 800);
+}
+
+async function loadServerPrefs() {
+  try {
+    const sp = await api('/api/prefs');
+    if (!sp || typeof sp !== 'object') return;
+    appPrefs = { ...sp };
+    // Apply known keys (validated) over the localStorage-seeded defaults.
+    if (typeof sp.nbm_nb_tab === 'string' && ['all','today','week','waiting','done'].includes(sp.nbm_nb_tab)) nbTab = sp.nbm_nb_tab;
+    if (typeof sp.nbm_nb_client === 'string') nbClient = sp.nbm_nb_client;
+    if (sp.nbm_nb_order === 'written' || sp.nbm_nb_order === 'due') nbOrder = sp.nbm_nb_order;
+    if (typeof sp.nbm_nb_font === 'string' && NB_PENS[sp.nbm_nb_font]) nbFont = sp.nbm_nb_font;
+    { const n = parseFloat(sp.nbm_nb_size); if (Number.isFinite(n) && n >= 0.7 && n <= 1.5) nbSize = n; }
+    if (sp.nbm_nb_hidedone === '1' || sp.nbm_nb_hidedone === '0') nbHideDone = sp.nbm_nb_hidedone === '1';
+    if (typeof sp.nbm_nb_hl === 'string' && NB_HLS[sp.nbm_nb_hl]) nbHl = sp.nbm_nb_hl;
+    if (sp.nbm_board_density === 'rows' || sp.nbm_board_density === 'cards') boardDensity = sp.nbm_board_density;
+    if (typeof sp.nbm_nb_newclient === 'string') { try { localStorage.setItem('nbm_nb_newclient', sp.nbm_nb_newclient); } catch {} }
+    // Mirror everything locally for instant next boot.
+    for (const [k, v] of Object.entries(sp)) { try { localStorage.setItem(k, String(v)); } catch {} }
+    applyNbFont();
+  } catch {}
+}
+
 // ─── View Switching ─────────────────────────────────────
 function applyViewVisibility() {
   const views = { dashboard: 'dashboardView', notebook: 'notebookView', inbox: 'inboxView', clients: 'clientsView', today: 'todayView', planning: 'planningView', calendar: 'calendarView', focus: 'focusView', email: 'emailView' };
@@ -311,7 +350,7 @@ function switchView(view) {
   document.getElementById('navMoreBtn')?.classList.toggle('active', OVERFLOW_VIEWS.includes(view));
   document.getElementById('navMoreDropdown')?.classList.remove('open');
   currentView = view;
-  try { localStorage.setItem('nbm_view', view); } catch {}
+  setPref('nbm_view', view);
   applyViewVisibility();
   if (view === 'dashboard') loadDashboard();
   if (view === 'notebook') loadNotebookView();
@@ -587,7 +626,7 @@ function renderControlBoard() {
 let boardDensity = localStorage.getItem('nbm_board_density') || 'cards';
 function toggleBoardDensity() {
   boardDensity = boardDensity === 'cards' ? 'rows' : 'cards';
-  try { localStorage.setItem('nbm_board_density', boardDensity); } catch {}
+  setPref('nbm_board_density', boardDensity);
   renderControlBoard();
 }
 
@@ -1032,17 +1071,17 @@ const NB_PENS = {
   'Indie Flower':       { label: 'Indie Flower (bubbly)',size: 21, small: 16 },
 };
 
-function nbSetTab(t) { nbTab = t; nbPage = 0; try { localStorage.setItem('nbm_nb_tab', t); } catch {} loadNotebookView(); }
-function nbSetClient(v) { nbClient = v; nbPage = 0; try { localStorage.setItem('nbm_nb_client', v); } catch {} loadNotebookView(); }
+function nbSetTab(t) { nbTab = t; nbPage = 0; setPref('nbm_nb_tab', t); loadNotebookView(); }
+function nbSetClient(v) { nbClient = v; nbPage = 0; setPref('nbm_nb_client', v); loadNotebookView(); }
 function nbToggleOrder() {
   nbOrder = nbOrder === 'written' ? 'due' : 'written';
   nbPage = 0;
-  try { localStorage.setItem('nbm_nb_order', nbOrder); } catch {}
+  setPref('nbm_nb_order', nbOrder);
   loadNotebookView();
 }
 function nbSetFont(f) {
   nbFont = NB_PENS[f] ? f : 'Caveat';
-  try { localStorage.setItem('nbm_nb_font', nbFont); } catch {}
+  setPref('nbm_nb_font', nbFont);
   applyNbFont();
   loadNotebookView();
 }
@@ -1064,12 +1103,12 @@ function applyNbFont() {
 }
 function nbSetSize(delta) {
   nbSize = Math.max(0.7, Math.min(1.5, Math.round(((nbSize || 1) + delta) * 100) / 100));
-  try { localStorage.setItem('nbm_nb_size', String(nbSize)); } catch {}
+  setPref('nbm_nb_size', String(nbSize));
   applyNbFont();
 }
 function nbToggleHideDone() {
   nbHideDone = !nbHideDone;
-  try { localStorage.setItem('nbm_nb_hidedone', nbHideDone ? '1' : '0'); } catch {}
+  setPref('nbm_nb_hidedone', nbHideDone ? '1' : '0');
   loadNotebookView();
 }
 
@@ -1084,7 +1123,7 @@ const NB_HLS = {
 };
 function nbSetHl(c) {
   nbHl = NB_HLS[c] ? c : 'yellow';
-  try { localStorage.setItem('nbm_nb_hl', nbHl); } catch {}
+  setPref('nbm_nb_hl', nbHl);
   applyNbFont();
   nbMarkActiveSwatch();
 }
@@ -1269,8 +1308,8 @@ async function nbQuickAdd() {
     body.client_id = +nbClient;
   } else {
     const chosen = document.getElementById('nbNewClient')?.value || '';
-    if (chosen) { body.client_id = +chosen; try { localStorage.setItem('nbm_nb_newclient', chosen); } catch {} }
-    else { try { localStorage.removeItem('nbm_nb_newclient'); } catch {} }
+    if (chosen) { body.client_id = +chosen; setPref('nbm_nb_newclient', chosen); }
+    else { setPref('nbm_nb_newclient', ''); }
   }
   // Writing on the "today" page = it's for today.
   if (nbTab === 'today') body.task_band = 'today';
@@ -3183,13 +3222,14 @@ async function toggleTaskPin(taskId, event) {
   try {
     applyViewVisibility();            // hide Tasks-view chrome on the default Dashboard landing
     await loadCurrentUser();
+    await loadServerPrefs();          // server-synced format/prefs — same on every device
     await loadTeam();
     await loadClients();              // populates clients + renders the Control Board (currentView==='dashboard')
     await loadPins();
     document.getElementById('todayDate').value=localDateStr(new Date());
     // Interruption insurance: reopen where you left off, not back at square one.
     try {
-      const savedView = localStorage.getItem('nbm_view');
+      const savedView = appPrefs.nbm_view || localStorage.getItem('nbm_view');
       if (savedView && savedView !== 'dashboard' && document.querySelector(`[data-view="${savedView}"]`)) switchView(savedView);
     } catch {}
   } catch(e) {
