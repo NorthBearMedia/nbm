@@ -47,7 +47,12 @@ backupDatabase();
 setInterval(backupDatabase, 60 * 60 * 1000);
 
 // ─── Core Middleware ─────────────────────────────────────
-app.use(express.json({ limit: '1mb' }));
+// Railway terminates TLS at a proxy: trust one hop so req.ip is the real
+// client (login rate limiting) and secure cookies work correctly.
+app.set('trust proxy', 1);
+// Keep the raw request body so webhook signatures (Meta X-Hub-Signature-256)
+// can be verified against exactly what was sent.
+app.use(express.json({ limit: '1mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(cookieParser());
 app.use(securityHeaders);
 
@@ -59,8 +64,15 @@ app.get('/', (req, res) => {
 });
 
 app.use(express.static(join(__dirname, 'public'), { maxAge: 0, etag: false }));
-app.use('/uploads', express.static(uploadsDir));
-app.use('/attachments', express.static(attachmentsDir));
+// User-uploaded content is served inert: the sandbox CSP means a crafted file
+// (e.g. SVG/HTML masquerading as an image) can never run script in our origin.
+const inertUploads = {
+  setHeaders: (res) => {
+    res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+  },
+};
+app.use('/uploads', express.static(uploadsDir, inertUploads));
+app.use('/attachments', express.static(attachmentsDir, inertUploads));
 
 // ─── API Auth Guard ─────────────────────────────────────
 app.use('/api', apiAuthGuard);

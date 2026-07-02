@@ -11,12 +11,9 @@ const router = Router();
 // ─── Health Check ─────────────────────────────────────
 router.get('/api/health', (req, res) => {
   try {
+    // Unauthenticated endpoint: liveness only — no business data (counts) leaks.
     db.prepare('SELECT 1').get();
-    const counts = {
-      clients: db.prepare('SELECT count(*) as c FROM clients').get().c,
-      tasks: db.prepare('SELECT count(*) as c FROM tasks').get().c,
-    };
-    res.json({ status: 'ok', timestamp: new Date().toISOString(), counts });
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
   } catch (err) {
     res.status(500).json({ status: 'error', error: 'Database unavailable' });
   }
@@ -45,7 +42,9 @@ router.post('/api/team', requireAuth, (req, res) => {
   if (req.user.role !== 'owner') return res.status(403).json({ error: 'Owner only' });
   const { name, role, avatar_color } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });
-  const r = db.prepare('INSERT INTO team_members (name, role, avatar_color) VALUES (?, ?, ?)').run(name, role || '', avatar_color || '#6366f1');
+  // avatar_color is rendered into inline styles client-side — accept hex only.
+  const color = /^#[0-9a-fA-F]{3,8}$/.test(avatar_color || '') ? avatar_color : '#6366f1';
+  const r = db.prepare('INSERT INTO team_members (name, role, avatar_color) VALUES (?, ?, ?)').run(name, role || '', color);
   res.json(db.prepare('SELECT * FROM team_members WHERE id = ?').get(r.lastInsertRowid));
 });
 
@@ -216,10 +215,13 @@ export function createBackupRoutes(backupDir, backupFn) {
     res.json({ success: true, message: 'Backup started' });
   });
 
+  // Backup filenames are machine-generated: allow only that exact shape.
+  const SAFE_BACKUP_NAME = /^[A-Za-z0-9._-]+\.db$/;
+
   r.get('/api/backups/download/:file', requireAuth, (req, res) => {
     if (req.user.role !== 'owner') return res.status(403).json({ error: 'Owner only' });
     const file = req.params.file;
-    if (!file || !file.endsWith('.db') || file.includes('..') || file.includes('/')) {
+    if (!file || !SAFE_BACKUP_NAME.test(file) || file.includes('..')) {
       return res.status(400).json({ error: 'Invalid backup file' });
     }
     const backupPath = join(backupDir, file);
@@ -234,7 +236,10 @@ export function createBackupRoutes(backupDir, backupFn) {
   r.post('/api/backups/restore', requireAuth, (req, res) => {
     if (req.user.role !== 'owner') return res.status(403).json({ error: 'Owner only' });
     const { file } = req.body;
-    if (!file || !file.endsWith('.db')) return res.status(400).json({ error: 'Invalid backup file' });
+    // Same strict filename rule as download — restore must never follow a path.
+    if (!file || !SAFE_BACKUP_NAME.test(file) || file.includes('..')) {
+      return res.status(400).json({ error: 'Invalid backup file' });
+    }
     const backupPath = join(backupDir, file);
     try {
       statSync(backupPath);

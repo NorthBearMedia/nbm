@@ -13,6 +13,18 @@ function requireClientAccess(req, res) {
   return client;
 }
 
+// Client date fields render into HTML attributes client-side — ISO dates or blank only.
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+function cleanDate(v) {
+  if (v === undefined || v === null) return v;
+  return ISO_DATE.test(String(v)) ? v : '';
+}
+function cleanMoney(v) {
+  if (v === undefined || v === null) return v;
+  const n = parseFloat(v);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
 function addDays(dateStr, n) {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + n);
@@ -116,10 +128,13 @@ router.get('/', requireAuth, (req, res) => {
 });
 
 router.post('/', requireAuth, requireWrite, (req, res) => {
-  const { name, code, agreement_type, notes, gmail_link, drive_link, is_private,
+  let { name, code, agreement_type, notes, gmail_link, drive_link, is_private,
     client_type, monthly_value, agreement_summary, recurring_deliverables,
     last_contact_date, next_scheduled_date, control_status, risk_level, important_contacts } = req.body;
   if (!name) return res.status(400).json({ error: 'Client name is required' });
+  last_contact_date = cleanDate(last_contact_date);
+  next_scheduled_date = cleanDate(next_scheduled_date);
+  monthly_value = cleanMoney(monthly_value);
   if (code && code.length !== 3) return res.status(400).json({ error: 'Client code must be exactly 3 characters' });
   if (is_private && req.user.role !== 'owner') return res.status(403).json({ error: 'Only owners can create private clients' });
 
@@ -158,6 +173,9 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   if (client_type !== undefined && !isValidClientType(client_type)) return res.status(400).json({ error: 'Invalid client_type' });
   if (control_status !== undefined && !isValidControlStatus(control_status)) return res.status(400).json({ error: 'Invalid control_status' });
   if (risk_level !== undefined && !isValidRisk(risk_level)) return res.status(400).json({ error: 'Invalid risk_level' });
+  last_contact_date = cleanDate(last_contact_date);
+  next_scheduled_date = cleanDate(next_scheduled_date);
+  monthly_value = cleanMoney(monthly_value);
 
   db.prepare('UPDATE clients SET name=COALESCE(?,name), code=COALESCE(?,code), agreement_type=COALESCE(?,agreement_type), notes=COALESCE(?,notes), logo_url=COALESCE(?,logo_url), gmail_link=COALESCE(?,gmail_link), drive_link=COALESCE(?,drive_link), is_private=COALESCE(?,is_private), client_type=COALESCE(?,client_type), monthly_value=COALESCE(?,monthly_value), agreement_summary=COALESCE(?,agreement_summary), recurring_deliverables=COALESCE(?,recurring_deliverables), last_contact_date=COALESCE(?,last_contact_date), next_scheduled_date=COALESCE(?,next_scheduled_date), control_status=COALESCE(?,control_status), risk_level=COALESCE(?,risk_level), important_contacts=COALESCE(?,important_contacts) WHERE id=?')
     .run(name, code, agreement_type, notes, logo_url, gmail_link, drive_link, is_private !== undefined ? (is_private ? 1 : 0) : null,

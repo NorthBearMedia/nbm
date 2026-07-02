@@ -1,29 +1,48 @@
 import { Router } from 'express';
 import db from '../database.js';
-import { requireAuth, requireRole, hashPassword, validatePassword, avatarUpload } from '../middleware.js';
+import { requireAuth, requireRole, hashPassword, verifyPassword, validatePassword, avatarUpload } from '../middleware.js';
 
 const router = Router();
+
+const VALID_ROLES = ['owner', 'editor', 'viewer'];
 
 router.get('/', requireAuth, (req, res) => {
   res.json(db.prepare('SELECT id, username, email, display_name, role, avatar_url, avatar_color FROM users ORDER BY display_name').all());
 });
 
 router.put('/:id', requireAuth, requireRole('owner'), (req, res) => {
-  const { display_name, role, email } = req.body;
+  let { display_name, role, email } = req.body;
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
+  if (role !== undefined && !VALID_ROLES.includes(role)) return res.status(400).json({ error: 'Invalid role' });
+  // Never allow the last owner to be demoted — that would lock everyone out of admin.
+  if (role && role !== 'owner' && user.role === 'owner') {
+    const owners = db.prepare("SELECT count(*) as c FROM users WHERE role='owner' AND status='active'").get().c;
+    if (owners <= 1) return res.status(400).json({ error: 'Cannot demote the last owner' });
+  }
+  if (email) email = email.toLowerCase().trim();   // login lookups are lowercased
   db.prepare('UPDATE users SET display_name=COALESCE(?,display_name), role=COALESCE(?,role), email=COALESCE(?,email) WHERE id=?')
     .run(display_name, role, email, req.params.id);
   res.json(db.prepare('SELECT id, username, email, display_name, role, avatar_url, avatar_color FROM users WHERE id = ?').get(req.params.id));
 });
 
 router.put('/:id/password', requireAuth, (req, res) => {
-  if (req.user.id !== parseInt(req.params.id) && req.user.role !== 'owner') {
+  const isSelf = req.user.id === parseInt(req.params.id);
+  if (!isSelf && req.user.role !== 'owner') {
     return res.status(403).json({ error: "Cannot change other users' passwords" });
   }
-  const { password } = req.body;
+  const { password, current_password } = req.body;
   const err = validatePassword(password);
   if (err) return res.status(400).json({ error: err });
+
+  // Changing your own password re-authenticates: a hijacked/walk-up session
+  // can't quietly take over the account. (Owner resets of OTHER users are exempt.)
+  if (isSelf) {
+    const me = db.prepare('SELECT password_hash, password_salt FROM users WHERE id = ?').get(req.user.id);
+    if (me?.password_salt && !verifyPassword(current_password || '', me.password_hash, me.password_salt)) {
+      return res.status(403).json({ error: 'Current password is incorrect' });
+    }
+  }
 
   const { hash, salt } = hashPassword(password);
   db.prepare('UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?').run(hash, salt, req.params.id);

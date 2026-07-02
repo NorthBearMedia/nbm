@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { timingSafeEqual } from 'crypto';
 import db from '../database.js';
 import {
   getSessionUser, checkLoginRateLimit, legacyHash,
@@ -30,8 +31,12 @@ router.post('/api/auth/login', (req, res) => {
   if (user.password_salt) {
     authenticated = verifyPassword(password, user.password_hash, user.password_salt);
   } else {
-    // Legacy SHA256 — migrate on success
-    authenticated = user.password_hash === legacyHash(password);
+    // Legacy SHA256 — timing-safe compare, migrate to scrypt on success
+    try {
+      const expected = Buffer.from(user.password_hash, 'hex');
+      const actual = Buffer.from(legacyHash(password), 'hex');
+      authenticated = expected.length === actual.length && timingSafeEqual(expected, actual);
+    } catch { authenticated = false; }
     if (authenticated) {
       const { hash, salt } = hashPassword(password);
       db.prepare('UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?').run(hash, salt, user.id);

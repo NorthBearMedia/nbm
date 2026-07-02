@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { randomBytes } from 'crypto';
 import { google } from 'googleapis';
 import db from '../database.js';
 import { requireAuth } from '../middleware.js';
@@ -47,10 +48,16 @@ router.get('/api/gmail/status', requireAuth, (req, res) => {
 // Start OAuth flow
 router.get('/auth/gmail/connect', requireAuth, (req, res) => {
   if (!CLIENT_ID || !CLIENT_SECRET) return res.status(503).send('Gmail not configured');
+  // CSRF protection: bind this flow to the browser via a random state nonce,
+  // so an attacker can't complete a forged callback and attach THEIR Gmail
+  // account to the victim's session.
+  const state = randomBytes(16).toString('hex');
+  res.cookie('gmail_oauth_state', state, { httpOnly: true, sameSite: 'lax', maxAge: 10 * 60 * 1000, secure: !!(process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV === 'production') });
   const oauth2 = makeOAuth2(req);
   const url = oauth2.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
+    state,
     scope: [
       'https://www.googleapis.com/auth/gmail.modify',
       'https://www.googleapis.com/auth/gmail.send',
@@ -61,8 +68,11 @@ router.get('/auth/gmail/connect', requireAuth, (req, res) => {
 
 // OAuth callback
 router.get('/auth/gmail/callback', requireAuth, async (req, res) => {
-  const { code } = req.query;
+  const { code, state } = req.query;
   if (!code) return res.status(400).send('Missing code');
+  const expected = req.cookies?.gmail_oauth_state;
+  res.clearCookie('gmail_oauth_state');
+  if (!expected || state !== expected) return res.status(403).send('OAuth state mismatch — please retry connecting Gmail.');
   try {
     const oauth2 = makeOAuth2(req);
     const { tokens } = await oauth2.getToken(code);

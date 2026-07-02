@@ -815,7 +815,7 @@ async function loadDashEmails() {
       const d = new Date(m.date);
       const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
       const cls = m.unread ? 'dash-widget-row email-row-unread' : 'dash-widget-row';
-      return `<div class="${cls}" onclick="document.querySelector('[data-view=email]').click();setTimeout(()=>openEmailThread('${m.threadId}'),300)"><div class="dash-widget-row-title">${esc(m.subject || '(no subject)')}</div><div class="dash-widget-row-meta">${esc(from)} · ${time}</div></div>`;
+      return `<div class="${cls}" onclick="document.querySelector('[data-view=email]').click();setTimeout(()=>openEmailThread('${jsSafe(m.threadId)}'),300)"><div class="dash-widget-row-title">${esc(m.subject || '(no subject)')}</div><div class="dash-widget-row-meta">${esc(from)} · ${time}</div></div>`;
     }).join('');
   } catch { body.innerHTML = '<div class="dash-widget-empty">Failed to load emails</div>'; }
 }
@@ -1255,13 +1255,20 @@ function navigateToTask(cid,tid) {
 }
 
 // ─── Helpers ────────────────────────────────────────────
-function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+// HTML-escape for BOTH element and attribute contexts. The old textContent
+// trick did not escape quotes, which left value="${...}" attributes injectable.
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+// For values interpolated into inline JS strings (onclick="f('...')") —
+// entity-escaping doesn't survive attribute decoding, so allow-list instead.
+function jsSafe(s){return String(s||'').replace(/[^A-Za-z0-9._-]/g,'');}
 function localDateStr(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function taskRef(id) { return 'NB' + String(id).padStart(3, '0'); }
 function userAvatar(user, size) {
   const s = size || 20;
   if (!user) return '';
-  const color = user.avatar_color || '#3eaf84';
+  // Colour lands in an inline style attribute — accept hex only.
+  const raw = user.avatar_color || '';
+  const color = /^#[0-9a-fA-F]{3,8}$/.test(raw) ? raw : '#3eaf84';
   if (user.avatar_url) {
     return `<img src="${esc(user.avatar_url)}" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;border:2px solid ${color};flex-shrink:0" alt="">`;
   }
@@ -1447,9 +1454,9 @@ function renderClients() {
       <div style="display:flex;align-items:center;gap:4px;min-width:80px">
         ${userAvatar(mem, 22)}<span style="font-size:12px">${esc(t.assignee||'')}</span>
       </div>
-      <div style="min-width:110px"><input type="date" class="inline-date ${dc}" value="${t.deadline||''}" onchange="inlineFieldChange(${t.id},'deadline',this.value)" onclick="event.stopPropagation()" title="Deadline"></div>
-      <div style="min-width:110px"><input type="date" class="inline-date" value="${t.planned_date||''}" onchange="inlineFieldChange(${t.id},'planned_date',this.value)" onclick="event.stopPropagation()" title="Planned date"></div>
-      <div style="min-width:50px"><input type="number" class="inline-hours" value="${t.estimated_hours||''}" min="0" step="0.5" onchange="inlineFieldChange(${t.id},'estimated_hours',parseFloat(this.value)||0)" onclick="event.stopPropagation()" title="Est. hours"></div>
+      <div style="min-width:110px"><input type="date" class="inline-date ${dc}" value="${esc(t.deadline||'')}" onchange="inlineFieldChange(${t.id},'deadline',this.value)" onclick="event.stopPropagation()" title="Deadline"></div>
+      <div style="min-width:110px"><input type="date" class="inline-date" value="${esc(t.planned_date||'')}" onchange="inlineFieldChange(${t.id},'planned_date',this.value)" onclick="event.stopPropagation()" title="Planned date"></div>
+      <div style="min-width:50px"><input type="number" class="inline-hours" value="${esc(t.estimated_hours||'')}" min="0" step="0.5" onchange="inlineFieldChange(${t.id},'estimated_hours',parseFloat(this.value)||0)" onclick="event.stopPropagation()" title="Est. hours"></div>
       <div><select class="quick-status status-${t.task_status}" onchange="quickStatusChange(${t.id},this.value)" onclick="event.stopPropagation()">
         ${statusOptions(t.task_status)}
       </select></div>
@@ -2307,8 +2314,17 @@ async function changeUserPassword(userId, name) {
   const pw = prompt(`New password for ${name}:`);
   if (!pw) return;
   if (pw.length < 8) { alert('Password must be at least 8 characters with uppercase, lowercase, and a number'); return; }
-  await api(`/api/users/${userId}/password`, { method: 'PUT', body: { password: pw } });
-  alert('Password updated');
+  const body = { password: pw };
+  // Changing your own password requires re-entering the current one.
+  if (currentUser && userId === currentUser.id) {
+    const cur = prompt('Confirm your CURRENT password:');
+    if (!cur) return;
+    body.current_password = cur;
+  }
+  try {
+    await api(`/api/users/${userId}/password`, { method: 'PUT', body });
+    alert('Password updated');
+  } catch (e) { alert(e.message || 'Password change failed'); }
 }
 
 async function deleteUser(userId, name) {
@@ -2363,8 +2379,8 @@ async function loadBackupsList() {
         <div style="font-size:11px;color:var(--text-secondary)">${date} &middot; ${size} &middot; ${b.tasks ?? '?'} tasks</div>
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0">
-        <button class="btn btn-ghost btn-sm" onclick="downloadBackup('${esc(b.file)}')" title="Download">&#11015;</button>
-        <button class="btn btn-ghost btn-sm" onclick="restoreBackup('${esc(b.file)}')" title="Restore" style="color:var(--warning)">&#8634;</button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadBackup('${jsSafe(b.file)}')" title="Download">&#11015;</button>
+        <button class="btn btn-ghost btn-sm" onclick="restoreBackup('${jsSafe(b.file)}')" title="Restore" style="color:var(--warning)">&#8634;</button>
       </div>
     </div>`;
   }).join('');
@@ -2572,7 +2588,7 @@ function showInlineEdit(taskId) {
   div.className = 'inline-edit-row';
   div.innerHTML = `
     <input type="text" placeholder="Quick note..." onkeydown="if(event.key==='Enter'){submitInlineNote(${taskId},this);event.preventDefault();}">
-    <input type="date" value="${t.planned_date || ''}" onchange="inlineDateChange(${taskId},this.value)" style="width:130px" title="Planned date">
+    <input type="date" value="${esc(t.planned_date || '')}" onchange="inlineDateChange(${taskId},this.value)" style="width:130px" title="Planned date">
     <select onchange="inlineAssigneeChange(${taskId},this.value)" style="width:110px">
       <option value="">Unassigned</option>
       ${appUsers.map(u => `<option value="${esc(u.display_name)}" ${u.display_name === t.assignee ? 'selected' : ''}>${esc(u.display_name)}</option>`).join('')}
@@ -2915,7 +2931,7 @@ function renderEmailRow(m) {
   const dateStr = isToday ? d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   const unreadClass = m.unread ? 'email-row-unread' : '';
 
-  return `<div class="email-row ${unreadClass}" onclick="openEmailThread('${m.threadId}')">
+  return `<div class="email-row ${unreadClass}" onclick="openEmailThread('${jsSafe(m.threadId)}')">
     <div class="email-row-from">${esc(fromName)}</div>
     <div class="email-row-content">
       <span class="email-row-subject">${esc(m.subject || '(no subject)')}</span>

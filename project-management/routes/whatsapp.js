@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { createHmac, timingSafeEqual } from 'crypto';
 import db from '../database.js';
 import { requireAuth, requireRole } from '../middleware.js';
 
@@ -7,7 +8,11 @@ const router = Router();
 // ─── Config endpoints ───────────────────────────────────
 
 router.get('/api/whatsapp/config', requireAuth, (req, res) => {
-  const configs = db.prepare('SELECT id, label, phone_number_id, waba_id, verify_token, enabled FROM whatsapp_config').all();
+  // verify_token is a webhook secret — only owners (who manage the config) see it.
+  const cols = req.user.role === 'owner'
+    ? 'id, label, phone_number_id, waba_id, verify_token, enabled'
+    : 'id, label, phone_number_id, enabled';
+  const configs = db.prepare(`SELECT ${cols} FROM whatsapp_config`).all();
   res.json(configs);
 });
 
@@ -123,7 +128,27 @@ router.get('/webhooks/whatsapp', (req, res) => {
 
 // ─── Webhook inbound messages (Meta calls this — no auth)
 
+// Verify Meta's X-Hub-Signature-256 (HMAC-SHA256 of the raw body with the app
+// secret). Without this, anyone who finds the URL can inject fake "inbound"
+// messages. Enforced when WHATSAPP_APP_SECRET is set; a warning is logged when
+// it isn't, so the gap is visible rather than silent.
+function verifyMetaSignature(req) {
+  const secret = process.env.WHATSAPP_APP_SECRET;
+  if (!secret) {
+    console.warn('[WhatsApp] WHATSAPP_APP_SECRET not set — webhook signature NOT verified');
+    return true;
+  }
+  const header = req.get('x-hub-signature-256') || '';
+  if (!header.startsWith('sha256=') || !req.rawBody) return false;
+  const expected = createHmac('sha256', secret).update(req.rawBody).digest('hex');
+  const given = header.slice(7);
+  try {
+    return given.length === expected.length && timingSafeEqual(Buffer.from(given, 'hex'), Buffer.from(expected, 'hex'));
+  } catch { return false; }
+}
+
 router.post('/webhooks/whatsapp', (req, res) => {
+  if (!verifyMetaSignature(req)) return res.sendStatus(403);
   try {
     const entries = req.body?.entry || [];
 
@@ -146,15 +171,17 @@ router.post('/webhooks/whatsapp', (req, res) => {
           const contact = contacts.find(c => c.wa_id === msg.from);
           const contactName = contact?.profile?.name || msg.from;
 
+          // Dedupe on Meta's message id (webhooks retry) and cap stored lengths.
+          if (msg.id && db.prepare('SELECT 1 FROM whatsapp_messages WHERE wa_message_id = ?').get(msg.id)) continue;
           db.prepare(
             'INSERT INTO whatsapp_messages (config_id, direction, from_number, to_number, contact_name, body, timestamp, wa_message_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
           ).run(
             config.id,
             'inbound',
-            msg.from,
+            String(msg.from || '').substring(0, 32),
             phoneNumberId,
-            contactName,
-            msg.text?.body || '',
+            String(contactName || '').substring(0, 128),
+            String(msg.text?.body || '').substring(0, 4096),
             new Date(parseInt(msg.timestamp) * 1000).toISOString(),
             msg.id
           );

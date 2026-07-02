@@ -113,10 +113,14 @@ setInterval(() => {
   for (const [ip, entry] of loginAttempts) {
     if (now > entry.resetAt) loginAttempts.delete(ip);
   }
+  // Expired session tokens are dead but stay queryable rows — purge them.
+  try { db.prepare("DELETE FROM sessions WHERE expires_at <= datetime('now')").run(); } catch {}
 }, 30 * 60 * 1000);
 
 // ─── File Upload Configs ──────────────────────────────
-const allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+// SVG deliberately excluded: it can embed <script> and would be a stored-XSS
+// vector when served from our origin. Raster formats only for logos/avatars.
+const allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const allowedAttachTypes = [
   ...allowedImageTypes,
   'application/pdf', 'application/msword',

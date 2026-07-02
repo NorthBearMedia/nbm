@@ -20,6 +20,19 @@ function checkPrivateClient(req, res, clientId) {
   return true;
 }
 
+// Date fields render into HTML value="" attributes client-side — accept only
+// real ISO dates (or blank) so they can never carry markup.
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+function cleanDate(v) {
+  if (v === undefined || v === null) return v;   // "not provided" stays untouched (COALESCE)
+  return ISO_DATE.test(String(v)) ? v : '';
+}
+function cleanHours(v) {
+  if (v === undefined || v === null) return v;
+  const n = parseFloat(v);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
 // The system "Unassigned" client catches clientless Inbox captures.
 function getUnassignedClientId() {
   let u = db.prepare("SELECT id FROM clients WHERE is_system=1 ORDER BY id LIMIT 1").get();
@@ -41,6 +54,10 @@ router.post('/', requireAuth, requireWrite, (req, res) => {
   // client_id is optional — clientless quick-captures land in the system "Unassigned" client
   if (!client_id) client_id = getUnassignedClientId();
   if (!checkPrivateClient(req, res, client_id)) return;
+
+  deadline = cleanDate(deadline);
+  planned_date = cleanDate(planned_date);
+  estimated_hours = cleanHours(estimated_hours);
 
   // New canonical fields (validated); legacy progress/priority derived as shadows.
   task_status = isValidStatus(task_status) ? task_status : 'inbox';
@@ -71,6 +88,10 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   const old = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!old) return res.status(404).json({ error: 'Task not found' });
   if (!checkPrivateClient(req, res, old.client_id)) return;
+
+  deadline = cleanDate(deadline);
+  planned_date = cleanDate(planned_date);
+  estimated_hours = cleanHours(estimated_hours);
 
   // Reassign client (e.g. triaging an Inbox task to a client)
   if (client_id !== undefined && client_id !== null && +client_id !== old.client_id) {
@@ -159,10 +180,14 @@ router.post('/batch-move', requireAuth, requireWrite, (req, res) => {
 
   const update = db.prepare('UPDATE tasks SET client_id = ? WHERE id = ?');
   const moved = [];
+  const isOwner = req.user.role === 'owner';
   db.transaction(() => {
     for (const id of task_ids) {
-      const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+      // Join the source client so tasks under private clients can't be moved
+      // (or discovered) by non-owners guessing ids.
+      const task = db.prepare('SELECT t.*, c.is_private FROM tasks t JOIN clients c ON t.client_id = c.id WHERE t.id = ?').get(id);
       if (!task) continue;
+      if (task.is_private && !isOwner) continue;
       update.run(target_client_id, id);
       moved.push(task.title);
       logActivity('task', id, 'updated', req.user.display_name, `Moved to "${targetClient.name}"`);
@@ -235,6 +260,9 @@ router.post('/:id/comments', requireAuth, requireWrite, (req, res) => {
 // ─── Checklists ──────────────────────────────────────
 
 router.get('/:id/checklist', requireAuth, (req, res) => {
+  const t = db.prepare('SELECT client_id FROM tasks WHERE id = ?').get(req.params.id);
+  if (!t) return res.status(404).json({ error: 'Task not found' });
+  if (!checkPrivateClient(req, res, t.client_id)) return;
   res.json(db.prepare('SELECT * FROM checklist_items WHERE task_id = ? ORDER BY sort_order, id').all(req.params.id));
 });
 
@@ -266,8 +294,9 @@ router.delete('/:id/checklist/:itemId', requireAuth, requireWrite, (req, res) =>
 // ─── Pin/Star ────────────────────────────────────────
 
 router.put('/:id/pin', requireAuth, (req, res) => {
-  const t = db.prepare('SELECT is_pinned FROM tasks WHERE id = ?').get(req.params.id);
+  const t = db.prepare('SELECT is_pinned, client_id FROM tasks WHERE id = ?').get(req.params.id);
   if (!t) return res.status(404).json({ error: 'Task not found' });
+  if (!checkPrivateClient(req, res, t.client_id)) return;
   const newVal = t.is_pinned ? 0 : 1;
   db.prepare('UPDATE tasks SET is_pinned = ? WHERE id = ?').run(newVal, req.params.id);
   res.json({ is_pinned: newVal });
