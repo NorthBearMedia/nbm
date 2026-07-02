@@ -21,6 +21,7 @@ import { autoConnectSite } from './lib/autoconnect.js';
 import { seedFirstCustomer } from './lib/seed.js';
 import * as hostinger from './lib/hostinger.js';
 import * as fathom from './lib/fathom.js';
+import { scheduleOpsSweep, runOpsSweep } from './lib/ops.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -298,6 +299,12 @@ app.post('/api/sync-clarity', requireAdmin, async (req, res) => {
   res.json({ ok: true, synced });
 });
 
+// Re-run the self-setup sweep on demand (idempotent — only fills gaps).
+app.post('/api/ops/run', requireAdmin, async (req, res) => {
+  try { res.json({ ok: true, log: await runOpsSweep({ force: true }) }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ─── Hostinger: list + one-click import of all hosted sites ──────
 app.get('/api/hostinger/websites', requireAdmin, async (req, res) => {
   try {
@@ -442,4 +449,5 @@ app.listen(config.port, () => {
   console.log(`North Bear Pulse running on port ${config.port} — ${getAppUrl()}`);
   seedFirstCustomer();
   startScheduler();
+  scheduleOpsSweep();
 });
