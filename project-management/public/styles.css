@@ -3112,3 +3112,35 @@ select { color-scheme:dark; }
 .nb-pagebtn:disabled { opacity:.25; cursor:default; border-bottom-color:transparent; }
 .nb-pagebtn:hover:not(:disabled) { color:#2d6a4f; }
 .nb-pagenum { font-size:17px; }
+
+/* ─── NOTEBOOK v4: roomier grid + right-click menu ───── */
+/* All vertical rhythm flows from --nb-lh so the JS-measured rules always match. */
+.nb-wrap { --nb-lh: 42px; }
+.nb-paper { padding: var(--nb-lh) 34px 60px 70px; }
+.nb-header, .nb-subheader { height: var(--nb-lh); line-height: var(--nb-lh); }
+.nb-line, .nb-bullet, .nb-new input, .nb-empty, .nb-footer, .nb-legend,
+.nb-filedunder, .nb-pagenav { line-height: var(--nb-lh); }
+.nb-footer { margin-top: var(--nb-lh); }
+.nb-legend { line-height: var(--nb-lh); }
+.nb-paper {
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 41px, rgba(112,146,190,.5) 41px 42px),
+    linear-gradient(#fbf7ec, #f5f0e2);
+}
+
+/* torn-scrap context menu */
+.nb-menu {
+  display:none; position:fixed; z-index:6000; width:240px;
+  background:#fbf7ec; color:#1c1c1c; border:1px solid rgba(28,28,28,.25);
+  border-radius:4px; box-shadow:0 12px 34px rgba(0,0,0,.45);
+  font-family:var(--nb-font, 'Caveat'), cursive; font-size:19px;
+  padding:8px 0; transform:rotate(-.4deg);
+}
+.nb-menu-title { padding:2px 14px 8px; font-weight:600; border-bottom:1px dashed rgba(28,28,28,.25); margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.nb-menu-item { display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:none; border:none; padding:5px 14px; font-family:inherit; font-size:inherit; color:#1c1c1c; cursor:pointer; }
+.nb-menu-item:hover { background:rgba(255,224,58,.45); }
+.nb-menu-pick { cursor:default; }
+.nb-menu-pick input[type=date] { font-family:inherit; font-size:15px; background:transparent; border:none; border-bottom:1px dashed rgba(28,28,28,.4); color:#1c1c1c; outline:none; width:130px; }
+.nb-menu-sep { height:1px; background:rgba(28,28,28,.15); margin:5px 10px; }
+.nb-menu-delete { color:#b3372f; text-decoration:line-through; text-decoration-color:rgba(179,55,47,.5); }
+.nb-menu-delete:hover { background:rgba(179,55,47,.12); }

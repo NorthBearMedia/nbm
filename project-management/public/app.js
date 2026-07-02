@@ -1017,13 +1017,31 @@ const NB_PAGE_SIZE = 22;        // lines per notebook page
 
 // Available "pens" — self-hosted handwriting fonts, each with its own size
 // tuning so the ink sits on the ruled lines regardless of the font's metrics.
+// Rule spacing for the whole page — roomier than a pocket book.
+const NB_LINE_H = 42;
 const NB_PENS = {
-  'Caveat':             { label: 'Caveat (flowing)',     size: 23, small: 17, base: 25 },
-  'Kalam':              { label: 'Kalam (biro)',         size: 19, small: 15, base: 23 },
-  'Patrick Hand':       { label: 'Patrick Hand (neat)',  size: 20, small: 15, base: 24 },
-  'Shadows Into Light': { label: 'Shadows (fine liner)', size: 20, small: 15, base: 24 },
-  'Indie Flower':       { label: 'Indie Flower (bubbly)',size: 19, small: 15, base: 23 },
+  'Caveat':             { label: 'Caveat (flowing)',     size: 27, small: 19 },
+  'Kalam':              { label: 'Kalam (biro)',         size: 21, small: 16 },
+  'Patrick Hand':       { label: 'Patrick Hand (neat)',  size: 23, small: 17 },
+  'Shadows Into Light': { label: 'Shadows (fine liner)', size: 23, small: 17 },
+  'Indie Flower':       { label: 'Indie Flower (bubbly)',size: 21, small: 16 },
 };
+
+// Measure where this browser ACTUALLY draws the text baseline for a given
+// pen (font metrics differ across platforms — hand-tuned constants drift).
+// Trick: a zero-height inline-block sits its box exactly on the baseline.
+function nbMeasureBaseline(family, sizePx) {
+  const probe = document.createElement('div');
+  probe.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;font-family:'${family}',cursive;font-size:${sizePx}px;line-height:${NB_LINE_H}px;`;
+  const marker = document.createElement('span');
+  marker.style.cssText = 'display:inline-block;width:0;height:0;';
+  probe.appendChild(document.createTextNode('Hgy'));
+  probe.appendChild(marker);
+  document.body.appendChild(probe);
+  const b = marker.getBoundingClientRect().top - probe.getBoundingClientRect().top;
+  document.body.removeChild(probe);
+  return b;
+}
 
 function nbSetTab(t) { nbTab = t; nbPage = 0; try { localStorage.setItem('nbm_nb_tab', t); } catch {} loadNotebookView(); }
 function nbSetClient(v) { nbClient = v; nbPage = 0; try { localStorage.setItem('nbm_nb_client', v); } catch {} loadNotebookView(); }
@@ -1046,9 +1064,21 @@ function applyNbFont() {
   wrap.style.setProperty('--nb-font', `'${nbFont}', cursive`);
   wrap.style.setProperty('--nb-size', pen.size + 'px');
   wrap.style.setProperty('--nb-small', pen.small + 'px');
-  // Re-phase the ruled lines so this pen's baseline lands on the rule.
+  wrap.style.setProperty('--nb-lh', NB_LINE_H + 'px');
   const paper = wrap.querySelector('.nb-paper');
-  if (paper) paper.style.backgroundPosition = `0 ${pen.base}px, 0 0`;
+  if (!paper) return;
+  const draw = () => {
+    // Generate the rules at the measured baseline: rule top ≈ baseline + 1px,
+    // so descenders cross the line exactly like real handwriting.
+    const baseline = nbMeasureBaseline(nbFont, pen.size);
+    const phase = ((Math.round(baseline) + 2) % NB_LINE_H + NB_LINE_H) % NB_LINE_H;
+    paper.style.backgroundImage =
+      `repeating-linear-gradient(to bottom, transparent 0 ${NB_LINE_H - 1}px, rgba(112,146,190,.5) ${NB_LINE_H - 1}px ${NB_LINE_H}px), linear-gradient(#fbf7ec, #f5f0e2)`;
+    paper.style.backgroundPosition = `0 ${phase}px, 0 0`;
+  };
+  draw();
+  // Metrics change once the webfont finishes loading — re-measure then.
+  try { document.fonts.load(`${pen.size}px '${nbFont}'`).then(draw); } catch {}
 }
 function nbFlip(dir) { nbPage += dir; loadNotebookView(); }
 
@@ -1156,7 +1186,7 @@ function loadNotebookView() {
     const overdue = !done && t.deadline && t.deadline < today;
     const client = t.client_name && !t.client_is_system ? `<span class="nb-client">&nbsp;&mdash; ${esc(t.client_name)}</span>` : '';
     const due = overdue ? `<span class="nb-due">&nbsp;(${relDate(t.deadline)}!)</span>` : '';
-    return `<div class="nb-line ${done ? 'nb-done' : ''}">
+    return `<div class="nb-line ${done ? 'nb-done' : ''}" data-id="${t.id}">
       <button class="nb-bullet ${done ? 'nb-ticked' : ''}" onclick="nbTick(${t.id})" title="${done ? 'Untick' : 'Tick off'}">${done ? '&#10003;' : '&bull;'}</button>
       <span class="nb-text"><span class="${hl ? 'nb-hl' : ''}" onclick="editTask(${t.id})" title="Open task">${esc(t.title)}</span>${client}${due}</span>
       <button class="nb-marker ${hl ? 'nb-marker-on' : ''}" onclick="nbHighlight(${t.id})" title="${hl ? 'Remove today highlight' : 'Highlight for today'}"></button>
@@ -1200,6 +1230,94 @@ async function nbQuickAdd() {
     inp.focus();
   } catch {}
 }
+
+// ─── Notebook right-click menu ──────────────────────────
+// Right-click (long-press on Android) a line: change due date, highlight,
+// open, or scribble it out entirely.
+let nbMenuTaskId = null;
+
+function nbMenuEl() {
+  let m = document.getElementById('nbMenu');
+  if (m) return m;
+  m = document.createElement('div');
+  m.id = 'nbMenu';
+  m.className = 'nb-menu';
+  m.innerHTML = `
+    <div class="nb-menu-title" id="nbMenuTitle"></div>
+    <button class="nb-menu-item" onclick="nbMenuDue('today')">Due today</button>
+    <button class="nb-menu-item" onclick="nbMenuDue('tomorrow')">Due tomorrow</button>
+    <button class="nb-menu-item" onclick="nbMenuDue('next-week')">Due next week</button>
+    <div class="nb-menu-item nb-menu-pick">Pick a date: <input type="date" id="nbMenuDate" onchange="nbMenuDue(this.value)" onclick="event.stopPropagation()"></div>
+    <button class="nb-menu-item" onclick="nbMenuDue('')">Clear due date</button>
+    <div class="nb-menu-sep"></div>
+    <button class="nb-menu-item" id="nbMenuHl" onclick="nbMenuHighlight()"></button>
+    <button class="nb-menu-item" onclick="nbMenuOpen()">Open full task</button>
+    <div class="nb-menu-sep"></div>
+    <button class="nb-menu-item nb-menu-delete" onclick="nbMenuDelete()">Scribble it out (delete)</button>`;
+  document.body.appendChild(m);
+  return m;
+}
+
+function nbOpenMenu(taskId, x, y) {
+  const t = findTaskById(taskId);
+  if (!t) return;
+  nbMenuTaskId = taskId;
+  const m = nbMenuEl();
+  document.getElementById('nbMenuTitle').textContent = t.title.length > 34 ? t.title.slice(0, 34) + '…' : t.title;
+  document.getElementById('nbMenuHl').textContent = t.task_band === 'today' ? 'Remove today highlight' : 'Highlight for today';
+  document.getElementById('nbMenuDate').value = t.deadline || '';
+  m.style.display = 'block';
+  const mw = 240, mh = m.offsetHeight || 320;
+  m.style.left = Math.min(x, window.innerWidth - mw - 12) + 'px';
+  m.style.top = Math.min(y, window.innerHeight - mh - 12) + 'px';
+}
+
+function nbCloseMenu() {
+  const m = document.getElementById('nbMenu');
+  if (m) m.style.display = 'none';
+  nbMenuTaskId = null;
+}
+
+async function nbMenuDue(when) {
+  if (nbMenuTaskId === null) return;
+  const d = new Date(); d.setHours(0, 0, 0, 0);
+  let deadline = when;
+  if (when === 'today') deadline = localDateStr(d);
+  else if (when === 'tomorrow') { d.setDate(d.getDate() + 1); deadline = localDateStr(d); }
+  else if (when === 'next-week') { const dow = d.getDay(); d.setDate(d.getDate() + (((8 - dow) % 7) || 7)); deadline = localDateStr(d); }
+  const id = nbMenuTaskId;
+  nbCloseMenu();
+  try { await api(`/api/tasks/${id}`, { method: 'PUT', body: { deadline } }); await loadClients(); } catch (e) { alert(e.message || 'Could not update'); }
+}
+
+async function nbMenuHighlight() {
+  const id = nbMenuTaskId; nbCloseMenu();
+  if (id !== null) await nbHighlight(id);
+}
+
+function nbMenuOpen() {
+  const id = nbMenuTaskId; nbCloseMenu();
+  if (id !== null) editTask(id);
+}
+
+async function nbMenuDelete() {
+  const id = nbMenuTaskId;
+  const t = id !== null ? findTaskById(id) : null;
+  nbCloseMenu();
+  if (!t) return;
+  if (!confirm(`Scribble out "${t.title}" for good? This deletes the task entirely.`)) return;
+  try { await api(`/api/tasks/${id}`, { method: 'DELETE' }); await loadClients(); }
+  catch (e) { alert(e.message || 'Only owners can delete tasks — tick it off or cancel it instead.'); }
+}
+
+document.getElementById('notebookLines').addEventListener('contextmenu', (e) => {
+  const line = e.target.closest('.nb-line');
+  if (!line || !line.dataset.id) return;
+  e.preventDefault();
+  nbOpenMenu(+line.dataset.id, e.clientX, e.clientY);
+});
+document.addEventListener('click', (e) => { if (!e.target.closest('#nbMenu')) nbCloseMenu(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') nbCloseMenu(); });
 
 // ─── Weekly Planning ────────────────────────────────────
 function planningTaskRow(t) {
