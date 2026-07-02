@@ -2303,12 +2303,26 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .bp-est { flex-shrink:0; font-size:11px; font-weight:600; color:var(--text-secondary); background:var(--bg-glass); padding:1px 7px; border-radius:8px; }
 .bp-sub { font-size:11px; color:var(--text-muted); white-space:nowrap; flex-shrink:0; max-width:150px; overflow:hidden; text-overflow:ellipsis; }
 .bp-actions { display:flex; align-items:center; gap:4px; flex-shrink:0; }
-.bp-act { width:24px; height:24px; border:none; border-radius:6px; background:rgba(255,255,255,0.06); color:var(--text-secondary); font-size:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .12s,color .12s; }
+.bp-act { width:28px; height:28px; border:none; border-radius:6px; background:rgba(255,255,255,0.06); color:var(--text-secondary); font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .12s,color .12s; }
 .bp-act:hover { background:rgba(255,255,255,0.14); color:var(--text); }
 .bp-done:hover { background:rgba(62,175,132,0.2); color:var(--primary); }
-.bp-resched { background:rgba(255,255,255,0.06); border:none; border-radius:6px; color:var(--text-secondary); font-size:11px; padding:3px 4px; cursor:pointer; font-family:inherit; color-scheme:dark; max-width:30px; }
-.bp-resched:hover { color:var(--text); }
+.bp-resched { background:rgba(255,255,255,0.06); border:none; border-radius:6px; color:var(--text-secondary); font-size:11px; padding:5px 6px; cursor:pointer; font-family:inherit; color-scheme:dark; }
+.bp-resched:hover { color:var(--text); background:rgba(255,255,255,0.12); }
+/* Actions sit quiet until the row is hovered — less visual buzz, same reachability. */
+@media (hover:hover) {
+  .bp-actions { opacity:0.3; transition:opacity .12s; }
+  .bp-item:hover .bp-actions { opacity:1; }
+}
+.bp-why { flex-shrink:0; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.03em; color:var(--text-muted); background:var(--bg-glass); padding:1px 7px; border-radius:8px; }
+.bp-why-bad { background:rgba(220,50,50,0.14); color:#e4787a; }
+.bp-group-est { font-weight:500; text-transform:none; letter-spacing:0; color:var(--text-muted); }
 .bp-empty { font-size:13px; color:var(--text-secondary); padding:6px 4px; }
+.dash-momentum { margin-top:6px; font-size:13px; color:var(--text-secondary); }
+.dash-momentum strong { color:var(--primary); }
+.rel-over { color:#e4484a; font-weight:600; }
+.rel-soon { color:#e6a020; font-weight:600; }
+.dash-stat { cursor:pointer; }
+.dash-stat:hover { transform:translateY(-2px); }
 .cb-stat-workload { background:rgba(62,175,132,0.10); color:var(--primary); }
 .cb-value-type { color:var(--text-secondary); background:var(--bg-glass); border-color:var(--border); }
 
@@ -2418,10 +2432,12 @@ select { color-scheme:dark; }
 .strip-header { margin:24px 0 10px; cursor:pointer; font-size:13px; font-weight:600; color:var(--text-secondary); user-select:none; display:flex; align-items:center; gap:8px; }
 .strip-header:hover { color:var(--text); }
 .band-badge { font-size:10px; font-weight:600; padding:1px 7px; border-radius:8px; background:var(--bg-glass); color:var(--text-secondary); white-space:nowrap; }
-.bd-today { background:rgba(220,50,50,0.15); color:#e4686a; }
-.bd-this-week { background:rgba(230,160,30,0.15); color:#e6a020; }
-.bd-scheduled { background:rgba(74,144,226,0.15); color:#6aa3e8; }
-.bd-waiting { background:rgba(160,120,220,0.15); color:#a884d8; }
+/* Colour discipline: red is reserved for overdue/urgent STATE. Band badges are
+   calendar metadata, so only "today" gets a warm (amber) nudge; the rest stay quiet. */
+.bd-today { background:rgba(230,160,30,0.18); color:#e6b050; }
+.bd-this-week { background:rgba(255,255,255,0.07); color:var(--text-secondary); }
+.bd-scheduled { background:rgba(74,144,226,0.12); color:#6aa3e8; }
+.bd-waiting { background:rgba(160,120,220,0.12); color:#a884d8; }
 .bd-someday { background:var(--bg-glass); color:var(--text-muted); }
 .type-badge { font-size:10px; padding:1px 6px; border-radius:6px; background:var(--bg-glass); color:var(--text-muted); }
 /* Client detail modal */

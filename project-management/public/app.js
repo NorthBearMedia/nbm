@@ -319,11 +319,13 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
 
 // ─── Dashboard ─────────────────────────────────────────
 let dashWaConfigs = [];
+let bpDoNowCount = 0;
 
 async function loadDashboard() {
   renderDashGreeting();
   renderDashStats();
   renderBattlePlan();
+  renderDashMomentum();
   renderControlBoard();
   // Integrations strip (preserved widgets, relocated below the board)
   renderDashUrgentTasks();
@@ -366,6 +368,23 @@ function lastContactLabel(dateStr) {
   if (n <= 0) return 'Last contact: today';
   if (n === 1) return 'Last contact: yesterday';
   return `Last contact: ${n} days ago`;
+}
+
+// Relative date language ("3d ago", "tomorrow") — faster to parse than raw dates.
+function relDate(ds) {
+  const n = daysSince(ds);
+  if (n === null) return '';
+  if (n === 0) return 'today';
+  if (n === 1) return 'yesterday';
+  if (n === -1) return 'tomorrow';
+  return n > 1 ? `${n}d ago` : `in ${-n}d`;
+}
+// Rendered span with urgency colouring + the real date in the tooltip.
+function relDateHtml(ds) {
+  if (!ds) return '—';
+  const n = daysSince(ds);
+  const cls = n > 0 ? 'rel-over' : (n === 0 || n === -1) ? 'rel-soon' : '';
+  return `<span class="${cls}" title="${ds}">${relDate(ds)}</span>`;
 }
 
 // Format estimated hours as 15m / 45m / 1h / 2h 30m. Empty string when none.
@@ -443,18 +462,29 @@ function renderBattlePlan() {
     if (isToday(t)) return '☼';
     return '▸';
   }
+  // A one-word "why this is here" — trust in the ordering means less re-checking the board.
+  function whyFor(t) {
+    if (isOverdue(t)) { const n = daysSince(t.deadline); return { text: n === 1 ? '1d overdue' : `${n}d overdue`, bad: true }; }
+    if (isUrgent(t)) return { text: 'urgent', bad: true };
+    if (isToday(t)) return { text: 'due today', bad: false };
+    if (isCrit(t)) return { text: 'client red', bad: false };
+    if (t.task_band === 'this-week') return { text: 'this week', bad: false };
+    return null;
+  }
   function itemHtml(t) {
     const est = fmtEstTime(t.estimated_hours);
+    const why = whyFor(t);
     return `<div class="bp-item">
       <span class="bp-icon">${iconFor(t)}</span>
       <span class="bp-text" onclick="editTask(${t.id})" title="Open task">${esc(t.title)}</span>
+      ${why ? `<span class="bp-why ${why.bad ? 'bp-why-bad' : ''}">${why.text}</span>` : ''}
       ${est ? `<span class="bp-est">${est}</span>` : ''}
       <span class="bp-sub">${esc(t.client_name || '')}</span>
       <span class="bp-actions">
         <button class="bp-act bp-focus" title="Start focus timer" onclick="event.stopPropagation();focusForTask(${t.id})">&#9201;</button>
         <button class="bp-act bp-done" title="Mark done" onclick="event.stopPropagation();bpDone(${t.id})">&#10003;</button>
         <select class="bp-resched" title="Reschedule" onchange="bpReschedule(${t.id}, this.value)" onclick="event.stopPropagation()">
-          <option value="">&#8986;</option>
+          <option value="">Move&hellip;</option>
           <option value="tomorrow">Tomorrow</option>
           <option value="this-week">Later this week</option>
           <option value="next-week">Next week</option>
@@ -463,9 +493,14 @@ function renderBattlePlan() {
       </span>
     </div>`;
   }
-  const group = (title, cls, arr) => arr.length
-    ? `<div class="bp-group ${cls}"><div class="bp-group-title">${title}</div>${arr.map(itemHtml).join('')}</div>` : '';
+  // Group headers show the summed estimate — the pile is visibly bounded ("~1h 20m", not "??").
+  const group = (title, cls, arr) => {
+    if (!arr.length) return '';
+    const est = arr.reduce((s, t) => s + (t.estimated_hours || 0), 0);
+    return `<div class="bp-group ${cls}"><div class="bp-group-title">${title}${est > 0 ? ` <span class="bp-group-est">· ~${fmtEstTime(est)}</span>` : ''}</div>${arr.map(itemHtml).join('')}</div>`;
+  };
 
+  bpDoNowCount = doNow.length;
   section.style.display = '';
   if (!doNow.length && !doNext.length && !canWait.length) {
     el.innerHTML = '<div class="bp-empty">✓ Nothing on fire. Pick from the board below, or plan your week.</div>';
@@ -532,7 +567,6 @@ function clientCardHTML(c) {
   const { status, risk, b } = clientControlData(c);
   const sCfg = CONTROL_STATUS[status] || CONTROL_STATUS.green;
   const overrideTag = c.control_status ? '<span class="cb-override" title="Manual override">override</span>' : '';
-  const due = b.next_due_date ? fmtDateShort(b.next_due_date) : '—';
   const logo = c.logo_url ? `<img src="${esc(c.logo_url)}" class="cb-logo" alt="">` : `<span class="cb-logo cb-logo-code">${esc(c.code || c.name.substring(0,3))}</span>`;
   const na = clientNextAction(c);
   const lcDays = daysSince(c.last_contact_date);
@@ -561,8 +595,8 @@ function clientCardHTML(c) {
       ${workloadLine ? `<span class="cb-stat cb-stat-workload">${workloadLine}</span>` : ''}
     </div>
     <div class="cb-meta">
-      <span title="Next due">Due: ${due}</span>
-      <span title="Next scheduled work">Sched: ${c.next_scheduled_date?fmtDateShort(c.next_scheduled_date):'—'}</span>
+      <span title="Next due">Due: ${b.next_due_date ? relDateHtml(b.next_due_date) : '—'}</span>
+      <span title="Next scheduled work">Sched: ${c.next_scheduled_date ? relDateHtml(c.next_scheduled_date) : '—'}</span>
       <span class="risk-badge risk-${risk}" title="Risk">${(RISK[risk]||'')} risk</span>
     </div>
     <div class="cb-contact ${lcStale?'cb-contact-stale':''}" title="Last contact">${lastContactLabel(c.last_contact_date)}${lcStale?' ⚠':''}</div>
@@ -635,6 +669,16 @@ function renderDashGreeting() {
   document.getElementById('dashDate').textContent = new Date().toLocaleDateString('en-GB', opts);
 }
 
+// Momentum strip — visible progress is the dopamine ADHD brains under-supply themselves.
+function renderDashMomentum() {
+  const el = document.getElementById('dashMomentum');
+  if (!el) return;
+  const today = localDateStr(new Date());
+  const done = allTasksFlat().filter(t => t.task_status === 'done' && (t.completed_at || '') === today).length;
+  if (!done && !bpDoNowCount) { el.innerHTML = ''; return; }
+  el.innerHTML = `${done ? `&#9989; <strong>${done}</strong> done today` : ''}${done && bpDoNowCount ? ' &middot; ' : ''}${bpDoNowCount ? `<strong>${bpDoNowCount}</strong> in Do-now` : ''}`;
+}
+
 function renderDashStats() {
   const today = new Date().toISOString().split('T')[0];
   let overdue = 0, dueToday = 0, waiting = 0, inbox = 0;
@@ -649,14 +693,21 @@ function renderDashStats() {
     }
   }
   const atRisk = clients.filter(c => !c.is_system && !c.archived && ['red','amber'].includes(clientControlData(c).status)).length;
+  // Every stat is a door: it opens the view where you can act on the number.
   document.getElementById('dashStats').innerHTML = `
-    <div class="dash-stat dash-stat--danger"><div class="dash-stat-icon">&#9888;</div><div class="dash-stat-value">${overdue}</div><div class="dash-stat-label">Overdue</div></div>
-    <div class="dash-stat dash-stat--warning"><div class="dash-stat-icon">&#9888;</div><div class="dash-stat-value">${atRisk}</div><div class="dash-stat-label">At-risk Clients</div></div>
-    <div class="dash-stat dash-stat--blue"><div class="dash-stat-icon">&#128197;</div><div class="dash-stat-value">${dueToday}</div><div class="dash-stat-label">Due Today</div></div>
-    <div class="dash-stat dash-stat--teal"><div class="dash-stat-icon">&#9203;</div><div class="dash-stat-value">${waiting}</div><div class="dash-stat-label">Waiting</div></div>
-    <div class="dash-stat dash-stat--purple" id="dashStatInbox"><div class="dash-stat-icon">&#128229;</div><div class="dash-stat-value">${inbox}</div><div class="dash-stat-label">Inbox</div></div>
-    <div class="dash-stat dash-stat--orange" id="dashStatMessages"><div class="dash-stat-icon">&#128172;</div><div class="dash-stat-value">—</div><div class="dash-stat-label">Messages</div></div>
+    <div class="dash-stat dash-stat--danger" onclick="switchView('planning')" title="Open Planning — Overdue section"><div class="dash-stat-icon">&#9888;</div><div class="dash-stat-value">${overdue}</div><div class="dash-stat-label">Overdue</div></div>
+    <div class="dash-stat dash-stat--warning" onclick="document.getElementById('controlBoardSection').scrollIntoView({behavior:'smooth'})" title="Scroll to the board (sorted risk-first)"><div class="dash-stat-icon">&#9888;</div><div class="dash-stat-value">${atRisk}</div><div class="dash-stat-label">At-risk Clients</div></div>
+    <div class="dash-stat dash-stat--blue" onclick="switchView('today')" title="Open Today"><div class="dash-stat-icon">&#128197;</div><div class="dash-stat-value">${dueToday}</div><div class="dash-stat-label">Due Today</div></div>
+    <div class="dash-stat dash-stat--teal" onclick="switchView('planning')" title="Open Planning — Waiting section"><div class="dash-stat-icon">&#9203;</div><div class="dash-stat-value">${waiting}</div><div class="dash-stat-label">Waiting</div></div>
+    <div class="dash-stat dash-stat--purple" id="dashStatInbox" onclick="switchView('inbox')" title="Open the Inbox"><div class="dash-stat-icon">&#128229;</div><div class="dash-stat-value">${inbox}</div><div class="dash-stat-label">Inbox</div></div>
+    <div class="dash-stat dash-stat--orange" id="dashStatMessages" style="display:none" onclick="openIntegrationsStrip()" title="Open the Workspace strip"><div class="dash-stat-icon">&#128172;</div><div class="dash-stat-value">—</div><div class="dash-stat-label">Messages</div></div>
   `;
+}
+
+function openIntegrationsStrip() {
+  const strip = document.getElementById('integrationsStrip');
+  if (strip.style.display === 'none') toggleIntegrationsStrip();
+  strip.scrollIntoView({ behavior: 'smooth' });
 }
 
 function renderDashUrgentTasks() {
@@ -701,6 +752,9 @@ function renderDashSchedule() {
 
 async function loadDashEmails() {
   const body = document.getElementById('dashEmailBody');
+  // No server-side Gmail config = dead widget. Hide it rather than show a permanent placeholder.
+  if (!gmailServerConfigured) { document.getElementById('dashEmails').style.display = 'none'; return; }
+  document.getElementById('dashEmails').style.display = '';
   if (!gmailConnected) {
     body.innerHTML = '<div class="dash-widget-empty"><div style="font-size:28px;margin-bottom:8px">&#9993;</div><p>Connect Gmail to see your inbox</p><a href="/auth/gmail/connect" class="dash-connect-btn">Connect Gmail</a></div>';
     return;
@@ -726,10 +780,8 @@ async function loadDashXero() {
   const body = document.getElementById('dashXeroBody');
   try {
     const status = await api('/api/xero/status');
-    if (!status.configured) {
-      body.innerHTML = '<div class="dash-widget-empty"><div style="font-size:28px;margin-bottom:8px">&#128176;</div><p>Connect Xero for invoices &amp; revenue</p><p style="font-size:11px;color:var(--text-muted);margin-top:8px">Set XERO_CLIENT_ID and XERO_CLIENT_SECRET in Railway</p></div>';
-      return;
-    }
+    if (!status.configured) { document.getElementById('dashXero').style.display = 'none'; return; }
+    document.getElementById('dashXero').style.display = '';
     if (!status.connected) {
       body.innerHTML = '<div class="dash-widget-empty"><div style="font-size:28px;margin-bottom:8px">&#128176;</div><p>Connect your Xero account</p><a href="/auth/xero/connect" class="dash-connect-btn">Connect Xero</a></div>';
       return;
@@ -755,17 +807,21 @@ async function loadDashWhatsApp() {
     const cfg = await api('/api/whatsapp/config');
     dashWaConfigs = cfg.configs || cfg || [];
     if (!dashWaConfigs.length) {
-      const connectHtml = '<div class="dash-widget-empty"><div style="font-size:28px;margin-bottom:8px">&#128172;</div><p>Set up WhatsApp Business</p><p style="font-size:11px;color:var(--text-muted);margin-top:8px">Owner can configure in Settings</p></div>';
-      body1.innerHTML = connectHtml;
-      body2.innerHTML = connectHtml;
+      // Not set up: hide both WhatsApp widgets and the Messages stat entirely.
+      document.getElementById('dashWhatsapp1').style.display = 'none';
+      document.getElementById('dashWhatsapp2').style.display = 'none';
       return;
     }
+    const msgStatCard = document.getElementById('dashStatMessages');
+    if (msgStatCard) msgStatCard.style.display = '';
     for (let i = 0; i < 2; i++) {
       const config = dashWaConfigs[i];
       const bodyEl = i === 0 ? body1 : body2;
+      const widgetEl = document.getElementById(`dashWhatsapp${i + 1}`);
       const titleEl = document.getElementById(`dashWa${i + 1}Title`);
       const inputEl = document.getElementById(`dashWa${i + 1}Input`);
-      if (!config) { bodyEl.innerHTML = '<div class="dash-widget-empty">Not configured</div>'; continue; }
+      if (!config) { widgetEl.style.display = 'none'; continue; }
+      widgetEl.style.display = '';
       titleEl.textContent = `WhatsApp — ${config.label}`;
       inputEl.style.display = 'flex';
       try {
@@ -806,14 +862,14 @@ async function sendDashWa(lineNum) {
   } catch (err) { alert('Failed: ' + (err.message || 'Error')); }
 }
 
+// Analytics/social aren't wired up yet — permanent "coming soon" placeholders are
+// pure visual noise, so these widgets stay hidden until a real integration exists.
 async function loadDashAnalytics() {
-  const body = document.getElementById('dashAnalyticsBody');
-  body.innerHTML = '<div class="dash-widget-empty"><div style="font-size:28px;margin-bottom:8px">&#128200;</div><p>Web Analytics</p><p style="font-size:11px;color:var(--text-muted);margin-top:8px">Coming soon — connect Google Analytics</p></div>';
+  document.getElementById('dashAnalytics').style.display = 'none';
 }
 
 function renderDashSocial() {
-  const body = document.getElementById('dashSocialBody');
-  body.innerHTML = '<div class="dash-widget-empty"><div style="font-size:28px;margin-bottom:8px">&#128241;</div><p>Social Analytics</p><p style="font-size:11px;color:var(--text-muted);margin-top:8px">Coming soon — connect Meta, TikTok, LinkedIn</p></div>';
+  document.getElementById('dashSocial').style.display = 'none';
 }
 
 async function loadDashActivity() {
@@ -841,7 +897,8 @@ function allTasksFlat() {
 function updateInboxCount() {
   const n = allTasksFlat().filter(t => t.task_status === 'inbox').length;
   const badge = document.getElementById('inboxCount');
-  if (badge) { badge.textContent = n; badge.style.display = n ? '' : 'none'; }
+  // Cap at 9+ — past a point the exact number is just shame-rendering, not information.
+  if (badge) { badge.textContent = n > 9 ? '9+' : n; badge.style.display = n ? '' : 'none'; }
 }
 
 function clientSelectOptions(sel) {
@@ -2597,6 +2654,7 @@ async function toggleTaskPin(taskId, event) {
 
 // ─── Gmail Integration ───────────────────────────────────
 let gmailConnected = false;
+let gmailServerConfigured = false;
 let gmailNextPageToken = null;
 let gmailLabelsLoaded = false;
 let gmailCurrentThread = null;
@@ -2604,6 +2662,7 @@ let gmailCurrentThread = null;
 async function checkGmailStatus() {
   try {
     const s = await api('/api/gmail/status');
+    gmailServerConfigured = !!s.configured;
     if (s.configured) {
       document.getElementById('emailNavTab').style.display = '';
       gmailConnected = s.connected;
@@ -2615,6 +2674,8 @@ async function checkGmailStatus() {
         document.querySelector('[data-view="email"]').click();
       }
     }
+    // The dashboard first paints before this status arrives — re-evaluate the email widget.
+    if (currentView === 'dashboard') loadDashEmails();
   } catch {}
 }
 
