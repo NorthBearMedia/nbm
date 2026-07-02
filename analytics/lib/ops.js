@@ -41,7 +41,8 @@ const MEASUREMENT_FOR_DEMO = { 'nbmdemosite2.co.uk': 'G-MS3V4KS3PB' };
 async function beginInjection(domain, measurementId) {
   await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
   const s = injectState();
-  s[domain] = { status: 'pending', tries: (s[domain]?.tries || 0), measurementId };
+  // tries resets to 0: this is a fresh attempt, whatever happened before.
+  s[domain] = { status: 'pending', tries: 0, measurementId };
   saveInjectState(s);
 }
 
@@ -396,12 +397,29 @@ export async function runInjectionRollout({ onlyDomain = null } = {}) {
   return results;
 }
 
+// Bumped whenever the cron/injection mechanism changes. A mismatch on boot
+// wipes non-verified injection state, removes stale crons built with the
+// old mechanism, and re-runs the demo proof — no human involvement.
+// v2: shell-free cron pair (Hostinger execs cron commands without a shell,
+// so the v1 curl|sh pipeline reached curl as literal arguments and failed).
+const INJECT_MECH_VERSION = '2';
+
 export function scheduleOpsSweep() {
   const smtp = getSmtp();
   // Contacts load on every boot (cheap, offline, idempotent).
   try { loadClientContacts(); } catch (e) { console.error('[ops]', e.message); }
   // GA auto-install proof on the demo site (never a client site), then a
   // recurring background pass that confirms pending injections + cleans up.
+  if (getSetting('inject_mech_version') !== INJECT_MECH_VERSION) {
+    setSetting('inject_mech_version', INJECT_MECH_VERSION);
+    setSetting('inject_demo_done', 'false');
+    setSetting('auto_rollout_done', 'false');
+    const s = injectState();
+    for (const [d, rec] of Object.entries(s)) if (rec.status !== 'verified') delete s[d];
+    saveInjectState(s);
+    deleteInjectCrons(HOSTINGER_USER).catch(() => {});
+    console.log('[inject] mechanism v' + INJECT_MECH_VERSION + ' — state reset, demo proof will re-run');
+  }
   if (getSetting('inject_demo_done') !== 'true') {
     setTimeout(() => runInjectionTest().catch(e => console.error('[inject]', e.message)), 120_000);
   }
