@@ -339,6 +339,10 @@ function showSettingsModal() {
           <input name="fathom_api_token" type="password" placeholder="${s.fathom_token_set ? '••••••••••••' : 'Fathom → Settings → API → Create key'}">
           <div class="help">Real, bot-filtered visitor data with history — becomes the primary source for reports.
           After saving, use <strong>Connect Fathom</strong> in the setup panel to match it to your sites.</div></div>
+        <div class="field full"><label>AI insights — Anthropic API key ${s.anthropic_key_set ? '(saved — leave blank to keep)' : ''}</label>
+          <input name="anthropic_api_key" type="password" placeholder="${s.anthropic_key_set ? '••••••••••••' : 'console.anthropic.com → API keys'}">
+          <div class="help">Writes the plain-English "what this means & what to do next" section of each report.
+          ${s.anthropic_key_set ? 'Active ✓' : 'Without it, reports use a strong built-in insights section instead.'}</div></div>
         <div class="field full"><label>Replace Google service account key (optional)</label>
           <textarea name="google_json" rows="3" placeholder='Paste new key JSON only if you need to replace it${setup.googleServiceAccountEmail ? ' — current: ' + esc(setup.googleServiceAccountEmail) : ''}'></textarea></div>
       </div>

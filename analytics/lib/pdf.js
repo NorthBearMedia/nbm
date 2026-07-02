@@ -392,6 +392,29 @@ export async function generateReportPdf(data) {
     y = emptyNote(doc, y, 'Microsoft Clarity is not connected for this site yet — once connected, you’ll see how people actually use your pages (scrolling, clicks and frustration signals).');
   }
 
+  // ── Insights & recommendations ──
+  if (data.insights?.recommendations?.length) {
+    const ins = data.insights;
+    y = ensureSpace(doc, data, y, 90);
+    y = sectionTitle(doc, y, 'What this means & what to do next',
+      ins.source === 'ai' ? 'Analysis by North Bear Media.' : '');
+    if (ins.headline) {
+      doc.font('Helvetica-Oblique').fontSize(10).fillColor(C.ink)
+        .text(ins.headline, M, y, { width: CW, lineGap: 1 });
+      y += doc.heightOfString(ins.headline, { width: CW, lineGap: 1 }) + 10;
+    }
+    for (const rec of ins.recommendations) {
+      doc.font('Helvetica').fontSize(9);
+      const bh = doc.heightOfString(rec.detail, { width: CW - 16, lineGap: 1 });
+      y = ensureSpace(doc, data, y, bh + 24);
+      doc.circle(M + 3, y + 4, 2.5).fill(C.green);
+      doc.font('Helvetica-Bold').fontSize(9.5).fillColor(C.ink).text(rec.title, M + 14, y, { width: CW - 14 });
+      doc.font('Helvetica').fontSize(9).fillColor(C.sub).text(rec.detail, M + 14, y + 13, { width: CW - 14, lineGap: 1 });
+      y += bh + 22;
+    }
+    y += 4;
+  }
+
   // ── Closing contact box ──
   y = ensureSpace(doc, data, y, 70);
   doc.roundedRect(M, y, CW, 58, 8).fill(C.charcoal);

@@ -156,6 +156,18 @@ function render(d) {
     </div>`;
   }
 
+  if (d.insights?.recommendations?.length) {
+    html += section('What this means & what to do next');
+    html += `<div class="panel">`;
+    if (d.insights.headline) html += `<p style="font-size:15px;margin-bottom:14px">${esc(d.insights.headline)}</p>`;
+    html += d.insights.recommendations.map(r => `
+      <div style="display:flex;gap:10px;margin-bottom:12px">
+        <div style="color:var(--green-light);font-weight:700">▸</div>
+        <div><strong>${esc(r.title)}</strong><br><span style="color:var(--text-secondary)">${esc(r.detail)}</span></div>
+      </div>`).join('');
+    html += `</div>`;
+  }
+
   $('#app').innerHTML = html;
 
   document.querySelectorAll('.range-switch button').forEach(b => {

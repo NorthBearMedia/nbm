@@ -60,6 +60,15 @@ export function getFathomToken() {
   return pick('fathom_api_token', process.env.FATHOM_API_TOKEN || '');
 }
 
+// Anthropic API key powers the AI-written report insights. Without it,
+// reports fall back to a strong rules-based insights section.
+export function getAnthropicKey() {
+  return pick('anthropic_api_key', process.env.ANTHROPIC_API_KEY || '');
+}
+export function getInsightsModel() {
+  return pick('insights_model', 'claude-opus-4-8');
+}
+
 // 'test' (default): every report delivers ONLY to the owner, tagged with
 // who it would have gone to. 'live': reports go to clients. The owner
 // flips this in Settings when happy — that flip is the arming action.
@@ -78,8 +87,8 @@ export function saveGoogleServiceAccount(json) {
   return parsed;
 }
 
-const SETTING_KEYS = ['smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'email_from', 'email_bcc', 'app_url', 'gsc_reader_email', 'hostinger_api_token', 'fathom_api_token', 'delivery_mode'];
-const KEEP_IF_BLANK = new Set(['smtp_pass', 'hostinger_api_token', 'fathom_api_token']);
+const SETTING_KEYS = ['smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'email_from', 'email_bcc', 'app_url', 'gsc_reader_email', 'hostinger_api_token', 'fathom_api_token', 'delivery_mode', 'anthropic_api_key', 'insights_model'];
+const KEEP_IF_BLANK = new Set(['smtp_pass', 'hostinger_api_token', 'fathom_api_token', 'anthropic_api_key']);
 
 export function saveSettings(body) {
   for (const key of SETTING_KEYS) {
@@ -116,6 +125,8 @@ export function setupStatus() {
       hostinger_token_set: Boolean(getHostingerToken()),
       fathom_token_set: Boolean(getFathomToken()),
       delivery_mode: getDeliveryMode(),
+      anthropic_key_set: Boolean(getAnthropicKey()),
+      insights_model: getInsightsModel(),
     },
   };
 }
