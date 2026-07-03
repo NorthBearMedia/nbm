@@ -81,6 +81,26 @@ router.post('/', requireAuth, requireWrite, (req, res) => {
   res.json(task);
 });
 
+// ─── Manual reorder (notebook drag & drop) ───────────
+router.put('/reorder', requireAuth, requireWrite, (req, res) => {
+  const { order } = req.body;
+  if (!Array.isArray(order) || !order.length || order.length > 2000 || !order.every(n => Number.isInteger(n))) {
+    return res.status(400).json({ error: 'order must be an array of task ids' });
+  }
+  const isOwner = req.user.role === 'owner';
+  const upd = db.prepare('UPDATE tasks SET sort_order = ? WHERE id = ?');
+  const check = db.prepare('SELECT c.is_private FROM tasks t JOIN clients c ON t.client_id = c.id WHERE t.id = ?');
+  db.transaction(() => {
+    order.forEach((id, i) => {
+      const row = check.get(id);
+      if (!row) return;
+      if (row.is_private && !isOwner) return;   // can't reorder what you can't see
+      upd.run((i + 1) * 10, id);
+    });
+  })();
+  res.json({ success: true });
+});
+
 router.put('/:id', requireAuth, requireWrite, (req, res) => {
   let { title, assignee, secondary_assignee, deadline, planned_date, estimated_hours,
     task_status, task_band, task_type, suggested_block, progress, priority,
