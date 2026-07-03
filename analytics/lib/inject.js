@@ -56,19 +56,28 @@ export function buildSnippet(measurementId, clarityId) {
 // *.nbmbak first.
 export function buildInjectorScript(rootDir, snippet) {
   const b64 = Buffer.from(snippet, 'utf8').toString('base64');
-  const awkProg = 'BEGIN{d=0}{if(!d&&index($0,"</head>")>0){sub(/<\\/head>/,s"</head>");d=1}print}';
+  const awkHead = 'BEGIN{d=0}{if(!d&&index($0,"</head>")>0){sub(/<\\/head>/,s"</head>");d=1}print}';
+  // Fallback for pages with no </head> (minified/odd builds): put the
+  // snippet before </body> instead — GA and Clarity work from there too.
+  const awkBody = 'BEGIN{d=0}{if(!d&&index($0,"</body>")>0){sub(/<\\/body>/,s"</body>");d=1}print}';
   return (
     `D='${rootDir}'\n` +
     // Diagnostic lines land in the captured cron output: distinguish
-    // "no docroot" (builder-hosted site, nothing to edit) and "no .html
-    // files" from a genuine injection pass.
+    // "no docroot" (builder-hosted site, nothing to edit), "no .html
+    // files", and "file has neither </head> nor </body>" from a genuine
+    // injection pass.
     `if [ ! -d "$D" ]; then echo "NBM-NO-DOCROOT $D"; exit 0; fi\n` +
     `echo "NBM-HTML-COUNT $(find "$D" -type f -name '*.html' 2>/dev/null | wc -l)"\n` +
     `S=$(printf %s '${b64}' | base64 -d)\n` +
     `find "$D" -type f -name '*.html' 2>/dev/null | while read f; do\n` +
-    `  if grep -q '</head>' "$f" && ! grep -q 'NBM-GA-TAG' "$f"; then\n` +
+    `  if grep -q 'NBM-GA-TAG' "$f"; then echo "already $f"\n` +
+    `  elif grep -q '</head>' "$f"; then\n` +
     `    cp "$f" "$f.nbmbak"\n` +
-    `    awk -v s="$S" '${awkProg}' "$f" > "$f.nbmtmp" && mv "$f.nbmtmp" "$f" && echo "injected $f"\n` +
+    `    awk -v s="$S" '${awkHead}' "$f" > "$f.nbmtmp" && mv "$f.nbmtmp" "$f" && echo "injected $f"\n` +
+    `  elif grep -q '</body>' "$f"; then\n` +
+    `    cp "$f" "$f.nbmbak"\n` +
+    `    awk -v s="$S" '${awkBody}' "$f" > "$f.nbmtmp" && mv "$f.nbmtmp" "$f" && echo "injected-body $f"\n` +
+    `  else echo "NBM-NO-HEAD $f"\n` +
     `  fi\n` +
     `done\n` +
     `echo "NBM-INJECT-COMPLETE"\n`
@@ -193,11 +202,14 @@ export async function injectCronOutput(username, domain) {
   } catch (e) { return '(output unavailable: ' + e.message.slice(0, 80) + ')'; }
 }
 
-// Confirm the tag is actually being served on the live page.
+// Confirm the tag is actually being served on the live page. The unique
+// query string busts page caches (LiteSpeed etc.) that could serve stale
+// HTML from before the injection.
 export async function verifyTag(domain, measurementId) {
-  for (const url of [`https://${domain}`, `https://www.${domain}`]) {
+  const bust = `?nbmv=${Date.now()}`;
+  for (const url of [`https://${domain}/${bust}`, `https://www.${domain}/${bust}`]) {
     try {
-      const res = await fetch(url, { headers: { 'User-Agent': 'NorthBearPulse/1.0' }, redirect: 'follow' });
+      const res = await fetch(url, { headers: { 'User-Agent': 'NorthBearPulse/1.0', 'Cache-Control': 'no-cache' }, redirect: 'follow' });
       if (!res.ok) continue;
       const html = (await res.text()).slice(0, 2_000_000);
       const hasGa = measurementId ? html.includes(measurementId) : /gtag\/js\?id=/.test(html);
