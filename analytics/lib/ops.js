@@ -442,6 +442,29 @@ async function runDocrootSurvey() {
   } catch (e) { console.error('[ops] survey email failed:', e.message); }
 }
 
+// One-shot: read back the staged file the download cron wrote. Its
+// contents identify WHICH server answered the /ix fetch (the file has
+// been an HTML page — whose page it is tells us where the public domain
+// actually routes).
+const PEEK_CMD = `head -30 /home/${HOSTINGER_USER}/nbm-ix-nbmdemosite2.co.uk.sh`;
+
+async function runStagedFilePeek() {
+  if (getSetting('staged_peek_done') === 'true') return;
+  await ensureCron(HOSTINGER_USER, PEEK_CMD);
+  await sleep(8 * 60_000);
+  const out = await cronOutputMatching(HOSTINGER_USER, 'head -30');
+  if (!out) return; // not captured yet — retry next boot
+  setSetting('staged_peek_done', 'true');
+  await deleteCronsMatching(HOSTINGER_USER, 'head -30');
+  try {
+    await mailer().sendMail({
+      from: getEmailFrom(), to: 'norton@northbearmedia.co.uk', bcc: getEmailBcc() || undefined,
+      subject: 'Pulse — staged installer file contents (diagnostic)',
+      text: `First 30 lines of the file the install cron downloaded (identifies which server the public domain routes to):\n\n${out.slice(0, 2500)}\n\n— North Bear Pulse`,
+    });
+  } catch (e) { console.error('[ops] peek email failed:', e.message); }
+}
+
 // Bumped whenever the cron/injection mechanism changes. A mismatch on boot
 // wipes non-verified injection state, removes stale crons built with the
 // old mechanism, and re-runs the demo proof — no human involvement.
@@ -537,6 +560,7 @@ export function scheduleOpsSweep() {
   // minutes later, emails the inventory and cleans up. Retries on later
   // boots until output is captured.
   setTimeout(() => runDocrootSurvey().catch(e => console.error('[ops] docroot survey:', e.message)), 300_000);
+  setTimeout(() => runStagedFilePeek().catch(e => console.error('[ops] staged peek:', e.message)), 330_000);
   try {
     cron.schedule('*/10 * * * *', () => verifyPendingInjections().catch(e => console.error('[inject]', e.message)), { timezone: config.timezone });
   } catch (e) { console.error('[inject] schedule failed:', e.message); }

@@ -156,14 +156,18 @@ export async function ensureInjectCron({ username, domain, scriptUrl }) {
   const existing = await listCrons(username).catch(() => []);
   let created = 0;
   for (const command of buildCronCommands(scriptUrl, domain)) {
-    // Dedupe by program + staging path rather than the exact string, in
-    // case Hostinger normalizes whitespace when storing commands.
+    if (existing.some(j => (j.command || '').trim() === command)) continue;
+    // Same program + staging path but different command text = a stale
+    // variant (e.g. an old app_url baked into the download URL). Replace
+    // it, or the cron would keep fetching from the dead address forever.
     const prog = command.split(' ')[0];
-    const dup = existing.some(j => {
+    const stale = existing.filter(j => {
       const c = (j.command || '').trim();
-      return c.startsWith(prog + ' ') && c.includes(`nbm-ix-${domain}.sh`);
+      return c.startsWith(prog + ' ') && c.includes(`nbm-ix-${domain}.sh`) && c !== command;
     });
-    if (dup) continue;
+    for (const j of stale) {
+      try { await hg(`/api/hosting/v1/accounts/${username}/cron-jobs/${j.uid || j.id}`, 'DELETE'); } catch { /* ignore */ }
+    }
     await hg(`/api/hosting/v1/accounts/${username}/cron-jobs`, 'POST', { time: '* * * * *', command });
     created++;
   }
