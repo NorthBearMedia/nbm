@@ -614,6 +614,15 @@ export function scheduleOpsSweep() {
     setSetting('boot_email_at', String(Date.now()));
     const state = injectState();
     const lines = Object.entries(state).map(([d, r]) => `  ${d}: ${r.status}${r.tries ? ` (${r.tries} checks)` : ''}`);
+    // Per-pending-site diagnostics (non-demo): why hasn't each verified?
+    // Shows the injector cron's captured output + a live-tag check.
+    const pendingDiag = [];
+    for (const [d, r] of Object.entries(state)) {
+      if (r.status !== 'pending' || d === 'nbmdemosite2.co.uk') continue;
+      const out = await injectCronOutput(HOSTINGER_USER, d).catch(e => '(err ' + e.message.slice(0, 40) + ')');
+      const lv = await verifyTag(d, r.measurementId).catch(() => ({ verified: false }));
+      pendingDiag.push(`  ${d}: live=${lv.verified ? 'TAG ✅' : 'no tag'} | cron: ${String(out).replace(/\n/g, ' ').slice(0, 160)}`);
+    }
     const cronOut = await injectCronOutput(HOSTINGER_USER, 'nbmdemosite2.co.uk').catch(e => '(unavailable: ' + e.message.slice(0, 80) + ')');
     const live = await verifyTag('nbmdemosite2.co.uk', MEASUREMENT_FOR_DEMO['nbmdemosite2.co.uk']).catch(() => ({ verified: false }));
     // Fetch our own /ix URL through the public edge — the exact path the
@@ -627,6 +636,7 @@ export function scheduleOpsSweep() {
       subject: 'Pulse status — deploy is live',
       text: `Pulse booted OK on the live server (mechanism v${INJECT_MECH_VERSION}, delivery mode: ${getSetting('delivery_mode') || 'test'}).\n\n`
         + `Tag-install pipeline:\n${lines.length ? lines.join('\n') : '  (demo proof starting — placement email follows if it is the first attempt)'}\n\n`
+        + (pendingDiag.length ? `Pending client sites — why not verified yet:\n${pendingDiag.join('\n')}\n\n` : '')
         + `Demo install cron output (diagnostics):\n  ${String(cronOut).slice(0, 800)}\n\n`
         + `Demo live-page check right now: ${live.verified ? 'TAG VISIBLE ✅ (' + live.url + ')' : 'tag not visible yet'}\n`
         + `Self-fetch of the injector URL via public edge: ${selfCheck}\n`
