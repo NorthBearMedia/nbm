@@ -449,13 +449,27 @@ export async function runInjectionRollout({ onlyDomain = null } = {}) {
   return results;
 }
 
+// File-hosted domains (from the server docroot survey, 3 Jul): the only
+// sites the file injector can tag. Builder-hosted (Horizons) sites have
+// no editable files — their tag goes in via the site builder, so placing
+// injector crons for them is pointless churn that can only end in a
+// failure email.
+const AUTO_TAGGABLE = new Set([
+  'northbearmedia.co.uk', 'richfordvehiclesales.co.uk', 'wowstays.co.uk',
+  'ivyhouseresidentialhome.co.uk', 'primeprandmarketing.co.uk',
+  'rcmhomeimprovements.co.uk', 'rmbgarage.co.uk', 'evccitysprint.co.uk',
+  'melanieparker.co.uk',
+]);
+
 // Self-healing rollout reconciler. Runs every 10 min once the demo has
-// proven the mechanism. For every active client site that has a GA
-// measurement ID and isn't already verified or failed, make sure an
+// proven the mechanism. For every file-hosted client site that has a GA
+// measurement ID and isn't already verified or mid-attempt, make sure an
 // injector cron is placed and the site is marked pending. Idempotent
 // (ensureInjectCron dedupes) — this recovers a rollout that hung or
 // errored (e.g. GA4 discovery stalled) WITHOUT depending on the one-shot
-// auto_rollout_done flag. Emits one summary the first time it places any.
+// auto_rollout_done flag. A FAILED attempt is retried with a fresh
+// window (whatever failed it may since be fixed — it was), so no site is
+// ever permanently stranded. Emits one summary the first time it places.
 export async function reconcileRolloutCrons() {
   if (injectState()['nbmdemosite2.co.uk']?.status !== 'verified') return { skipped: 'demo not verified' };
   const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND domain != ''").all();
@@ -463,11 +477,10 @@ export async function reconcileRolloutCrons() {
   const placed = [], noId = [];
   for (const site of sites) {
     const domain = (site.domain || '').toLowerCase().replace(/^www\./, '');
-    if (domain === 'nbmdemosite2.co.uk') continue;
+    if (domain === 'nbmdemosite2.co.uk' || !AUTO_TAGGABLE.has(domain)) continue;
     const rec = state[domain];
-    if (rec && (rec.status === 'verified' || rec.status === 'failed')) continue;
+    if (rec && (rec.status === 'verified' || rec.status === 'pending')) continue;
     if (!site.ga4_measurement_id) { noId.push(domain); continue; }
-    if (rec?.status === 'pending') continue; // already in flight
     try {
       await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
       state[domain] = { status: 'pending', tries: 0, measurementId: site.ga4_measurement_id, at: Date.now() };
