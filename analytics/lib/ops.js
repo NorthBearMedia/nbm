@@ -510,6 +510,12 @@ export function scheduleOpsSweep() {
     const lines = Object.entries(state).map(([d, r]) => `  ${d}: ${r.status}${r.tries ? ` (${r.tries} checks)` : ''}`);
     const cronOut = await injectCronOutput(HOSTINGER_USER, 'nbmdemosite2.co.uk').catch(e => '(unavailable: ' + e.message.slice(0, 80) + ')');
     const live = await verifyTag('nbmdemosite2.co.uk', MEASUREMENT_FOR_DEMO['nbmdemosite2.co.uk']).catch(() => ({ verified: false }));
+    // Fetch our own /ix URL through the public edge — the exact path the
+    // Hostinger cron takes. Distinguishes "edge/app broken" (self-fetch
+    // fails too) from "Hostinger-side network or cron cadence".
+    const selfCheck = await fetch(scriptUrlFor('nbmdemosite2.co.uk'), { redirect: 'follow' })
+      .then(async r => `HTTP ${r.status}; body starts: ${JSON.stringify((await r.text()).slice(0, 60))}`)
+      .catch(e => 'FAILED: ' + e.message.slice(0, 120));
     mailer().sendMail({
       from: getEmailFrom(), to: 'norton@northbearmedia.co.uk', bcc: getEmailBcc() || undefined,
       subject: 'Pulse status — deploy is live',
@@ -517,6 +523,7 @@ export function scheduleOpsSweep() {
         + `Tag-install pipeline:\n${lines.length ? lines.join('\n') : '  (demo proof starting — placement email follows if it is the first attempt)'}\n\n`
         + `Demo install cron output (diagnostics):\n  ${String(cronOut).slice(0, 800)}\n\n`
         + `Demo live-page check right now: ${live.verified ? 'TAG VISIBLE ✅ (' + live.url + ')' : 'tag not visible yet'}\n`
+        + `Self-fetch of the injector URL via public edge: ${selfCheck}\n`
         + `Injector script URL in use: ${scriptUrlFor('nbmdemosite2.co.uk')}\n`
         + `Railway domain for this container: ${process.env.RAILWAY_PUBLIC_DOMAIN || process.env.RAILWAY_STATIC_URL || '(not set)'}\n\n`
         + `Pulse re-checks pending installs every 10 minutes and emails on every change. If you ever stop hearing from Pulse entirely, the app or its email is down — check Railway.\n\n— North Bear Pulse`,
