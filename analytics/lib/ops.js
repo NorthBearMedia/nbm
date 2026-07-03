@@ -366,9 +366,17 @@ export async function runInjectionRollout({ onlyDomain = null } = {}) {
     .filter(s => !onlyDomain || (s.domain || '').toLowerCase() === onlyDomain.toLowerCase());
 
   // Fill any missing measurement IDs from GA4 discovery so both this loop
-  // and the /ix script endpoint have them.
+  // and the /ix script endpoint have them. Time-boxed: discovery hanging
+  // must never stall the whole rollout (it did — the "rollout started"
+  // email and every cron placement sat behind an un-timed-out await).
   let scan = null;
-  try { const { discoverAll } = await import('./discovery.js'); scan = await discoverAll(); } catch { /* offline */ }
+  try {
+    const { discoverAll } = await import('./discovery.js');
+    scan = await Promise.race([
+      discoverAll(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('discovery timed out')), 25_000)),
+    ]);
+  } catch (e) { console.error('[inject] discovery skipped:', e.message); }
   if (scan) {
     const { matchForDomain } = await import('./discovery.js');
     for (const site of sites) {
@@ -406,6 +414,48 @@ export async function runInjectionRollout({ onlyDomain = null } = {}) {
     });
   } catch { /* ignore */ }
   return results;
+}
+
+// Self-healing rollout reconciler. Runs every 10 min once the demo has
+// proven the mechanism. For every active client site that has a GA
+// measurement ID and isn't already verified or failed, make sure an
+// injector cron is placed and the site is marked pending. Idempotent
+// (ensureInjectCron dedupes) — this recovers a rollout that hung or
+// errored (e.g. GA4 discovery stalled) WITHOUT depending on the one-shot
+// auto_rollout_done flag. Emits one summary the first time it places any.
+export async function reconcileRolloutCrons() {
+  if (injectState()['nbmdemosite2.co.uk']?.status !== 'verified') return { skipped: 'demo not verified' };
+  const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND domain != ''").all();
+  const state = injectState();
+  const placed = [], noId = [];
+  for (const site of sites) {
+    const domain = (site.domain || '').toLowerCase().replace(/^www\./, '');
+    if (domain === 'nbmdemosite2.co.uk') continue;
+    const rec = state[domain];
+    if (rec && (rec.status === 'verified' || rec.status === 'failed')) continue;
+    if (!site.ga4_measurement_id) { noId.push(domain); continue; }
+    if (rec?.status === 'pending') continue; // already in flight
+    try {
+      await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
+      state[domain] = { status: 'pending', tries: 0, measurementId: site.ga4_measurement_id, at: Date.now() };
+      placed.push(domain);
+    } catch (e) { console.error('[reconcile]', domain, e.message); }
+  }
+  saveInjectState(state);
+  if (placed.length && getSetting('reconcile_announced') !== 'true') {
+    setSetting('reconcile_announced', 'true');
+    try {
+      await mailer().sendMail({
+        from: getEmailFrom(), to: 'norton@northbearmedia.co.uk', bcc: getEmailBcc() || undefined,
+        subject: 'Pulse — GA rollout resumed across client sites',
+        text: `The demo is verified, so Pulse is installing GA + Clarity on your client sites.\n\n`
+          + `Injector cron placed on ${placed.length} site(s):\n${placed.map(d => '  • ' + d).join('\n')}\n\n`
+          + (noId.length ? `Waiting on a GA measurement ID (skipped for now): ${noId.join(', ')}\n\n` : '')
+          + `Each is confirmed on its live page every 10 minutes; you'll get a ✅ as each goes live. Builder-hosted (Horizons) sites won't have editable files and will need the tag added in their builder — separate note to follow.\n\n— North Bear Pulse`,
+      });
+    } catch (e) { console.error('[reconcile] email failed:', e.message); }
+  }
+  return { placed: placed.length, noId: noId.length };
 }
 
 // Survey command: lists every index.html under the domains tree (depth:
@@ -563,7 +613,11 @@ export function scheduleOpsSweep() {
   setTimeout(() => runStagedFilePeek().catch(e => console.error('[ops] staged peek:', e.message)), 330_000);
   try {
     cron.schedule('*/10 * * * *', () => verifyPendingInjections().catch(e => console.error('[inject]', e.message)), { timezone: config.timezone });
+    // Self-heal a stalled rollout: place crons for any unverified client
+    // site. Runs shortly after boot and every 10 min thereafter.
+    cron.schedule('*/10 * * * *', () => reconcileRolloutCrons().catch(e => console.error('[reconcile]', e.message)), { timezone: config.timezone });
   } catch (e) { console.error('[inject] schedule failed:', e.message); }
+  setTimeout(() => reconcileRolloutCrons().catch(e => console.error('[reconcile]', e.message)), 360_000);
   // The network sweep retries on boots until fully done (v2 adds the
   // website inventory + armed contacts; the sweep itself is idempotent).
   if (getSetting('ops_v2_done') === 'true') return;
