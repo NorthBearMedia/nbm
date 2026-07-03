@@ -487,3 +487,15 @@ app.listen(config.port, () => {
   startScheduler();
   scheduleOpsSweep();
 });
+
+// Railway's edge routes the public domain to ONE configured target port.
+// If that setting drifts from config.port, the edge returns 502
+// "Application failed to respond" while the app runs happily — which is
+// exactly what the boot email's self-fetch diagnosed. Answering on the
+// usual suspects too makes the domain work whichever port the edge hits.
+const extraPorts = [...new Set([Number(process.env.PORT) || 0, 8080, 3000, 3001, 5000])]
+  .filter(p => p && p !== Number(config.port));
+for (const p of extraPorts) {
+  const srv = app.listen(p, () => console.log(`[net] also listening on ${p} (edge port-drift guard)`));
+  srv.on('error', () => { /* port busy — fine, main listener has it */ });
+}
