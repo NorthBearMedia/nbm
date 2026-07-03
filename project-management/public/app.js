@@ -316,7 +316,7 @@ async function loadServerPrefs() {
     // Apply known keys (validated) over the localStorage-seeded defaults.
     if (typeof sp.nbm_nb_tab === 'string' && ['all','today','week','waiting','done'].includes(sp.nbm_nb_tab)) nbTab = sp.nbm_nb_tab;
     if (typeof sp.nbm_nb_client === 'string') nbClient = sp.nbm_nb_client;
-    if (sp.nbm_nb_order === 'written' || sp.nbm_nb_order === 'due') nbOrder = sp.nbm_nb_order;
+    if (typeof sp.nbm_nb_order === 'string' && NB_ORDERS.includes(sp.nbm_nb_order)) nbOrder = sp.nbm_nb_order;
     if (typeof sp.nbm_nb_font === 'string' && NB_PENS[sp.nbm_nb_font]) nbFont = sp.nbm_nb_font;
     { const n = parseFloat(sp.nbm_nb_size); if (Number.isFinite(n) && n >= 0.7 && n <= 1.5) nbSize = n; }
     if (sp.nbm_nb_hidedone === '1' || sp.nbm_nb_hidedone === '0') nbHideDone = sp.nbm_nb_hidedone === '1';
@@ -1073,11 +1073,137 @@ const NB_PENS = {
 
 function nbSetTab(t) { nbTab = t; nbPage = 0; setPref('nbm_nb_tab', t); loadNotebookView(); }
 function nbSetClient(v) { nbClient = v; nbPage = 0; setPref('nbm_nb_client', v); loadNotebookView(); }
-function nbToggleOrder() {
-  nbOrder = nbOrder === 'written' ? 'due' : 'written';
+const NB_ORDERS = ['manual', 'written', 'due', 'client', 'status', 'alpha', 'band', 'quick'];
+function nbSetOrder(v) {
+  nbOrder = NB_ORDERS.includes(v) ? v : 'written';
   nbPage = 0;
   setPref('nbm_nb_order', nbOrder);
   loadNotebookView();
+}
+
+function nbComparator(order) {
+  const eff = t => t.planned_date || t.deadline || '';
+  const big = 1e15;
+  switch (order) {
+    case 'manual': return (a, b) => ((a.sort_order || big) - (b.sort_order || big)) || (a.id - b.id);
+    case 'due':    return (a, b) => { const x = eff(a) || '9999', y = eff(b) || '9999'; return x < y ? -1 : x > y ? 1 : a.id - b.id; };
+    case 'client': return (a, b) => (a.client_name || '').localeCompare(b.client_name || '') || (a.id - b.id);
+    case 'status': return (a, b) => (STATUS_ORDER.indexOf(a.task_status) - STATUS_ORDER.indexOf(b.task_status)) || (a.id - b.id);
+    case 'alpha':  return (a, b) => (a.title || '').localeCompare(b.title || '') || (a.id - b.id);
+    case 'band':   return (a, b) => ((BAND_RANK[a.task_band] ?? 9) - (BAND_RANK[b.task_band] ?? 9)) || (a.id - b.id);
+    case 'quick':  return (a, b) => ((a.estimated_hours || big) - (b.estimated_hours || big)) || (a.id - b.id);
+    default:       return (a, b) => a.id - b.id;   // written (entry order)
+  }
+}
+
+// ─── Meaningful highlight colours ────────────────────────
+// The marker colour is a visual language over real task state. Priority when
+// several apply: urgent/overdue (pink) beats everything, then due today.
+function nbHighlightFor(t) {
+  if (!isOpenTask(t)) return null;
+  const today = localDateStr(new Date());
+  if (t.task_type === 'urgent' || (t.deadline && t.deadline < today)) return 'pink';
+  if (t.task_band === 'today' || (t.planned_date || t.deadline) === today) return 'green';
+  if (t.task_status === 'waiting-on-client') return 'blue';
+  if (t.task_status === 'waiting-on-me') return 'orange';
+  if (t.assignee && currentUser && t.assignee !== currentUser.display_name) return 'yellow';
+  return null;
+}
+
+// Tapping a line's marker opens a mini palette; picking a colour SETS the
+// matching state (blue really does mark it waiting-on-client, etc.).
+let nbPaletteTaskId = null;
+function nbPaletteEl() {
+  let m = document.getElementById('nbPalette');
+  if (m) return m;
+  m = document.createElement('div');
+  m.id = 'nbPalette';
+  m.className = 'nb-menu nb-palette';
+  document.body.appendChild(m);
+  return m;
+}
+function nbOpenPalette(taskId, ev) {
+  if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+  const t = findTaskById(taskId);
+  if (!t) return;
+  nbPaletteTaskId = taskId;
+  const m = nbPaletteEl();
+  m.innerHTML = `
+    <div class="nb-menu-title">${esc(t.title.length > 30 ? t.title.slice(0, 30) + '…' : t.title)}</div>
+    <button class="nb-menu-item" onclick="nbPaint('pink')"><span class="nb-leg-chip nb-chip-pink"></span> Urgent</button>
+    <button class="nb-menu-item" onclick="nbPaint('green')"><span class="nb-leg-chip nb-chip-green"></span> Due today</button>
+    <button class="nb-menu-item" onclick="nbPaint('blue')"><span class="nb-leg-chip nb-chip-blue"></span> Awaiting client</button>
+    <button class="nb-menu-item" onclick="nbPaint('orange')"><span class="nb-leg-chip nb-chip-orange"></span> Waiting on me</button>
+    <button class="nb-menu-item" onclick="nbPaint('yellow')"><span class="nb-leg-chip nb-chip-yellow"></span> Delegate to&hellip;</button>
+    <div class="nb-menu-sep"></div>
+    <button class="nb-menu-item" onclick="nbPaint('')">&#9003; Rub it out (clear)</button>`;
+  const x = ev?.clientX ?? 200, y = ev?.clientY ?? 200;
+  m.style.display = 'block';
+  m.style.left = Math.min(x, window.innerWidth - 240) + 'px';
+  m.style.top = Math.min(y, window.innerHeight - 300) + 'px';
+}
+function nbClosePalette() {
+  const m = document.getElementById('nbPalette');
+  if (m) m.style.display = 'none';
+  nbPaletteTaskId = null;
+}
+async function nbPaint(colour) {
+  const t = nbPaletteTaskId !== null ? findTaskById(nbPaletteTaskId) : null;
+  if (!t) { nbClosePalette(); return; }
+  if (colour === 'yellow') {
+    // Delegating needs a name — swap the palette for a person list.
+    const m = nbPaletteEl();
+    const me = currentUser?.display_name;
+    m.innerHTML = `<div class="nb-menu-title">Delegate to&hellip;</div>` +
+      appUsers.filter(u => u.display_name !== me).map(u =>
+        `<button class="nb-menu-item" onclick="nbDelegate('${esc(u.display_name)}')">${esc(u.display_name)}</button>`).join('') +
+      `<div class="nb-menu-sep"></div><button class="nb-menu-item" onclick="nbClosePalette()">Cancel</button>`;
+    return;
+  }
+  const id = nbPaletteTaskId;
+  nbClosePalette();
+  const body = {};
+  if (colour === 'pink') body.task_type = 'urgent';
+  else if (colour === 'green') body.task_band = 'today';
+  else if (colour === 'blue') body.task_status = 'waiting-on-client';
+  else if (colour === 'orange') body.task_status = 'waiting-on-me';
+  else {
+    // Eraser: strip whatever is giving this line its colour.
+    if (t.task_type === 'urgent') body.task_type = 'ad-hoc';
+    if (t.task_band === 'today') body.task_band = 'scheduled';
+    if (t.task_status === 'waiting-on-client' || t.task_status === 'waiting-on-me') body.task_status = 'scheduled';
+    if (!Object.keys(body).length) return;
+  }
+  try { await api(`/api/tasks/${id}`, { method: 'PUT', body }); await loadClients(); } catch {}
+}
+async function nbDelegate(name) {
+  const id = nbPaletteTaskId;
+  nbClosePalette();
+  if (id === null) return;
+  try { await api(`/api/tasks/${id}`, { method: 'PUT', body: { assignee: name } }); await loadClients(); } catch {}
+}
+document.addEventListener('click', (e) => { if (!e.target.closest('#nbPalette') && !e.target.closest('.nb-marker')) nbClosePalette(); });
+
+// ─── Drag & drop reordering ──────────────────────────────
+// Dropping snapshots the order you were LOOKING at (whatever sort), applies
+// your move, and switches to "My order" so it sticks.
+let nbDragId = null;
+async function nbDrop(targetId) {
+  const dragged = nbDragId; nbDragId = null;
+  if (dragged === null || dragged === targetId) return;
+  const all = allTasksFlat().slice().sort(nbComparator(nbOrder));
+  const ids = all.map(t => t.id);
+  const from = ids.indexOf(dragged), to = ids.indexOf(targetId);
+  if (from < 0 || to < 0) return;
+  ids.splice(from, 1);
+  let at = ids.indexOf(targetId);
+  if (from < to) at += 1;
+  ids.splice(at, 0, dragged);
+  try {
+    await api('/api/tasks/reorder', { method: 'PUT', body: { order: ids } });
+    if (nbOrder !== 'manual') { nbOrder = 'manual'; setPref('nbm_nb_order', 'manual'); }
+    await loadClients();
+  } catch {}
 }
 function nbSetFont(f) {
   nbFont = NB_PENS[f] ? f : 'Caveat';
@@ -1162,14 +1288,14 @@ function loadNotebookView() {
     penSel.innerHTML = Object.entries(NB_PENS).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('');
   }
   if (penSel) penSel.value = nbFont;
-  nbMarkActiveSwatch();
   // Tabs + client dropdown state
   document.querySelectorAll('#nbTabs .nb-tab').forEach(b => b.classList.toggle('nb-tab-active', b.dataset.nbtab === nbTab));
   const sel = document.getElementById('nbClientFilter');
   const realClients = clients.filter(c => !c.is_system && !c.archived).sort((a, b) => a.name.localeCompare(b.name));
   sel.innerHTML = '<option value="">everyone</option>' + realClients.map(c => `<option value="${c.id}" ${String(c.id) === nbClient ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
   document.getElementById('nbPageTitle').textContent = NB_PAGE_TITLES[nbTab] || '';
-  document.getElementById('nbOrderBtn').textContent = nbOrder === 'written' ? 'in the order I wrote them' : 'soonest first';
+  const orderSel = document.getElementById('nbOrderSelect');
+  if (orderSel) orderSel.value = nbOrder;
   const hideBtn = document.getElementById('nbHideDoneBtn');
   if (hideBtn) {
     hideBtn.textContent = nbHideDone ? 'show ticked off' : 'hide ticked off';
@@ -1207,11 +1333,7 @@ function loadNotebookView() {
   // dedicated "Ticked off" tab always shows completed regardless).
   if (nbHideDone && nbTab !== 'done') items = items.filter(isOpenTask);
 
-  if (nbOrder === 'due') {
-    items.sort((a, b) => (eff(a) || '9999') < (eff(b) || '9999') ? -1 : (eff(a) || '9999') > (eff(b) || '9999') ? 1 : a.id - b.id);
-  } else {
-    items.sort((a, b) => a.id - b.id);
-  }
+  items.sort(nbComparator(nbOrder));
 
   // Footer note in pencil (counts across the whole filtered set, not just this page)
   const openCount = items.filter(isOpenTask).length;
@@ -1265,14 +1387,14 @@ function loadNotebookView() {
 
   el.innerHTML = pageItems.map(t => {
     const done = t.task_status === 'done';
-    const hl = t.task_band === 'today' && !done;
+    const hlc = done ? null : nbHighlightFor(t);
     const overdue = !done && t.deadline && t.deadline < today;
     const client = t.client_name && !t.client_is_system ? `<span class="nb-client">&nbsp;&mdash; ${esc(t.client_name)}</span>` : '';
     const due = overdue ? `<span class="nb-due">&nbsp;(${relDate(t.deadline)}!)</span>` : '';
-    return `<div class="nb-line ${done ? 'nb-done' : ''}" data-id="${t.id}">
+    return `<div class="nb-line ${done ? 'nb-done' : ''}" data-id="${t.id}" draggable="true">
       <button class="nb-bullet ${done ? 'nb-ticked' : ''}" onclick="nbTick(${t.id})" title="${done ? 'Untick' : 'Tick off'}">${done ? '&#10003;' : '&bull;'}</button>
-      <span class="nb-text"><span class="${hl ? 'nb-hl' : ''}" onclick="editTask(${t.id})" title="Open task">${esc(t.title)}</span>${client}${due}</span>
-      <button class="nb-marker ${hl ? 'nb-marker-on' : ''}" onclick="nbHighlight(${t.id})" title="${hl ? 'Remove today highlight' : 'Highlight for today'}"></button>
+      <span class="nb-text"><span class="${hlc ? 'nb-hl nb-hl-' + hlc : ''}" onclick="editTask(${t.id})" title="Open task">${esc(t.title)}</span>${client}${due}</span>
+      <button class="nb-marker ${hlc ? 'nb-marker-' + hlc : ''}" onclick="nbOpenPalette(${t.id}, event)" title="Colour-code this line"></button>
     </div>`;
   }).join('');
 }
@@ -1340,7 +1462,7 @@ function nbMenuEl() {
     <div class="nb-menu-item nb-menu-pick">Pick a date: <input type="date" id="nbMenuDate" onchange="nbMenuDue(this.value)" onclick="event.stopPropagation()"></div>
     <button class="nb-menu-item" onclick="nbMenuDue('')">Clear due date</button>
     <div class="nb-menu-sep"></div>
-    <button class="nb-menu-item" id="nbMenuHl" onclick="nbMenuHighlight()"></button>
+    <button class="nb-menu-item" id="nbMenuHl" onclick="nbMenuColour(event)">Colour-code&hellip;</button>
     <button class="nb-menu-item" onclick="nbMenuOpen()">Open full task</button>
     <div class="nb-menu-sep"></div>
     <button class="nb-menu-item nb-menu-delete" onclick="nbMenuDelete()">Scribble it out (delete)</button>`;
@@ -1354,7 +1476,7 @@ function nbOpenMenu(taskId, x, y) {
   nbMenuTaskId = taskId;
   const m = nbMenuEl();
   document.getElementById('nbMenuTitle').textContent = t.title.length > 34 ? t.title.slice(0, 34) + '…' : t.title;
-  document.getElementById('nbMenuHl').textContent = t.task_band === 'today' ? 'Remove today highlight' : 'Highlight for today';
+
   document.getElementById('nbMenuDate').value = t.deadline || '';
   m.style.display = 'block';
   const mw = 240, mh = m.offsetHeight || 320;
@@ -1380,9 +1502,9 @@ async function nbMenuDue(when) {
   try { await api(`/api/tasks/${id}`, { method: 'PUT', body: { deadline } }); await loadClients(); } catch (e) { alert(e.message || 'Could not update'); }
 }
 
-async function nbMenuHighlight() {
+function nbMenuColour(ev) {
   const id = nbMenuTaskId; nbCloseMenu();
-  if (id !== null) await nbHighlight(id);
+  if (id !== null) nbOpenPalette(id, ev);
 }
 
 function nbMenuOpen() {
@@ -1430,6 +1552,37 @@ document.getElementById('notebookLines').addEventListener('touchmove', (e) => {
 }, { passive: true });
 ['touchend', 'touchcancel'].forEach(ev =>
   document.getElementById('notebookLines').addEventListener(ev, () => { if (nbPressTimer) { clearTimeout(nbPressTimer); nbPressTimer = null; } }));
+
+// Desktop drag & drop (HTML5 DnD — iOS uses the long-press menu instead)
+const nbLinesEl = document.getElementById('notebookLines');
+nbLinesEl.addEventListener('dragstart', (e) => {
+  const line = e.target.closest('.nb-line');
+  if (!line || !line.dataset.id) return;
+  nbDragId = +line.dataset.id;
+  line.classList.add('nb-dragging');
+  try { e.dataTransfer.setData('text/plain', line.dataset.id); e.dataTransfer.effectAllowed = 'move'; } catch {}
+});
+nbLinesEl.addEventListener('dragover', (e) => {
+  const line = e.target.closest('.nb-line');
+  if (!line || !line.dataset.id || nbDragId === null) return;
+  e.preventDefault();
+  document.querySelectorAll('.nb-drop-target').forEach(x => x.classList.remove('nb-drop-target'));
+  line.classList.add('nb-drop-target');
+});
+nbLinesEl.addEventListener('dragleave', (e) => {
+  const line = e.target.closest('.nb-line');
+  if (line) line.classList.remove('nb-drop-target');
+});
+nbLinesEl.addEventListener('drop', (e) => {
+  const line = e.target.closest('.nb-line');
+  document.querySelectorAll('.nb-drop-target,.nb-dragging').forEach(x => x.classList.remove('nb-drop-target', 'nb-dragging'));
+  if (!line || !line.dataset.id) return;
+  e.preventDefault();
+  nbDrop(+line.dataset.id);
+});
+nbLinesEl.addEventListener('dragend', () => {
+  document.querySelectorAll('.nb-drop-target,.nb-dragging').forEach(x => x.classList.remove('nb-drop-target', 'nb-dragging'));
+});
 document.addEventListener('click', (e) => { if (!e.target.closest('#nbMenu')) nbCloseMenu(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') nbCloseMenu(); });
 

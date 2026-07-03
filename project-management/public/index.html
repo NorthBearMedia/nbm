@@ -12,7 +12,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=73">
+  <link rel="stylesheet" href="styles.css?v=74">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -393,22 +393,29 @@
                 <button class="nb-size-btn" onclick="nbSetSize(0.1)">A+</button>
               </span>
             </div>
-            <div class="nb-opt-row"><span class="nb-opt-label">Highlighter</span>
-              <span class="nb-swatches" id="nbSwatches">
-                <button class="nb-swatch" data-hl="yellow" onclick="nbSetHl('yellow')" title="Yellow"></button>
-                <button class="nb-swatch" data-hl="green" onclick="nbSetHl('green')" title="Green"></button>
-                <button class="nb-swatch" data-hl="pink" onclick="nbSetHl('pink')" title="Pink"></button>
-                <button class="nb-swatch" data-hl="blue" onclick="nbSetHl('blue')" title="Blue"></button>
-                <button class="nb-swatch" data-hl="orange" onclick="nbSetHl('orange')" title="Orange"></button>
-              </span>
-            </div>
-            <div class="nb-opt-sep"></div>
             <div class="nb-opt-row"><span class="nb-opt-label">Order</span>
-              <button id="nbOrderBtn" class="nb-order" onclick="nbToggleOrder()"></button>
+              <select id="nbOrderSelect" class="nb-pen-select" onchange="nbSetOrder(this.value)">
+                <option value="manual">My order (drag lines)</option>
+                <option value="written">As I wrote them</option>
+                <option value="due">Due date</option>
+                <option value="client">By client</option>
+                <option value="status">By status</option>
+                <option value="alpha">A to Z</option>
+                <option value="band">By band</option>
+                <option value="quick">Quickest first</option>
+              </select>
             </div>
             <div class="nb-opt-row"><span class="nb-opt-label">Page</span>
               <button id="nbHideDoneBtn" class="nb-order" onclick="nbToggleHideDone()"></button>
             </div>
+            <div class="nb-opt-sep"></div>
+            <div class="nb-opt-title">Highlighter key</div>
+            <div class="nb-leg-row"><span class="nb-leg-chip nb-chip-pink"></span> urgent / overdue</div>
+            <div class="nb-leg-row"><span class="nb-leg-chip nb-chip-green"></span> due today</div>
+            <div class="nb-leg-row"><span class="nb-leg-chip nb-chip-blue"></span> awaiting client</div>
+            <div class="nb-leg-row"><span class="nb-leg-chip nb-chip-orange"></span> waiting on me</div>
+            <div class="nb-leg-row"><span class="nb-leg-chip nb-chip-yellow"></span> delegated</div>
+            <div class="nb-leg-hint">tap a line's marker to colour it</div>
           </div>
           <div id="notebookLines"></div>
           <div class="nb-pagenav" id="nbPageNav" style="display:none">
@@ -424,7 +431,7 @@
             </span>
           </div>
           <div class="nb-footer" id="nbFooter"></div>
-          <div class="nb-legend">tap &bull; to tick off &middot; tap the marker to highlight for today</div>
+          <div class="nb-legend">tap &bull; to tick off &middot; tap the marker to colour-code &middot; drag lines to reorder</div>
         </div>
       </div>
     </div>
@@ -707,6 +714,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=73"></script>
+  <script src="app.js?v=74"></script>
 </body>
 </html>
