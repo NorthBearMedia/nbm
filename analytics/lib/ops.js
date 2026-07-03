@@ -67,7 +67,7 @@ export async function verifyPendingInjections() {
         saveInjectState(s);
         runInjectionRollout().catch(e => console.error('[inject] auto-rollout:', e.message));
       }
-    } else if (rec.tries >= 12) {
+    } else if (rec.tries >= 36) { // ~6h — Hostinger runs custom crons far less often than every minute
       rec.status = 'failed';
       const out = await injectCronOutput(HOSTINGER_USER, domain);
       await deleteInjectCrons(HOSTINGER_USER, domain);
@@ -524,6 +524,7 @@ export function scheduleOpsSweep() {
         + `Demo install cron output (diagnostics):\n  ${String(cronOut).slice(0, 800)}\n\n`
         + `Demo live-page check right now: ${live.verified ? 'TAG VISIBLE ✅ (' + live.url + ')' : 'tag not visible yet'}\n`
         + `Self-fetch of the injector URL via public edge: ${selfCheck}\n`
+        + `Last recorded crash: ${getSetting('last_crash') || '(none recorded)'}\n`
         + `Injector script URL in use: ${scriptUrlFor('nbmdemosite2.co.uk')}\n`
         + `Railway domain for this container: ${process.env.RAILWAY_PUBLIC_DOMAIN || process.env.RAILWAY_STATIC_URL || '(not set)'}\n\n`
         + `Pulse re-checks pending installs every 10 minutes and emails on every change. If you ever stop hearing from Pulse entirely, the app or its email is down — check Railway.\n\n— North Bear Pulse`,
