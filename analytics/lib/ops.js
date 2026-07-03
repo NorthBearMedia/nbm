@@ -504,6 +504,54 @@ export async function reconcileRolloutCrons() {
   return { placed: placed.length, noId: noId.length };
 }
 
+// Search Console finalizer. Ownership of every client domain was DNS-
+// verified on 3 Jul, but registering the sc-domain PROPERTY (what the
+// report queries) needs the webmasters WRITE scope, which the Workspace
+// delegation may not include yet. Retry on a timer: the moment the scope
+// is granted in admin.google.com, every property registers itself, each
+// site's gsc_site_url is pointed at it, and months of Google rankings
+// data flow into the reports — with no further human step. Idempotent.
+async function finalizeSearchConsole() {
+  if (getSetting('gsc_finalized') === 'true') return;
+  const subject = getGscReaderEmail() || 'norton@northbearmedia.co.uk';
+  let client;
+  try {
+    client = googleClient({ scopes: ['https://www.googleapis.com/auth/webmasters'], subject });
+    await client.getAccessToken(); // throws unauthorized_client until the scope is granted
+  } catch (e) { console.log('[gsc] webmasters scope not granted yet (' + e.message.slice(0, 60) + ')'); return; }
+  const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND domain != ''").all();
+  const added = [], failed = [];
+  for (const site of sites) {
+    const d = (site.domain || '').toLowerCase().replace(/^www\./, '');
+    if (!d || d === 'nbmdemosite2.co.uk') continue;
+    try {
+      await client.request({ url: 'https://www.googleapis.com/webmasters/v3/sites/' + encodeURIComponent('sc-domain:' + d), method: 'PUT' });
+      db.prepare('UPDATE sites SET gsc_site_url = ? WHERE id = ?').run('sc-domain:' + d, site.id);
+      added.push(d);
+    } catch (e) {
+      // evccitysprint's sc-domain never verified, but its URL-prefix
+      // property exists and is owned — use that instead.
+      if (d === 'evccitysprint.co.uk') {
+        db.prepare('UPDATE sites SET gsc_site_url = ? WHERE id = ?').run('https://evccitysprint.co.uk/', site.id);
+        added.push(d + ' (url-prefix)');
+      } else failed.push(`${d} (${e.message.slice(0, 50)})`);
+    }
+  }
+  if (added.length) {
+    setSetting('gsc_finalized', 'true');
+    try {
+      await mailer().sendMail({
+        from: getEmailFrom(), to: 'norton@northbearmedia.co.uk', bcc: getEmailBcc() || undefined,
+        subject: 'Pulse — Google Search Console connected for all sites',
+        text: `The webmasters scope is live, so Pulse just registered Search Console for your sites — Google rankings data (including months of history) now flows into every report and dashboard.\n\n`
+          + `Connected (${added.length}):\n${added.map(x => '  ✅ ' + x).join('\n')}\n`
+          + (failed.length ? `\nNot connected (${failed.length}):\n${failed.map(x => '  ⚠️ ' + x).join('\n')}\n` : '')
+          + `\n— North Bear Pulse`,
+      });
+    } catch (e) { console.error('[gsc] finalize email failed:', e.message); }
+  }
+}
+
 // Survey command: lists every index.html under the domains tree (depth:
 // domains/<domain>/public_html/index.html). Single program invocation,
 // no shell metacharacters (Hostinger execs cron commands without a shell)
@@ -667,6 +715,12 @@ export function scheduleOpsSweep() {
   // boots until output is captured.
   setTimeout(() => runDocrootSurvey().catch(e => console.error('[ops] docroot survey:', e.message)), 300_000);
   setTimeout(() => runStagedFilePeek().catch(e => console.error('[ops] staged peek:', e.message)), 330_000);
+  // Search Console finalizer: cheap no-op until the webmasters scope is
+  // granted, then completes GSC for every site in one pass.
+  setTimeout(() => finalizeSearchConsole().catch(e => console.error('[gsc]', e.message)), 150_000);
+  try {
+    cron.schedule('7 * * * *', () => finalizeSearchConsole().catch(e => console.error('[gsc]', e.message)), { timezone: config.timezone });
+  } catch (e) { console.error('[gsc] schedule failed:', e.message); }
   try {
     cron.schedule('*/10 * * * *', () => verifyPendingInjections().catch(e => console.error('[inject]', e.message)), { timezone: config.timezone });
     // Self-heal a stalled rollout: place crons for any unverified client
