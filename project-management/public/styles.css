@@ -3296,3 +3296,36 @@ select { color-scheme:dark; }
   .nb-paper { padding-left: 56px; padding-right: 12px; }
   .nb-paper::before { left: 40px; }
 }
+
+/* ─── NOTEBOOK v8: meaningful colours + drag & drop ──── */
+/* Colour language (pink=urgent/overdue, green=due today, blue=awaiting client,
+   orange=waiting on me, yellow=delegated). Overrides the old single-pen rules. */
+.nb-text .nb-hl.nb-hl-pink   { background: linear-gradient(100deg, transparent .5%, rgba(255,158,203,.8) 3%, rgba(255,158,203,.8) 97%, transparent 99.5%) !important; }
+.nb-text .nb-hl.nb-hl-green  { background: linear-gradient(100deg, transparent .5%, rgba(142,226,125,.8) 3%, rgba(142,226,125,.8) 97%, transparent 99.5%) !important; }
+.nb-text .nb-hl.nb-hl-blue   { background: linear-gradient(100deg, transparent .5%, rgba(143,208,255,.8) 3%, rgba(143,208,255,.8) 97%, transparent 99.5%) !important; }
+.nb-text .nb-hl.nb-hl-orange { background: linear-gradient(100deg, transparent .5%, rgba(255,180,94,.8) 3%, rgba(255,180,94,.8) 97%, transparent 99.5%) !important; }
+.nb-text .nb-hl.nb-hl-yellow { background: linear-gradient(100deg, transparent .5%, rgba(255,228,58,.8) 3%, rgba(255,228,58,.8) 97%, transparent 99.5%) !important; }
+
+/* Uncoloured lines get a faint empty marker; coloured lines show their colour */
+.nb-line .nb-marker { background: transparent !important; border: 1px dashed rgba(28,28,28,.3); box-shadow: none !important; }
+.nb-line .nb-marker.nb-marker-pink   { background: linear-gradient(180deg,#ff9ecb,#f77fb4) !important; border-style: solid; opacity: .95; }
+.nb-line .nb-marker.nb-marker-green  { background: linear-gradient(180deg,#8ee27d,#6fcf5e) !important; border-style: solid; opacity: .95; }
+.nb-line .nb-marker.nb-marker-blue   { background: linear-gradient(180deg,#8fd0ff,#6cb8f2) !important; border-style: solid; opacity: .95; }
+.nb-line .nb-marker.nb-marker-orange { background: linear-gradient(180deg,#ffb45e,#f29b3f) !important; border-style: solid; opacity: .95; }
+.nb-line .nb-marker.nb-marker-yellow { background: linear-gradient(180deg,#ffe43a,#f6cf22) !important; border-style: solid; opacity: .95; }
+
+/* Legend chips (options panel + palette) */
+.nb-leg-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 17px; color: rgba(28,28,28,.7); }
+.nb-leg-chip { display: inline-block; width: 22px; height: 12px; border-radius: 3px; border: 1px solid rgba(28,28,28,.3); flex-shrink: 0; }
+.nb-chip-pink   { background: linear-gradient(180deg,#ff9ecb,#f77fb4); }
+.nb-chip-green  { background: linear-gradient(180deg,#8ee27d,#6fcf5e); }
+.nb-chip-blue   { background: linear-gradient(180deg,#8fd0ff,#6cb8f2); }
+.nb-chip-orange { background: linear-gradient(180deg,#ffb45e,#f29b3f); }
+.nb-chip-yellow { background: linear-gradient(180deg,#ffe43a,#f6cf22); }
+.nb-leg-hint { font-size: 15px; color: rgba(28,28,28,.4); padding-top: 4px; }
+.nb-palette .nb-menu-item { display: flex; align-items: center; gap: 10px; }
+
+/* Drag & drop affordances */
+.nb-line[draggable="true"] { cursor: grab; }
+.nb-line.nb-dragging { opacity: .45; }
+.nb-line.nb-drop-target { box-shadow: inset 0 3px 0 rgba(45,106,79,.65); }
