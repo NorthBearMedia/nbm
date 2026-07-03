@@ -143,9 +143,37 @@ const CLARITY_PROJECTS = {
   'wowstays.co.uk': 'xg3wjoxrm0',
 };
 
+// GA4 web measurement IDs, keyed by domain — read directly from NBM's own
+// GA4 account (each property's web data stream). Like Clarity IDs these
+// are PUBLIC (they appear in every page's source), not secrets. The
+// in-app GA4 discovery was leaving these blank, which stalled the tag
+// rollout ("waiting on a GA measurement ID"); loading them from this
+// owner-confirmed map fills every blank deterministically. Manual edits
+// in the app always win (only BLANK fields are filled).
+const GA_MEASUREMENT = {
+  'iwpg.co.uk': 'G-QHLC82Q1KW',
+  'northbearmedia.co.uk': 'G-9NX0CJ85CL',
+  'caringplacesltd.co.uk': 'G-57BCDN5VTS',
+  'primeprandmarketing.co.uk': 'G-ETTX5ZCWYW',
+  'rcmhomeimprovements.co.uk': 'G-MGEREL8SFQ',
+  'richfordvehiclesales.co.uk': 'G-Z5RX27WP2V',
+  'maxus-evc.co.uk': 'G-T7CFY4BNKZ',
+  'alphashunt.co.uk': 'G-3YKJX05JJ4',
+  'ivyhouseresidentialhome.co.uk': 'G-JDE3V1EFV2',
+  'pslimited.uk': 'G-PPYF902922',
+  'rmbgarage.co.uk': 'G-5WT1S570JR',
+  'wowstays.co.uk': 'G-B13EC6D2GG',
+  'evccitysprint.co.uk': 'G-TEZ0FFLV2T',
+  'greenpathgardencare.co.uk': 'G-NMSX1W8JPM',
+  'swanwickkidsclub.co.uk': 'G-LWMK96TY1W',
+  'muskengineering.co.uk': 'G-ZFNRCD6V17',
+  'woodlandwalkdaycare.co.uk': 'G-29XJD64544',
+  'melanieparker.co.uk': 'G-5VJGBD4YWR',
+};
+
 // Runs on every boot: cheap, offline, idempotent.
 export function loadClientContacts() {
-  const sites = db.prepare('SELECT id, client_name, domain, contact_emails, clarity_project_id FROM sites WHERE active = 1').all();
+  const sites = db.prepare('SELECT id, client_name, domain, contact_emails, clarity_project_id, ga4_measurement_id FROM sites WHERE active = 1').all();
   const loaded = [];
   for (const site of sites) {
     const d = (site.domain || '').toLowerCase().replace(/^www\./, '');
@@ -159,6 +187,11 @@ export function loadClientContacts() {
     if (clarity && !site.clarity_project_id) {
       db.prepare('UPDATE sites SET clarity_project_id = ? WHERE id = ?').run(clarity, site.id);
       console.log(`[ops] Clarity project loaded: ${site.client_name} → ${clarity}`);
+    }
+    const mid = GA_MEASUREMENT[d];
+    if (mid && !site.ga4_measurement_id) {
+      db.prepare('UPDATE sites SET ga4_measurement_id = ? WHERE id = ?').run(mid, site.id);
+      console.log(`[ops] GA measurement ID loaded: ${site.client_name} → ${mid}`);
     }
   }
   return loaded;
