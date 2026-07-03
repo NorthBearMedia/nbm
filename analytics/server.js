@@ -491,7 +491,14 @@ app.get('/ix/:token/:domain', (req, res) => {
   res.type('text/x-shellscript').send(script);
 });
 
-app.get('/healthz', (req, res) => res.json({ ok: true }));
+// Health checks. railway.json's healthcheckPath is /api/health; the app
+// only served /healthz, so every deploy failed its health check and
+// Railway refused to route the public domain to it (502 "Application
+// failed to respond") even though the process was running fine. Serve
+// both, and keep them dependency-free so a slow DB/SMTP can't fail them.
+const health = (req, res) => res.json({ ok: true });
+app.get('/healthz', health);
+app.get('/api/health', health);
 app.use(express.static(join(__dirname, 'public')));
 
 app.listen(config.port, () => {
