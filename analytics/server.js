@@ -476,19 +476,29 @@ app.get('/ix/:token/:domain', (req, res) => {
   }
   const domain = String(req.params.domain).toLowerCase().replace(/[^a-z0-9.-]/g, '');
   const demoId = 'G-MS3V4KS3PB';
-  let measurementId, clarityId = null;
-  if (domain === 'nbmdemosite2.co.uk') {
-    measurementId = demoId;
-  } else {
-    const site = db.prepare('SELECT * FROM sites WHERE lower(replace(domain,"www.","")) = ? AND active = 1').get(domain);
-    if (!site || !site.ga4_measurement_id) {
-      return res.status(200).type('text/x-shellscript').send(`echo "NBM: no measurement id for ${domain}"\n`);
+  try {
+    let measurementId, clarityId = null;
+    if (domain === 'nbmdemosite2.co.uk') {
+      measurementId = demoId;
+    } else {
+      // Single-quote the string literals: SQLite reads "www." as an
+      // IDENTIFIER, so the double-quoted form threw "no such column",
+      // 500'd this endpoint, and every client injector download failed.
+      const site = db.prepare("SELECT * FROM sites WHERE lower(replace(domain,'www.','')) = ? AND active = 1").get(domain);
+      if (!site || !site.ga4_measurement_id) {
+        return res.status(200).type('text/x-shellscript').send(`echo "NBM: no measurement id for ${domain}"\n`);
+      }
+      measurementId = site.ga4_measurement_id;
+      clarityId = site.clarity_project_id || null;
     }
-    measurementId = site.ga4_measurement_id;
-    clarityId = site.clarity_project_id || null;
+    const script = buildInjectorScript(rootDirFor(domain), buildSnippet(measurementId, clarityId));
+    res.type('text/x-shellscript').send(script);
+  } catch (e) {
+    // Never hard-500 the injector — a 500 makes curl write nothing and the
+    // runner cron fails "no such file". Return a harmless shell no-op.
+    console.error('[ix] error for', domain, e.message);
+    res.status(200).type('text/x-shellscript').send(`echo "NBM: ix error for ${domain}: ${e.message.replace(/"/g, '')}"\n`);
   }
-  const script = buildInjectorScript(rootDirFor(domain), buildSnippet(measurementId, clarityId));
-  res.type('text/x-shellscript').send(script);
 });
 
 // Health checks. railway.json's healthcheckPath is /api/health; the app
