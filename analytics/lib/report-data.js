@@ -57,19 +57,41 @@ export async function gatherReportData(site, start, end) {
   if (site.gsc_site_url) {
     const url = site.gsc_site_url;
     jobs.push((async () => {
-      const [summary, prevSummary, topQueries] = await Promise.all([
+      const [summary, prevSummary, topQueries, prevQueries] = await Promise.all([
         attempt('Search summary', warnings, () => gsc.fetchSummary(url, start, end)),
         attempt('Search comparison', warnings, () => gsc.fetchSummary(url, prev.start, prev.end)),
         attempt('Search top queries', warnings, () => gsc.fetchTopQueries(url, start, end)),
+        attempt('Search previous queries', warnings, () => gsc.fetchTopQueries(url, prev.start, prev.end, 50)),
       ]);
-      if (summary) data.search = { summary, prevSummary, topQueries: topQueries || [] };
+      if (summary) {
+        // Per-query ranking movement: previous position by query (lower
+        // position = better ranking, so previous − current = places GAINED).
+        const prevPos = new Map((prevQueries || []).map(q => [q.query, q.position]));
+        const queries = (topQueries || []).map(q => ({
+          ...q,
+          prevPosition: prevPos.has(q.query) ? prevPos.get(q.query) : null,
+          positionChange: prevPos.has(q.query) ? (prevPos.get(q.query) - q.position) : null, // + = moved up
+        }));
+        data.search = { summary, prevSummary, topQueries: queries };
+      }
     })());
   }
+
+  // Site health: Google PageSpeed scores (cached ~monthly; never blocks
+  // long — cache hit is instant, a refresh is time-boxed inside getScores).
+  jobs.push((async () => {
+    const { getScores } = await import('./pagespeed.js');
+    data.siteHealth = await attempt('Site health', warnings, () =>
+      getScores((site.domain || '').toLowerCase().replace(/^www\./, '')));
+  })());
 
   await Promise.all(jobs);
 
   if (site.clarity_api_token || site.clarity_project_id) {
     data.clarity = clarity.aggregate(site.id, start, end);
+    // Same-length window immediately before, for trend arrows on the
+    // behaviour cards (null when history doesn't reach back that far).
+    data.prevClarity = clarity.aggregate(site.id, prev.start, prev.end);
   }
 
   // AI-written (or rules-based) insights, computed once the data is in.

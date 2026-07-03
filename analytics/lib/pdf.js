@@ -112,6 +112,26 @@ function drawDelta(doc, x, y, pct, { invert = false, suffix = 'vs previous perio
   doc.font('Helvetica').fontSize(7.5).fillColor(C.faint).text(` ${suffix}`, x + 9 + w, y, { lineBreak: false });
 }
 
+// Plain-English rank movement ("up 2.3 places") with the same coloured
+// triangle as drawDelta — for ranking positions, where a percentage
+// change means nothing to a business owner.
+function drawMove(doc, x, y, places, { suffix = 'vs previous period' } = {}) {
+  if (places == null || !isFinite(places)) {
+    doc.font('Helvetica').fontSize(7.5).fillColor(C.faint).text(`— ${suffix}`, x, y);
+    return;
+  }
+  const good = places >= 0; // positive = moved UP the rankings
+  const color = Math.abs(places) < 0.05 ? C.faint : (good ? C.greenDark : C.red);
+  doc.save().fillColor(color);
+  if (good) doc.moveTo(x, y + 6).lineTo(x + 6, y + 6).lineTo(x + 3, y + 1).fill();
+  else doc.moveTo(x, y + 1).lineTo(x + 6, y + 1).lineTo(x + 3, y + 6).fill();
+  doc.restore();
+  const word = Math.abs(places) < 0.05 ? 'no change' : `${good ? 'up' : 'down'} ${Math.abs(places).toFixed(1)} place${Math.abs(places).toFixed(1) === '1.0' ? '' : 's'}`;
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor(color).text(word, x + 9, y, { lineBreak: false });
+  const w = doc.widthOfString(word);
+  doc.font('Helvetica').fontSize(7.5).fillColor(C.faint).text(` ${suffix}`, x + 9 + w, y, { lineBreak: false });
+}
+
 function kpiCards(doc, y, cards, { perRow = 3, cardH = 70 } = {}) {
   const gap = 10;
   const cardW = (CW - gap * (perRow - 1)) / perRow;
@@ -125,7 +145,8 @@ function kpiCards(doc, y, cards, { perRow = 3, cardH = 70 } = {}) {
       .text(card.label.toUpperCase(), cx + 12, cy + 11, { width: cardW - 20, characterSpacing: 0.8, lineBreak: false, ellipsis: true });
     doc.font('Helvetica-Bold').fontSize(19).fillColor(C.ink)
       .text(card.value, cx + 12, cy + 24, { width: cardW - 20, lineBreak: false, ellipsis: true, height: 24 });
-    if (card.delta !== undefined) drawDelta(doc, cx + 12, cy + 50, card.delta, { invert: card.invert });
+    if (card.move !== undefined) drawMove(doc, cx + 12, cy + 50, card.move);
+    else if (card.delta !== undefined) drawDelta(doc, cx + 12, cy + 50, card.delta, { invert: card.invert });
     else if (card.note) doc.font('Helvetica').fontSize(7.5).fillColor(C.faint).text(card.note, cx + 12, cy + 50, { width: cardW - 20, lineBreak: false, ellipsis: true });
   });
   const rows = Math.ceil(cards.length / perRow);
@@ -206,7 +227,8 @@ function table(doc, y, cols, rows, { rowH = 16 } = {}) {
     cols.forEach(col => {
       const raw = row[col.key];
       const val = col.format ? col.format(raw, row) : String(raw ?? '');
-      doc.font(col.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(8.5).fillColor(C.ink)
+      const color = col.color ? (col.color(raw, row) || C.ink) : C.ink;
+      doc.font(col.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(8.5).fillColor(color)
         .text(val, cx + (col.align === 'right' ? 0 : 2), ry + 1.5, {
           width: col.width - 6, align: col.align || 'left', lineBreak: false, ellipsis: true, height: rowH,
         });
@@ -249,6 +271,8 @@ function plainEnglishSummary(data) {
   const sSum = data.search?.summary;
   if (sSum && sSum.impressions > 0) {
     lines.push(`It appeared in Google search results ${fmtInt(sSum.impressions)} times, earning ${fmtInt(sSum.clicks)} visits, with an average ranking position of ${sSum.position.toFixed(1)}.`);
+    const page1 = (data.search.topQueries || []).filter(q => q.position && q.position <= 10).length;
+    if (page1 > 0) lines.push(`${page1} of your top search terms rank${page1 === 1 ? 's' : ''} on page 1 of Google.`);
   }
   return lines.join(' ');
 }
@@ -342,23 +366,40 @@ export async function generateReportPdf(data) {
     'How your website showed up in Google searches. "Average position" is where you ranked — lower is better, and position 1–10 is page one of Google.');
   if (data.search?.summary) {
     const s = data.search.summary, p = data.search.prevSummary || {};
+    // Rank movement in places (previous − current: positive = moved UP),
+    // not a percentage — percentages of a ranking mean nothing to owners.
+    const posMove = (s.position && p.position) ? p.position - s.position : null;
     y = kpiCards(doc, y, [
       { label: 'Google clicks', value: fmtInt(s.clicks), delta: pctChange(s.clicks, p.clicks) },
       { label: 'Times shown', value: fmtInt(s.impressions), delta: pctChange(s.impressions, p.impressions) },
       { label: 'Click rate', value: fmtPct(s.ctr * 100), delta: pctChange(s.ctr, p.ctr) },
-      { label: 'Avg. position', value: s.position ? s.position.toFixed(1) : '—', delta: pctChange(s.position, p.position), invert: true },
+      { label: 'Avg. position', value: s.position ? s.position.toFixed(1) : '—', move: posMove },
     ], { perRow: 4 });
 
     if (data.search.topQueries?.length) {
       const rows = data.search.topQueries.slice(0, 8);
       y = ensureSpace(doc, data, y, 40 + rows.length * 16);
       doc.font('Helvetica-Bold').fontSize(10).fillColor(C.ink).text('Top search terms people found you with', M, y);
+      const moveText = (v, r) => {
+        if (r.positionChange == null) return r.prevPosition == null ? 'new' : '—';
+        if (Math.abs(r.positionChange) < 0.05) return 'no change';
+        return `${r.positionChange > 0 ? 'up' : 'down'} ${Math.abs(r.positionChange).toFixed(1)}`;
+      };
+      const moveColor = (v, r) => {
+        if (r.positionChange == null) return r.prevPosition == null ? C.greenDark : C.faint;
+        if (Math.abs(r.positionChange) < 0.05) return C.faint;
+        return r.positionChange > 0 ? C.greenDark : C.red;
+      };
       y = table(doc, y + 16, [
-        { label: 'Search term', key: 'query', width: CW - 240, bold: true },
-        { label: 'Clicks', key: 'clicks', width: 70, align: 'right', format: fmtInt },
-        { label: 'Times shown', key: 'impressions', width: 90, align: 'right', format: fmtInt },
-        { label: 'Avg. position', key: 'position', width: 80, align: 'right', format: v => v.toFixed(1) },
+        { label: 'Search term', key: 'query', width: CW - 300, bold: true },
+        { label: 'Clicks', key: 'clicks', width: 58, align: 'right', format: fmtInt },
+        { label: 'Times shown', key: 'impressions', width: 82, align: 'right', format: fmtInt },
+        { label: 'Position', key: 'position', width: 68, align: 'right', format: (v, r) => v.toFixed(1) + (v <= 10 ? ' · pg 1' : '') },
+        { label: 'Movement', key: 'positionChange', width: 92, align: 'right', bold: true, format: moveText, color: moveColor },
       ], rows) + 8;
+      doc.font('Helvetica-Oblique').fontSize(7).fillColor(C.faint)
+        .text('"Movement" is places gained or lost on Google vs the previous period · "pg 1" means it appears on the first page of results.', M, y - 4, { width: CW });
+      y += 8;
     }
   } else {
     y = emptyNote(doc, y, 'Google Search Console is not connected for this site yet — once connected, your Google rankings and search clicks will appear here.');
@@ -381,15 +422,40 @@ export async function generateReportPdf(data) {
   y = sectionTitle(doc, y, 'User experience insights',
     'Measured by Microsoft Clarity. "Dead clicks" are clicks that did nothing; "rage clicks" are rapid frustrated clicking — low numbers are good.');
   if (data.clarity) {
-    const cl = data.clarity;
+    const cl = data.clarity, pc = data.prevClarity;
+    const humans = cl.humanSessions != null ? cl.humanSessions : cl.sessions;
+    const prevHumans = pc ? (pc.humanSessions != null ? pc.humanSessions : pc.sessions) : null;
+    const d = (cur, prev) => pc ? pctChange(cur, prev) : undefined; // no history yet → note instead of '—'
     y = kpiCards(doc, y, [
-      { label: 'Sessions analysed', value: fmtInt(cl.sessions), note: `over ${cl.daysCovered} day${cl.daysCovered === 1 ? '' : 's'}` },
-      { label: 'Avg. scroll depth', value: cl.avgScrollDepth != null ? fmtPct(cl.avgScrollDepth, 0) : '—', note: 'how far people scroll' },
-      { label: 'Dead clicks', value: fmtInt(cl.deadClicks), note: 'lower is better' },
-      { label: 'Rage clicks', value: fmtInt(cl.rageClicks), note: 'lower is better' },
+      pc ? { label: 'Sessions analysed', value: fmtInt(humans), delta: d(humans, prevHumans) }
+         : { label: 'Sessions analysed', value: fmtInt(humans), note: 'real people, bots excluded' },
+      pc ? { label: 'Avg. scroll depth', value: cl.avgScrollDepth != null ? fmtPct(cl.avgScrollDepth, 0) : '—', delta: d(cl.avgScrollDepth, pc.avgScrollDepth) }
+         : { label: 'Avg. scroll depth', value: cl.avgScrollDepth != null ? fmtPct(cl.avgScrollDepth, 0) : '—', note: 'how far people scroll' },
+      pc ? { label: 'Dead clicks', value: fmtInt(cl.deadClicks), delta: d(cl.deadClicks, pc.deadClicks), invert: true }
+         : { label: 'Dead clicks', value: fmtInt(cl.deadClicks), note: 'lower is better' },
+      pc ? { label: 'Rage clicks', value: fmtInt(cl.rageClicks), delta: d(cl.rageClicks, pc.rageClicks), invert: true }
+         : { label: 'Rage clicks', value: fmtInt(cl.rageClicks), note: 'lower is better' },
     ], { perRow: 4 });
+    doc.font('Helvetica-Oblique').fontSize(7).fillColor(C.faint)
+      .text(`Based on ${cl.daysCovered} day${cl.daysCovered === 1 ? '' : 's'} of Clarity measurement in this period`
+        + (cl.quickBacks ? ` · ${fmtInt(cl.quickBacks)} quick-backs (visitors who left a page straight away)` : '') + '.', M, y - 6, { width: CW });
+    y += 8;
   } else {
     y = emptyNote(doc, y, 'Microsoft Clarity is not connected for this site yet — once connected, you’ll see how people actually use your pages (scrolling, clicks and frustration signals).');
+  }
+
+  // ── Site health (Google PageSpeed) ──
+  const sh = data.siteHealth;
+  if (sh && (sh.performance != null || sh.seo != null)) {
+    y = ensureSpace(doc, data, y, 150);
+    y = sectionTitle(doc, y, 'Site health check',
+      'Scored out of 100 by Google PageSpeed (mobile). 90+ is excellent, 50–89 has room to improve.');
+    const grade = v => v == null ? '—' : v >= 90 ? 'excellent' : v >= 50 ? 'room to improve' : 'needs attention';
+    y = kpiCards(doc, y, [
+      { label: 'Speed score', value: sh.performance != null ? String(sh.performance) : '—', note: grade(sh.performance) },
+      { label: 'Google-friendliness (SEO)', value: sh.seo != null ? String(sh.seo) : '—', note: grade(sh.seo) },
+      { label: 'Built to best practice', value: sh.bestPractices != null ? String(sh.bestPractices) : '—', note: grade(sh.bestPractices) },
+    ], { perRow: 3 });
   }
 
   // ── Insights & recommendations ──

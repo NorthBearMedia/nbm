@@ -72,6 +72,8 @@ export function aggregate(siteId, start, end) {
   return {
     daysCovered: rows.length,
     sessions: totals.sessions,
+    // What clients should see: real people, bots excluded.
+    humanSessions: Math.max(0, totals.sessions - totals.botSessions),
     botSessions: totals.botSessions,
     deadClicks: totals.deadClicks,
     rageClicks: totals.rageClicks,
