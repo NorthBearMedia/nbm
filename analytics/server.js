@@ -25,6 +25,19 @@ import { scheduleOpsSweep, runOpsSweep, runInjectionTest, runInjectionRollout } 
 import { buildInjectorScript, buildSnippet, rootDirFor } from './lib/inject.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// The production app has been dying minutes after boot with nothing in
+// our own telemetry (only 1-2 verifier ticks ever ran per hour). Survive
+// fatal errors instead of crash-looping, and stash the stack in settings
+// so the next boot status email shows exactly what fired.
+for (const kind of ['uncaughtException', 'unhandledRejection']) {
+  process.on(kind, err => {
+    console.error(`[fatal] ${kind}:`, err);
+    try { setSetting('last_crash', `${new Date().toISOString()} ${kind}: ${(err && (err.stack || err.message)) || String(err)}`.slice(0, 1500)); }
+    catch { /* db unavailable — nothing more we can do */ }
+  });
+}
+
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
