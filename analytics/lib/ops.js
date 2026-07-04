@@ -181,9 +181,34 @@ const GA_MEASUREMENT = {
   'melanieparker.co.uk': 'G-5VJGBD4YWR',
 };
 
+// GA4 PROPERTY IDs, keyed by domain — read from NBM's GA4 account (the
+// numeric property behind each measurement ID). The report data fetch
+// queries by property ID; sites loaded with only a measurement ID showed
+// "analytics not connected" on their dashboards because this was blank.
+const GA_PROPERTY = {
+  'iwpg.co.uk': '526989557',
+  'northbearmedia.co.uk': '526994009',
+  'caringplacesltd.co.uk': '533120439',
+  'primeprandmarketing.co.uk': '541248640',
+  'rcmhomeimprovements.co.uk': '541257675',
+  'richfordvehiclesales.co.uk': '541271955',
+  'maxus-evc.co.uk': '541282763',
+  'alphashunt.co.uk': '541294057',
+  'ivyhouseresidentialhome.co.uk': '541295397',
+  'pslimited.uk': '541298626',
+  'rmbgarage.co.uk': '541299194',
+  'wowstays.co.uk': '541299533',
+  'evccitysprint.co.uk': '541301551',
+  'greenpathgardencare.co.uk': '541303151',
+  'swanwickkidsclub.co.uk': '541307695',
+  'muskengineering.co.uk': '541328965',
+  'woodlandwalkdaycare.co.uk': '541334500',
+  'melanieparker.co.uk': '541335650',
+};
+
 // Runs on every boot: cheap, offline, idempotent.
 export function loadClientContacts() {
-  const sites = db.prepare('SELECT id, client_name, domain, contact_emails, clarity_project_id, ga4_measurement_id FROM sites WHERE active = 1').all();
+  const sites = db.prepare('SELECT id, client_name, domain, contact_emails, clarity_project_id, ga4_measurement_id, ga4_property_id FROM sites WHERE active = 1').all();
   const loaded = [];
   for (const site of sites) {
     const d = (site.domain || '').toLowerCase().replace(/^www\./, '');
@@ -203,8 +228,62 @@ export function loadClientContacts() {
       db.prepare('UPDATE sites SET ga4_measurement_id = ? WHERE id = ?').run(mid, site.id);
       console.log(`[ops] GA measurement ID loaded: ${site.client_name} → ${mid}`);
     }
+    const pid = GA_PROPERTY[d];
+    if (pid && !site.ga4_property_id) {
+      db.prepare('UPDATE sites SET ga4_property_id = ? WHERE id = ?').run(pid, site.id);
+      console.log(`[ops] GA property ID loaded: ${site.client_name} → ${pid}`);
+    }
   }
   return loaded;
+}
+
+// One-shot after the property-ID fix: generate the owner's own site
+// report and email it with a per-source connection summary — the
+// requested sense check proving GA + GSC + Clarity + AI all work.
+async function sendSenseCheckReport() {
+  if (getSetting('sense_check_v1_sent') === 'true') return;
+  const site = db.prepare("SELECT * FROM sites WHERE active = 1 AND lower(domain) LIKE '%northbearmedia.co.uk%'").get();
+  if (!site) return;
+  const { gatherReportData } = await import('./report-data.js');
+  const { generateReportPdf } = await import('./pdf.js');
+  const { addDays, todayISO } = await import('./dates.js');
+  const end = addDays(todayISO(), -1), start = addDays(end, -29);
+  const data = await gatherReportData(site, start, end);
+  const pdf = await generateReportPdf(data);
+  const cl = data.clarity;
+  const lines = [
+    data.ga4?.overview
+      ? `Google Analytics: ✓ connected — ${Math.round(data.ga4.overview.sessions)} visit(s) in the period (your own tag only went live 3 Jul, so numbers build from now)`
+      : 'Google Analytics: ✗ NOT returning data',
+    data.search?.summary
+      ? `Google Search Console: ✓ connected — ${Math.round(data.search.summary.clicks)} Google clicks, avg position ${(data.search.summary.position || 0).toFixed(1)}, ${(data.search.topQueries || []).length} top search terms`
+      : 'Google Search Console: ✗ NOT returning data',
+    cl
+      ? `Microsoft Clarity: ✓ connected — ${cl.daysCovered} day(s) of behaviour data so far`
+      : 'Microsoft Clarity: token saved, no data yet — first sync runs tonight at 03:40, behaviour sections fill from tomorrow',
+    data.siteHealth && data.siteHealth.performance != null
+      ? `Site health (Google PageSpeed): ✓ scored — speed ${data.siteHealth.performance}/100, SEO ${data.siteHealth.seo ?? '—'}/100`
+      : 'Site health (Google PageSpeed): pending — scores are fetched and cached on report runs',
+    data.insights?.source === 'ai'
+      ? 'AI insights (Anthropic): ✓ WORKING — the "What this means" section in the attached report was written by the AI using your key'
+      : 'AI insights (Anthropic): ✗ not used — the report fell back to rules-based recommendations (check the key in Settings)',
+    (data.warnings || []).length ? `Warnings: ${data.warnings.join(' | ')}` : 'Warnings: none',
+  ];
+  try {
+    await mailer().sendMail({
+      from: getEmailFrom(), to: 'norton@northbearmedia.co.uk', bcc: getEmailBcc() || undefined,
+      subject: 'Pulse — sense check: North Bear Media report + connection status',
+      text: `Full end-to-end sense check for northbearmedia.co.uk (${start} to ${end}). The attached PDF is exactly what a client would receive.
+
+CONNECTIONS
+${lines.map(l => '  • ' + l).join('\n')}
+
+— North Bear Pulse`,
+      attachments: [{ filename: `sense-check-north-bear-media-${end}.pdf`, content: pdf, contentType: 'application/pdf' }],
+    });
+    setSetting('sense_check_v1_sent', 'true');
+    console.log('[ops] sense-check report sent');
+  } catch (e) { console.error('[ops] sense check email failed:', e.message); }
 }
 
 function scAuth() {
@@ -730,6 +809,7 @@ export function scheduleOpsSweep() {
   // single metacharacter-free find cron, reads its captured output a few
   // minutes later, emails the inventory and cleans up. Retries on later
   // boots until output is captured.
+  setTimeout(() => sendSenseCheckReport().catch(e => console.error('[ops] sense check:', e.message)), 210_000);
   setTimeout(() => runDocrootSurvey().catch(e => console.error('[ops] docroot survey:', e.message)), 300_000);
   setTimeout(() => runStagedFilePeek().catch(e => console.error('[ops] staged peek:', e.message)), 330_000);
   // Search Console finalizer: cheap no-op until the webmasters scope is
