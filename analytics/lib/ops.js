@@ -646,14 +646,14 @@ async function probeHostingerAnalytics() {
 // wired a fathom_site_id into — 30-day traffic + how far back the data
 // reaches, straight from the Fathom API with the stored key.
 async function fathomCheck() {
-  if (getSetting('fathom_check_v1_done') === 'true') return;
+  if (getSetting('fathom_check_v2_done') === 'true') return;
   const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND fathom_site_id != '' AND fathom_site_id IS NOT NULL").all();
   if (!sites.length) return;
   // No account API key yet? Stay quiet and retry next boot + hourly —
   // the check completes itself the moment the owner saves the key.
   const { getFathomToken } = await import('./runtime-config.js');
   if (!getFathomToken()) { console.log('[fathom-check] waiting for API key in Settings'); return; }
-  setSetting('fathom_check_v1_done', 'true');
+  setSetting('fathom_check_v2_done', 'true');
   const { gatherFathom } = await import('./fathom.js');
   const { addDays, todayISO } = await import('./dates.js');
   const end = addDays(todayISO(), -1);
