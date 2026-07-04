@@ -41,8 +41,9 @@ const MEASUREMENT_FOR_DEMO = { 'nbmdemosite2.co.uk': 'G-MS3V4KS3PB' };
 async function beginInjection(domain, measurementId) {
   await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
   const s = injectState();
-  // tries resets to 0: this is a fresh attempt, whatever happened before.
-  s[domain] = { status: 'pending', tries: 0, measurementId, at: Date.now() };
+  // Fresh attempt: tries resets to 0; spread keeps failure history
+  // (lastFailSig) so repeat identical failures stay email-suppressed.
+  s[domain] = { ...(s[domain] || {}), status: 'pending', tries: 0, measurementId, at: Date.now() };
   saveInjectState(s);
 }
 
@@ -71,7 +72,16 @@ export async function verifyPendingInjections() {
       rec.status = 'failed';
       const out = await injectCronOutput(HOSTINGER_USER, domain);
       await deleteInjectCrons(HOSTINGER_USER, domain);
-      transitions.push(`❌ ${domain} — not confirmed after ${rec.tries} checks; cron output: ${out.slice(0, 200)}`);
+      // A site stuck for a known reason (e.g. builder-served page while
+      // the owner's paste is pending) retries every ~6h — announce each
+      // DISTINCT failure once, not the same one four times a day.
+      const sig = String(out).slice(0, 120);
+      if (rec.lastFailSig !== sig) {
+        rec.lastFailSig = sig;
+        transitions.push(`❌ ${domain} — not confirmed after ${rec.tries} checks; cron output: ${out.slice(0, 200)}`);
+      } else {
+        console.log('[inject] repeat failure, email suppressed:', domain);
+      }
     }
   }
   saveInjectState(s);
@@ -483,7 +493,7 @@ export async function reconcileRolloutCrons() {
     if (!site.ga4_measurement_id) { noId.push(domain); continue; }
     try {
       await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
-      state[domain] = { status: 'pending', tries: 0, measurementId: site.ga4_measurement_id, at: Date.now() };
+      state[domain] = { ...(state[domain] || {}), status: 'pending', tries: 0, measurementId: site.ga4_measurement_id, at: Date.now() };
       placed.push(domain);
     } catch (e) { console.error('[reconcile]', domain, e.message); }
   }
