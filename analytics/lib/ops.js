@@ -487,15 +487,22 @@ export async function reconcileRolloutCrons() {
   const placed = [], noId = [];
   for (const site of sites) {
     const domain = (site.domain || '').toLowerCase().replace(/^www\./, '');
-    if (domain === 'nbmdemosite2.co.uk' || !AUTO_TAGGABLE.has(domain)) continue;
+    if (domain === 'nbmdemosite2.co.uk') continue;
     const rec = state[domain];
     if (rec && (rec.status === 'verified' || rec.status === 'pending')) continue;
     if (!site.ga4_measurement_id) { noId.push(domain); continue; }
-    try {
-      await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
-      state[domain] = { ...(state[domain] || {}), status: 'pending', tries: 0, measurementId: site.ga4_measurement_id, at: Date.now() };
-      placed.push(domain);
-    } catch (e) { console.error('[reconcile]', domain, e.message); }
+    if (AUTO_TAGGABLE.has(domain)) {
+      try {
+        await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
+        state[domain] = { ...(state[domain] || {}), status: 'pending', tries: 0, measurementId: site.ga4_measurement_id, at: Date.now() };
+        placed.push(domain);
+      } catch (e) { console.error('[reconcile]', domain, e.message); }
+    } else {
+      // Builder-hosted (Horizons etc.): nothing to inject, but the owner
+      // pastes the tag in the site builder — WATCH the live page so that
+      // paste still earns its ✅ confirmation email. No crons placed.
+      state[domain] = { ...(state[domain] || {}), status: 'pending', tries: 0, measurementId: site.ga4_measurement_id, at: Date.now(), watchOnly: true };
+    }
   }
   saveInjectState(state);
   if (placed.length && getSetting('reconcile_announced') !== 'true') {
