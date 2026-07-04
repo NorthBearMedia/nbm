@@ -72,8 +72,13 @@ function render(d) {
 
   if (o) {
     const delta = pctChange(o.sessions, p.sessions);
+    const firstDay = d.ga4.timeseries?.[0]?.date;
+    const daysIn = firstDay && d.period?.start && firstDay > d.period.start
+      ? Math.round((Date.parse(firstDay) - Date.parse(d.period.start)) / 86400000) : 0;
+    const freshNote = daysIn >= 5
+      ? ` <span class="hint">(Visitor tracking was installed on ${new Date(firstDay + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}, so traffic numbers only cover from that date.)</span>` : '';
     html += `<div class="plain-english"><span class="tag">IN PLAIN ENGLISH</span>
-      Your website was visited <strong>${fmtInt(o.sessions)}</strong> times by <strong>${fmtInt(o.totalUsers)}</strong> people in the last ${d.rangeDays} days${delta != null && isFinite(delta) ? ` — <strong>${delta >= 0 ? 'up' : 'down'} ${Math.abs(delta).toFixed(1)}%</strong> on the period before` : ''}.${s && s.impressions > 0 ? ` It showed up in Google searches <strong>${fmtInt(s.impressions)}</strong> times.` : ''}
+      Your website was visited <strong>${fmtInt(o.sessions)}</strong> times by <strong>${fmtInt(o.totalUsers)}</strong> people in the last ${d.rangeDays} days${delta != null && isFinite(delta) ? ` — <strong>${delta >= 0 ? 'up' : 'down'} ${Math.abs(delta).toFixed(1)}%</strong> on the period before` : ''}.${s && s.impressions > 0 ? ` It showed up in Google searches <strong>${fmtInt(s.impressions)}</strong> times.` : ''}${freshNote}
     </div>`;
 
     html += section('At a glance');

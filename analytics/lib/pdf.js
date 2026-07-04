@@ -267,6 +267,14 @@ function plainEnglishSummary(data) {
     let s = `Your website was visited ${fmtInt(o.sessions)} times by ${fmtInt(o.totalUsers)} people`;
     if (delta != null && isFinite(delta)) s += ` — ${delta >= 0 ? 'up' : 'down'} ${Math.abs(delta).toFixed(1)}% on the previous period`;
     lines.push(s + '.');
+    // Freshly-tagged site: GA can't see back before its tag was installed,
+    // so a month-long report may only contain days of measurement. Say so,
+    // or a low number reads as broken data.
+    const first = data.ga4.timeseries?.[0]?.date;
+    if (first && first > data.period.start) {
+      const daysIn = Math.round((Date.parse(first) - Date.parse(data.period.start)) / 86400000);
+      if (daysIn >= 5) lines.push(`(Your visitor tracking was installed on ${formatDate(first)}, so traffic numbers only cover from that date — they'll build to a full picture over the coming weeks.)`);
+    }
   }
   const sSum = data.search?.summary;
   if (sSum && sSum.impressions > 0) {
