@@ -649,6 +649,10 @@ async function fathomCheck() {
   if (getSetting('fathom_check_v1_done') === 'true') return;
   const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND fathom_site_id != '' AND fathom_site_id IS NOT NULL").all();
   if (!sites.length) return;
+  // No account API key yet? Stay quiet and retry next boot + hourly —
+  // the check completes itself the moment the owner saves the key.
+  const { getFathomToken } = await import('./runtime-config.js');
+  if (!getFathomToken()) { console.log('[fathom-check] waiting for API key in Settings'); return; }
   setSetting('fathom_check_v1_done', 'true');
   const { gatherFathom } = await import('./fathom.js');
   const { addDays, todayISO } = await import('./dates.js');
@@ -890,6 +894,9 @@ export function scheduleOpsSweep() {
   setTimeout(() => sendSenseCheckReport().catch(e => console.error('[ops] sense check:', e.message)), 210_000);
   setTimeout(() => probeHostingerAnalytics().catch(e => console.error('[probe]', e.message)), 240_000);
   setTimeout(() => fathomCheck().catch(e => console.error('[fathom-check]', e.message)), 180_000);
+  try {
+    cron.schedule('11 * * * *', () => fathomCheck().catch(e => console.error('[fathom-check]', e.message)), { timezone: config.timezone });
+  } catch (e) { console.error('[fathom-check] schedule failed:', e.message); }
   setTimeout(() => runDocrootSurvey().catch(e => console.error('[ops] docroot survey:', e.message)), 300_000);
   setTimeout(() => runStagedFilePeek().catch(e => console.error('[ops] staged peek:', e.message)), 330_000);
   // Search Console finalizer: cheap no-op until the webmasters scope is
