@@ -600,6 +600,48 @@ export async function reconcileRolloutCrons() {
   return { placed: placed.length, noId: noId.length };
 }
 
+// One-shot probe: does Hostinger expose website traffic/visitor stats
+// anywhere our API token can reach, and do raw access logs exist on the
+// server? The hPanel Analytics data would give visitor HISTORY that
+// pre-dates our GA tags. Emails whatever it finds.
+async function probeHostingerAnalytics() {
+  if (getSetting('hostinger_analytics_probe_done') === 'true') return;
+  const token = getHostingerToken();
+  if (!token) return;
+  const lines = [];
+  const tryGet = async (label, path) => {
+    try {
+      const r = await fetch('https://developers.hostinger.com' + path, { headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } });
+      const body = (await r.text()).slice(0, 300).replace(/\s+/g, ' ');
+      lines.push(`${r.status}  ${label}  ${path}\n      ${body}`);
+    } catch (e) { lines.push(`ERR  ${label}  ${path} — ${e.message.slice(0, 80)}`); }
+  };
+  const d = 'northbearmedia.co.uk';
+  await tryGet('website detail (full fields)', `/api/hosting/v1/websites/${d}`);
+  await tryGet('website analytics', `/api/hosting/v1/websites/${d}/analytics`);
+  await tryGet('website statistics', `/api/hosting/v1/websites/${d}/statistics`);
+  await tryGet('website traffic', `/api/hosting/v1/websites/${d}/traffic`);
+  await tryGet('website visitors', `/api/hosting/v1/websites/${d}/visitors`);
+  await tryGet('account statistics', `/api/hosting/v1/accounts/${HOSTINGER_USER}/statistics`);
+  await tryGet('account analytics', `/api/hosting/v1/accounts/${HOSTINGER_USER}/analytics`);
+  // Server-side: do access logs exist on the hosting account?
+  try {
+    await ensureCron(HOSTINGER_USER, `find /home/${HOSTINGER_USER} -maxdepth 4 -iname *access*log* -o -maxdepth 4 -iname *.log`);
+    await sleep(8 * 60_000);
+    const out = await cronOutputMatching(HOSTINGER_USER, '-iname');
+    await deleteCronsMatching(HOSTINGER_USER, '-iname');
+    lines.push('SERVER LOG FILES FOUND:\n' + (out ? out.slice(0, 1200) : '(none captured — cron may not have run yet; will not retry)'));
+  } catch (e) { lines.push('log survey failed: ' + e.message.slice(0, 80)); }
+  setSetting('hostinger_analytics_probe_done', 'true');
+  try {
+    await mailer().sendMail({
+      from: getEmailFrom(), to: 'norton@northbearmedia.co.uk', bcc: getEmailBcc() || undefined,
+      subject: 'Pulse — Hostinger analytics probe results',
+      text: `Probing whether Hostinger exposes historical visitor data to the API (and whether raw access logs exist on the server):\n\n${lines.join('\n\n')}\n\n— North Bear Pulse`,
+    });
+  } catch (e) { console.error('[probe] email failed:', e.message); }
+}
+
 // Search Console finalizer. Ownership of every client domain was DNS-
 // verified on 3 Jul, but registering the sc-domain PROPERTY (what the
 // report queries) needs the webmasters WRITE scope, which the Workspace
@@ -810,6 +852,7 @@ export function scheduleOpsSweep() {
   // minutes later, emails the inventory and cleans up. Retries on later
   // boots until output is captured.
   setTimeout(() => sendSenseCheckReport().catch(e => console.error('[ops] sense check:', e.message)), 210_000);
+  setTimeout(() => probeHostingerAnalytics().catch(e => console.error('[probe]', e.message)), 240_000);
   setTimeout(() => runDocrootSurvey().catch(e => console.error('[ops] docroot survey:', e.message)), 300_000);
   setTimeout(() => runStagedFilePeek().catch(e => console.error('[ops] staged peek:', e.message)), 330_000);
   // Search Console finalizer: cheap no-op until the webmasters scope is
