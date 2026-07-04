@@ -642,6 +642,42 @@ async function probeHostingerAnalytics() {
   } catch (e) { console.error('[probe] email failed:', e.message); }
 }
 
+// One-shot: verify Fathom is pulling for every site the owner has
+// wired a fathom_site_id into — 30-day traffic + how far back the data
+// reaches, straight from the Fathom API with the stored key.
+async function fathomCheck() {
+  if (getSetting('fathom_check_v1_done') === 'true') return;
+  const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND fathom_site_id != '' AND fathom_site_id IS NOT NULL").all();
+  if (!sites.length) return;
+  setSetting('fathom_check_v1_done', 'true');
+  const { gatherFathom } = await import('./fathom.js');
+  const { addDays, todayISO } = await import('./dates.js');
+  const end = addDays(todayISO(), -1);
+  const lines = [];
+  for (const site of sites) {
+    try {
+      const m = await gatherFathom(site.fathom_site_id, addDays(end, -29), end);
+      const o = m?.overview;
+      if (!o) { lines.push(`✗ ${site.domain} (${site.fathom_site_id}): connected but returned no data`); continue; }
+      // how far back does history reach? probe a full year
+      let since = '(unknown)';
+      try {
+        const y = await gatherFathom(site.fathom_site_id, addDays(end, -364), end);
+        const first = y?.timeseries?.find(t => t.sessions > 0);
+        if (first) since = first.date;
+      } catch { /* year probe optional */ }
+      lines.push(`✓ ${site.domain} (${site.fathom_site_id}): ${Math.round(o.sessions)} visits / ${Math.round(o.totalUsers)} visitors in the last 30 days · history reaches back to ${since}`);
+    } catch (e) { lines.push(`✗ ${site.domain} (${site.fathom_site_id}): ${e.message.slice(0, 120)}`); }
+  }
+  try {
+    await mailer().sendMail({
+      from: getEmailFrom(), to: 'norton@northbearmedia.co.uk', bcc: getEmailBcc() || undefined,
+      subject: 'Pulse — Fathom connection check',
+      text: `Sites with a Fathom site ID, checked live against the Fathom API:\n\n${lines.map(l => '  ' + l).join('\n')}\n\nWhere Fathom is connected it becomes the site's traffic source (bot-filtered, with history) and the dashboard/report will say "Source: Fathom Analytics".\n\n— North Bear Pulse`,
+    });
+  } catch (e) { console.error('[fathom-check] email failed:', e.message); }
+}
+
 // Search Console finalizer. Ownership of every client domain was DNS-
 // verified on 3 Jul, but registering the sc-domain PROPERTY (what the
 // report queries) needs the webmasters WRITE scope, which the Workspace
@@ -853,6 +889,7 @@ export function scheduleOpsSweep() {
   // boots until output is captured.
   setTimeout(() => sendSenseCheckReport().catch(e => console.error('[ops] sense check:', e.message)), 210_000);
   setTimeout(() => probeHostingerAnalytics().catch(e => console.error('[probe]', e.message)), 240_000);
+  setTimeout(() => fathomCheck().catch(e => console.error('[fathom-check]', e.message)), 180_000);
   setTimeout(() => runDocrootSurvey().catch(e => console.error('[ops] docroot survey:', e.message)), 300_000);
   setTimeout(() => runStagedFilePeek().catch(e => console.error('[ops] staged peek:', e.message)), 330_000);
   // Search Console finalizer: cheap no-op until the webmasters scope is
