@@ -646,6 +646,44 @@ function closeModal() { $('#modalRoot').innerHTML = ''; }
 $('#addSiteBtn').onclick = () => showSiteModal();
 $('#settingsBtn').onclick = () => showSettingsModal();
 $('#logoutBtn').onclick = async () => { await api('/api/logout', { method: 'POST' }); location.href = '/login'; };
+$('#siteAuditBtn').onclick = async (e) => {
+  e.target.disabled = true; e.target.textContent = 'Checking Hostinger…';
+  try {
+    const data = await api('/api/hostinger/websites');
+    const list = (data.websites || []).slice().sort((a, b) => Number(a.alreadyInPulse) - Number(b.alreadyInPulse) || a.domain.localeCompare(b.domain));
+    const missing = list.filter(w => !w.alreadyInPulse);
+    const rows = list.map(w => `<tr>
+      <td style="padding:5px 10px"><strong>${esc(w.domain)}</strong></td>
+      <td style="padding:5px 10px">${w.alreadyInPulse ? '✅ tracked in Pulse' : '<span style=\'color:#d9534f\'>❌ not tracked</span>'}</td>
+      <td style="padding:5px 10px">${w.alreadyInPulse ? '' : `<label class=\'hint\'><input type=\'checkbox\' class=\'audit-import\' value=\'${esc(w.domain)}\'> import</label>`}</td>
+    </tr>`).join('');
+    $('#modalRoot').innerHTML = `
+    <div class="modal-backdrop" id="backdrop"><div class="modal" style="max-width:760px">
+      <h3>Site audit — Hostinger vs Pulse</h3>
+      <p class="hint" style="margin:4px 0 12px">${list.length} website(s) on your Hostinger account · <strong>${missing.length} not tracked in Pulse</strong>. Hostinger is the source of truth; anything ❌ was never set up. Tick to bring it in (Analytics/Search Console auto-connect; add the client email after).</p>
+      <div style="overflow:auto;max-height:60vh"><table class="data" style="width:100%">
+        <thead><tr><th style="text-align:left;padding:5px 10px">Website</th><th style="text-align:left;padding:5px 10px">Status</th><th style="text-align:left;padding:5px 10px"></th></tr></thead>
+        <tbody>${rows}</tbody></table></div>
+      <div class="modal-actions" style="margin-top:14px;display:flex;gap:8px">
+        ${missing.length ? '<button class="btn primary" id="auditImportBtn">Import ticked sites</button>' : ''}
+        <button class="btn" onclick="document.getElementById('modalRoot').innerHTML=''">Close</button>
+      </div>
+    </div></div>`;
+    $('#backdrop').onclick = ev => { if (ev.target.id === 'backdrop') closeModal(); };
+    $('#auditImportBtn')?.addEventListener('click', async (ev) => {
+      const domains = [...document.querySelectorAll('.audit-import:checked')].map(c => c.value);
+      if (!domains.length) return toast('Tick at least one site to import', 'err');
+      ev.target.disabled = true; ev.target.textContent = 'Importing & auto-connecting…';
+      try {
+        const r = await api('/api/hostinger/import-sites', { method: 'POST', body: { domains } });
+        toast(`${r.created} site(s) imported and auto-connected`, 'ok', 8000);
+        closeModal(); await loadSites();
+      } catch (err) { toast(err.message, 'err'); ev.target.disabled = false; ev.target.textContent = 'Import ticked sites'; }
+    });
+  } catch (err) { toast(err.message, 'err', 9000); }
+  e.target.disabled = false; e.target.textContent = 'Site audit';
+};
+
 $('#connectionsBtn').onclick = async (e) => {
   e.target.disabled = true; e.target.textContent = 'Checking…';
   try {
