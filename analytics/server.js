@@ -39,11 +39,39 @@ for (const kind of ['uncaughtException', 'unhandledRejection']) {
 }
 
 const app = express();
+app.set('trust proxy', 1); // Railway terminates TLS in front of us
 app.use(express.json());
 app.use(cookieParser());
 
+// Security headers on every response. Clickjacking (dashboards must not be
+// framed by third parties), MIME sniffing, HSTS on HTTPS, tight referrer.
+app.use((req, res, next) => {
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
+  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
+
 // ─── Admin auth (single password, stateless HMAC-signed cookie) ──
 const SECRET = createHmac('sha256', 'nbm-pulse-v1').update(config.adminPassword || 'unset').digest();
+
+// Simple in-memory brute-force guard for the single admin password:
+// lock an IP for 15 min after 8 failed attempts in a rolling 15-min window.
+const loginFails = new Map();
+function loginBlocked(ip) {
+  const rec = loginFails.get(ip);
+  if (!rec) return false;
+  if (Date.now() - rec.first > 15 * 60_000) { loginFails.delete(ip); return false; }
+  return rec.count >= 8;
+}
+function noteLoginFail(ip) {
+  const rec = loginFails.get(ip) || { count: 0, first: Date.now() };
+  rec.count++; loginFails.set(ip, rec);
+}
 
 function signSession(expiresMs) {
   const sig = createHmac('sha256', SECRET).update(String(expiresMs)).digest('hex');
@@ -65,9 +93,17 @@ function requireAdmin(req, res, next) {
 
 app.post('/api/login', (req, res) => {
   if (!config.adminPassword) return res.status(500).json({ error: 'ADMIN_PASSWORD is not set on the server' });
-  if (req.body?.password !== config.adminPassword) return res.status(401).json({ error: 'Wrong password' });
+  const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+  if (loginBlocked(ip)) return res.status(429).json({ error: 'Too many attempts — try again in 15 minutes.' });
+  // Timing-safe comparison so response time can't reveal the password.
+  const given = Buffer.from(String(req.body?.password || ''));
+  const real = Buffer.from(String(config.adminPassword));
+  const okPw = given.length === real.length && timingSafeEqual(given, real);
+  if (!okPw) { noteLoginFail(ip); return res.status(401).json({ error: 'Wrong password' }); }
+  loginFails.delete(ip);
   const expires = Date.now() + 7 * 24 * 60 * 60 * 1000;
-  res.cookie('pulse_session', signSession(expires), { httpOnly: true, maxAge: expires - Date.now(), sameSite: 'lax' });
+  const secure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+  res.cookie('pulse_session', signSession(expires), { httpOnly: true, maxAge: expires - Date.now(), sameSite: 'lax', secure });
   res.json({ ok: true });
 });
 
@@ -432,12 +468,15 @@ app.get('/api/client/:token/data', async (req, res) => {
   const start = addDays(end, -(rangeDays - 1));
   try {
     const data = await gatherReportData(site, start, end);
+    // Never expose internal gather warnings (raw API error strings, property
+    // IDs) to the client browser — they're for the admin console only.
+    const { warnings, ...clientData } = data;
     const payload = {
       clientName: site.client_name,
       domain: site.domain,
       frequency: site.report_frequency,
       rangeDays,
-      ...data,
+      ...clientData,
     };
     dataCache.set(cacheKey, { at: Date.now(), data: payload });
     res.json(payload);
