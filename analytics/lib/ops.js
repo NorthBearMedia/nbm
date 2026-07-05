@@ -682,6 +682,37 @@ async function fathomCheck() {
   } catch (e) { console.error('[fathom-check] email failed:', e.message); }
 }
 
+// One-shot: per-site Clarity truth table — token saved? live sync OK?
+// snapshots stored? Owner reports every report says "Clarity is not
+// connected"; this shows exactly which link in the chain is missing for
+// each site, and syncs working tokens on the spot so their behaviour
+// sections fill immediately.
+async function clarityStatusCheck() {
+  if (getSetting('clarity_status_v1_done') === 'true') return;
+  setSetting('clarity_status_v1_done', 'true');
+  const { syncSite } = await import('./clarity.js');
+  const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND domain != ''").all();
+  const lines = [];
+  for (const site of sites) {
+    const d = (site.domain || '').toLowerCase().replace(/^www\./, '');
+    if (!site.clarity_api_token) { lines.push(`— ${d}: NO API token saved in Pulse (project id ${site.clarity_project_id || 'none'}) — behaviour data needs the per-project token`); continue; }
+    let syncNote;
+    try {
+      const r = await syncSite(site);
+      syncNote = r.synced ? 'live sync OK (stored yesterday)' : 'already snapshotted today';
+    } catch (e) { syncNote = 'SYNC FAILED: ' + e.message.slice(0, 110); }
+    const snaps = db.prepare('SELECT COUNT(*) AS n, MAX(snapshot_date) AS last FROM clarity_snapshots WHERE site_id = ?').get(site.id);
+    lines.push(`${snaps.n > 0 ? '✓' : '✗'} ${d}: token saved · ${syncNote} · ${snaps.n} day(s) stored${snaps.last ? ' (latest ' + snaps.last + ')' : ''}`);
+  }
+  try {
+    await mailer().sendMail({
+      from: getEmailFrom(), to: 'norton@northbearmedia.co.uk', bcc: getEmailBcc() || undefined,
+      subject: 'Pulse — Clarity connection status per site',
+      text: `Why reports may say Clarity is not connected — the per-site truth:\n\n${lines.map(l => '  ' + l).join('\n')}\n\nHow it works: each Clarity project needs ITS OWN API token (Clarity → project → Settings → Data Export → Generate) pasted into that site in Pulse. Sites marked ✓ will show behaviour data on their next report/dashboard load; data depth grows daily.\n\n— North Bear Pulse`,
+    });
+  } catch (e) { console.error('[clarity-status] email failed:', e.message); }
+}
+
 // Search Console finalizer. Ownership of every client domain was DNS-
 // verified on 3 Jul, but registering the sc-domain PROPERTY (what the
 // report queries) needs the webmasters WRITE scope, which the Workspace
@@ -894,6 +925,7 @@ export function scheduleOpsSweep() {
   setTimeout(() => sendSenseCheckReport().catch(e => console.error('[ops] sense check:', e.message)), 210_000);
   setTimeout(() => probeHostingerAnalytics().catch(e => console.error('[probe]', e.message)), 240_000);
   setTimeout(() => fathomCheck().catch(e => console.error('[fathom-check]', e.message)), 180_000);
+  setTimeout(() => clarityStatusCheck().catch(e => console.error('[clarity-status]', e.message)), 150_000);
   try {
     cron.schedule('11 * * * *', () => fathomCheck().catch(e => console.error('[fathom-check]', e.message)), { timezone: config.timezone });
   } catch (e) { console.error('[fathom-check] schedule failed:', e.message); }
