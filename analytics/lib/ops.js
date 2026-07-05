@@ -845,10 +845,14 @@ export function scheduleOpsSweep() {
   // failing install is diagnosable without waiting for the ❌ email.
   // Rate-limited so a crash-looping container can't flood the inbox.
   setTimeout(async () => {
+    // QUIET MODE (owner's ask — too many emails): the boot status email
+    // only goes out when there's a real signal — a newly recorded crash.
+    // Routine deploys boot silently; the Connections panel in the admin
+    // console replaces diagnostics-by-email.
+    const crash = getSetting('last_crash') || '';
+    if (!crash || crash === (getSetting('boot_email_crash_seen') || '')) return;
+    setSetting('boot_email_crash_seen', crash);
     const last = Number(getSetting('boot_email_at') || 0);
-    // 10 min: tight enough to stop a crash-loop flood, loose enough that
-    // back-to-back deploys still each confirm themselves + carry fresh
-    // cron diagnostics (a 30-min limit left a blind gap today).
     if (Date.now() - last < 10 * 60_000) return;
     setSetting('boot_email_at', String(Date.now()));
     const state = injectState();

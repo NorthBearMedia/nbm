@@ -646,6 +646,32 @@ function closeModal() { $('#modalRoot').innerHTML = ''; }
 $('#addSiteBtn').onclick = () => showSiteModal();
 $('#settingsBtn').onclick = () => showSettingsModal();
 $('#logoutBtn').onclick = async () => { await api('/api/logout', { method: 'POST' }); location.href = '/login'; };
+$('#connectionsBtn').onclick = async (e) => {
+  e.target.disabled = true; e.target.textContent = 'Checking…';
+  try {
+    const h = await api('/api/connections');
+    const cell = c => c
+      ? `<td style="padding:6px 10px;white-space:nowrap">${c.ok ? '✅' : '❌'} <span class="hint">${esc(c.detail || '')}</span></td>`
+      : '<td style="padding:6px 10px">—</td>';
+    $('#modalRoot').innerHTML = `
+    <div class="modal-backdrop" id="backdrop"><div class="modal" style="max-width:1050px">
+      <h3>Connections — live check (last 7 days)</h3>
+      <p class="hint" style="margin:4px 0 12px">Checked ${new Date(h.checkedAt).toLocaleTimeString('en-GB')} · ✅ pulling data · ❌ needs attention (reason shown)</p>
+      <div style="overflow:auto;max-height:65vh">
+      <table class="data" style="width:100%">
+        <thead><tr><th style="text-align:left;padding:6px 10px">Site</th><th style="text-align:left;padding:6px 10px">Google Analytics</th><th style="text-align:left;padding:6px 10px">Search Console</th><th style="text-align:left;padding:6px 10px">Clarity</th><th style="text-align:left;padding:6px 10px">Fathom</th></tr></thead>
+        <tbody>${h.sites.map(r => `<tr>
+          <td style="padding:6px 10px"><strong>${esc(r.client)}</strong><br><span class="hint">${esc(r.domain)}</span></td>
+          ${r.error ? `<td colspan="4" style="padding:6px 10px">❌ ${esc(r.error)}</td>` : cell(r.ga) + cell(r.search) + cell(r.clarity) + cell(r.fathom)}
+        </tr>`).join('')}</tbody>
+      </table></div>
+      <div class="modal-actions" style="margin-top:14px"><button class="btn" onclick="document.getElementById('modalRoot').innerHTML=''">Close</button></div>
+    </div></div>`;
+    $('#backdrop').onclick = ev => { if (ev.target.id === 'backdrop') closeModal(); };
+  } catch (err) { toast(err.message, 'err'); }
+  e.target.disabled = false; e.target.textContent = 'Connections';
+};
+
 $('#syncClarityBtn').onclick = async (e) => {
   e.target.disabled = true; e.target.textContent = 'Syncing…';
   try {
