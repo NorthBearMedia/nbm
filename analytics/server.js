@@ -313,6 +313,15 @@ app.post('/api/sync-clarity', requireAdmin, async (req, res) => {
   res.json({ ok: true, synced });
 });
 
+// Per-site connections health for the admin "Connections" panel — the
+// no-email replacement for diagnostic emails.
+app.get('/api/connections', requireAdmin, async (req, res) => {
+  try {
+    const { connectionsHealth } = await import('./lib/health.js');
+    res.json(await connectionsHealth());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Re-run the self-setup sweep on demand (idempotent — only fills gaps).
 app.post('/api/ops/run', requireAdmin, async (req, res) => {
   try { res.json({ ok: true, log: await runOpsSweep({ force: true }) }); }
