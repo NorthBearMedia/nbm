@@ -2,6 +2,7 @@
 let clients = [];
 let teamMembers = [];
 let appUsers = [];
+let assigneePool = []; // display names assignable to tasks (users + team_members)
 let currentUser = null;
 let currentFilter = 'all';
 let currentView = 'dashboard';
@@ -85,6 +86,14 @@ async function loadTeam() {
   try { appUsers = await api('/api/users'); } catch(e) { appUsers = []; }
   if (!Array.isArray(appUsers)) appUsers = [];
   teamMembers = appUsers.map(u => ({ id: u.id, name: u.display_name, role: u.role, avatar_color: u.avatar_color, avatar_url: u.avatar_url }));
+  // Everyone a task can be assigned to: login users + the team_members table
+  // (people without logins — The Bear already merges these, the UI must too).
+  let extra = [];
+  try { extra = await api('/api/team'); } catch(e) { extra = []; }
+  const seen = new Set(appUsers.map(u => u.display_name));
+  assigneePool = appUsers.map(u => u.display_name)
+    .concat((Array.isArray(extra) ? extra : []).map(m => m.name).filter(n => n && !seen.has(n)))
+    .sort((a, b) => a.localeCompare(b));
   updateUserSelector();
   updatePersonDropdowns();
   updatePersonFilter();
@@ -1239,10 +1248,17 @@ async function nbPaint(colour) {
     // Delegating needs a name — swap the palette for a person list.
     const m = nbPaletteEl();
     const me = currentUser?.display_name;
+    const candidates = assigneePool.filter(n => n !== me);
+    if (!candidates.length) {
+      m.innerHTML = `<div class="nb-menu-title">Delegate to&hellip;</div>
+        <div class="nb-leg-hint" style="padding:6px 10px">No one to hand this to yet &mdash; add a user or team member first.</div>
+        <div class="nb-menu-sep"></div><button class="nb-menu-item" onclick="nbClosePalette()">Close</button>`;
+      return;
+    }
     m.innerHTML = `<div class="nb-menu-title">Delegate to&hellip;</div>` +
-      appUsers.filter(u => u.display_name !== me).map(u =>
-        `<button class="nb-menu-item" onclick="nbDelegate('${esc(u.display_name)}')">${esc(u.display_name)}</button>`).join('') +
+      candidates.map(n => `<button class="nb-menu-item" data-name="${esc(n)}">${esc(n)}</button>`).join('') +
       `<div class="nb-menu-sep"></div><button class="nb-menu-item" onclick="nbClosePalette()">Cancel</button>`;
+    m.querySelectorAll('[data-name]').forEach(b => b.addEventListener('click', () => nbDelegate(b.dataset.name)));
     return;
   }
   const id = nbPaletteTaskId;
@@ -1304,7 +1320,12 @@ async function nbDelegate(name) {
     await loadClients();
   } catch {}
 }
-document.addEventListener('click', (e) => { if (!e.target.closest('#nbPalette') && !e.target.closest('.nb-marker')) nbClosePalette(); });
+document.addEventListener('click', (e) => {
+  // A click on "Delegate to…" re-renders the palette, detaching the clicked
+  // button before this bubbles here — a detached target isn't an outside click.
+  if (!e.target.isConnected) return;
+  if (!e.target.closest('#nbPalette') && !e.target.closest('.nb-marker')) nbClosePalette();
+});
 
 // ─── Drag & drop reordering ──────────────────────────────
 // Dropping snapshots the order you were LOOKING at (whatever sort), applies
@@ -2519,8 +2540,13 @@ function newTaskFromClient(clientId) {
 }
 
 function populateAssigneeDropdown(cur, secondaryCur){
-  document.getElementById('taskAssignee').innerHTML='<option value="">Unassigned</option>'+appUsers.map(u=>`<option value="${esc(u.display_name)}" ${u.display_name===cur?'selected':''}>${esc(u.display_name)}</option>`).join('');
-  document.getElementById('taskSecondaryAssignee').innerHTML='<option value="">None</option>'+appUsers.map(u=>`<option value="${esc(u.display_name)}" ${u.display_name===(secondaryCur||'')?'selected':''}>${esc(u.display_name)}</option>`).join('');
+  // Pool + the current value even if it's no longer in the pool, so opening
+  // a task never silently shows (and later saves) "Unassigned".
+  const opts = (blank, val) => `<option value="">${blank}</option>`
+    + (val && !assigneePool.includes(val) ? `<option value="${esc(val)}" selected>${esc(val)}</option>` : '')
+    + assigneePool.map(n=>`<option value="${esc(n)}" ${n===val?'selected':''}>${esc(n)}</option>`).join('');
+  document.getElementById('taskAssignee').innerHTML = opts('Unassigned', cur);
+  document.getElementById('taskSecondaryAssignee').innerHTML = opts('None', secondaryCur || '');
 }
 
 // Recurring toggle
@@ -3287,7 +3313,8 @@ function showInlineEdit(taskId) {
     <input type="date" value="${esc(t.planned_date || '')}" onchange="inlineDateChange(${taskId},this.value)" style="width:130px" title="Planned date">
     <select onchange="inlineAssigneeChange(${taskId},this.value)" style="width:110px">
       <option value="">Unassigned</option>
-      ${appUsers.map(u => `<option value="${esc(u.display_name)}" ${u.display_name === t.assignee ? 'selected' : ''}>${esc(u.display_name)}</option>`).join('')}
+      ${t.assignee && !assigneePool.includes(t.assignee) ? `<option value="${esc(t.assignee)}" selected>${esc(t.assignee)}</option>` : ''}
+      ${assigneePool.map(n => `<option value="${esc(n)}" ${n === t.assignee ? 'selected' : ''}>${esc(n)}</option>`).join('')}
     </select>
     <button class="btn btn-ghost btn-sm" onclick="quickStatusChange(${taskId},'stuck')" title="Mark blocked" style="color:var(--danger)">&#9888;</button>
     <button class="btn btn-ghost btn-sm" onclick="this.closest('.inline-edit-row').remove()">&#10005;</button>
