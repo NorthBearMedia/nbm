@@ -409,6 +409,11 @@
               <button id="nbHideDoneBtn" class="nb-order" onclick="nbToggleHideDone()"></button>
             </div>
             <div class="nb-opt-sep"></div>
+            <div class="nb-opt-title">Quick actions</div>
+            <div class="nb-opt-row"><button id="nbUndoBtn" class="nb-order" onclick="nbUndo()" disabled>&#8617; Nothing to undo</button></div>
+            <div class="nb-opt-row"><button class="nb-order" onclick="nbClearAllHighlights()">Clear all highlighter</button></div>
+            <div class="nb-opt-row"><button class="nb-order" onclick="nbPushDeadlines()">Push all deadlines&hellip;</button></div>
+            <div class="nb-opt-sep"></div>
             <div class="nb-opt-title">Highlighter key</div>
             <div class="nb-leg-row"><span class="nb-leg-chip nb-chip-pink"></span> urgent / overdue</div>
             <div class="nb-leg-row"><span class="nb-leg-chip nb-chip-green"></span> due today</div>
@@ -714,6 +719,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=74"></script>
+  <script src="app.js?v=75"></script>
 </body>
 </html>
