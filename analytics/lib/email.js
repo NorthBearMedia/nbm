@@ -35,23 +35,44 @@ export function mailer() {
 
 const nf = new Intl.NumberFormat('en-GB');
 
-function stat(label, value) {
+function trendHtml(pct, invert = false) {
+  if (pct == null || !isFinite(pct)) return '';
+  const good = invert ? pct <= 0 : pct >= 0;
+  const color = good ? '#1e8a61' : '#d9534f';
+  const arrow = pct >= 0 ? '\u25b2' : '\u25bc';
+  return `<div style="font-size:11px;font-weight:bold;color:${color};font-family:Arial,sans-serif;margin-top:3px;">${arrow} ${Math.abs(pct).toFixed(1)}%</div>`;
+}
+
+function stat(label, value, trend = '') {
   return `<td align="center" style="padding:14px 8px;background:#f5f6f8;border-radius:8px;">
     <div style="font-size:22px;font-weight:bold;color:#23262c;font-family:Arial,sans-serif;">${value}</div>
+    ${trend}
     <div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;font-family:Arial,sans-serif;margin-top:4px;">${label}</div>
   </td>`;
 }
 
+function pctOf(cur, prev) {
+  if (prev == null || cur == null || !prev) return null;
+  return ((cur - prev) / prev) * 100;
+}
+
 export function reportEmailHtml(site, data, periodText) {
-  const o = data.ga4?.overview;
-  const s = data.search?.summary;
+  const o = data.ga4?.overview, po = data.ga4?.prevOverview || {};
+  const s = data.search?.summary, ps = data.search?.prevSummary || {};
   const dashUrl = `${getAppUrl()}/r/${site.dashboard_token}`;
   const stats = [];
   if (o) {
-    stats.push(stat('Visits', nf.format(Math.round(o.sessions))));
-    stats.push(stat('Visitors', nf.format(Math.round(o.totalUsers))));
+    stats.push(stat('Visits', nf.format(Math.round(o.sessions)), trendHtml(pctOf(o.sessions, po.sessions))));
+    stats.push(stat('Visitors', nf.format(Math.round(o.totalUsers)), trendHtml(pctOf(o.totalUsers, po.totalUsers))));
   }
-  if (s) stats.push(stat('Google clicks', nf.format(Math.round(s.clicks))));
+  if (s) stats.push(stat('Google clicks', nf.format(Math.round(s.clicks)), trendHtml(pctOf(s.clicks, ps.clicks))));
+  if (s && s.position) {
+    // Rank movement in places — plain English, not a percentage.
+    const move = ps.position ? ps.position - s.position : null;
+    const moveHtml = move == null ? ''
+      : `<div style="font-size:11px;font-weight:bold;color:${move >= 0 ? '#1e8a61' : '#d9534f'};font-family:Arial,sans-serif;margin-top:3px;">${move >= 0 ? '\u25b2 up' : '\u25bc down'} ${Math.abs(move).toFixed(1)} places</div>`;
+    stats.push(stat('Google position', s.position.toFixed(1), moveHtml));
+  }
 
   return `<!doctype html><html><body style="margin:0;padding:0;background:#eef0f3;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#eef0f3;padding:24px 0;"><tr><td align="center">

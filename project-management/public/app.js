@@ -1096,6 +1096,91 @@ function nbComparator(order) {
   }
 }
 
+// ─── Notebook undo ───────────────────────────────────────
+// Every notebook action (marker paint, tick, delegate, bulk clear/push)
+// records its inverse; the Undo button / Ctrl+Z plays them back, newest
+// first. In-memory only — a page refresh starts a fresh history.
+const nbUndoStack = [];
+function nbPushUndo(label, undoFn) {
+  nbUndoStack.push({ label, undoFn });
+  if (nbUndoStack.length > 25) nbUndoStack.shift();
+  nbUpdateUndoBtn();
+}
+function nbUpdateUndoBtn() {
+  const b = document.getElementById('nbUndoBtn');
+  if (!b) return;
+  const top = nbUndoStack[nbUndoStack.length - 1];
+  b.disabled = !top;
+  b.textContent = top ? `\u21a9 Undo: ${top.label}` : '\u21a9 Nothing to undo';
+}
+async function nbUndo() {
+  const entry = nbUndoStack.pop();
+  nbUpdateUndoBtn();
+  if (!entry) return;
+  try { await entry.undoFn(); } catch {}
+  await loadClients();
+}
+document.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.key.toLowerCase() !== 'z') return;
+  const nb = document.getElementById('notebookLines');
+  if (!nb || !nb.offsetParent) return; // only when the notebook is on screen
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  e.preventDefault();
+  nbUndo();
+});
+
+// Snapshot the fields the marker palette can touch, for undo.
+function nbStateSnapshot(t) {
+  return { task_status: t.task_status, task_band: t.task_band, task_type: t.task_type };
+}
+
+// "Clear all highlighter": rub out every state-driven colour on the book
+// (urgent / due-today / waiting flags). Delegation (yellow) is a real
+// assignment, not ink — it stays. One undo entry restores the lot.
+async function nbClearAllHighlights() {
+  const targets = allTasksFlat().filter(t => {
+    if (!isOpenTask(t)) return false;
+    return t.task_type === 'urgent' || t.task_band === 'today'
+      || t.task_status === 'waiting-on-client' || t.task_status === 'waiting-on-me';
+  });
+  if (!targets.length) { alert('No highlighter to clear — every colour on the page comes from deadlines or delegation.'); return; }
+  if (!confirm(`Clear the highlighter from ${targets.length} line(s)?\nThis removes their urgent / due-today / waiting flags — the tasks themselves stay put. (Undo can bring them back.)`)) return;
+  const prev = targets.map(t => ({ id: t.id, ...nbStateSnapshot(t) }));
+  for (const t of targets) {
+    const body = {};
+    if (t.task_type === 'urgent') body.task_type = 'ad-hoc';
+    if (t.task_band === 'today') body.task_band = 'scheduled';
+    if (t.task_status === 'waiting-on-client' || t.task_status === 'waiting-on-me') body.task_status = 'scheduled';
+    try { await api(`/api/tasks/${t.id}`, { method: 'PUT', body }); } catch {}
+  }
+  nbPushUndo(`clear highlighter (${targets.length} lines)`, async () => {
+    for (const p of prev) {
+      try { await api(`/api/tasks/${p.id}`, { method: 'PUT', body: { task_status: p.task_status, task_band: p.task_band, task_type: p.task_type } }); } catch {}
+    }
+  });
+  await loadClients();
+}
+
+// "Push all deadlines": didn't finish Friday? Shift every open task's
+// deadline/planned date by N days in one server call. Undo shifts exactly
+// those tasks back.
+async function nbPushDeadlines() {
+  const v = prompt('Push every open task\u2019s deadline forward by how many days?\n(3 = Friday \u2192 Monday. Negative pulls them back.)', '3');
+  if (v === null) return;
+  const days = parseInt(v, 10);
+  if (!Number.isInteger(days) || days === 0 || Math.abs(days) > 60) { alert('Enter a whole number of days between -60 and 60.'); return; }
+  try {
+    const r = await api('/api/tasks/bulk-shift', { method: 'POST', body: { days } });
+    if (!r.shifted) { alert('No open tasks with dates to push.'); return; }
+    nbPushUndo(`deadline push ${days > 0 ? '+' : ''}${days}d (${r.shifted} tasks)`, async () => {
+      await api('/api/tasks/bulk-shift', { method: 'POST', body: { days: -days, taskIds: r.taskIds } });
+    });
+    await loadClients();
+    alert(`Done \u2014 pushed ${r.shifted} task deadline(s) by ${days > 0 ? '+' : ''}${days} day(s).`);
+  } catch (e) { alert(e.message || 'Could not push deadlines.'); }
+}
+
 // ─── Meaningful highlight colours ────────────────────────
 // The marker colour is a visual language over real task state. Priority when
 // several apply: urgent/overdue (pink) beats everything, then due today.
@@ -1161,6 +1246,7 @@ async function nbPaint(colour) {
     return;
   }
   const id = nbPaletteTaskId;
+  const prev = { id, ...nbStateSnapshot(t) };
   nbClosePalette();
   const body = {};
   if (colour === 'pink') body.task_type = 'urgent';
@@ -1174,13 +1260,27 @@ async function nbPaint(colour) {
     if (t.task_status === 'waiting-on-client' || t.task_status === 'waiting-on-me') body.task_status = 'scheduled';
     if (!Object.keys(body).length) return;
   }
-  try { await api(`/api/tasks/${id}`, { method: 'PUT', body }); await loadClients(); } catch {}
+  try {
+    await api(`/api/tasks/${id}`, { method: 'PUT', body });
+    nbPushUndo(colour ? 'highlight' : 'rub out', async () => {
+      await api(`/api/tasks/${prev.id}`, { method: 'PUT', body: { task_status: prev.task_status, task_band: prev.task_band, task_type: prev.task_type } });
+    });
+    await loadClients();
+  } catch {}
 }
 async function nbDelegate(name) {
   const id = nbPaletteTaskId;
   nbClosePalette();
   if (id === null) return;
-  try { await api(`/api/tasks/${id}`, { method: 'PUT', body: { assignee: name } }); await loadClients(); } catch {}
+  const t = findTaskById(id);
+  const prevAssignee = t ? t.assignee : null;
+  try {
+    await api(`/api/tasks/${id}`, { method: 'PUT', body: { assignee: name } });
+    nbPushUndo(`delegate to ${name}`, async () => {
+      await api(`/api/tasks/${id}`, { method: 'PUT', body: { assignee: prevAssignee || '' } });
+    });
+    await loadClients();
+  } catch {}
 }
 document.addEventListener('click', (e) => { if (!e.target.closest('#nbPalette') && !e.target.closest('.nb-marker')) nbClosePalette(); });
 
@@ -1403,8 +1503,12 @@ async function nbTick(id) {
   const t = findTaskById(id);
   if (!t) return;
   const done = t.task_status === 'done';
+  const prevStatus = t.task_status;
   try {
     await api(`/api/tasks/${id}`, { method: 'PUT', body: { task_status: done ? 'scheduled' : 'done' } });
+    nbPushUndo(done ? 'untick' : 'tick off', async () => {
+      await api(`/api/tasks/${id}`, { method: 'PUT', body: { task_status: prevStatus } });
+    });
     if (!done) { try { celebrate(); } catch {} }
     await loadClients();
   } catch {}

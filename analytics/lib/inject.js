@@ -56,14 +56,28 @@ export function buildSnippet(measurementId, clarityId) {
 // *.nbmbak first.
 export function buildInjectorScript(rootDir, snippet) {
   const b64 = Buffer.from(snippet, 'utf8').toString('base64');
-  const awkProg = 'BEGIN{d=0}{if(!d&&index($0,"</head>")>0){sub(/<\\/head>/,s"</head>");d=1}print}';
+  const awkHead = 'BEGIN{d=0}{if(!d&&index($0,"</head>")>0){sub(/<\\/head>/,s"</head>");d=1}print}';
+  // Fallback for pages with no </head> (minified/odd builds): put the
+  // snippet before </body> instead — GA and Clarity work from there too.
+  const awkBody = 'BEGIN{d=0}{if(!d&&index($0,"</body>")>0){sub(/<\\/body>/,s"</body>");d=1}print}';
   return (
     `D='${rootDir}'\n` +
+    // Diagnostic lines land in the captured cron output: distinguish
+    // "no docroot" (builder-hosted site, nothing to edit), "no .html
+    // files", and "file has neither </head> nor </body>" from a genuine
+    // injection pass.
+    `if [ ! -d "$D" ]; then echo "NBM-NO-DOCROOT $D"; exit 0; fi\n` +
+    `echo "NBM-HTML-COUNT $(find "$D" -type f -name '*.html' 2>/dev/null | wc -l)"\n` +
     `S=$(printf %s '${b64}' | base64 -d)\n` +
     `find "$D" -type f -name '*.html' 2>/dev/null | while read f; do\n` +
-    `  if grep -q '</head>' "$f" && ! grep -q 'NBM-GA-TAG' "$f"; then\n` +
+    `  if grep -q 'NBM-GA-TAG' "$f"; then echo "already $f"\n` +
+    `  elif grep -q '</head>' "$f"; then\n` +
     `    cp "$f" "$f.nbmbak"\n` +
-    `    awk -v s="$S" '${awkProg}' "$f" > "$f.nbmtmp" && mv "$f.nbmtmp" "$f" && echo "injected $f"\n` +
+    `    awk -v s="$S" '${awkHead}' "$f" > "$f.nbmtmp" && mv "$f.nbmtmp" "$f" && echo "injected $f"\n` +
+    `  elif grep -q '</body>' "$f"; then\n` +
+    `    cp "$f" "$f.nbmbak"\n` +
+    `    awk -v s="$S" '${awkBody}' "$f" > "$f.nbmtmp" && mv "$f.nbmtmp" "$f" && echo "injected-body $f"\n` +
+    `  else echo "NBM-NO-HEAD $f"\n` +
     `  fi\n` +
     `done\n` +
     `echo "NBM-INJECT-COMPLETE"\n`
@@ -89,6 +103,38 @@ export function buildCronCommands(scriptUrl, domain) {
 export async function listCrons(username) {
   const list = await hg(`/api/hosting/v1/accounts/${username}/cron-jobs`);
   return Array.isArray(list) ? list : (list.data || []);
+}
+
+// Generic cron helpers (used by diagnostics like the docroot survey).
+export async function ensureCron(username, command) {
+  const existing = (await listCrons(username).catch(() => [])).find(j => (j.command || '').trim() === command);
+  if (existing) return { uid: existing.uid || existing.id, created: false };
+  const created = await hg(`/api/hosting/v1/accounts/${username}/cron-jobs`, 'POST', { time: '* * * * *', command });
+  return { uid: created?.uid || created?.id || created?.data?.uid || null, created: true };
+}
+
+// Last captured output of the first cron whose command contains `substr`,
+// or null if the cron is missing / has produced no output yet.
+export async function cronOutputMatching(username, substr) {
+  try {
+    const job = (await listCrons(username)).find(j => (j.command || '').includes(substr));
+    if (!job) return null;
+    const out = await hg(`/api/hosting/v1/accounts/${username}/cron-jobs/${job.uid || job.id}/output`);
+    const text = typeof out === 'string' ? out : (out.output || out.data || '');
+    return text && String(text).trim() ? String(text) : null;
+  } catch { return null; }
+}
+
+export async function deleteCronsMatching(username, substr) {
+  let removed = 0;
+  try {
+    for (const job of await listCrons(username)) {
+      if ((job.command || '').includes(substr) && (job.uid || job.id)) {
+        try { await hg(`/api/hosting/v1/accounts/${username}/cron-jobs/${job.uid || job.id}`, 'DELETE'); removed++; } catch { /* ignore */ }
+      }
+    }
+  } catch { /* ignore */ }
+  return removed;
 }
 
 // An injector cron is recognisable by the /ix/ script URL (downloader) or
@@ -119,14 +165,18 @@ export async function ensureInjectCron({ username, domain, scriptUrl }) {
   const existing = await listCrons(username).catch(() => []);
   let created = 0;
   for (const command of buildCronCommands(scriptUrl, domain)) {
-    // Dedupe by program + staging path rather than the exact string, in
-    // case Hostinger normalizes whitespace when storing commands.
+    if (existing.some(j => (j.command || '').trim() === command)) continue;
+    // Same program + staging path but different command text = a stale
+    // variant (e.g. an old app_url baked into the download URL). Replace
+    // it, or the cron would keep fetching from the dead address forever.
     const prog = command.split(' ')[0];
-    const dup = existing.some(j => {
+    const stale = existing.filter(j => {
       const c = (j.command || '').trim();
-      return c.startsWith(prog + ' ') && c.includes(`nbm-ix-${domain}.sh`);
+      return c.startsWith(prog + ' ') && c.includes(`nbm-ix-${domain}.sh`) && c !== command;
     });
-    if (dup) continue;
+    for (const j of stale) {
+      try { await hg(`/api/hosting/v1/accounts/${username}/cron-jobs/${j.uid || j.id}`, 'DELETE'); } catch { /* ignore */ }
+    }
     await hg(`/api/hosting/v1/accounts/${username}/cron-jobs`, 'POST', { time: '* * * * *', command });
     created++;
   }
@@ -152,11 +202,14 @@ export async function injectCronOutput(username, domain) {
   } catch (e) { return '(output unavailable: ' + e.message.slice(0, 80) + ')'; }
 }
 
-// Confirm the tag is actually being served on the live page.
+// Confirm the tag is actually being served on the live page. The unique
+// query string busts page caches (LiteSpeed etc.) that could serve stale
+// HTML from before the injection.
 export async function verifyTag(domain, measurementId) {
-  for (const url of [`https://${domain}`, `https://www.${domain}`]) {
+  const bust = `?nbmv=${Date.now()}`;
+  for (const url of [`https://${domain}/${bust}`, `https://www.${domain}/${bust}`]) {
     try {
-      const res = await fetch(url, { headers: { 'User-Agent': 'NorthBearPulse/1.0' }, redirect: 'follow' });
+      const res = await fetch(url, { headers: { 'User-Agent': 'NorthBearPulse/1.0', 'Cache-Control': 'no-cache' }, redirect: 'follow' });
       if (!res.ok) continue;
       const html = (await res.text()).slice(0, 2_000_000);
       const hasGa = measurementId ? html.includes(measurementId) : /gtag\/js\?id=/.test(html);

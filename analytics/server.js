@@ -25,12 +25,53 @@ import { scheduleOpsSweep, runOpsSweep, runInjectionTest, runInjectionRollout } 
 import { buildInjectorScript, buildSnippet, rootDirFor } from './lib/inject.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// The production app has been dying minutes after boot with nothing in
+// our own telemetry (only 1-2 verifier ticks ever ran per hour). Survive
+// fatal errors instead of crash-looping, and stash the stack in settings
+// so the next boot status email shows exactly what fired.
+for (const kind of ['uncaughtException', 'unhandledRejection']) {
+  process.on(kind, err => {
+    console.error(`[fatal] ${kind}:`, err);
+    try { setSetting('last_crash', `${new Date().toISOString()} ${kind}: ${(err && (err.stack || err.message)) || String(err)}`.slice(0, 1500)); }
+    catch { /* db unavailable — nothing more we can do */ }
+  });
+}
+
 const app = express();
+app.set('trust proxy', 1); // Railway terminates TLS in front of us
 app.use(express.json());
 app.use(cookieParser());
 
+// Security headers on every response. Clickjacking (dashboards must not be
+// framed by third parties), MIME sniffing, HSTS on HTTPS, tight referrer.
+app.use((req, res, next) => {
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
+  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
+
 // ─── Admin auth (single password, stateless HMAC-signed cookie) ──
 const SECRET = createHmac('sha256', 'nbm-pulse-v1').update(config.adminPassword || 'unset').digest();
+
+// Simple in-memory brute-force guard for the single admin password:
+// lock an IP for 15 min after 8 failed attempts in a rolling 15-min window.
+const loginFails = new Map();
+function loginBlocked(ip) {
+  const rec = loginFails.get(ip);
+  if (!rec) return false;
+  if (Date.now() - rec.first > 15 * 60_000) { loginFails.delete(ip); return false; }
+  return rec.count >= 8;
+}
+function noteLoginFail(ip) {
+  const rec = loginFails.get(ip) || { count: 0, first: Date.now() };
+  rec.count++; loginFails.set(ip, rec);
+}
 
 function signSession(expiresMs) {
   const sig = createHmac('sha256', SECRET).update(String(expiresMs)).digest('hex');
@@ -52,9 +93,17 @@ function requireAdmin(req, res, next) {
 
 app.post('/api/login', (req, res) => {
   if (!config.adminPassword) return res.status(500).json({ error: 'ADMIN_PASSWORD is not set on the server' });
-  if (req.body?.password !== config.adminPassword) return res.status(401).json({ error: 'Wrong password' });
+  const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+  if (loginBlocked(ip)) return res.status(429).json({ error: 'Too many attempts — try again in 15 minutes.' });
+  // Timing-safe comparison so response time can't reveal the password.
+  const given = Buffer.from(String(req.body?.password || ''));
+  const real = Buffer.from(String(config.adminPassword));
+  const okPw = given.length === real.length && timingSafeEqual(given, real);
+  if (!okPw) { noteLoginFail(ip); return res.status(401).json({ error: 'Wrong password' }); }
+  loginFails.delete(ip);
   const expires = Date.now() + 7 * 24 * 60 * 60 * 1000;
-  res.cookie('pulse_session', signSession(expires), { httpOnly: true, maxAge: expires - Date.now(), sameSite: 'lax' });
+  const secure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+  res.cookie('pulse_session', signSession(expires), { httpOnly: true, maxAge: expires - Date.now(), sameSite: 'lax', secure });
   res.json({ ok: true });
 });
 
@@ -300,6 +349,15 @@ app.post('/api/sync-clarity', requireAdmin, async (req, res) => {
   res.json({ ok: true, synced });
 });
 
+// Per-site connections health for the admin "Connections" panel — the
+// no-email replacement for diagnostic emails.
+app.get('/api/connections', requireAdmin, async (req, res) => {
+  try {
+    const { connectionsHealth } = await import('./lib/health.js');
+    res.json(await connectionsHealth());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Re-run the self-setup sweep on demand (idempotent — only fills gaps).
 app.post('/api/ops/run', requireAdmin, async (req, res) => {
   try { res.json({ ok: true, log: await runOpsSweep({ force: true }) }); }
@@ -410,12 +468,15 @@ app.get('/api/client/:token/data', async (req, res) => {
   const start = addDays(end, -(rangeDays - 1));
   try {
     const data = await gatherReportData(site, start, end);
+    // Never expose internal gather warnings (raw API error strings, property
+    // IDs) to the client browser — they're for the admin console only.
+    const { warnings, ...clientData } = data;
     const payload = {
       clientName: site.client_name,
       domain: site.domain,
       frequency: site.report_frequency,
       rangeDays,
-      ...data,
+      ...clientData,
     };
     dataCache.set(cacheKey, { at: Date.now(), data: payload });
     res.json(payload);
@@ -463,22 +524,39 @@ app.get('/ix/:token/:domain', (req, res) => {
   }
   const domain = String(req.params.domain).toLowerCase().replace(/[^a-z0-9.-]/g, '');
   const demoId = 'G-MS3V4KS3PB';
-  let measurementId, clarityId = null;
-  if (domain === 'nbmdemosite2.co.uk') {
-    measurementId = demoId;
-  } else {
-    const site = db.prepare('SELECT * FROM sites WHERE lower(replace(domain,"www.","")) = ? AND active = 1').get(domain);
-    if (!site || !site.ga4_measurement_id) {
-      return res.status(200).type('text/x-shellscript').send(`echo "NBM: no measurement id for ${domain}"\n`);
+  try {
+    let measurementId, clarityId = null;
+    if (domain === 'nbmdemosite2.co.uk') {
+      measurementId = demoId;
+    } else {
+      // Single-quote the string literals: SQLite reads "www." as an
+      // IDENTIFIER, so the double-quoted form threw "no such column",
+      // 500'd this endpoint, and every client injector download failed.
+      const site = db.prepare("SELECT * FROM sites WHERE lower(replace(domain,'www.','')) = ? AND active = 1").get(domain);
+      if (!site || !site.ga4_measurement_id) {
+        return res.status(200).type('text/x-shellscript').send(`echo "NBM: no measurement id for ${domain}"\n`);
+      }
+      measurementId = site.ga4_measurement_id;
+      clarityId = site.clarity_project_id || null;
     }
-    measurementId = site.ga4_measurement_id;
-    clarityId = site.clarity_project_id || null;
+    const script = buildInjectorScript(rootDirFor(domain), buildSnippet(measurementId, clarityId));
+    res.type('text/x-shellscript').send(script);
+  } catch (e) {
+    // Never hard-500 the injector — a 500 makes curl write nothing and the
+    // runner cron fails "no such file". Return a harmless shell no-op.
+    console.error('[ix] error for', domain, e.message);
+    res.status(200).type('text/x-shellscript').send(`echo "NBM: ix error for ${domain}: ${e.message.replace(/"/g, '')}"\n`);
   }
-  const script = buildInjectorScript(rootDirFor(domain), buildSnippet(measurementId, clarityId));
-  res.type('text/x-shellscript').send(script);
 });
 
-app.get('/healthz', (req, res) => res.json({ ok: true }));
+// Health checks. railway.json's healthcheckPath is /api/health; the app
+// only served /healthz, so every deploy failed its health check and
+// Railway refused to route the public domain to it (502 "Application
+// failed to respond") even though the process was running fine. Serve
+// both, and keep them dependency-free so a slow DB/SMTP can't fail them.
+const health = (req, res) => res.json({ ok: true });
+app.get('/healthz', health);
+app.get('/api/health', health);
 app.use(express.static(join(__dirname, 'public')));
 
 app.listen(config.port, () => {
@@ -487,3 +565,15 @@ app.listen(config.port, () => {
   startScheduler();
   scheduleOpsSweep();
 });
+
+// Railway's edge routes the public domain to ONE configured target port.
+// If that setting drifts from config.port, the edge returns 502
+// "Application failed to respond" while the app runs happily — which is
+// exactly what the boot email's self-fetch diagnosed. Answering on the
+// usual suspects too makes the domain work whichever port the edge hits.
+const extraPorts = [...new Set([Number(process.env.PORT) || 0, 8080, 3000, 3001, 5000])]
+  .filter(p => p && p !== Number(config.port));
+for (const p of extraPorts) {
+  const srv = app.listen(p, () => console.log(`[net] also listening on ${p} (edge port-drift guard)`));
+  srv.on('error', () => { /* port busy — fine, main listener has it */ });
+}

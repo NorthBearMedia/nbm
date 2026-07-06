@@ -33,6 +33,15 @@ function deltaHtml(pct, invert = false) {
   return `<div class="delta ${cls}">${arrow} ${Math.abs(pct).toFixed(1)}% <span class="vs">vs previous</span></div>`;
 }
 
+// Rank movement in plain English ("up 2.3 places") — a % of a ranking
+// position means nothing to a business owner.
+function moveHtml(places) {
+  if (places == null || !isFinite(places)) return '<div class="delta flat">—</div>';
+  if (Math.abs(places) < 0.05) return '<div class="delta flat">no change <span class="vs">vs previous</span></div>';
+  const up = places > 0; // positive = climbed the rankings
+  return `<div class="delta ${up ? 'up' : 'down'}">${up ? '▲' : '▼'} ${up ? 'up' : 'down'} ${Math.abs(places).toFixed(1)} places <span class="vs">vs previous</span></div>`;
+}
+
 function kpi(label, value, delta, invert = false) {
   return `<div class="kpi"><div class="label">${label}</div><div class="value">${value}</div>${deltaHtml(delta, invert)}</div>`;
 }
@@ -63,8 +72,13 @@ function render(d) {
 
   if (o) {
     const delta = pctChange(o.sessions, p.sessions);
+    const firstDay = d.ga4.timeseries?.[0]?.date;
+    const daysIn = firstDay && d.period?.start && firstDay > d.period.start
+      ? Math.round((Date.parse(firstDay) - Date.parse(d.period.start)) / 86400000) : 0;
+    const freshNote = daysIn >= 5
+      ? ` <span class="hint">(Visitor tracking was installed on ${new Date(firstDay + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}, so traffic numbers only cover from that date.)</span>` : '';
     html += `<div class="plain-english"><span class="tag">IN PLAIN ENGLISH</span>
-      Your website was visited <strong>${fmtInt(o.sessions)}</strong> times by <strong>${fmtInt(o.totalUsers)}</strong> people in the last ${d.rangeDays} days${delta != null && isFinite(delta) ? ` — <strong>${delta >= 0 ? 'up' : 'down'} ${Math.abs(delta).toFixed(1)}%</strong> on the period before` : ''}.${s && s.impressions > 0 ? ` It showed up in Google searches <strong>${fmtInt(s.impressions)}</strong> times.` : ''}
+      Your website was visited <strong>${fmtInt(o.sessions)}</strong> times by <strong>${fmtInt(o.totalUsers)}</strong> people in the last ${d.rangeDays} days${delta != null && isFinite(delta) ? ` — <strong>${delta >= 0 ? 'up' : 'down'} ${Math.abs(delta).toFixed(1)}%</strong> on the period before` : ''}.${s && s.impressions > 0 ? ` It showed up in Google searches <strong>${fmtInt(s.impressions)}</strong> times.` : ''}${freshNote}
     </div>`;
 
     html += section('At a glance');
@@ -116,23 +130,36 @@ function render(d) {
 
   if (s) {
     html += section('Google search performance', 'Average position = where you rank in Google. 1–10 is page one.');
+    const posMove = (s.position && sp.position) ? sp.position - s.position : null;
     html += `<div class="kpi-grid">
       ${kpi('Clicks from Google', fmtInt(s.clicks), pctChange(s.clicks, sp.clicks))}
       ${kpi('Times shown', fmtInt(s.impressions), pctChange(s.impressions, sp.impressions))}
       ${kpi('Click-through rate', fmtPct(s.ctr * 100), pctChange(s.ctr, sp.ctr))}
-      ${kpi('Avg. position', s.position ? s.position.toFixed(1) : '—', pctChange(s.position, sp.position), true)}
+      <div class="kpi"><div class="label">Avg. position</div><div class="value">${s.position ? s.position.toFixed(1) : '—'}</div>${moveHtml(posMove)}</div>
     </div>`;
     if (d.search.topQueries?.length) {
+      const moveCell = q => {
+        if (q.positionChange == null) return q.prevPosition == null ? '<span class="delta up" style="display:inline">new</span>' : '<span class="delta flat" style="display:inline">—</span>';
+        if (Math.abs(q.positionChange) < 0.05) return '<span class="delta flat" style="display:inline">no change</span>';
+        const up = q.positionChange > 0;
+        return `<span class="delta ${up ? 'up' : 'down'}" style="display:inline">${up ? '▲ up' : '▼ down'} ${Math.abs(q.positionChange).toFixed(1)}</span>`;
+      };
       html += `<div class="panel" style="margin-top:16px">
         <h2 style="margin-bottom:10px">Top search terms people found you with</h2>
         <table class="data">
-          <thead><tr><th>Search term</th><th class="num">Clicks</th><th class="num">Times shown</th><th class="num">Position</th></tr></thead>
+          <thead><tr><th>Search term</th><th class="num">Clicks</th><th class="num">Times shown</th><th class="num">Position</th><th class="num">Movement</th></tr></thead>
           <tbody>${d.search.topQueries.slice(0, 10).map(q => `
             <tr><td class="trunc" title="${esc(q.query)}"><strong>${esc(q.query)}</strong></td>
-            <td class="num">${fmtInt(q.clicks)}</td><td class="num">${fmtInt(q.impressions)}</td><td class="num">${q.position.toFixed(1)}</td></tr>`).join('')}
+            <td class="num">${fmtInt(q.clicks)}</td><td class="num">${fmtInt(q.impressions)}</td>
+            <td class="num">${q.position.toFixed(1)}${q.position <= 10 ? ' <span class="hint">pg 1</span>' : ''}</td>
+            <td class="num">${moveCell(q)}</td></tr>`).join('')}
           </tbody></table>
+        <div class="hint" style="margin-top:8px">"Movement" is places gained or lost on Google vs the previous period · "pg 1" means the first page of results.</div>
       </div>`;
     }
+  } else {
+    html += section('Google search performance');
+    html += `<div class="panel"><p class="hint">Google Search Console is being connected for your site — your Google rankings and search clicks will appear here soon.</p></div>`;
   }
 
   if (d.ga4?.topPages?.length) {
@@ -146,13 +173,30 @@ function render(d) {
   }
 
   if (d.clarity) {
-    const cl = d.clarity;
+    const cl = d.clarity, pc = d.prevClarity;
+    const humans = cl.humanSessions != null ? cl.humanSessions : cl.sessions;
+    const prevHumans = pc ? (pc.humanSessions != null ? pc.humanSessions : pc.sessions) : null;
     html += section('How people use your site', 'Measured by Microsoft Clarity — low frustration numbers are good.');
     html += `<div class="kpi-grid">
-      <div class="kpi"><div class="label">Sessions analysed</div><div class="value">${fmtInt(cl.sessions)}</div><div class="delta flat">over ${cl.daysCovered} day${cl.daysCovered === 1 ? '' : 's'}</div></div>
-      <div class="kpi"><div class="label">Avg. scroll depth</div><div class="value">${cl.avgScrollDepth != null ? fmtPct(cl.avgScrollDepth, 0) : '—'}</div><div class="delta flat">how far people scroll</div></div>
-      <div class="kpi"><div class="label">Dead clicks</div><div class="value">${fmtInt(cl.deadClicks)}</div><div class="delta flat">clicks that did nothing</div></div>
-      <div class="kpi"><div class="label">Rage clicks</div><div class="value">${fmtInt(cl.rageClicks)}</div><div class="delta flat">frustrated clicking</div></div>
+      <div class="kpi"><div class="label">Sessions analysed</div><div class="value">${fmtInt(humans)}</div>${pc ? deltaHtml(pctChange(humans, prevHumans)) : '<div class="delta flat">real people, bots excluded</div>'}</div>
+      <div class="kpi"><div class="label">Avg. scroll depth</div><div class="value">${cl.avgScrollDepth != null ? fmtPct(cl.avgScrollDepth, 0) : '—'}</div>${pc ? deltaHtml(pctChange(cl.avgScrollDepth, pc.avgScrollDepth)) : '<div class="delta flat">how far people scroll</div>'}</div>
+      <div class="kpi"><div class="label">Dead clicks</div><div class="value">${fmtInt(cl.deadClicks)}</div>${pc ? deltaHtml(pctChange(cl.deadClicks, pc.deadClicks), true) : '<div class="delta flat">clicks that did nothing</div>'}</div>
+      <div class="kpi"><div class="label">Rage clicks</div><div class="value">${fmtInt(cl.rageClicks)}</div>${pc ? deltaHtml(pctChange(cl.rageClicks, pc.rageClicks), true) : '<div class="delta flat">frustrated clicking</div>'}</div>
+    </div>
+    <div class="hint" style="margin-top:6px">Based on ${cl.daysCovered} day${cl.daysCovered === 1 ? '' : 's'} of Clarity measurement in this period${cl.quickBacks ? ` · ${fmtInt(cl.quickBacks)} quick-backs (visitors who left a page straight away)` : ''}.</div>`;
+  } else {
+    html += section('How people use your site');
+    html += `<div class="panel"><p class="hint">Microsoft Clarity is being connected for your site — you'll soon see how visitors scroll, click and where they get stuck.</p></div>`;
+  }
+
+  if (d.siteHealth && (d.siteHealth.performance != null || d.siteHealth.seo != null)) {
+    const sh = d.siteHealth;
+    const grade = v => v == null ? '—' : v >= 90 ? 'excellent' : v >= 50 ? 'room to improve' : 'needs attention';
+    html += section('Site health check', 'Scored out of 100 by Google PageSpeed (mobile). 90+ is excellent.');
+    html += `<div class="kpi-grid">
+      <div class="kpi"><div class="label">Speed score</div><div class="value">${sh.performance ?? '—'}</div><div class="delta flat">${grade(sh.performance)}</div></div>
+      <div class="kpi"><div class="label">Google-friendliness (SEO)</div><div class="value">${sh.seo ?? '—'}</div><div class="delta flat">${grade(sh.seo)}</div></div>
+      <div class="kpi"><div class="label">Built to best practice</div><div class="value">${sh.bestPractices ?? '—'}</div><div class="delta flat">${grade(sh.bestPractices)}</div></div>
     </div>`;
   }
 
