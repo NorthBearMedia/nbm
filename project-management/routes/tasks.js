@@ -217,6 +217,49 @@ router.post('/batch-move', requireAuth, requireWrite, (req, res) => {
   res.json({ success: true, moved: moved.length });
 });
 
+// ─── Bulk deadline push ──────────────────────────────
+// "Didn't finish Friday — push everything to Monday": shift every open
+// task's deadline/planned date by N days in one go. Optional taskIds
+// restricts the shift (used by the notebook's undo to reverse exactly
+// the tasks it moved). Private clients' tasks stay owner-only.
+router.post('/bulk-shift', requireAuth, requireWrite, (req, res) => {
+  const days = parseInt(req.body?.days, 10);
+  if (!Number.isInteger(days) || days === 0 || Math.abs(days) > 60) {
+    return res.status(400).json({ error: 'days must be a whole number between -60 and 60 (not 0)' });
+  }
+  const onlyIds = Array.isArray(req.body?.taskIds) ? req.body.taskIds.map(Number).filter(Number.isInteger) : null;
+  const isOwner = req.user.role === 'owner';
+  const priv = isOwner ? '' : 'AND c.is_private = 0';
+  let rows;
+  if (onlyIds && onlyIds.length) {
+    rows = db.prepare(`SELECT t.id, t.deadline, t.planned_date FROM tasks t JOIN clients c ON c.id = t.client_id
+      WHERE t.id IN (${onlyIds.map(() => '?').join(',')}) AND t.archived = 0 ${priv}`).all(...onlyIds);
+  } else {
+    rows = db.prepare(`SELECT t.id, t.deadline, t.planned_date FROM tasks t JOIN clients c ON c.id = t.client_id
+      WHERE t.archived = 0 AND t.progress NOT IN ('completed','invoiced')
+        AND ((t.deadline IS NOT NULL AND t.deadline != '') OR (t.planned_date IS NOT NULL AND t.planned_date != '')) ${priv}`).all();
+  }
+  const shift = (str) => {
+    if (!str) return str;
+    const d = new Date(str + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split('T')[0];
+  };
+  const update = db.prepare('UPDATE tasks SET deadline = ?, planned_date = ? WHERE id = ?');
+  const shifted = [];
+  db.transaction(() => {
+    for (const t of rows) {
+      update.run(shift(t.deadline), shift(t.planned_date), t.id);
+      shifted.push(t.id);
+    }
+  })();
+  if (shifted.length) {
+    logActivity('task', shifted[0], 'updated', req.user.display_name,
+      `Pushed ${shifted.length} task deadline(s) by ${days > 0 ? '+' : ''}${days} day(s) (bulk)`);
+  }
+  res.json({ success: true, shifted: shifted.length, taskIds: shifted });
+});
+
 router.delete('/:id', requireAuth, requireRole('owner'), (req, res) => {
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);
