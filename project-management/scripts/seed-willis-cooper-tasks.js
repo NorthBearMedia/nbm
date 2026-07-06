@@ -1,21 +1,18 @@
 // scripts/seed-willis-cooper-tasks.js
 //
-// One-off: drafts the July 2026 content list into Willis Cooper tasks.
+// Drafts the July 2026 content list into Willis Cooper tasks.
 //
 //   node scripts/seed-willis-cooper-tasks.js            # apply
 //   node scripts/seed-willis-cooper-tasks.js --dry-run  # preview only
+//
+// Also exported as seedWillisCooper(db) so server.js can run it once at boot
+// (guarded by an app_meta flag) — no Railway shell step needed.
 //
 // Same safety pattern as seed-current-workload.js: matches the client by name,
 // skips tasks whose titles already exist (idempotent), never deletes anything,
 // writes canonical status/band/type with legacy shadows via lib/taskmap.js.
 
-import db from '../database.js';
 import { statusToProgress, bandToPriority } from '../lib/taskmap.js';
-
-const DRY = process.argv.includes('--dry-run');
-
-const client = db.prepare("SELECT id, name FROM clients WHERE lower(name) = 'willis cooper' AND is_system = 0").get();
-if (!client) { console.error('Willis Cooper client not found — aborting (nothing written).'); process.exit(1); }
 
 const TASKS = [
   {
@@ -73,40 +70,55 @@ const TASKS = [
 ];
 
 const norm = s => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-const existing = db.prepare('SELECT title FROM tasks WHERE client_id = ? AND archived = 0').all(client.id).map(r => norm(r.title));
 
-function ensureProject(clientId) {
-  let proj = db.prepare('SELECT id FROM projects WHERE client_id = ? ORDER BY id LIMIT 1').get(clientId);
-  if (proj) return proj.id;
-  const r = db.prepare("INSERT INTO projects (client_id, name, status) VALUES (?, 'General', 'active')").run(clientId);
-  return r.lastInsertRowid;
+// Returns a report, or null when the Willis Cooper client doesn't exist yet
+// (so the boot-time caller can retry on a later start instead of flagging done).
+export function seedWillisCooper(db, { dry = false } = {}) {
+  const client = db.prepare("SELECT id, name FROM clients WHERE lower(name) = 'willis cooper' AND is_system = 0").get();
+  if (!client) return null;
+
+  const existing = db.prepare('SELECT title FROM tasks WHERE client_id = ? AND archived = 0').all(client.id).map(r => norm(r.title));
+
+  const ensureProject = clientId => {
+    const proj = db.prepare('SELECT id FROM projects WHERE client_id = ? ORDER BY id LIMIT 1').get(clientId);
+    if (proj) return proj.id;
+    return db.prepare("INSERT INTO projects (client_id, name, status) VALUES (?, 'General', 'active')").run(clientId).lastInsertRowid;
+  };
+
+  let created = 0; const skipped = [];
+  const run = () => {
+    const projectId = ensureProject(client.id);
+    for (const t of TASKS) {
+      const names = [t.title, ...(t.aliases || [])].map(norm);
+      if (existing.some(e => names.includes(e))) { skipped.push(t.title); continue; }
+      if (!dry) {
+        db.prepare(
+          `INSERT INTO tasks (project_id, client_id, title, deadline, planned_date, progress, priority,
+             task_status, task_band, task_type, notes, is_recurring, recur_interval, recur_unit)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).run(
+          projectId, client.id, t.title, t.deadline || '', t.planned || '',
+          statusToProgress(t.status), t.band ? bandToPriority(t.band) : 'medium',
+          t.status, t.band || '', t.type, t.notes || '',
+          t.recurring ? 1 : 0, t.recurring?.interval || 0, t.recurring?.unit || ''
+        );
+      }
+      created++;
+    }
+  };
+  dry ? run() : db.transaction(run)();
+  return { client, created, skipped };
 }
 
-let created = 0; const skipped = [];
-const run = () => {
-  const projectId = ensureProject(client.id);
-  for (const t of TASKS) {
-    const names = [t.title, ...(t.aliases || [])].map(norm);
-    if (existing.some(e => names.includes(e))) { skipped.push(t.title); continue; }
-    if (!DRY) {
-      db.prepare(
-        `INSERT INTO tasks (project_id, client_id, title, deadline, planned_date, progress, priority,
-           task_status, task_band, task_type, notes, is_recurring, recur_interval, recur_unit)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(
-        projectId, client.id, t.title, t.deadline || '', t.planned || '',
-        statusToProgress(t.status), t.band ? bandToPriority(t.band) : 'medium',
-        t.status, t.band || '', t.type, t.notes || '',
-        t.recurring ? 1 : 0, t.recurring?.interval || 0, t.recurring?.unit || ''
-      );
-    }
-    created++;
-  }
-};
-DRY ? run() : db.transaction(run)();
-
-console.log(`\nWillis Cooper content list ${DRY ? '(DRY RUN)' : ''}`);
-console.log(`  client: #${client.id} ${client.name}`);
-console.log(`  tasks created: ${created}`);
-console.log(`  skipped as already present: ${skipped.length}${skipped.length ? ' — ' + skipped.join(' | ') : ''}\n`);
-process.exit(0);
+// CLI entrypoint (kept for manual runs in the Railway shell)
+if (process.argv[1] && process.argv[1].endsWith('seed-willis-cooper-tasks.js')) {
+  const { default: db } = await import('../database.js');
+  const DRY = process.argv.includes('--dry-run');
+  const report = seedWillisCooper(db, { dry: DRY });
+  if (!report) { console.error('Willis Cooper client not found — aborting (nothing written).'); process.exit(1); }
+  console.log(`\nWillis Cooper content list ${DRY ? '(DRY RUN)' : ''}`);
+  console.log(`  client: #${report.client.id} ${report.client.name}`);
+  console.log(`  tasks created: ${report.created}`);
+  console.log(`  skipped as already present: ${report.skipped.length}${report.skipped.length ? ' — ' + report.skipped.join(' | ') : ''}\n`);
+  process.exit(0);
+}
