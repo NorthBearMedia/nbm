@@ -775,16 +775,27 @@ async function verifyManagedSitesGsc() {
   } catch (e) { console.log('[gsc-managed] scopes unavailable:', e.message.slice(0, 60)); return; }
   for (const m of pending) {
     const siteUrl = 'https://' + m.domain + '/';
+    // Google's ANALYTICS method doesn't work with Hostinger-builder GA4
+    // tags (confirmed: tag live, method still fails), so try META too —
+    // the owner pastes the meta tag into the builder's Search Console
+    // integration and this verifies on the next hourly pass.
+    let done = false;
+    for (const method of ['META', 'ANALYTICS']) {
+      try {
+        await client.request({
+          url: 'https://www.googleapis.com/siteVerification/v1/webResource?verificationMethod=' + method,
+          method: 'POST',
+          data: { site: { type: 'SITE', identifier: siteUrl } },
+        });
+        done = true; break;
+      } catch { /* try next method */ }
+    }
+    if (!done) { console.log('[gsc-managed]', m.domain, 'not verifiable yet (paste the meta tag)'); continue; }
     try {
-      await client.request({
-        url: 'https://www.googleapis.com/siteVerification/v1/webResource?verificationMethod=ANALYTICS',
-        method: 'POST',
-        data: { site: { type: 'SITE', identifier: siteUrl } },
-      });
       await client.request({ url: 'https://www.googleapis.com/webmasters/v3/sites/' + encodeURIComponent(siteUrl), method: 'PUT' });
       db.prepare("UPDATE sites SET gsc_site_url = ? WHERE lower(replace(domain,'www.','')) = ?").run(siteUrl, m.domain);
       console.log('[gsc-managed] verified + registered:', siteUrl);
-    } catch (e) { console.log('[gsc-managed]', m.domain, 'not yet:', String(e.message || e).slice(0, 90)); }
+    } catch (e) { console.log('[gsc-managed]', m.domain, 'register failed:', String(e.message || e).slice(0, 90)); }
   }
 }
 
