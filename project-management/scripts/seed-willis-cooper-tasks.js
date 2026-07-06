@@ -24,9 +24,10 @@ const TASKS = [
     notes: 'Inheritance tax content going onto socials — Thursday 9 July.',
   },
   {
-    title: 'World Cup social updates — quarter-finals onwards', deadline: '2026-07-09',
+    title: 'World Cup sweepstake updates — who’s still in', deadline: '2026-07-09',
+    aliases: ['World Cup social updates — quarter-finals onwards'],
     status: 'scheduled', band: 'this-week', type: 'ad-hoc',
-    notes: 'Cover the World Cup from the quarter-finals through the final. CONFIRM: "who is on" — who’s still in / staff picks / who posts?',
+    notes: 'Post who is still in the sweepstake — from the round of 16 through to the final, updating as teams go out.',
   },
   {
     title: 'MTD post (generic) — first quarter ends', deadline: '2026-08-02',
@@ -61,19 +62,14 @@ const TASKS = [
   {
     title: 'Publish blogs onto website + videos',
     status: 'inbox', band: '', type: 'ad-hoc',
-    notes: 'Get the blogs onto the website along with the videos. CONFIRM: one-off backlog or a recurring rhythm?',
+    notes: 'One-off backlog clear: get the existing blogs onto the website along with the videos.',
   },
   {
     title: 'Lucie back from trip — welcome-back post',
-    status: 'inbox', band: '', type: 'ad-hoc',
-    notes: 'Welcome-back content when Lucie returns. CONFIRM: return date TBC.',
+    status: 'scheduled', band: 'this-week', type: 'ad-hoc',
+    notes: 'Lucie is back — get the details (and any photos) from her about the trip, then draft the welcome-back post.',
   },
-  {
-    title: 'Fortnightly Tuesday 14:00 slot', planned: '2026-07-07',
-    status: 'scheduled', band: 'scheduled', type: 'recurring',
-    recurring: { interval: 2, unit: 'weeks' },
-    notes: '14:00 every other Tuesday. CONFIRM: which Tuesday anchors it (7th or 14th?) and what the slot is (catch-up call / content drop?).',
-  },
+  // Fortnightly Tuesday 14:00 removed — it's a catch-up call already in Norton's diary, not a task.
 ];
 
 const norm = s => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -90,7 +86,8 @@ let created = 0; const skipped = [];
 const run = () => {
   const projectId = ensureProject(client.id);
   for (const t of TASKS) {
-    if (existing.some(e => e === norm(t.title))) { skipped.push(t.title); continue; }
+    const names = [t.title, ...(t.aliases || [])].map(norm);
+    if (existing.some(e => names.includes(e))) { skipped.push(t.title); continue; }
     if (!DRY) {
       db.prepare(
         `INSERT INTO tasks (project_id, client_id, title, deadline, planned_date, progress, priority,
