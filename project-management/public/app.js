@@ -2,6 +2,7 @@
 let clients = [];
 let teamMembers = [];
 let appUsers = [];
+let assigneePool = []; // display names assignable to tasks (users + team_members)
 let currentUser = null;
 let currentFilter = 'all';
 let currentView = 'dashboard';
@@ -85,6 +86,14 @@ async function loadTeam() {
   try { appUsers = await api('/api/users'); } catch(e) { appUsers = []; }
   if (!Array.isArray(appUsers)) appUsers = [];
   teamMembers = appUsers.map(u => ({ id: u.id, name: u.display_name, role: u.role, avatar_color: u.avatar_color, avatar_url: u.avatar_url }));
+  // Everyone a task can be assigned to: login users + the team_members table
+  // (people without logins — The Bear already merges these, the UI must too).
+  let extra = [];
+  try { extra = await api('/api/team'); } catch(e) { extra = []; }
+  const seen = new Set(appUsers.map(u => u.display_name));
+  assigneePool = appUsers.map(u => u.display_name)
+    .concat((Array.isArray(extra) ? extra : []).map(m => m.name).filter(n => n && !seen.has(n)))
+    .sort((a, b) => a.localeCompare(b));
   updateUserSelector();
   updatePersonDropdowns();
   updatePersonFilter();
@@ -1056,8 +1065,6 @@ let nbFont = localStorage.getItem('nbm_nb_font') || 'Caveat';
 let nbSize = parseFloat(localStorage.getItem('nbm_nb_size')) || 1;
 let nbHideDone = localStorage.getItem('nbm_nb_hidedone') === '1';
 let nbHl = localStorage.getItem('nbm_nb_hl') || 'yellow';
-let nbPage = 0;                 // current page index for long lists
-const NB_PAGE_SIZE = 22;        // lines per notebook page
 
 // Available "pens" — self-hosted handwriting fonts, each with its own size
 // tuning so the ink sits on the ruled lines regardless of the font's metrics.
@@ -1071,12 +1078,11 @@ const NB_PENS = {
   'Indie Flower':       { label: 'Indie Flower (bubbly)',size: 21, small: 16 },
 };
 
-function nbSetTab(t) { nbTab = t; nbPage = 0; setPref('nbm_nb_tab', t); loadNotebookView(); }
-function nbSetClient(v) { nbClient = v; nbPage = 0; setPref('nbm_nb_client', v); loadNotebookView(); }
+function nbSetTab(t) { nbTab = t; setPref('nbm_nb_tab', t); loadNotebookView(); }
+function nbSetClient(v) { nbClient = v; setPref('nbm_nb_client', v); loadNotebookView(); }
 const NB_ORDERS = ['manual', 'written', 'due', 'client', 'status', 'alpha', 'band', 'quick'];
 function nbSetOrder(v) {
   nbOrder = NB_ORDERS.includes(v) ? v : 'written';
-  nbPage = 0;
   setPref('nbm_nb_order', nbOrder);
   loadNotebookView();
 }
@@ -1132,7 +1138,7 @@ document.addEventListener('keydown', (e) => {
 
 // Snapshot the fields the marker palette can touch, for undo.
 function nbStateSnapshot(t) {
-  return { task_status: t.task_status, task_band: t.task_band, task_type: t.task_type };
+  return { task_status: t.task_status, task_band: t.task_band, task_type: t.task_type, assignee: t.assignee || '', planned_date: t.planned_date || '' };
 }
 
 // "Clear all highlighter": rub out every state-driven colour on the book
@@ -1182,16 +1188,19 @@ async function nbPushDeadlines() {
 }
 
 // ─── Meaningful highlight colours ────────────────────────
-// The marker colour is a visual language over real task state. Priority when
-// several apply: urgent/overdue (pink) beats everything, then due today.
+// The marker colour is a visual language over real task state. Painted states
+// (urgent, waiting, band=today) come first so a colour you choose always
+// shows; derived colours (delegated, overdue, dated today) fill in beneath.
 function nbHighlightFor(t) {
   if (!isOpenTask(t)) return null;
   const today = localDateStr(new Date());
-  if (t.task_type === 'urgent' || (t.deadline && t.deadline < today)) return 'pink';
-  if (t.task_band === 'today' || (t.planned_date || t.deadline) === today) return 'green';
+  if (t.task_type === 'urgent') return 'pink';
   if (t.task_status === 'waiting-on-client') return 'blue';
   if (t.task_status === 'waiting-on-me') return 'orange';
+  if (t.task_band === 'today') return 'green';
   if (t.assignee && currentUser && t.assignee !== currentUser.display_name) return 'yellow';
+  if (t.deadline && t.deadline < today) return 'pink';
+  if ((t.planned_date || t.deadline) === today) return 'green';
   return null;
 }
 
@@ -1239,31 +1248,53 @@ async function nbPaint(colour) {
     // Delegating needs a name — swap the palette for a person list.
     const m = nbPaletteEl();
     const me = currentUser?.display_name;
+    const candidates = assigneePool.filter(n => n !== me);
+    if (!candidates.length) {
+      m.innerHTML = `<div class="nb-menu-title">Delegate to&hellip;</div>
+        <div class="nb-leg-hint" style="padding:6px 10px">No one to hand this to yet &mdash; add a user or team member first.</div>
+        <div class="nb-menu-sep"></div><button class="nb-menu-item" onclick="nbClosePalette()">Close</button>`;
+      return;
+    }
     m.innerHTML = `<div class="nb-menu-title">Delegate to&hellip;</div>` +
-      appUsers.filter(u => u.display_name !== me).map(u =>
-        `<button class="nb-menu-item" onclick="nbDelegate('${esc(u.display_name)}')">${esc(u.display_name)}</button>`).join('') +
+      candidates.map(n => `<button class="nb-menu-item" data-name="${esc(n)}">${esc(n)}</button>`).join('') +
       `<div class="nb-menu-sep"></div><button class="nb-menu-item" onclick="nbClosePalette()">Cancel</button>`;
+    m.querySelectorAll('[data-name]').forEach(b => b.addEventListener('click', () => nbDelegate(b.dataset.name)));
     return;
   }
   const id = nbPaletteTaskId;
   const prev = { id, ...nbStateSnapshot(t) };
   nbClosePalette();
+  const today = localDateStr(new Date());
+  const isWaiting = t.task_status === 'waiting-on-client' || t.task_status === 'waiting-on-me';
+  const isDelegated = t.assignee && currentUser && t.assignee !== currentUser.display_name;
   const body = {};
+  // Each colour also clears any state that outranks it, so the colour you
+  // pick is the colour you see.
   if (colour === 'pink') body.task_type = 'urgent';
-  else if (colour === 'green') body.task_band = 'today';
-  else if (colour === 'blue') body.task_status = 'waiting-on-client';
-  else if (colour === 'orange') body.task_status = 'waiting-on-me';
-  else {
-    // Eraser: strip whatever is giving this line its colour.
+  else if (colour === 'blue') {
+    body.task_status = 'waiting-on-client';
+    if (t.task_type === 'urgent') body.task_type = 'ad-hoc';
+  } else if (colour === 'orange') {
+    body.task_status = 'waiting-on-me';
+    if (t.task_type === 'urgent') body.task_type = 'ad-hoc';
+  } else if (colour === 'green') {
+    body.task_band = 'today';
+    if (t.task_type === 'urgent') body.task_type = 'ad-hoc';
+    if (isWaiting) body.task_status = 'scheduled';
+  } else {
+    // Eraser: strip whatever is giving this line its colour. Real deadlines
+    // stay put — an overdue line stays pink until it's rescheduled or done.
     if (t.task_type === 'urgent') body.task_type = 'ad-hoc';
     if (t.task_band === 'today') body.task_band = 'scheduled';
-    if (t.task_status === 'waiting-on-client' || t.task_status === 'waiting-on-me') body.task_status = 'scheduled';
+    if (isWaiting) body.task_status = 'scheduled';
+    if (isDelegated) body.assignee = currentUser.display_name;
+    if (t.planned_date === today && (!t.deadline || t.deadline !== today)) body.planned_date = '';
     if (!Object.keys(body).length) return;
   }
   try {
     await api(`/api/tasks/${id}`, { method: 'PUT', body });
     nbPushUndo(colour ? 'highlight' : 'rub out', async () => {
-      await api(`/api/tasks/${prev.id}`, { method: 'PUT', body: { task_status: prev.task_status, task_band: prev.task_band, task_type: prev.task_type } });
+      await api(`/api/tasks/${prev.id}`, { method: 'PUT', body: { task_status: prev.task_status, task_band: prev.task_band, task_type: prev.task_type, assignee: prev.assignee, planned_date: prev.planned_date } });
     });
     await loadClients();
   } catch {}
@@ -1273,16 +1304,28 @@ async function nbDelegate(name) {
   nbClosePalette();
   if (id === null) return;
   const t = findTaskById(id);
-  const prevAssignee = t ? t.assignee : null;
+  if (!t) return;
+  const prev = { id, ...nbStateSnapshot(t) };
+  // Yellow must show once painted, so delegating also clears the painted
+  // flags that outrank it (the dates/facts on the task are untouched).
+  const body = { assignee: name };
+  if (t.task_type === 'urgent') body.task_type = 'ad-hoc';
+  if (t.task_status === 'waiting-on-client' || t.task_status === 'waiting-on-me') body.task_status = 'scheduled';
+  if (t.task_band === 'today') body.task_band = 'scheduled';
   try {
-    await api(`/api/tasks/${id}`, { method: 'PUT', body: { assignee: name } });
+    await api(`/api/tasks/${id}`, { method: 'PUT', body });
     nbPushUndo(`delegate to ${name}`, async () => {
-      await api(`/api/tasks/${id}`, { method: 'PUT', body: { assignee: prevAssignee || '' } });
+      await api(`/api/tasks/${id}`, { method: 'PUT', body: { assignee: prev.assignee || '', task_status: prev.task_status, task_band: prev.task_band, task_type: prev.task_type } });
     });
     await loadClients();
   } catch {}
 }
-document.addEventListener('click', (e) => { if (!e.target.closest('#nbPalette') && !e.target.closest('.nb-marker')) nbClosePalette(); });
+document.addEventListener('click', (e) => {
+  // A click on "Delegate to…" re-renders the palette, detaching the clicked
+  // button before this bubbles here — a detached target isn't an outside click.
+  if (!e.target.isConnected) return;
+  if (!e.target.closest('#nbPalette') && !e.target.closest('.nb-marker')) nbClosePalette();
+});
 
 // ─── Drag & drop reordering ──────────────────────────────
 // Dropping snapshots the order you were LOOKING at (whatever sort), applies
@@ -1365,8 +1408,6 @@ document.addEventListener('click', (e) => {
     document.getElementById('nbOptions')?.classList.remove('open');
   }
 });
-function nbFlip(dir) { nbPage += dir; loadNotebookView(); }
-
 const NB_PAGE_TITLES = {
   all: 'Everything on my plate',
   today: "Today's page",
@@ -1462,30 +1503,13 @@ function loadNotebookView() {
   }
 
   if (!items.length) {
-    document.getElementById('nbPageNav').style.display = 'none';
     document.getElementById('nbFooter').textContent = '';
     el.innerHTML = `<div class="nb-empty">${nbTab === 'done' ? 'Nothing ticked off yet — go tick something.' : 'A blank page. Write something below…'}</div>`;
     return;
   }
 
-  // Pagination — a long list becomes real notebook pages you flip through.
-  const totalPages = Math.max(1, Math.ceil(items.length / NB_PAGE_SIZE));
-  if (nbPage > totalPages - 1) nbPage = totalPages - 1;
-  if (nbPage < 0) nbPage = 0;
-  const nav = document.getElementById('nbPageNav');
-  if (totalPages > 1) {
-    nav.style.display = '';
-    document.getElementById('nbPageNum').textContent = `page ${nbPage + 1} of ${totalPages}`;
-    document.getElementById('nbPrevPage').disabled = nbPage === 0;
-    document.getElementById('nbNextPage').disabled = nbPage === totalPages - 1;
-    // On earlier pages the "write" line would be misleading — only show it on the last page.
-    document.getElementById('nbNewRow').style.display = (nbTab === 'done' || nbPage !== totalPages - 1) ? 'none' : '';
-  } else {
-    nav.style.display = 'none';
-  }
-  const pageItems = items.slice(nbPage * NB_PAGE_SIZE, (nbPage + 1) * NB_PAGE_SIZE);
-
-  el.innerHTML = pageItems.map(t => {
+  // One long page — every task on a single scroll, write line at the bottom.
+  el.innerHTML = items.map(t => {
     const done = t.task_status === 'done';
     const hlc = done ? null : nbHighlightFor(t);
     const overdue = !done && t.deadline && t.deadline < today;
@@ -2516,8 +2540,13 @@ function newTaskFromClient(clientId) {
 }
 
 function populateAssigneeDropdown(cur, secondaryCur){
-  document.getElementById('taskAssignee').innerHTML='<option value="">Unassigned</option>'+appUsers.map(u=>`<option value="${esc(u.display_name)}" ${u.display_name===cur?'selected':''}>${esc(u.display_name)}</option>`).join('');
-  document.getElementById('taskSecondaryAssignee').innerHTML='<option value="">None</option>'+appUsers.map(u=>`<option value="${esc(u.display_name)}" ${u.display_name===(secondaryCur||'')?'selected':''}>${esc(u.display_name)}</option>`).join('');
+  // Pool + the current value even if it's no longer in the pool, so opening
+  // a task never silently shows (and later saves) "Unassigned".
+  const opts = (blank, val) => `<option value="">${blank}</option>`
+    + (val && !assigneePool.includes(val) ? `<option value="${esc(val)}" selected>${esc(val)}</option>` : '')
+    + assigneePool.map(n=>`<option value="${esc(n)}" ${n===val?'selected':''}>${esc(n)}</option>`).join('');
+  document.getElementById('taskAssignee').innerHTML = opts('Unassigned', cur);
+  document.getElementById('taskSecondaryAssignee').innerHTML = opts('None', secondaryCur || '');
 }
 
 // Recurring toggle
@@ -3284,7 +3313,8 @@ function showInlineEdit(taskId) {
     <input type="date" value="${esc(t.planned_date || '')}" onchange="inlineDateChange(${taskId},this.value)" style="width:130px" title="Planned date">
     <select onchange="inlineAssigneeChange(${taskId},this.value)" style="width:110px">
       <option value="">Unassigned</option>
-      ${appUsers.map(u => `<option value="${esc(u.display_name)}" ${u.display_name === t.assignee ? 'selected' : ''}>${esc(u.display_name)}</option>`).join('')}
+      ${t.assignee && !assigneePool.includes(t.assignee) ? `<option value="${esc(t.assignee)}" selected>${esc(t.assignee)}</option>` : ''}
+      ${assigneePool.map(n => `<option value="${esc(n)}" ${n === t.assignee ? 'selected' : ''}>${esc(n)}</option>`).join('')}
     </select>
     <button class="btn btn-ghost btn-sm" onclick="quickStatusChange(${taskId},'stuck')" title="Mark blocked" style="color:var(--danger)">&#9888;</button>
     <button class="btn btn-ghost btn-sm" onclick="this.closest('.inline-edit-row').remove()">&#10005;</button>
