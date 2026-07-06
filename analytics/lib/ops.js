@@ -14,8 +14,9 @@
 //
 // Guarded by a settings flag; unverified domains are retried on later boots.
 import cron from 'node-cron';
-import db, { getSetting, setSetting } from '../database.js';
+import db, { getSetting, setSetting, newDashboardToken } from '../database.js';
 import { config } from '../config.js';
+import { nextRunAt } from './dates.js';
 import { googleClient } from './google.js';
 import { getGscReaderEmail, getHostingerToken, getEmailBcc, getSmtp, getEmailFrom, getAppUrl } from './runtime-config.js';
 import { mailer } from './email.js';
@@ -111,6 +112,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // anything else except confirm it is working", 2 Jul 2026). Only ever
 // fills BLANK contact fields — manual edits in the app always win.
 const CLIENT_EMAILS = {
+  'williscooper.com': 'emma@williscooper.com',
+  'active-personnel.co.uk': 'Ashley@active-personnel.co.uk',
   'iwpg.co.uk': 'nicholaswestray@iwpg.co.uk',
   'caringplacesltd.co.uk': 'contact@caringplacesltd.co.uk',
   'evccitysprint.co.uk': 'ksims@theelectricvan.co',
@@ -161,6 +164,8 @@ const CLARITY_PROJECTS = {
 // owner-confirmed map fills every blank deterministically. Manual edits
 // in the app always win (only BLANK fields are filled).
 const GA_MEASUREMENT = {
+  'williscooper.com': 'G-3P870GR1ZQ',
+  'active-personnel.co.uk': 'G-27R2729ZBK',
   'iwpg.co.uk': 'G-QHLC82Q1KW',
   'northbearmedia.co.uk': 'G-9NX0CJ85CL',
   'caringplacesltd.co.uk': 'G-57BCDN5VTS',
@@ -186,6 +191,8 @@ const GA_MEASUREMENT = {
 // queries by property ID; sites loaded with only a measurement ID showed
 // "analytics not connected" on their dashboards because this was blank.
 const GA_PROPERTY = {
+  'williscooper.com': '544325864',
+  'active-personnel.co.uk': '544332915',
   'iwpg.co.uk': '526989557',
   'northbearmedia.co.uk': '526994009',
   'caringplacesltd.co.uk': '533120439',
@@ -205,6 +212,26 @@ const GA_PROPERTY = {
   'woodlandwalkdaycare.co.uk': '541334500',
   'melanieparker.co.uk': '541335650',
 };
+
+// Sites the owner manages but whose DOMAINS he doesn't control (so no
+// Hostinger DNS / no sc-domain). Rows are created here if missing; GA ids
+// and contacts fill from the maps above; Search Console verifies via the
+// GA tag (see verifyManagedSitesGsc) as a URL-prefix property.
+const MANAGED_SITES = [
+  { name: 'Willis Cooper', domain: 'williscooper.com' },
+  { name: 'Active Personnel', domain: 'active-personnel.co.uk' },
+];
+
+function ensureManagedSites() {
+  for (const m of MANAGED_SITES) {
+    const existing = db.prepare("SELECT id FROM sites WHERE lower(replace(domain,'www.','')) = ?").get(m.domain);
+    if (existing) continue;
+    db.prepare(`INSERT INTO sites (client_name, domain, report_frequency, notes, dashboard_token, next_report_at)
+                VALUES (?, ?, 'monthly', ?, ?, ?)`)
+      .run(m.name, m.domain, 'Managed site (domain not ours) — added by ops', newDashboardToken(), nextRunAt('monthly'));
+    console.log('[ops] managed site created:', m.domain);
+  }
+}
 
 // Runs on every boot: cheap, offline, idempotent.
 export function loadClientContacts() {
@@ -730,6 +757,37 @@ async function finalizeSearchConsole() {
   }
 }
 
+// Search Console for managed sites without DNS control: once their GA
+// tag is live, Google can verify ownership THROUGH the tag (ANALYTICS
+// method) for a URL-prefix property — no DNS records needed. Retries
+// hourly until each verifies, then registers the property and points
+// gsc_site_url at it. Silent; state visible in the Connections panel.
+async function verifyManagedSitesGsc() {
+  const pending = MANAGED_SITES.filter(m => {
+    const row = db.prepare("SELECT gsc_site_url FROM sites WHERE lower(replace(domain,'www.','')) = ?").get(m.domain);
+    return row && !row.gsc_site_url;
+  });
+  if (!pending.length) return;
+  let client;
+  try {
+    client = googleClient({ scopes: ['https://www.googleapis.com/auth/siteverification', 'https://www.googleapis.com/auth/webmasters'], subject: getGscReaderEmail() || 'norton@northbearmedia.co.uk' });
+    await client.getAccessToken();
+  } catch (e) { console.log('[gsc-managed] scopes unavailable:', e.message.slice(0, 60)); return; }
+  for (const m of pending) {
+    const siteUrl = 'https://' + m.domain + '/';
+    try {
+      await client.request({
+        url: 'https://www.googleapis.com/siteVerification/v1/webResource?verificationMethod=ANALYTICS',
+        method: 'POST',
+        data: { site: { type: 'SITE', identifier: siteUrl } },
+      });
+      await client.request({ url: 'https://www.googleapis.com/webmasters/v3/sites/' + encodeURIComponent(siteUrl), method: 'PUT' });
+      db.prepare("UPDATE sites SET gsc_site_url = ? WHERE lower(replace(domain,'www.','')) = ?").run(siteUrl, m.domain);
+      console.log('[gsc-managed] verified + registered:', siteUrl);
+    } catch (e) { console.log('[gsc-managed]', m.domain, 'not yet:', String(e.message || e).slice(0, 90)); }
+  }
+}
+
 // Survey command: lists every index.html under the domains tree (depth:
 // domains/<domain>/public_html/index.html). Single program invocation,
 // no shell metacharacters (Hostinger execs cron commands without a shell)
@@ -814,6 +872,7 @@ export function scheduleOpsSweep() {
     }
   }
   // Contacts load on every boot (cheap, offline, idempotent).
+  try { ensureManagedSites(); } catch (e) { console.error('[ops] managed sites:', e.message); }
   try { loadClientContacts(); } catch (e) { console.error('[ops]', e.message); }
   // GA auto-install proof on the demo site (never a client site), then a
   // recurring background pass that confirms pending injections + cleans up.
@@ -906,8 +965,9 @@ export function scheduleOpsSweep() {
   // Search Console finalizer: cheap no-op until the webmasters scope is
   // granted, then completes GSC for every site in one pass.
   setTimeout(() => finalizeSearchConsole().catch(e => console.error('[gsc]', e.message)), 150_000);
+  setTimeout(() => verifyManagedSitesGsc().catch(e => console.error('[gsc-managed]', e.message)), 165_000);
   try {
-    cron.schedule('7 * * * *', () => finalizeSearchConsole().catch(e => console.error('[gsc]', e.message)), { timezone: config.timezone });
+    cron.schedule('7 * * * *', () => { finalizeSearchConsole().catch(e => console.error('[gsc]', e.message)); verifyManagedSitesGsc().catch(e => console.error('[gsc-managed]', e.message)); }, { timezone: config.timezone });
   } catch (e) { console.error('[gsc] schedule failed:', e.message); }
   try {
     cron.schedule('*/10 * * * *', () => verifyPendingInjections().catch(e => console.error('[inject]', e.message)), { timezone: config.timezone });
