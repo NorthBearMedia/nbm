@@ -48,6 +48,37 @@ const TOOLS = [
     }
   },
   {
+    name: 'create_tasks',
+    description: 'Create MANY tasks in one call. Always use this instead of repeated create_task calls when the user gives a list — a pasted email, bullet points, meeting notes, or several tasks in one message. Each item takes the same fields as create_task. Duplicates of existing open tasks (same client, same title) are skipped and reported back.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        tasks: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              client_id: { type: 'integer', description: 'Client ID — use list_clients to find it' },
+              title: { type: 'string' },
+              assignee: { type: 'string' },
+              secondary_assignee: { type: 'string' },
+              deadline: { type: 'string', description: 'YYYY-MM-DD' },
+              planned_date: { type: 'string', description: 'YYYY-MM-DD' },
+              estimated_hours: { type: 'number' },
+              status: { type: 'string', enum: ['inbox', 'scheduled', 'in-progress', 'waiting-on-client', 'waiting-on-me', 'done', 'cancelled'] },
+              band: { type: 'string', enum: ['today', 'this-week', 'scheduled', 'waiting', 'someday'] },
+              task_type: { type: 'string', enum: ['recurring', 'ad-hoc', 'urgent', 'sales', 'admin', 'waiting', 'idea'] },
+              notes: { type: 'string' },
+              references_text: { type: 'string' }
+            },
+            required: ['client_id', 'title']
+          }
+        }
+      },
+      required: ['tasks']
+    }
+  },
+  {
     name: 'update_task',
     description: 'Update fields on an existing task. Only pass fields you want to change. Setting status to "done" completes it (and spawns the next occurrence if recurring).',
     input_schema: {
@@ -97,7 +128,38 @@ const TOOLS = [
   }
 ];
 
-function executeTool(name, input, user) {
+const normTitle = s => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+// Shared by create_task and create_tasks. Throws on bad client / permission.
+function createOneTask(input, user, isOwner) {
+  const cl = db.prepare('SELECT is_private FROM clients WHERE id = ?').get(input.client_id);
+  if (!cl) throw new Error(`Client ${input.client_id} not found`);
+  if (cl.is_private && !isOwner) throw new Error('Access denied');
+  let proj = db.prepare('SELECT id FROM projects WHERE client_id = ? ORDER BY id LIMIT 1').get(input.client_id);
+  if (!proj) {
+    const pr = db.prepare('INSERT INTO projects (client_id, name, status) VALUES (?, ?, ?)').run(input.client_id, 'General', 'active');
+    proj = { id: pr.lastInsertRowid };
+  }
+  const status = isValidStatus(input.status) ? input.status : 'inbox';
+  const band = isValidBand(input.band) ? input.band : '';
+  const ttype = isValidType(input.task_type) ? input.task_type : 'ad-hoc';
+  const progress = statusToProgress(status);
+  const priorityShadow = band ? bandToPriority(band) : 'medium';
+  const r = db.prepare(
+    'INSERT INTO tasks (project_id, client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, progress, priority, task_status, task_band, task_type, references_text, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(
+    proj.id, input.client_id, input.title,
+    input.assignee || '', input.secondary_assignee || '',
+    input.deadline || '', input.planned_date || '',
+    input.estimated_hours || 0, progress, priorityShadow,
+    status, band, ttype,
+    input.references_text || '', input.notes || ''
+  );
+  logActivity('task', r.lastInsertRowid, 'created', user.display_name, `Created task "${input.title}" (via AI assistant)`);
+  return { task_id: r.lastInsertRowid, ref: 'NB' + String(r.lastInsertRowid).padStart(3, '0'), title: input.title };
+}
+
+export function executeTool(name, input, user) {
   const isOwner = user.role === 'owner';
   const canWrite = user.role === 'owner' || user.role === 'editor';
   const priv = isOwner ? '' : 'AND c.is_private = 0';
@@ -120,31 +182,30 @@ function executeTool(name, input, user) {
 
       case 'create_task': {
         if (!canWrite) return { error: 'No write permission' };
-        const cl = db.prepare('SELECT is_private FROM clients WHERE id = ?').get(input.client_id);
-        if (!cl) return { error: 'Client not found' };
-        if (cl.is_private && !isOwner) return { error: 'Access denied' };
-        let proj = db.prepare('SELECT id FROM projects WHERE client_id = ? ORDER BY id LIMIT 1').get(input.client_id);
-        if (!proj) {
-          const pr = db.prepare('INSERT INTO projects (client_id, name, status) VALUES (?, ?, ?)').run(input.client_id, 'General', 'active');
-          proj = { id: pr.lastInsertRowid };
-        }
-        const status = isValidStatus(input.status) ? input.status : 'inbox';
-        const band = isValidBand(input.band) ? input.band : '';
-        const ttype = isValidType(input.task_type) ? input.task_type : 'ad-hoc';
-        const progress = statusToProgress(status);
-        const priorityShadow = band ? bandToPriority(band) : 'medium';
-        const r = db.prepare(
-          'INSERT INTO tasks (project_id, client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, progress, priority, task_status, task_band, task_type, references_text, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-        ).run(
-          proj.id, input.client_id, input.title,
-          input.assignee || '', input.secondary_assignee || '',
-          input.deadline || '', input.planned_date || '',
-          input.estimated_hours || 0, progress, priorityShadow,
-          status, band, ttype,
-          input.references_text || '', input.notes || ''
-        );
-        logActivity('task', r.lastInsertRowid, 'created', user.display_name, `Created task "${input.title}" (via AI assistant)`);
-        return { success: true, task_id: r.lastInsertRowid, ref: 'NB' + String(r.lastInsertRowid).padStart(3, '0'), title: input.title };
+        const created = createOneTask(input, user, isOwner);
+        return { success: true, ...created };
+      }
+
+      case 'create_tasks': {
+        if (!canWrite) return { error: 'No write permission' };
+        if (!Array.isArray(input.tasks) || !input.tasks.length) return { error: 'tasks array required' };
+        if (input.tasks.length > 100) return { error: 'Too many tasks in one call (max 100)' };
+        const created = [], skipped_duplicates = [], errors = [];
+        db.transaction(() => {
+          for (const t of input.tasks) {
+            try {
+              if (!t.title || !t.client_id) { errors.push({ title: t.title || '(untitled)', error: 'client_id and title required' }); continue; }
+              const dupe = db.prepare(
+                "SELECT id, title FROM tasks WHERE client_id = ? AND archived = 0 AND task_status NOT IN ('done','cancelled')"
+              ).all(t.client_id).find(row => normTitle(row.title) === normTitle(t.title));
+              if (dupe) { skipped_duplicates.push({ title: t.title, existing_ref: 'NB' + String(dupe.id).padStart(3, '0') }); continue; }
+              created.push(createOneTask(t, user, isOwner));
+            } catch (err) {
+              errors.push({ title: t.title || '(untitled)', error: err.message });
+            }
+          }
+        })();
+        return { success: true, created_count: created.length, created, skipped_duplicates, errors };
       }
 
       case 'update_task': {
@@ -275,6 +336,15 @@ Guidelines:
 - Task band = when it needs doing: today, this-week, scheduled, waiting, someday. Use this instead of urgency words.
 - Task type categorises work: recurring, ad-hoc, urgent, sales, admin, waiting, idea.
 - When the user dumps a quick task without detail, just capture it to the inbox (status inbox) — don't over-question.
+
+Pasted task lists (emails, bullet points, meeting notes — typed or pasted text):
+- When the user pastes a list, parse EVERY line/item into a task and create them all in ONE create_tasks call. Never loop create_task per line, and never ask line-by-line questions.
+- Create directly — do NOT ask for confirmation first. The user pastes lists precisely so they get banged straight in. (The confirm-first rule below applies only to voice notes and images.)
+- Work out the client ONCE from context — the email sender, a heading, or the user saying "for X" — via list_clients, matching loosely on name. Apply it to the whole list unless a line clearly names a different client. If you genuinely can't tell which client, ask that one question first, then create everything.
+- Titles: short and action-led. Everything else from the line (context, sender asks, caveats) goes into notes — don't lose detail, don't bloat titles.
+- Dates: convert anything like "Thursday 9th", "end of month", "next week" to YYYY-MM-DD against today's date. Items with a date → status "scheduled" (+ band "today"/"this-week" if it falls there); undated items → status "inbox".
+- Make sensible assumptions rather than asking; record any assumption in that task's notes so the user can correct it later.
+- Afterwards, reply with a tight summary: one line per task (NB ref — title — date), plus any skipped duplicates or failures.
 
 Voice / Image input:
 - When the user sends a voice transcription or an image, interpret the content and present your understanding as a clear summary BEFORE creating any tasks.
