@@ -1,0 +1,55 @@
+name: Deploy Willis Cooper (staging)
+
+# Manual-only. Builds the staging-safe copy of sites/williscooper
+# (noindex + live analytics stripped) and uploads it over FTPS to the
+# new.williscooper.com subdomain document root on Hostinger.
+#
+# It ONLY writes inside the folder named by HOSTINGER_STAGING_DIR, so it
+# cannot touch the live williscooper.com site — provided that secret points
+# at the STAGING subdomain's docroot and nothing else. Double-check it.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   HOSTINGER_FTP_SERVER    e.g. ftp.williscooper.com  (or the host shown in hPanel → Files → FTP Accounts)
+#   HOSTINGER_FTP_USERNAME  the FTP account username from hPanel
+#   HOSTINGER_FTP_PASSWORD  that FTP account's password
+#   HOSTINGER_STAGING_DIR   absolute-ish server path to the subdomain docroot,
+#                           e.g. /domains/williscooper.com/public_html/new/  (MUST end with /)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy" to confirm you are targeting the STAGING subdomain, not the live site'
+        required: true
+        default: ''
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard — require explicit confirmation
+        if: ${{ github.event.inputs.confirm != 'deploy' }}
+        run: |
+          echo "::error::You must type 'deploy' in the confirm box to run this."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build staging-safe site
+        run: node sites/williscooper/make-staging.mjs sites/williscooper-staging-build
+
+      - name: Deploy over FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.HOSTINGER_FTP_SERVER }}
+          username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
+          password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./sites/williscooper-staging-build/
+          server-dir: ${{ secrets.HOSTINGER_STAGING_DIR }}
+          # Keeps the target folder in sync with the build. Because server-dir
+          # is the isolated staging docroot, this never reaches the live site.
