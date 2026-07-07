@@ -130,6 +130,30 @@ The static pages are tuned for search and social sharing:
 If you redeploy under a different domain, update the absolute URLs in `sitemap.xml`, `robots.txt`,
 the `og:image` tags, and the JSON-LD `url`/`@id` fields (all currently `https://williscooper.com`).
 
+## AI SEO (answer engines / GEO)
+
+Optimised to be found and cited by AI assistants and answer engines (ChatGPT, Claude,
+Perplexity, Google AI Overviews, Bing Copilot):
+
+- **`llms.txt`** and **`llms-full.txt`** at the site root — the emerging convention for giving
+  LLMs a clean, markdown summary of the business: what the firm is, its services (with links and
+  descriptions), location, contact details, and the full FAQ answers. `llms-full.txt` carries the
+  fuller service and FAQ text for models that ingest it.
+- **`FAQPage` structured data** on `about-us.html` — the six real client FAQs (Companies House
+  filing, corporation tax, HMRC scam emails, self-assessment, etc.) marked up so engines can quote
+  the answers directly.
+- **`Service` structured data** on each of the eight service pages, each linked to the firm via the
+  shared `AccountingService` `@id` — machine-readable descriptions of what's offered and where.
+- **`AccountingService` / `LocalBusiness` entity** (from the SEO pass) gives assistants a confident,
+  grounded entity: name, address, phone, email and social profiles.
+- **AI-crawler rules in `robots.txt`** — GPTBot, OAI-SearchBot, ChatGPT-User, ClaudeBot,
+  anthropic-ai, PerplexityBot, Google-Extended, Applebot-Extended, CCBot and others are explicitly
+  **allowed** so these engines can crawl and cite the site. If the firm would rather *not* be used
+  for AI training/answers, change those groups to `Disallow: /`.
+
+All structured data is plain JSON-LD in the page `<head>`/`<body>` — validate any page at
+search.google.com/test/rich-results or schema.org's validator.
+
 ## Notes
 
 - The `<link rel="canonical">` / Open Graph / JSON-LD metadata still name
