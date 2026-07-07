@@ -4,8 +4,11 @@ A faithful, self-contained static rebuild of **williscooper.com** (Willis Cooper
 Chartered Accountants, Belper), cloned from the live Hostinger Website Builder
 site and converted into plain, hand-editable HTML.
 
-Everything renders offline with **no calls back to the Hostinger builder or any
-CDN** — all CSS, fonts and images are stored locally under `assets/`.
+All CSS, fonts and images are stored locally under `assets/`, so the site
+renders offline with **no calls back to the Hostinger builder CDN**. The two
+analytics tags (Google Analytics + Fathom) are deliberately kept exactly as on
+the live site, so they still call out to Google/Fathom when the page is served
+online — see "Analytics" below.
 
 ## Preview it
 
@@ -72,11 +75,27 @@ Text, headings and image `src`s are plain HTML — edit them directly.
   `images.unsplash.com` were downloaded into `assets/` and every reference
   rewritten to a relative local path. `srcset` variants were collapsed to a
   single local image per picture.
-- **Builder runtime & tracking removed.** The Astro/Vue hydration bundles,
-  Google Tag Manager, Google Analytics and Fathom analytics were stripped —
+- **Builder runtime removed.** The Astro/Vue hydration bundles were stripped —
   the pages are now static HTML that needs no JavaScript to display.
+- **Analytics kept exactly** (see below). Only the framework runtime was
+  removed, not the tracking tags.
 - **Internal links rewritten** from absolute builder URLs (`/about-us`, etc.)
   to local `*.html` files.
+
+## Analytics
+
+The site's analytics tags are copied verbatim onto every page, so tracking
+continues to work unchanged when you redeploy:
+
+- **Google Analytics 4** — `G-3P870GR1ZQ`. In each page `<head>`:
+  the `gtag.js` loader (`https://www.googletagmanager.com/gtag/js?id=G-3P870GR1ZQ`)
+  plus the standard inline `gtag('js', …)` / `gtag('config', 'G-3P870GR1ZQ')` snippet.
+- **Fathom Analytics** — `data-site="GATBBBHW"`. In each page `<body>`:
+  `<script src="https://cdn.usefathom.com/script.js" data-site="GATBBBHW" defer>`.
+
+These are the only scripts that intentionally call external hosts. To change the
+tracking IDs or remove analytics, edit those tags (they're plain `<script>` tags,
+identical across all pages).
 
 ## Third-party embeds that need the internet
 
