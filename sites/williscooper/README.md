@@ -110,6 +110,26 @@ appear blank in a purely offline preview:
   prefer a fully local copy, drop the PDF into `assets/docs/` and point the
   embed at it.
 
+## SEO
+
+The static pages are tuned for search and social sharing:
+
+- **`sitemap.xml`** (all 24 URLs) and **`robots.txt`** (allow-all + sitemap reference) at the site root.
+- **Meta descriptions** on every page — unique, locally-worded (Belper / Derbyshire) copy added to the
+  14 service/other pages that had none.
+- **`og:image` / `twitter:image`** converted from relative paths to absolute `https://williscooper.com/…`
+  URLs so link previews render on Facebook, LinkedIn, X, WhatsApp, etc.
+- **One `<h1>` per page.** Pages whose hero heading was a styled `<h2>`/`<h3>` now carry a
+  visually-hidden, descriptive `<h1>` (accessibility + SEO, no change to the visible design).
+- **`alt` text** on images — descriptive alt for content images (logos, team, service and blog images),
+  empty `alt=""` on decorative graphics.
+- **LocalBusiness structured data** (`AccountingService` JSON-LD) on every page with the firm's name,
+  address, phone, email and social profiles — important for local/Google Business visibility.
+- **`robots` + `geo`** meta (`index, follow`, `GB-DBY`, Belper) added to each page.
+
+If you redeploy under a different domain, update the absolute URLs in `sitemap.xml`, `robots.txt`,
+the `og:image` tags, and the JSON-LD `url`/`@id` fields (all currently `https://williscooper.com`).
+
 ## Notes
 
 - The `<link rel="canonical">` / Open Graph / JSON-LD metadata still name
