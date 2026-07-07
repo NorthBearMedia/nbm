@@ -154,6 +154,45 @@ Perplexity, Google AI Overviews, Bing Copilot):
 All structured data is plain JSON-LD in the page `<head>`/`<body>` — validate any page at
 search.google.com/test/rich-results or schema.org's validator.
 
+## Ranking on Google
+
+Every on-page lever has been pulled. **On-page is necessary but not sufficient** — the items in the
+"off-page" list below are what actually move a local firm up the rankings, and they're the owner's to do.
+
+**Done on-page:**
+- **Unique, keyword-rich, local `<title>` on every page** (the single biggest on-page factor) — e.g.
+  "Accountants in Belper, Derbyshire | Willis Cooper", "Payroll Services in Belper, Derbyshire | Willis
+  Cooper", "Xero Cloud Accounting in Belper | Willis Cooper". `og:title`/`twitter:title` match.
+- **One keyword-relevant `<h1>` per page**, unique meta descriptions, clean canonicals.
+- **`LocalBusiness` (`AccountingService`) schema** enriched with description, founding date (2000),
+  `knowsAbout`, `hasMap`, and **`areaServed`** widened to Belper, Duffield, Ripley, Heanor, Alfreton,
+  Ambergate, Milford, Derby, Amber Valley, Derbyshire and the East Midlands.
+- **`Service` schema** per service page, **`FAQPage`** on About Us, **`BreadcrumbList`** on every inner
+  page, plus the sitemap/robots from the SEO pass.
+- **Core Web Vitals:** images optimised and resized (≤1600px) — total image weight cut from ~35 MB to
+  ~15 MB, so pages load fast on mobile (a Google ranking + conversion factor).
+
+**Target queries this positions the site for:** `accountants in belper`, `chartered accountants belper`,
+`accountant belper derbyshire`, plus service+location combos (`payroll belper`, `tax accountant belper`,
+`xero accountant belper/derbyshire`, `audit / bookkeeping / R&D tax relief derbyshire`) and the
+surrounding towns above.
+
+**Off-page — required to actually rank (owner actions, cannot be done in code):**
+1. **Google Business Profile** — claim/verify the Belper listing; it drives the local "map pack" and is
+   the #1 factor for `accountant belper`. Keep the name, address and phone identical to this site.
+2. **Reviews** — collect Google reviews steadily; volume + recency strongly affect local ranking. (Once
+   you have genuine reviews, we can add `Review`/`AggregateRating` schema — don't add it without real data.)
+3. **Local citations** — consistent NAP on Yell, FreeIndex, the ICAEW "Find a Chartered Accountant"
+   directory, Bing Places, Apple Maps, local Belper/Derbyshire directories.
+4. **Backlinks** — from local business groups, the Chamber of Commerce, suppliers, clients, sponsorships.
+5. **Fresh content** — keep publishing blog posts on the questions clients ask (the existing FAQ topics
+   are a good seam); depth and freshness both help.
+6. **Deploy on HTTPS** with a fast host and submit the sitemap in Google Search Console.
+
+Realistic expectation: with a claimed Google Business Profile + reviews, ranking in the local pack for
+"accountants in Belper" is very achievable; broad terms like "accountants Derby" are more competitive and
+take backlinks and time.
+
 ## Notes
 
 - The `<link rel="canonical">` / Open Graph / JSON-LD metadata still name
