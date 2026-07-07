@@ -1,0 +1,18 @@
+/* ==========================================================================
+   North Bear — static-clone overrides
+   --------------------------------------------------------------------------
+   The original Hostinger builder reveals "animate on scroll" blocks with
+   JavaScript: elements start at opacity:0 and the script sets
+   data-animation-state="active" (and images get a .loaded class) once they
+   scroll into view. This static rebuild has no builder JS, so those blocks
+   — FAQs, the Morale Officers text, the footer, and similar sections — would
+   stay invisible. We force them to their final, revealed state so all content
+   shows without JavaScript.
+   ========================================================================== */
+.transition,
+.transition [data-animation-role],
+.transition [data-animation-role="block-element"],
+.transition [data-animation-role="image"] {
+  opacity: 1 !important;
+  transform: none !important;
+}
