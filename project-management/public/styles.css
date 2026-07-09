@@ -3341,6 +3341,7 @@ select { color-scheme:dark; }
   font-size: calc(var(--nb-small, 17px) - 3px); line-height: 1.02;
   color: rgba(28,28,28,.5); white-space: nowrap;
 }
+.nb-line { position: relative; }   /* containing block for the floated add-date affordance */
 .nb-dchip {
   position: relative; display: inline-flex; align-items: baseline; gap: 0;
   cursor: pointer; border-bottom: 1px dashed transparent;
@@ -3354,8 +3355,12 @@ select { color-scheme:dark; }
 .nb-dlabel { color: rgba(28,28,28,.38); }
 .nb-dchip-over { color: #b3372f; }
 .nb-dchip-over .nb-dlabel { color: rgba(179,55,47,.65); }
-/* add-a-date affordance: hidden until you hover the line (kept off the aesthetic) */
-.nb-dadd { opacity: 0; transition: opacity .12s; }
+/* add-a-date affordance: floated (absolute) so it reserves NO width — an
+   undated line keeps its full title. Hidden until you hover the line. */
+.nb-dadd {
+  position: absolute; right: 32px; bottom: 3px;
+  opacity: 0; transition: opacity .12s;
+}
 .nb-line:hover .nb-dadd { opacity: 1; }
 /* the +1d pill: quiet until hover, greens on press */
 .nb-push1 {
@@ -3374,5 +3379,5 @@ select { color-scheme:dark; }
   .nb-dlabel { display: none; }              /* bare dates on phones to save width */
   .nb-d-due { font-weight: 600; }            /* deadline stays distinguishable without its label */
   .nb-push1 { opacity: .7; }
-  .nb-dadd { opacity: .5; }
+  .nb-dadd { opacity: .5; right: 40px; }   /* clear the wider touch marker */
 }
