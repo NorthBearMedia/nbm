@@ -3376,7 +3376,10 @@ select { color-scheme:dark; }
 /* Touch: no hover, so keep the push + add gently visible and shrink the type */
 @media (max-width: 600px) {
   .nb-dates { font-size: 13px; gap: 7px; }
-  .nb-dlabel { display: none; }              /* bare dates on phones to save width */
+  /* Hide 'plan'/'due' words on DATED chips only — bare dates save width. The
+     '+ date' chip keeps its label (it's its only content; hiding it would make
+     the tap target collapse to nothing on a phone). */
+  .nb-dchip:not(.nb-dadd) .nb-dlabel { display: none; }
   .nb-d-due { font-weight: 600; }            /* deadline stays distinguishable without its label */
   .nb-push1 { opacity: .7; }
   .nb-dadd { opacity: .5; right: 40px; }   /* clear the wider touch marker */
