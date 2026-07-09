@@ -1176,9 +1176,9 @@ function nbDatesHtml(t) {
   const today = localDateStr(new Date());
   const chip = (field, label, val) => {
     const over = field === 'deadline' && val && val < today;
-    return `<span class="nb-dchip ${over ? 'nb-dchip-over' : ''} nb-d-${field === 'deadline' ? 'due' : 'plan'}" onclick="event.stopPropagation()">`
+    return `<span class="nb-dchip ${over ? 'nb-dchip-over' : ''} nb-d-${field === 'deadline' ? 'due' : 'plan'}">`
       + `<span class="nb-dlabel">${label}</span>&nbsp;${esc(fmtDateShort(val))}`
-      + `<input type="date" value="${esc(val)}" onchange="nbSetDate(${t.id},'${field}',this.value)" onclick="event.stopPropagation()" draggable="false" title="${label} date — tap to change">`
+      + `<input type="date" value="${esc(val)}" onchange="nbSetDate(${t.id},'${field}',this.value)" onclick="nbPickDate(this)" draggable="false" title="${label} date — click to change">`
       + `</span>`;
   };
   const parts = [];
@@ -1186,15 +1186,20 @@ function nbDatesHtml(t) {
   if (t.deadline) parts.push(chip('deadline', 'due', t.deadline));
   const hasDate = t.planned_date || t.deadline;
   if (!hasDate) {
-    parts.push(`<span class="nb-dchip nb-dadd" onclick="event.stopPropagation()">`
+    parts.push(`<span class="nb-dchip nb-dadd">`
       + `<span class="nb-dlabel">+ date</span>`
-      + `<input type="date" value="" onchange="nbSetDate(${t.id},'deadline',this.value)" onclick="event.stopPropagation()" draggable="false" title="Set a due date">`
+      + `<input type="date" value="" onchange="nbSetDate(${t.id},'deadline',this.value)" onclick="nbPickDate(this)" draggable="false" title="Set a due date">`
       + `</span>`);
   } else {
-    parts.push(`<button class="nb-push1" onclick="nbPush1(${t.id});event.stopPropagation()" draggable="false" title="Push planned + deadline forward one day">+1d</button>`);
+    parts.push(`<button class="nb-push1" onclick="nbPush1(${t.id})" draggable="false" title="Push planned + deadline forward one day">+1d</button>`);
   }
   return `<span class="nb-dates">${parts.join('')}</span>`;
 }
+
+// Open the native date picker on click. On desktop, a bare (indicator-hidden)
+// date input won't drop the calendar on a plain click; showPicker() does — and
+// letting the click bubble still closes any open palette/menu.
+function nbPickDate(el) { try { el.showPicker && el.showPicker(); } catch (e) {} }
 
 // Set one date field on a task from the notebook, with undo. Blank clears it.
 async function nbSetDate(id, field, value) {
@@ -1216,13 +1221,14 @@ async function nbSetDate(id, field, value) {
 async function nbPush1(id) {
   const t = findTaskById(id);
   if (!t || (!t.planned_date && !t.deadline)) return;
-  const prev = { planned_date: t.planned_date || '', deadline: t.deadline || '' };
-  const body = {};
-  if (t.planned_date) body.planned_date = shiftDate(t.planned_date, 1);
-  if (t.deadline) body.deadline = shiftDate(t.deadline, 1);
+  // Only touch (and only later restore) the fields that actually had a date —
+  // so undo can never blank a planned/deadline date added after the push.
+  const body = {}, prevBody = {};
+  if (t.planned_date) { body.planned_date = shiftDate(t.planned_date, 1); prevBody.planned_date = t.planned_date; }
+  if (t.deadline) { body.deadline = shiftDate(t.deadline, 1); prevBody.deadline = t.deadline; }
   try {
     await api(`/api/tasks/${id}`, { method: 'PUT', body });
-    nbPushUndo('push +1 day', async () => { await api(`/api/tasks/${id}`, { method: 'PUT', body: prev }); });
+    nbPushUndo('push +1 day', async () => { await api(`/api/tasks/${id}`, { method: 'PUT', body: prevBody }); });
     await loadClients();
   } catch (e) { alert(e.message || 'Could not push the dates.'); }
 }
@@ -2828,9 +2834,13 @@ async function doReschedule(overdueOnly) {
 }
 
 function shiftDate(dateStr, days) {
-  const d = new Date(dateStr + 'T00:00:00');
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
+  // UTC math only — parsing 'YYYY-MM-DDT00:00:00' as local then reading it back
+  // via toISOString() drops (or adds) a day in any non-UTC timezone. In BST the
+  // old version made "+1 day" a silent no-op. Calendar days are TZ-agnostic.
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().split('T')[0];
 }
 
 function clearAllFilters() {
