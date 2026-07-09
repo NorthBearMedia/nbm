@@ -3329,3 +3329,50 @@ select { color-scheme:dark; }
 .nb-line[draggable="true"] { cursor: grab; }
 .nb-line.nb-dragging { opacity: .45; }
 .nb-line.nb-drop-target { box-shadow: inset 0 3px 0 rgba(45,106,79,.65); }
+
+/* ─── NOTEBOOK v9: per-line dates + one-click push ───── */
+/* Small "margin note" dates. Each date is a native <input type=date> laid
+   transparently over tiny handwriting text, so the picker is real but the
+   page still reads as ink. All of it lives within the fixed row height. */
+.nb-dates {
+  flex-shrink: 0; display: inline-flex; align-items: flex-end; gap: 9px;
+  align-self: flex-end; padding-bottom: 2px; transform: translateY(var(--nb-drop));
+  font-family: var(--nb-font,'Caveat'),cursive;
+  font-size: calc(var(--nb-small, 17px) - 3px); line-height: 1.02;
+  color: rgba(28,28,28,.5); white-space: nowrap;
+}
+.nb-dchip {
+  position: relative; display: inline-flex; align-items: baseline; gap: 0;
+  cursor: pointer; border-bottom: 1px dashed transparent;
+}
+.nb-line:hover .nb-dchip { border-bottom-color: rgba(28,28,28,.28); }
+.nb-dchip input[type=date] {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; border: none; padding: 0; margin: 0; cursor: pointer;
+  -webkit-appearance: none; appearance: none;
+}
+.nb-dlabel { color: rgba(28,28,28,.38); }
+.nb-dchip-over { color: #b3372f; }
+.nb-dchip-over .nb-dlabel { color: rgba(179,55,47,.65); }
+/* add-a-date affordance: hidden until you hover the line (kept off the aesthetic) */
+.nb-dadd { opacity: 0; transition: opacity .12s; }
+.nb-line:hover .nb-dadd { opacity: 1; }
+/* the +1d pill: quiet until hover, greens on press */
+.nb-push1 {
+  flex-shrink: 0; align-self: flex-end; font-family: inherit; font-size: inherit;
+  color: rgba(28,28,28,.42); background: transparent;
+  border: 1px solid rgba(28,28,28,.22); border-radius: 4px;
+  padding: 0 5px; line-height: 1.5; cursor: pointer;
+  opacity: 0; transition: opacity .12s, color .12s, border-color .12s;
+}
+.nb-line:hover .nb-push1 { opacity: .8; }
+.nb-push1:hover { color: #2d6a4f; border-color: #2d6a4f; opacity: 1 !important; }
+
+/* Touch: no hover, so keep the push + add gently visible and shrink the type */
+@media (max-width: 600px) {
+  .nb-dates { font-size: 13px; gap: 7px; }
+  .nb-dlabel { display: none; }              /* bare dates on phones to save width */
+  .nb-d-due { font-weight: 600; }            /* deadline stays distinguishable without its label */
+  .nb-push1 { opacity: .7; }
+  .nb-dadd { opacity: .5; }
+}

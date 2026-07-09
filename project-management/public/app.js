@@ -1168,6 +1168,65 @@ async function nbClearAllHighlights() {
   await loadClients();
 }
 
+// ─── Per-line dates: show small, edit inline, one-click push ─────────────
+// Compact "margin note" showing a task's planned/deadline dates. Each is a
+// native date input overlaid on tiny handwriting text (so the picker is real
+// but the look stays penned). A "+1d" pill shifts both dates one day.
+function nbDatesHtml(t) {
+  const today = localDateStr(new Date());
+  const chip = (field, label, val) => {
+    const over = field === 'deadline' && val && val < today;
+    return `<span class="nb-dchip ${over ? 'nb-dchip-over' : ''} nb-d-${field === 'deadline' ? 'due' : 'plan'}" onclick="event.stopPropagation()">`
+      + `<span class="nb-dlabel">${label}</span>&nbsp;${esc(fmtDateShort(val))}`
+      + `<input type="date" value="${esc(val)}" onchange="nbSetDate(${t.id},'${field}',this.value)" onclick="event.stopPropagation()" draggable="false" title="${label} date — tap to change">`
+      + `</span>`;
+  };
+  const parts = [];
+  if (t.planned_date) parts.push(chip('planned_date', 'plan', t.planned_date));
+  if (t.deadline) parts.push(chip('deadline', 'due', t.deadline));
+  const hasDate = t.planned_date || t.deadline;
+  if (!hasDate) {
+    parts.push(`<span class="nb-dchip nb-dadd" onclick="event.stopPropagation()">`
+      + `<span class="nb-dlabel">+ date</span>`
+      + `<input type="date" value="" onchange="nbSetDate(${t.id},'deadline',this.value)" onclick="event.stopPropagation()" draggable="false" title="Set a due date">`
+      + `</span>`);
+  } else {
+    parts.push(`<button class="nb-push1" onclick="nbPush1(${t.id});event.stopPropagation()" draggable="false" title="Push planned + deadline forward one day">+1d</button>`);
+  }
+  return `<span class="nb-dates">${parts.join('')}</span>`;
+}
+
+// Set one date field on a task from the notebook, with undo. Blank clears it.
+async function nbSetDate(id, field, value) {
+  const t = findTaskById(id);
+  if (!t) return;
+  const clean = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
+  const prevVal = (field === 'deadline' ? t.deadline : t.planned_date) || '';
+  if (clean === prevVal) return;
+  try {
+    await api(`/api/tasks/${id}`, { method: 'PUT', body: { [field]: clean } });
+    nbPushUndo(clean ? (field === 'deadline' ? 'change due date' : 'change planned date') : 'clear date', async () => {
+      await api(`/api/tasks/${id}`, { method: 'PUT', body: { [field]: prevVal } });
+    });
+    await loadClients();
+  } catch (e) { alert(e.message || 'Could not set the date.'); }
+}
+
+// One-click "+1 day": shift whichever of planned/deadline exists forward a day.
+async function nbPush1(id) {
+  const t = findTaskById(id);
+  if (!t || (!t.planned_date && !t.deadline)) return;
+  const prev = { planned_date: t.planned_date || '', deadline: t.deadline || '' };
+  const body = {};
+  if (t.planned_date) body.planned_date = shiftDate(t.planned_date, 1);
+  if (t.deadline) body.deadline = shiftDate(t.deadline, 1);
+  try {
+    await api(`/api/tasks/${id}`, { method: 'PUT', body });
+    nbPushUndo('push +1 day', async () => { await api(`/api/tasks/${id}`, { method: 'PUT', body: prev }); });
+    await loadClients();
+  } catch (e) { alert(e.message || 'Could not push the dates.'); }
+}
+
 // "Push all deadlines": didn't finish Friday? Shift every open task's
 // deadline/planned date by N days in one server call. Undo shifts exactly
 // those tasks back.
@@ -1518,6 +1577,7 @@ function loadNotebookView() {
     return `<div class="nb-line ${done ? 'nb-done' : ''}" data-id="${t.id}" draggable="true">
       <button class="nb-bullet ${done ? 'nb-ticked' : ''}" onclick="nbTick(${t.id})" title="${done ? 'Untick' : 'Tick off'}">${done ? '&#10003;' : '&bull;'}</button>
       <span class="nb-text"><span class="${hlc ? 'nb-hl nb-hl-' + hlc : ''}" onclick="editTask(${t.id})" title="Open task">${esc(t.title)}</span>${client}${due}</span>
+      ${done ? '' : nbDatesHtml(t)}
       <button class="nb-marker ${hlc ? 'nb-marker-' + hlc : ''}" onclick="nbOpenPalette(${t.id}, event)" title="Colour-code this line"></button>
     </div>`;
   }).join('');
@@ -1589,6 +1649,7 @@ function nbMenuEl() {
     <button class="nb-menu-item" onclick="nbMenuDue('next-week')">Due next week</button>
     <div class="nb-menu-item nb-menu-pick">Pick a date: <input type="date" id="nbMenuDate" onchange="nbMenuDue(this.value)" onclick="event.stopPropagation()"></div>
     <button class="nb-menu-item" onclick="nbMenuDue('')">Clear due date</button>
+    <button class="nb-menu-item" onclick="nbMenuPush1()">Push both dates +1 day</button>
     <div class="nb-menu-sep"></div>
     <button class="nb-menu-item" id="nbMenuHl" onclick="nbMenuColour(event)">Colour-code&hellip;</button>
     <button class="nb-menu-item" onclick="nbMenuOpen()">Open full task</button>
@@ -1635,6 +1696,15 @@ function nbMenuColour(ev) {
   if (id !== null) nbOpenPalette(id, ev);
 }
 
+function nbMenuPush1() {
+  const id = nbMenuTaskId;
+  const t = id !== null ? findTaskById(id) : null;
+  nbCloseMenu();
+  if (!t) return;
+  if (!t.planned_date && !t.deadline) { alert('This task has no planned or deadline date to push yet — set one first.'); return; }
+  nbPush1(id);
+}
+
 function nbMenuOpen() {
   const id = nbMenuTaskId; nbCloseMenu();
   if (id !== null) editTask(id);
@@ -1662,6 +1732,7 @@ document.getElementById('notebookLines').addEventListener('contextmenu', (e) => 
 let nbPressTimer = null;
 let nbPressStart = null;
 document.getElementById('notebookLines').addEventListener('touchstart', (e) => {
+  if (e.target.closest('.nb-dates')) return; // tapping a date/push control isn't a long-press
   const line = e.target.closest('.nb-line');
   if (!line || !line.dataset.id || e.touches.length !== 1) return;
   const t = e.touches[0];
@@ -1684,6 +1755,8 @@ document.getElementById('notebookLines').addEventListener('touchmove', (e) => {
 // Desktop drag & drop (HTML5 DnD — iOS uses the long-press menu instead)
 const nbLinesEl = document.getElementById('notebookLines');
 nbLinesEl.addEventListener('dragstart', (e) => {
+  // Never start a line drag from the date controls (the date input / +1d pill).
+  if (e.target.closest('.nb-dates')) { e.preventDefault(); return; }
   const line = e.target.closest('.nb-line');
   if (!line || !line.dataset.id) return;
   nbDragId = +line.dataset.id;
