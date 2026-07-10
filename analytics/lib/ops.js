@@ -253,10 +253,14 @@ function ensureManagedSites() {
   for (const m of MANAGED_SITES) {
     const existing = db.prepare("SELECT id FROM sites WHERE lower(replace(domain,'www.','')) = ?").get(m.domain);
     if (existing) continue;
-    db.prepare(`INSERT INTO sites (client_name, domain, report_frequency, notes, dashboard_token, next_report_at)
-                VALUES (?, ?, 'monthly', ?, ?, ?)`)
+    // Held back until their Search Console verifies (owner still has to
+    // paste the META tag into the builder): reports stay owner-only even in
+    // Live mode, so the fleet can go live without these two going out half
+    // finished. verifyManagedSitesGsc() releases the hold on success.
+    db.prepare(`INSERT INTO sites (client_name, domain, report_frequency, notes, dashboard_token, next_report_at, delivery_hold)
+                VALUES (?, ?, 'monthly', ?, ?, ?, 1)`)
       .run(m.name, m.domain, 'Managed site (domain not ours) — added by ops', newDashboardToken(), nextRunAt('monthly'));
-    console.log('[ops] managed site created:', m.domain);
+    console.log('[ops] managed site created (delivery held until GSC verifies):', m.domain);
   }
 }
 
@@ -476,11 +480,13 @@ export async function runOpsSweep({ force = false } = {}) {
   // 2 ── Load any approved client emails into blank contact fields
   loadClientContacts().forEach(l => say('Contact loaded: ' + l));
 
-  // 3 ── Everyone on monthly; past-due stamps stay past-due so the very
-  //      next hourly tick sends the month's reports.
+  // 3 ── Everyone on monthly, scheduled at the next natural send date (the
+  //      3rd, lag-aware). A brand-new/managed site must NOT fire the moment
+  //      it's given an email — it waits for the next period boundary, giving
+  //      time to finish keywords/Clarity and review the data first.
   for (const site of sites) {
     if (site.report_frequency === 'none') {
-      db.prepare("UPDATE sites SET report_frequency = 'monthly', next_report_at = COALESCE(next_report_at, '2026-07-01 07:00') WHERE id = ?").run(site.id);
+      db.prepare("UPDATE sites SET report_frequency = 'monthly', next_report_at = COALESCE(NULLIF(next_report_at, ''), ?) WHERE id = ?").run(nextRunAt('monthly'), site.id);
       say(`Schedule set to monthly: ${site.client_name}`);
     }
   }
@@ -502,7 +508,10 @@ export async function runOpsSweep({ force = false } = {}) {
   }
 
   setSetting('ops_v1_done', unverified.length ? 'partial' : 'true');
-  setSetting('ops_v2_done', 'true');
+  // Only mark the sweep fully done when nothing is left unverified —
+  // otherwise leave it re-runnable so a partially-failed sweep retries on
+  // the next boot instead of being stranded forever.
+  setSetting('ops_v2_done', unverified.length ? 'partial' : 'true');
   say('Sweep complete.');
 
   // 4 ── Tell Norton exactly what happened
@@ -836,8 +845,10 @@ async function verifyManagedSitesGsc() {
     if (!done) { console.log('[gsc-managed]', m.domain, 'not verifiable yet (paste the meta tag)'); continue; }
     try {
       await client.request({ url: 'https://www.googleapis.com/webmasters/v3/sites/' + encodeURIComponent(siteUrl), method: 'PUT' });
-      db.prepare("UPDATE sites SET gsc_site_url = ? WHERE lower(replace(domain,'www.','')) = ?").run(siteUrl, m.domain);
-      console.log('[gsc-managed] verified + registered:', siteUrl);
+      // Verified at last: link the property AND release the delivery hold so
+      // this site now behaves exactly like the rest of the fleet.
+      db.prepare("UPDATE sites SET gsc_site_url = ?, delivery_hold = 0 WHERE lower(replace(domain,'www.','')) = ?").run(siteUrl, m.domain);
+      console.log('[gsc-managed] verified + registered + delivery released:', siteUrl);
     } catch (e) { console.log('[gsc-managed]', m.domain, 'register failed:', String(e.message || e).slice(0, 90)); }
   }
 }

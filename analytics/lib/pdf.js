@@ -372,7 +372,11 @@ export async function generateReportPdf(data) {
   y = slimHeader(doc, data);
   y = sectionTitle(doc, y, 'Google search performance',
     'How your website showed up in Google searches. "Average position" is where you ranked — lower is better, and position 1–10 is page one of Google.');
-  if (data.search?.summary) {
+  if (data.search?.summary && data.search.empty) {
+    // Connected, but Google hasn't shown the site for any searches this
+    // period yet — an honest, hopeful note beats a wall of zeros.
+    y = emptyNote(doc, y, 'Your site is connected to Google Search Console, but Google didn’t record any searches leading to it in this period yet. As your site builds authority this section will fill with the terms people find you with.');
+  } else if (data.search?.summary) {
     const s = data.search.summary, p = data.search.prevSummary || {};
     // Rank movement in places (previous − current: positive = moved UP),
     // not a percentage — percentages of a ranking mean nothing to owners.

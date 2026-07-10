@@ -57,6 +57,23 @@ function emailFormFields(s) {
     </div>`;
 }
 
+function alertsHtml() {
+  // Things the owner must SEE, not hunt for: a database that reset (detached
+  // volume) and any report that failed to send in the last week.
+  let html = '';
+  if (setup.freshDatabase) {
+    html += `<div class="panel" style="border-color:var(--red);margin-bottom:12px">
+      <strong style="color:var(--red)">⚠ Fresh database detected.</strong>
+      <span class="hint">This server started with an empty database. On first setup that's normal — but if you had sites configured, the Railway data volume may have detached. Do not re-enter data until you've checked the volume is mounted; a recent backup is in the data volume's <code>backups/</code> folder.</span></div>`;
+  }
+  if (setup.failedReports7d?.length) {
+    html += `<div class="panel" style="border-color:var(--red);margin-bottom:12px">
+      <strong style="color:var(--red)">⚠ ${setup.failedReports7d.length} report send(s) failed in the last 7 days.</strong>
+      <div class="hint" style="margin-top:6px">${setup.failedReports7d.slice(0, 6).map(f => `${esc(f.client_name)} — ${esc(String(f.error || '').slice(0, 100))}`).join('<br>')}</div></div>`;
+  }
+  return html;
+}
+
 function renderSetup() {
   const panel = $('#setupPanel');
   panel.style.display = 'block';
@@ -64,7 +81,7 @@ function renderSetup() {
   const allDone = st.email && st.google && st.sites;
 
   if (allDone) {
-    panel.innerHTML = `
+    panel.innerHTML = alertsHtml() + `
       <div class="row" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
         <span class="chip ok">Email ✓</span>
         <span class="chip ok">Google ✓</span>
@@ -75,7 +92,7 @@ function renderSetup() {
     return;
   }
 
-  panel.innerHTML = `
+  panel.innerHTML = alertsHtml() + `
     <h2>Set up North Bear Pulse</h2>
     <div class="hint" style="margin-bottom:16px">Three steps, copy &amp; paste, ~15 minutes total — then everything runs itself.</div>
 
@@ -417,6 +434,7 @@ function renderSites() {
       <div class="actions">
         ${(!s.ga4_property_id || !s.gsc_site_url) ? '<button class="btn small primary" data-act="autoconnect">⚡ Auto-connect</button>' : ''}
         <button class="btn small" data-act="copy-link">Copy dashboard link</button>
+        <button class="btn small" data-act="rotate-link">New link</button>
         <a class="btn small" href="/r/${esc(s.dashboard_token)}" target="_blank" rel="noopener">Open dashboard</a>
         <a class="btn small" href="/api/sites/${s.id}/preview.pdf" target="_blank" rel="noopener">Preview PDF</a>
         <button class="btn small" data-act="send">Send report now</button>
@@ -439,6 +457,13 @@ $('#sitesGrid').addEventListener('click', async (e) => {
   if (act === 'copy-link') {
     await navigator.clipboard.writeText(site.dashboardUrl);
     toast('Dashboard link copied — safe to send to the client');
+  } else if (act === 'rotate-link') {
+    if (!confirm(`Generate a new dashboard link for ${site.client_name}? The current link will stop working immediately — use this if the old link was shared outside the client's team.`)) return;
+    try {
+      await api(`/api/sites/${site.id}/rotate-token`, { method: 'POST' });
+      toast('New dashboard link generated — the old one no longer works. Copy the new link to share it.', 'ok', 8000);
+      await loadSites();
+    } catch (err) { toast(err.message, 'err', 8000); }
   } else if (act === 'autoconnect') {
     btn.disabled = true; btn.textContent = 'Connecting…';
     try {
@@ -498,6 +523,13 @@ function showSiteModal(site = null) {
           </select></div>
         <div class="field"><label>Status</label>
           <select name="active"><option value="1" ${site?.active !== 0 ? 'selected' : ''}>Active</option><option value="0" ${site?.active === 0 ? 'selected' : ''}>Paused</option></select></div>
+        <div class="field"><label>Client delivery</label>
+          <select name="delivery_hold"><option value="0" ${site?.delivery_hold ? '' : 'selected'}>Send to client when Live</option><option value="1" ${site?.delivery_hold ? 'selected' : ''}>Hold back (owner only)</option></select>
+          <div class="help">"Hold back" keeps this site's reports coming only to you even in Live mode — for sites not yet finished.</div></div>
+
+        <div class="field full"><label>Target keywords (their ideal Google searches)</label>
+          <input name="target_keywords" value="${esc(site?.target_keywords)}" placeholder="e.g. care home derby, respite care ripley, dementia care">
+          <div class="help">Comma-separated. Reports & dashboard show where they rank for each — including "not appearing yet".</div></div>
 
         <div class="field full"><label>Target keywords (their ideal Google searches)</label>
           <input name="target_keywords" value="${esc(site?.target_keywords)}" placeholder="e.g. care home derby, respite care ripley, dementia care">
@@ -550,6 +582,7 @@ function showSiteModal(site = null) {
     if (!form.reportValidity()) return;
     const body = Object.fromEntries(new FormData(form).entries());
     body.active = body.active === '1';
+    body.delivery_hold = body.delivery_hold === '1';
     try {
       const saved = isNew
         ? await api('/api/sites', { method: 'POST', body })

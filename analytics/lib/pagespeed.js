@@ -24,13 +24,15 @@ export async function fetchScores(domain) {
 
 // Cached wrapper used by report generation: returns the stored scores if
 // fresh; otherwise refreshes (and on failure serves whatever is stored,
-// however old, or null). Never throws.
-export async function getScores(domain) {
+// however old, or null). Never throws. With cachedOnly (the dashboard
+// fast path) it never triggers a live Lighthouse run — stale or null is
+// fine; the next report run refreshes it.
+export async function getScores(domain, { cachedOnly = false } = {}) {
   const key = 'psi_' + domain;
   let cached = null;
   try { cached = JSON.parse(getSetting(key) || 'null'); } catch { /* ignore */ }
   const fresh = cached && cached.fetchedAt && (Date.now() - Date.parse(cached.fetchedAt)) < FRESH_MS;
-  if (fresh) return cached;
+  if (fresh || cachedOnly) return cached;
   try {
     const scores = await fetchScores(domain);
     if (scores.performance != null || scores.seo != null) {

@@ -128,7 +128,10 @@ function render(d) {
     html += `</div>`;
   }
 
-  if (s) {
+  if (s && d.search.empty) {
+    html += section('Google search performance', 'Average position = where you rank in Google. 1–10 is page one.');
+    html += `<div class="panel"><p class="hint">Your site is connected to Google Search Console, but Google hasn't recorded any searches leading to it in this period yet. As your site builds authority, the terms people find you with will appear here.</p></div>`;
+  } else if (s) {
     html += section('Google search performance', 'Average position = where you rank in Google. 1–10 is page one.');
     const posMove = (s.position && sp.position) ? sp.position - s.position : null;
     html += `<div class="kpi-grid">
@@ -271,12 +274,28 @@ function drawChart(points) {
 
 async function load() {
   $('#app').innerHTML = `<div class="loading-overlay"><div class="spinner"></div>Fetching your latest numbers…</div>`;
-  const res = await fetch(`/api/client/${token}/data?range=${currentRange}`);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    $('#app').innerHTML = `<div class="panel" style="text-align:center"><h2>Hmm, that didn't load</h2>
-      <p class="hint" style="margin-top:8px">${esc(err.error || 'Please try again in a few minutes.')}</p></div>`;
-    return;
+  // A flaky mobile connection or a server restart mid-request shouldn't
+  // leave the spinner turning forever: time each attempt out, retry once,
+  // then show a friendly retry button.
+  const fetchOnce = async () => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 30000);
+    try { return await fetch(`/api/client/${token}/data?range=${currentRange}`, { signal: ctrl.signal }); }
+    finally { clearTimeout(timer); }
+  };
+  let res;
+  try {
+    res = await fetchOnce();
+    if (!res.ok) throw new Error('bad status');
+  } catch {
+    try { res = await fetchOnce(); if (!res.ok) throw new Error('bad status'); }
+    catch {
+      $('#app').innerHTML = `<div class="panel" style="text-align:center"><h2>Hmm, that didn't load</h2>
+        <p class="hint" style="margin:8px 0 16px">Your connection may have dropped. Please try again.</p>
+        <button class="btn primary" id="retryBtn">Try again</button></div>`;
+      const rb = $('#retryBtn'); if (rb) rb.onclick = load;
+      return;
+    }
   }
   render(await res.json());
 }

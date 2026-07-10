@@ -51,9 +51,13 @@ async function siteHealth(site, start, end) {
 
   // Clarity: two independent things must be true — the tracking TAG on the
   // live page (collects data) and the API token here (reads it back).
-  // Check both so "not working" is never a mystery.
+  // Check both so "not working" is never a mystery. A tag loaded through
+  // Google Tag Manager won't show in raw HTML, so "not found" is only
+  // damning when there's also no data arriving.
   const tagOnPage = await clarityTagOnPage(domain);
-  const tagNote = tagOnPage === true ? 'tag on site ✓' : tagOnPage === false ? 'TAG NOT ON SITE ✗' : 'tag check inconclusive';
+  const tagNote = tagOnPage === true ? 'tag on site ✓'
+    : tagOnPage === false ? 'tag not found in page HTML (fine if loaded via Tag Manager)'
+    : 'tag check inconclusive';
   if (!site.clarity_api_token) {
     out.clarity = bad(`${site.clarity_project_id ? 'no API token saved for this site' : 'not set up'} · ${tagNote}`);
   } else {
@@ -63,8 +67,19 @@ async function siteHealth(site, start, end) {
     const base = snaps.n > 0
       ? `${snaps.n} day(s) of data (latest ${snaps.last})${syncErr ? ' · last sync error: ' + syncErr : ''}`
       : (syncErr ? 'token errors: ' + syncErr : 'token saved, no data stored yet');
-    out.clarity = (snaps.n > 0 && tagOnPage !== false) ? ok(`${base} · ${tagNote}`) : bad(`${base} · ${tagNote}`);
+    // Data arriving = working, whatever the HTML grep says. No data AND no
+    // tag found = the tracking tag is missing (the usual "not working").
+    out.clarity = snaps.n > 0
+      ? ok(`${base}${tagOnPage === false ? ' · ' + tagNote : ''}`)
+      : bad(`${base} · ${tagOnPage === false ? 'TAG NOT ON SITE ✗ — add the Clarity snippet in the site builder' : tagNote}`);
   }
+
+  // Report delivery: the last report's fate, so a silently failing send is
+  // visible here instead of nowhere.
+  const last = db.prepare('SELECT status, period_label, error, created_at FROM reports WHERE site_id = ? ORDER BY id DESC LIMIT 1').get(site.id);
+  out.delivery = !last ? bad('no reports generated yet')
+    : last.status === 'sent' ? ok(`last report sent ${String(last.created_at).slice(0, 10)} (${last.period_label})`)
+    : bad(`LAST REPORT FAILED ${String(last.created_at).slice(0, 10)}: ${String(last.error || '').slice(0, 90)}`);
   return out;
 }
 

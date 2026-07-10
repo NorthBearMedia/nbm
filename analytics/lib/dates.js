@@ -65,26 +65,33 @@ export function previousPeriod(start, end) {
   return { start: addDays(start, -len), end: addDays(start, -1) };
 }
 
-// Next scheduled send: weekly → next Monday, monthly → 1st of next month,
-// quarterly → next quarter start. Always 07:00 in the configured timezone
-// (stored as an ISO date-hour string the scheduler compares against).
+// Next scheduled send. Google's data (especially Search Console) runs 2-3
+// days behind, so sending on the 1st/Monday would systematically undercount
+// the final days of every period — clients cross-checking later would see
+// bigger numbers than our report claimed. Sends therefore go out on the
+// 3rd of the month (covering the previous calendar month), Wednesday
+// (covering the previous Mon–Sun), and the 3rd of the quarter month.
+// Always 07:00 in the configured timezone.
 export function nextRunAt(frequency, from = new Date()) {
   if (frequency === 'none') return null;
   const today = toISODate(from);
   let dateIso;
   if (frequency === 'weekly') {
     const d = new Date(today + 'T12:00:00Z');
-    const dow = d.getUTCDay() || 7;
-    dateIso = addDays(today, 8 - dow); // next Monday (always in the future)
+    const dow = d.getUTCDay() || 7; // Mon=1..Sun=7
+    const until = ((3 - dow) + 7) % 7 || 7; // days to next Wednesday, always future
+    dateIso = addDays(today, until);
   } else if (frequency === 'quarterly') {
     const d = new Date(today + 'T12:00:00Z');
-    const nextQMonth = (Math.floor(d.getUTCMonth() / 3) + 1) * 3;
-    const nq = new Date(Date.UTC(d.getUTCFullYear(), nextQMonth, 1, 12));
-    dateIso = nq.toISOString().slice(0, 10);
+    const thisQMonth = Math.floor(d.getUTCMonth() / 3) * 3;
+    const thisQ = new Date(Date.UTC(d.getUTCFullYear(), thisQMonth, 3, 12));
+    const nextQ = new Date(Date.UTC(d.getUTCFullYear(), thisQMonth + 3, 3, 12));
+    dateIso = (today < thisQ.toISOString().slice(0, 10) ? thisQ : nextQ).toISOString().slice(0, 10);
   } else {
     const d = new Date(today + 'T12:00:00Z');
-    const nm = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1, 12));
-    dateIso = nm.toISOString().slice(0, 10);
+    const thisM = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 3, 12));
+    const nextM = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 3, 12));
+    dateIso = (today < thisM.toISOString().slice(0, 10) ? thisM : nextM).toISOString().slice(0, 10);
   }
   return `${dateIso} 07:00`;
 }

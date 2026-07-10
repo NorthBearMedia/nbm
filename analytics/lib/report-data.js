@@ -15,7 +15,11 @@ async function attempt(name, warnings, fn) {
   }
 }
 
-export async function gatherReportData(site, start, end) {
+// opts.fast — the client-dashboard path: serve PageSpeed from cache only
+// (never a live 90s Lighthouse run in a page load) and use the instant
+// rules-based insights instead of a live AI call. Reports/PDFs keep the
+// full pipeline.
+export async function gatherReportData(site, start, end, opts = {}) {
   const prev = previousPeriod(start, end);
   const warnings = [];
   const data = {
@@ -50,7 +54,12 @@ export async function gatherReportData(site, start, end) {
         attempt('Analytics channels', warnings, () => ga4.fetchChannels(pid, start, end)),
         attempt('Analytics devices', warnings, () => ga4.fetchDevices(pid, start, end)),
       ]);
-      if (overview) data.ga4 = { sourceLabel: 'Google Analytics', overview, prevOverview, timeseries: timeseries || [], topPages: topPages || [], channels: channels || [], devices: devices || [] };
+      // GA4 answers all-zeros (not an error) for a property whose tag was
+      // never installed — treat that as "not recording" rather than send a
+      // client a branded report headlining "0 visits".
+      const dead = overview && !(overview.sessions > 0) && !(overview.screenPageViews > 0) && !(overview.totalUsers > 0);
+      if (dead) warnings.push('Analytics: property returned zero traffic for the whole period — treating as not yet recording');
+      if (overview && !dead) data.ga4 = { sourceLabel: 'Google Analytics', overview, prevOverview, timeseries: timeseries || [], topPages: topPages || [], channels: channels || [], devices: devices || [] };
     }
   })());
 
@@ -72,19 +81,26 @@ export async function gatherReportData(site, start, end) {
           prevPosition: prevPos.has(q.query) ? prevPos.get(q.query) : null,
           positionChange: prevPos.has(q.query) ? (prevPos.get(q.query) - q.position) : null, // + = moved up
         }));
-        data.search = { summary, prevSummary, topQueries: queries };
+        // Connected-but-silent (all-zeros) is different from not-connected:
+        // renderers show "no search activity recorded yet" instead of a
+        // dead wall of zeros or a false "not connected" note.
+        const empty = !(summary.clicks > 0) && !(summary.impressions > 0);
+        data.search = { summary, prevSummary, topQueries: queries, empty };
 
         // Target keywords: where does the site rank for the searches the
         // OWNER cares about — even when they earn no clicks (GSC's top-N
         // misses those entirely). Deep query list fetched once, matched
         // fuzzily (either string contains the other). "Not appearing yet"
-        // is an honest, useful answer.
+        // is an honest, useful answer — but only when the deep fetch itself
+        // succeeded and the property has data: a failed/empty pull must not
+        // masquerade as "you rank for nothing".
         const kws = String(site.target_keywords || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean).slice(0, 12);
-        if (kws.length) {
+        if (kws.length && !empty) {
           const [deep, prevDeep] = await Promise.all([
-            attempt('Search target keywords', warnings, () => gsc.fetchTopQueries(url, start, end, 500)),
-            attempt('Search target keywords (prev)', warnings, () => gsc.fetchTopQueries(url, prev.start, prev.end, 500)),
+            attempt('Search target keywords', warnings, () => gsc.fetchTopQueries(url, start, end, 1000)),
+            attempt('Search target keywords (prev)', warnings, () => gsc.fetchTopQueries(url, prev.start, prev.end, 1000)),
           ]);
+          if (deep == null) return; // fetch failed — skip the table rather than lie
           const match = (rows, kw) => (rows || []).filter(r => {
             const q = r.query.toLowerCase();
             return q.includes(kw) || kw.includes(q);
@@ -107,12 +123,13 @@ export async function gatherReportData(site, start, end) {
     })());
   }
 
-  // Site health: Google PageSpeed scores (cached ~monthly; never blocks
-  // long — cache hit is instant, a refresh is time-boxed inside getScores).
+  // Site health: Google PageSpeed scores. Reports may refresh a stale
+  // cache (time-boxed Lighthouse run); the dashboard fast path serves
+  // cache-only so a page load never waits on Lighthouse.
   jobs.push((async () => {
     const { getScores } = await import('./pagespeed.js');
     data.siteHealth = await attempt('Site health', warnings, () =>
-      getScores((site.domain || '').toLowerCase().replace(/^www\./, '')));
+      getScores((site.domain || '').toLowerCase().replace(/^www\./, ''), { cachedOnly: Boolean(opts.fast) }));
   })());
 
   await Promise.all(jobs);
@@ -127,7 +144,7 @@ export async function gatherReportData(site, start, end) {
   // AI-written (or rules-based) insights, computed once the data is in.
   try {
     const { generateInsights } = await import('./insights.js');
-    data.insights = await generateInsights(data);
+    data.insights = await generateInsights(data, { rulesOnly: Boolean(opts.fast) });
   } catch (err) {
     warnings.push(`Insights: ${err.message}`);
     data.insights = null;

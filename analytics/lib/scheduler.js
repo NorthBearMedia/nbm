@@ -3,7 +3,7 @@
 //  · 03:40   — snapshot yesterday's Microsoft Clarity numbers for every site
 // Times run in the configured timezone (default Europe/London).
 import cron from 'node-cron';
-import db from '../database.js';
+import db, { backupDatabase, getSetting, setSetting } from '../database.js';
 import { config } from '../config.js';
 import { runReport } from './reporter.js';
 import { syncSite } from './clarity.js';
@@ -23,6 +23,16 @@ export function initialiseSchedules() {
   for (const site of sites) {
     db.prepare('UPDATE sites SET next_report_at = ? WHERE id = ?').run(nextRunAt(site.report_frequency), site.id);
   }
+  // One-shot repair: schedules stamped under the old timing (1st/Monday)
+  // move to the new lag-aware dates (3rd/Wednesday) — including any date
+  // stuck in the past on sites that had no contact email.
+  if (getSetting('schedule_repair_v1_done') !== 'true') {
+    const all = db.prepare(`SELECT * FROM sites WHERE report_frequency != 'none' AND next_report_at IS NOT NULL`).all();
+    for (const site of all) {
+      db.prepare('UPDATE sites SET next_report_at = ? WHERE id = ?').run(nextRunAt(site.report_frequency), site.id);
+    }
+    setSetting('schedule_repair_v1_done', 'true');
+  }
 }
 
 export async function sendDueReports() {
@@ -35,12 +45,20 @@ export async function sendDueReports() {
     // Advance the schedule first so a crash mid-send can't cause an email storm.
     db.prepare('UPDATE sites SET next_report_at = ? WHERE id = ?').run(nextRunAt(site.report_frequency), site.id);
     const result = await runReport(site, { trigger: 'scheduled' });
-    // No meaningful data yet (e.g. Search Console still provisioning a new
-    // property)? Retry tomorrow morning instead of skipping a whole month.
+    // Failed (no data yet, SMTP down, bad address…)? Retry tomorrow morning
+    // instead of skipping a whole period — but only a few times: after 4
+    // failures in a week, park it at the next natural date so a broken site
+    // can't fail-and-retry daily forever. Failures stay visible in the
+    // admin console (Connections panel + setup status).
     if (!result.ok) {
-      const tomorrow = `${addDays(todayISO(), 1)} 07:00`;
-      db.prepare('UPDATE sites SET next_report_at = ? WHERE id = ?').run(tomorrow, site.id);
-      console.log(`[scheduler] ${site.client_name}: no data yet — will retry ${tomorrow}`);
+      const failsThisWeek = db.prepare(`SELECT COUNT(*) AS n FROM reports WHERE site_id = ? AND status = 'failed' AND trigger_type = 'scheduled' AND created_at > datetime('now', '-7 day')`).get(site.id).n;
+      if (failsThisWeek < 4) {
+        const tomorrow = `${addDays(todayISO(), 1)} 07:00`;
+        db.prepare('UPDATE sites SET next_report_at = ? WHERE id = ?').run(tomorrow, site.id);
+        console.log(`[scheduler] ${site.client_name}: failed (${failsThisWeek + 1} this week) — will retry ${tomorrow}`);
+      } else {
+        console.log(`[scheduler] ${site.client_name}: failed ${failsThisWeek} times this week — parked until next scheduled date`);
+      }
     }
   }
   return due.length;
@@ -64,8 +82,14 @@ export async function syncAllClarity() {
 export function startScheduler() {
   initialiseSchedules();
   cron.schedule('5 * * * *', () => sendDueReports().catch(e => console.error('[scheduler]', e)), { timezone: config.timezone });
+  // Clarity's API only exposes yesterday, so a day the 03:40 run is missed
+  // (redeploy, API blip) would be a permanent hole — the 13:40 pass and the
+  // boot catch-up are second and third chances at the same snapshot.
   cron.schedule('40 3 * * *', () => syncAllClarity().catch(e => console.error('[clarity]', e)), { timezone: config.timezone });
-  // Catch up on Clarity snapshots shortly after boot too (covers restarts/deploys).
+  cron.schedule('40 13 * * *', () => syncAllClarity().catch(e => console.error('[clarity]', e)), { timezone: config.timezone });
   setTimeout(() => syncAllClarity().catch(e => console.error('[clarity]', e)), 15_000);
-  console.log(`[scheduler] running (timezone ${config.timezone}) — reports checked hourly, Clarity synced daily 03:40`);
+  // Hourly rolling database backups (kept: last 48) + one shortly after boot.
+  cron.schedule('50 * * * *', () => backupDatabase().catch(e => console.error('[backup]', e)), { timezone: config.timezone });
+  setTimeout(() => backupDatabase('boot').catch(e => console.error('[backup]', e)), 30_000);
+  console.log(`[scheduler] running (timezone ${config.timezone}) — reports hourly, Clarity 03:40+13:40, DB backup hourly`);
 }
