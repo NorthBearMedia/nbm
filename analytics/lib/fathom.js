@@ -95,6 +95,9 @@ export async function gatherFathom(fathomSiteId, start, end) {
     agg(fathomSiteId, { aggregates: 'visits', date_from: start, date_to: end, field_grouping: 'device_type', sort_by: 'visits:desc' }),
   ]);
 
+  // All-zero Fathom (quiet period or stale site ID) returns null so the
+  // caller can fall back to GA4 — real numbers from either source beat a
+  // "0 visits" report, and a dead GA4 is caught by its own zero-guard.
   const overview = overviewFrom(cur[0]);
   if (!overview || overview.sessions === 0) return null;
 

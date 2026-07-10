@@ -37,6 +37,9 @@ export async function fetchTimeseries(propertyId, start, end) {
     metrics: [{ name: 'sessions' }, { name: 'totalUsers' }],
     orderBys: [{ dimension: { dimensionName: 'date' } }],
     limit: 400,
+    // Without this GA omits zero-visit days entirely, so the daily chart
+    // silently skips quiet days and distorts the shape of the line.
+    keepEmptyRows: true,
   });
   return (report.rows || []).map(r => ({
     date: r.dimensionValues[0].value.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'),

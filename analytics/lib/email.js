@@ -4,7 +4,7 @@
 import nodemailer from 'nodemailer';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { getSmtp, getEmailFrom, getEmailBcc, getAppUrl, getDeliveryMode } from './runtime-config.js';
+import { getSmtp, getEmailFrom, getEmailBcc, getAppUrl, getDeliveryMode, getOwnerEmail, getReplyTo } from './runtime-config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LOGO = join(__dirname, '..', 'public', 'assets', 'nbm-logo-light-trimmed.png');
@@ -99,9 +99,32 @@ export function reportEmailHtml(site, data, periodText) {
         <p style="font-family:Arial,sans-serif;font-size:11px;color:#98a0ac;margin:0;text-align:center;">
           North Bear Media · northbearmedia.co.uk · info@northbearmedia.co.uk
         </p>
+        <p style="font-family:Arial,sans-serif;font-size:11px;color:#98a0ac;margin:6px 0 0;text-align:center;">
+          You're receiving this because North Bear Media looks after your website.
+          To change how often you get reports — or to stop them — just reply to this email.
+        </p>
       </td></tr>
     </table>
   </td></tr></table></body></html>`;
+}
+
+// Plain-text alternative part — HTML-only mail with a PDF attachment from a
+// small mailbox is a classic spam-score profile; a text part fixes that and
+// serves text-only mail clients.
+function reportEmailText(site, data, periodText) {
+  const o = data.ga4?.overview, s = data.search?.summary;
+  const lines = [
+    `Hi${site.contact_name ? ' ' + site.contact_name.split(' ')[0] : ''},`,
+    '',
+    `Here's the performance report for ${site.domain || site.client_name} covering ${periodText}. The full report is attached as a PDF.`,
+    '',
+  ];
+  if (o) lines.push(`Visits: ${nf.format(Math.round(o.sessions))} · Visitors: ${nf.format(Math.round(o.totalUsers))}`);
+  if (s && s.impressions > 0) lines.push(`Google clicks: ${nf.format(Math.round(s.clicks))} · Average Google position: ${s.position ? s.position.toFixed(1) : '—'}`);
+  lines.push('', `Your live dashboard: ${getAppUrl()}/r/${site.dashboard_token}`, '',
+    'North Bear Media · northbearmedia.co.uk · info@northbearmedia.co.uk',
+    'To change how often you get reports — or to stop them — just reply to this email.');
+  return lines.join('\n');
 }
 
 export async function sendReportEmail(site, data, pdfBuffer, periodText, filename) {
@@ -110,16 +133,23 @@ export async function sendReportEmail(site, data, pdfBuffer, periodText, filenam
   // Test mode (default): the full report is produced on the real schedule
   // but delivered ONLY to the owner, tagged with its intended recipients.
   // Flipping Settings → Delivery mode to Live is the owner's arming action.
-  const test = getDeliveryMode() !== 'live';
-  const to = test ? ['norton@northbearmedia.co.uk'] : realTo;
-  const subject = (test ? `[TEST — would send to ${realTo.join(', ')}] ` : '')
+  // A site with delivery_hold stays owner-only even in Live mode, so the
+  // fleet can go live while unfinished sites are held back.
+  const held = site.delivery_hold === 1;
+  const test = getDeliveryMode() !== 'live' || held;
+  const to = test ? [getOwnerEmail()] : realTo;
+  const subject = (test ? `[${held && getDeliveryMode() === 'live' ? 'HELD' : 'TEST'} — would send to ${realTo.join(', ')}] ` : '')
     + `Your website report — ${site.client_name} (${periodText})`;
+  const replyTo = getReplyTo();
   await mailer().sendMail({
     from: getEmailFrom(),
     to,
     bcc: test ? undefined : (getEmailBcc() || undefined),
+    replyTo: replyTo || undefined,
     subject,
     html: reportEmailHtml(site, data, periodText),
+    text: reportEmailText(site, data, periodText),
+    headers: replyTo ? { 'List-Unsubscribe': `<mailto:${replyTo}?subject=Unsubscribe%20${encodeURIComponent(site.domain || site.client_name)}>` } : undefined,
     attachments: [
       { filename, content: pdfBuffer, contentType: 'application/pdf' },
       { filename: 'nbm-logo.png', path: LOGO, cid: 'nbmlogo' },

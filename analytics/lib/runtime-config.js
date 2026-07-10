@@ -28,7 +28,20 @@ export function getEmailFrom() {
 }
 
 export function getEmailBcc() {
-  return pick('email_bcc', config.emailBcc);
+  // Default to the agency inbox: the Live-mode promise is "you stay
+  // BCC'd on every client report", and that must hold even if the
+  // settings form was never saved.
+  return pick('email_bcc', config.emailBcc) || 'info@northbearmedia.co.uk';
+}
+
+// Where internal/TEST-mode mail goes. A setting, not 13 hardcoded strings.
+export function getOwnerEmail() {
+  return pick('owner_email', 'norton@northbearmedia.co.uk');
+}
+
+// Client replies to report emails land here (not the raw SMTP mailbox).
+export function getReplyTo() {
+  return pick('email_reply_to', 'info@northbearmedia.co.uk');
 }
 
 export function getAppUrl() {
@@ -87,7 +100,7 @@ export function saveGoogleServiceAccount(json) {
   return parsed;
 }
 
-const SETTING_KEYS = ['smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'email_from', 'email_bcc', 'app_url', 'gsc_reader_email', 'hostinger_api_token', 'fathom_api_token', 'delivery_mode', 'anthropic_api_key', 'insights_model'];
+const SETTING_KEYS = ['smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'email_from', 'email_bcc', 'email_reply_to', 'owner_email', 'app_url', 'gsc_reader_email', 'hostinger_api_token', 'fathom_api_token', 'delivery_mode', 'anthropic_api_key', 'insights_model'];
 const KEEP_IF_BLANK = new Set(['smtp_pass', 'hostinger_api_token', 'fathom_api_token', 'anthropic_api_key']);
 
 export function saveSettings(body) {

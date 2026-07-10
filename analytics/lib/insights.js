@@ -39,6 +39,7 @@ Rules:
 - British English. Warm, plain, jargon-free — explain any metric in everyday terms.
 - Ground EVERY statement in the numbers provided. Never invent data. If a number isn't provided, don't reference it.
 - Be genuinely useful: highlight what's working, flag what isn't, and give specific, doable recommendations for THIS business.
+- Mind the time of year (the covering dates are given): quiet spells over Christmas/New Year, Easter or summer holidays are normal for many small businesses — frame a seasonal dip as expected seasonality, not a problem to fix.
 - Reply with ONLY a JSON object, no prose around it:
   {"headline": "one encouraging plain-English sentence summarising the month",
    "recommendations": [{"title": "3-5 word bold label", "detail": "1-2 sentence specific insight or action"}]}
@@ -105,14 +106,16 @@ function rulesInsights(data) {
   return { source: 'rules', headline, recommendations: recs.slice(0, 4) };
 }
 
-export async function generateInsights(data) {
+export async function generateInsights(data, { rulesOnly = false } = {}) {
   // Need at least one data source to say anything meaningful.
   if (!data.ga4 && !data.search && !data.clarity) return null;
-  try {
-    const ai = await aiInsights(data);
-    if (ai) return ai;
-  } catch (err) {
-    (data.warnings || []).push(`AI insights unavailable: ${err.message.slice(0, 120)}`);
+  if (!rulesOnly) {
+    try {
+      const ai = await aiInsights(data);
+      if (ai) return ai;
+    } catch (err) {
+      (data.warnings || []).push(`AI insights unavailable: ${err.message.slice(0, 120)}`);
+    }
   }
   return rulesInsights(data);
 }

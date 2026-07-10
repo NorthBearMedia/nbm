@@ -1,6 +1,13 @@
 import Database from 'better-sqlite3';
 import { randomBytes } from 'crypto';
+import { existsSync, mkdirSync, readdirSync, unlinkSync } from 'fs';
+import { join } from 'path';
 import { config } from './config.js';
+
+// A brand-new database file is normal on first install but alarming any
+// time after — a detached Railway volume silently presents as a fresh
+// install. Surfaced in the admin console via setup-status.
+export const freshDatabase = !existsSync(config.dbPath);
 
 const db = new Database(config.dbPath);
 db.pragma('journal_mode = WAL');
@@ -73,9 +80,26 @@ function addColumnIfMissing(table, column, definition) {
 }
 addColumnIfMissing('sites', 'fathom_site_id', "TEXT DEFAULT ''");
 addColumnIfMissing('sites', 'target_keywords', "TEXT DEFAULT ''");
+// Per-site Live holdback: 1 = reports for this site go only to the owner
+// even when the global delivery mode is Live.
+addColumnIfMissing('sites', 'delivery_hold', 'INTEGER NOT NULL DEFAULT 0');
 
 export function newDashboardToken() {
   return randomBytes(24).toString('hex');
+}
+
+// Rolling online backups (safe under WAL via better-sqlite3's backup API):
+// hourly copies into <dataDir>/backups, keeping the most recent 48. The
+// single SQLite file holds every token, keyword and report record — this
+// is the difference between a bad hour and a bad month.
+const backupsDir = join(config.dataDir, 'backups');
+export async function backupDatabase(prefix = 'hourly') {
+  mkdirSync(backupsDir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  await db.backup(join(backupsDir, `${prefix}-${stamp}.db`));
+  const old = readdirSync(backupsDir).filter(f => f.startsWith(prefix + '-') && f.endsWith('.db')).sort();
+  while (old.length > 48) unlinkSync(join(backupsDir, old.shift()));
+  return true;
 }
 
 export function getSetting(key) {

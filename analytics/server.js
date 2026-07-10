@@ -6,7 +6,7 @@ import { dirname, join } from 'path';
 import { existsSync } from 'fs';
 
 import { config } from './config.js';
-import db, { newDashboardToken, setSetting, getSetting } from './database.js';
+import db, { newDashboardToken, setSetting, getSetting, freshDatabase } from './database.js';
 import { setupStatus, saveSettings, saveGoogleServiceAccount, getAppUrl, getEmailBcc, getSmtp } from './lib/runtime-config.js';
 import { startScheduler, syncAllClarity } from './lib/scheduler.js';
 import { runReport, previewReportPdf } from './lib/reporter.js';
@@ -115,12 +115,18 @@ app.post('/api/logout', (req, res) => {
 // ─── Admin: setup wizard + settings ───────────────────────────────
 app.get('/api/setup-status', requireAdmin, (req, res) => {
   const sites = db.prepare('SELECT id, client_name, domain, ga4_property_id, gsc_site_url, clarity_api_token, contact_emails FROM sites WHERE active = 1').all();
+  const failed = db.prepare(`SELECT s.client_name, r.error, r.created_at FROM reports r JOIN sites s ON s.id = r.site_id
+    WHERE r.status = 'failed' AND r.created_at > datetime('now', '-7 day') ORDER BY r.id DESC LIMIT 20`).all();
   res.json({
     ...setupStatus(),
     sitesTotal: sites.length,
     sitesGoogleConnected: sites.filter(s => s.ga4_property_id && s.gsc_site_url).length,
     sitesFullyConnected: sites.filter(s => s.ga4_property_id && s.gsc_site_url && s.clarity_api_token).length,
     sitesMissingEmail: sites.filter(s => !s.contact_emails).length,
+    // Silent failure is the enemy: recent report failures + a fresh-database
+    // warning (a detached Railway volume looks exactly like a new install).
+    failedReports7d: failed,
+    freshDatabase,
   });
 });
 
@@ -247,11 +253,25 @@ function cleanSiteBody(body) {
   if (out.report_frequency && !['weekly', 'monthly', 'quarterly', 'none'].includes(out.report_frequency)) {
     out.report_frequency = 'monthly';
   }
+  // Validate contact emails at save time — a typo'd address otherwise only
+  // surfaces months later as a silently failing scheduled report. Accepts
+  // comma/semicolon separators and pasted "Name <a@b.com>" formats.
+  if (out.contact_emails) {
+    const emails = out.contact_emails.split(/[,;]/).map(e => {
+      const m = e.match(/<([^>]+)>/);
+      return (m ? m[1] : e).trim();
+    }).filter(Boolean);
+    const bad = emails.filter(e => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+    if (bad.length) throw Object.assign(new Error(`These don't look like valid email addresses: ${bad.join(', ')}`), { status: 400 });
+    out.contact_emails = emails.join(', ');
+  }
   return out;
 }
 
 app.post('/api/sites', requireAdmin, (req, res) => {
-  const data = cleanSiteBody(req.body || {});
+  let data;
+  try { data = cleanSiteBody(req.body || {}); }
+  catch (err) { return res.status(err.status || 400).json({ error: err.message }); }
   if (!data.client_name) return res.status(400).json({ error: 'Client name is required' });
   const freq = data.report_frequency || 'monthly';
   const info = db.prepare(`INSERT INTO sites (client_name, contact_name, contact_emails, domain, ga4_property_id, ga4_measurement_id, gsc_site_url, clarity_project_id, clarity_api_token, fathom_site_id, report_frequency, notes, dashboard_token, next_report_at)
@@ -268,11 +288,14 @@ app.post('/api/sites', requireAdmin, (req, res) => {
 app.put('/api/sites/:id', requireAdmin, (req, res) => {
   const site = db.prepare('SELECT * FROM sites WHERE id = ?').get(req.params.id);
   if (!site) return res.status(404).json({ error: 'Site not found' });
-  const data = cleanSiteBody(req.body || {});
+  let data;
+  try { data = cleanSiteBody(req.body || {}); }
+  catch (err) { return res.status(err.status || 400).json({ error: err.message }); }
   // Blank clarity token in the form means "keep the existing one".
   if (data.clarity_api_token === '') delete data.clarity_api_token;
   if (req.body?.clear_clarity_token) data.clarity_api_token = '';
   if (req.body?.active !== undefined) data.active = req.body.active ? 1 : 0;
+  if (req.body?.delivery_hold !== undefined) data.delivery_hold = req.body.delivery_hold ? 1 : 0;
   if (data.report_frequency && data.report_frequency !== site.report_frequency) {
     data.next_report_at = nextRunAt(data.report_frequency);
   }
@@ -310,6 +333,16 @@ app.post('/api/sites/:id/test-connections', requireAdmin, async (req, res) => {
     gsc: await check(site.gsc_site_url, () => gsc.testConnection(site.gsc_site_url)),
     clarity: await check(site.clarity_api_token, () => clarity.testConnection(site.clarity_api_token)),
   });
+});
+
+// Rotate a client's dashboard link (e.g. after a report email was forwarded
+// outside the business). The old token URL stops working immediately; the
+// next report email carries the new link.
+app.post('/api/sites/:id/rotate-token', requireAdmin, (req, res) => {
+  const site = db.prepare('SELECT * FROM sites WHERE id = ?').get(req.params.id);
+  if (!site) return res.status(404).json({ error: 'Site not found' });
+  db.prepare('UPDATE sites SET dashboard_token = ? WHERE id = ?').run(newDashboardToken(), site.id);
+  res.json(siteSummary(db.prepare('SELECT * FROM sites WHERE id = ?').get(site.id)));
 });
 
 app.post('/api/sites/:id/send-report', requireAdmin, async (req, res) => {
@@ -467,7 +500,9 @@ app.get('/api/client/:token/data', async (req, res) => {
   const end = addDays(todayISO(), -1);
   const start = addDays(end, -(rangeDays - 1));
   try {
-    const data = await gatherReportData(site, start, end);
+    // fast: cached-only PageSpeed + rules-based insights, so a client's
+    // page load never waits on a Lighthouse run or a live AI call.
+    const data = await gatherReportData(site, start, end, { fast: true });
     // Never expose internal gather warnings (raw API error strings, property
     // IDs) to the client browser — they're for the admin console only.
     const { warnings, ...clientData } = data;
@@ -488,12 +523,22 @@ app.get('/api/client/:token/data', async (req, res) => {
 app.post('/api/client/:token/request-report', async (req, res) => {
   const site = siteByToken(req.params.token);
   if (!site) return res.status(404).json({ error: 'Dashboard not found' });
-  const recent = db.prepare(`SELECT COUNT(*) AS n FROM reports WHERE site_id = ? AND trigger_type = 'requested' AND created_at > datetime('now', '-1 day')`).get(site.id).n;
+  // Rate limit on SUCCESSFUL sends only — three failures shouldn't lock a
+  // client out with a message claiming a report is "already in your inbox".
+  const recent = db.prepare(`SELECT COUNT(*) AS n FROM reports WHERE site_id = ? AND trigger_type = 'requested' AND status = 'sent' AND created_at > datetime('now', '-1 day')`).get(site.id).n;
   if (recent >= 3) {
-    return res.status(429).json({ error: 'You can request up to 3 reports a day — your most recent one should already be in your inbox.' });
+    return res.status(429).json({ error: 'You can request up to 3 reports a day. Need another? Email info@northbearmedia.co.uk and we’ll send one over.' });
   }
   const result = await runReport(site, { trigger: 'requested' });
-  if (!result.ok) return res.status(500).json({ error: 'Sorry, we could not generate your report just now. North Bear Media has been notified.' });
+  // Every honest word matters here: failures are recorded and surfaced in
+  // the North Bear admin console, but no human is paged — so say "email
+  // us", not "we've been notified". And while delivery is in test/held
+  // mode the PDF goes to North Bear, not the client — don't tell them
+  // it's on its way to their inbox.
+  if (!result.ok) return res.status(500).json({ error: 'Sorry — we couldn’t generate your report just now. Email info@northbearmedia.co.uk and we’ll send it over.' });
+  if (String(result.sentTo?.[0] || '').startsWith('TEST→')) {
+    return res.json({ ok: true, message: `Thanks — your report request has been received. North Bear Media will email your report (${result.periodText}) over shortly.` });
+  }
   const masked = site.contact_emails.split(',').map(e => {
     const [user, dom] = e.trim().split('@');
     return user && dom ? `${user.slice(0, 2)}…@${dom}` : e;
@@ -503,7 +548,19 @@ app.post('/api/client/:token/request-report', async (req, res) => {
 
 // ─── Pages + static ───────────────────────────────────────────────
 app.get('/r/:token', (req, res) => {
-  if (!siteByToken(req.params.token)) return res.status(404).send('Dashboard not found');
+  if (!siteByToken(req.params.token)) {
+    // Branded page, not a bare-text 404 — this is what a client sees if
+    // their link was rotated or mistyped.
+    return res.status(404).type('html').send(`<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Dashboard not found — North Bear Media</title>
+<meta name="robots" content="noindex,nofollow"><link rel="icon" href="/assets/favicon.svg"><link rel="stylesheet" href="/styles.css?v=2"></head>
+<body><div class="container" style="max-width:560px;margin:60px auto;text-align:center">
+<img src="/assets/nbm-logo-light-trimmed.png" alt="North Bear Media" style="height:44px;margin-bottom:24px">
+<div class="panel"><h2>This dashboard link isn't active</h2>
+<p class="hint" style="margin-top:10px;line-height:1.6">The link may have been replaced with a newer one, or wasn't copied fully.<br>
+Email <a href="mailto:info@northbearmedia.co.uk">info@northbearmedia.co.uk</a> and we'll send you your current dashboard link.</p></div>
+</div></body></html>`);
+  }
   res.sendFile(join(__dirname, 'public', 'client.html'));
 });
 
@@ -519,7 +576,12 @@ app.get('/', (req, res) => {
 // real script must be fetched). Returns the GA/Clarity injector for the
 // given domain, resolved from that site's stored measurement/Clarity IDs.
 app.get('/ix/:token/:domain', (req, res) => {
-  if (!req.params.token || req.params.token !== getSetting('inject_script_token')) {
+  // Timing-safe token check, same as every other secret compare here.
+  const expected = getSetting('inject_script_token') || '';
+  const given = String(req.params.token || '');
+  const tokenOk = expected.length > 0 && given.length === expected.length
+    && timingSafeEqual(Buffer.from(given), Buffer.from(expected));
+  if (!tokenOk) {
     return res.status(403).type('text/plain').send('echo "NBM: bad token"');
   }
   const domain = String(req.params.domain).toLowerCase().replace(/[^a-z0-9.-]/g, '');
@@ -543,9 +605,10 @@ app.get('/ix/:token/:domain', (req, res) => {
     res.type('text/x-shellscript').send(script);
   } catch (e) {
     // Never hard-500 the injector — a 500 makes curl write nothing and the
-    // runner cron fails "no such file". Return a harmless shell no-op.
+    // runner cron fails "no such file". Return a harmless shell no-op, and
+    // keep internal error detail out of the public response.
     console.error('[ix] error for', domain, e.message);
-    res.status(200).type('text/x-shellscript').send(`echo "NBM: ix error for ${domain}: ${e.message.replace(/"/g, '')}"\n`);
+    res.status(200).type('text/x-shellscript').send(`echo "NBM: ix error for ${domain}"\n`);
   }
 });
 
