@@ -72,6 +72,7 @@ function addColumnIfMissing(table, column, definition) {
   }
 }
 addColumnIfMissing('sites', 'fathom_site_id', "TEXT DEFAULT ''");
+addColumnIfMissing('sites', 'target_keywords', "TEXT DEFAULT ''");
 
 export function newDashboardToken() {
   return randomBytes(24).toString('hex');

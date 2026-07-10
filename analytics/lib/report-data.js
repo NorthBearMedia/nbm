@@ -73,6 +73,36 @@ export async function gatherReportData(site, start, end) {
           positionChange: prevPos.has(q.query) ? (prevPos.get(q.query) - q.position) : null, // + = moved up
         }));
         data.search = { summary, prevSummary, topQueries: queries };
+
+        // Target keywords: where does the site rank for the searches the
+        // OWNER cares about — even when they earn no clicks (GSC's top-N
+        // misses those entirely). Deep query list fetched once, matched
+        // fuzzily (either string contains the other). "Not appearing yet"
+        // is an honest, useful answer.
+        const kws = String(site.target_keywords || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean).slice(0, 12);
+        if (kws.length) {
+          const [deep, prevDeep] = await Promise.all([
+            attempt('Search target keywords', warnings, () => gsc.fetchTopQueries(url, start, end, 500)),
+            attempt('Search target keywords (prev)', warnings, () => gsc.fetchTopQueries(url, prev.start, prev.end, 500)),
+          ]);
+          const match = (rows, kw) => (rows || []).filter(r => {
+            const q = r.query.toLowerCase();
+            return q.includes(kw) || kw.includes(q);
+          });
+          data.search.targets = kws.map(kw => {
+            const cur = match(deep, kw), prv = match(prevDeep, kw);
+            const best = cur.length ? Math.min(...cur.map(r => r.position)) : null;
+            const prevBest = prv.length ? Math.min(...prv.map(r => r.position)) : null;
+            return {
+              keyword: kw,
+              position: best,
+              prevPosition: prevBest,
+              movement: best != null && prevBest != null ? prevBest - best : null, // + = up
+              clicks: cur.reduce((a, r) => a + r.clicks, 0),
+              impressions: cur.reduce((a, r) => a + r.impressions, 0),
+            };
+          });
+        }
       }
     })());
   }

@@ -409,6 +409,36 @@ export async function generateReportPdf(data) {
         .text('"Movement" is places gained or lost on Google vs the previous period · "pg 1" means it appears on the first page of results.', M, y - 4, { width: CW });
       y += 8;
     }
+
+    // ── Target searches: the terms the client actually wants to win ──
+    if (data.search.targets?.length) {
+      const rows = data.search.targets;
+      y = ensureSpace(doc, data, y, 60 + rows.length * 16);
+      doc.font('Helvetica-Bold').fontSize(10).fillColor(C.ink).text('Where you rank for your target searches', M, y);
+      const tMove = (v, r) => {
+        if (r.position == null) return r.prevPosition != null ? 'dropped off' : '—';
+        if (r.movement == null) return r.prevPosition == null ? 'new' : '—';
+        if (Math.abs(r.movement) < 0.05) return 'no change';
+        return `${r.movement > 0 ? 'up' : 'down'} ${Math.abs(r.movement).toFixed(1)}`;
+      };
+      const tColor = (v, r) => {
+        if (r.position == null) return r.prevPosition != null ? C.red : C.faint;
+        if (r.movement == null) return r.prevPosition == null ? C.greenDark : C.faint;
+        if (Math.abs(r.movement) < 0.05) return C.faint;
+        return r.movement > 0 ? C.greenDark : C.red;
+      };
+      y = table(doc, y + 16, [
+        { label: 'Target search', key: 'keyword', width: CW - 300, bold: true },
+        { label: 'Position', key: 'position', width: 105, align: 'right',
+          format: v => v == null ? 'not appearing yet' : v.toFixed(1) + (v <= 10 ? ' · pg 1' : ''),
+          color: v => v == null ? C.faint : C.ink },
+        { label: 'Times shown', key: 'impressions', width: 80, align: 'right', format: fmtInt },
+        { label: 'Movement', key: 'movement', width: 90, align: 'right', bold: true, format: tMove, color: tColor },
+      ], rows) + 4;
+      doc.font('Helvetica-Oblique').fontSize(7).fillColor(C.faint)
+        .text('These are the searches you\u2019ve told us matter most. "Not appearing yet" means Google didn\u2019t show the site for that search this period \u2014 a clear opportunity.', M, y, { width: CW });
+      y += 14;
+    }
   } else {
     y = emptyNote(doc, y, 'Google Search Console is not connected for this site yet — once connected, your Google rankings and search clicks will appear here.');
   }
