@@ -213,6 +213,33 @@ const GA_PROPERTY = {
   'melanieparker.co.uk': '541335650',
 };
 
+// Starter target keywords per site — the searches each business plausibly
+// wants to win, grounded in their real Search Console queries + brand terms.
+// Seeded ONCE into blank fields (flag below); the owner refines them in
+// Edit site → Target keywords, and his edits/clears are never overwritten.
+const TARGET_KEYWORDS = {
+  'northbearmedia.co.uk': 'brand photographer derbyshire, commercial videographer derby, content marketing agency derbyshire, north bear media',
+  'caringplacesltd.co.uk': 'day services for adults with disabilities, supported living derbyshire, respite care derby, caring places',
+  'iwpg.co.uk': 'industrial warehouse group, industrial units to let, warehouse space to rent, iwpg',
+  'primeprandmarketing.co.uk': 'pr agency derby, marketing agency derbyshire, pr and marketing agency, prime pr',
+  'rcmhomeimprovements.co.uk': 'home improvements derby, builder derby, rcm home improvements',
+  'richfordvehiclesales.co.uk': 'used recovery truck for sale, recovery trucks for sale uk, richford vehicle sales',
+  'maxus-evc.co.uk': 'maxus electric van dealer, electric commercial vehicles, electric van dealership uk',
+  'alphashunt.co.uk': 'shunter vehicle hire, terminal tractor hire, alpha shunt',
+  'ivyhouseresidentialhome.co.uk': 'care home mickleover, residential care home derby, ivy house care home',
+  'pslimited.uk': 'personnel solutions, recruitment agency derby, ps limited',
+  'rmbgarage.co.uk': 'garage ambergate, mot ambergate, mechanics near me, rmb garage',
+  'wowstays.co.uk': 'wow stays, luxury holiday lets, self catering holiday accommodation',
+  'evccitysprint.co.uk': 'electric van company, electric van leasing, evc city sprint',
+  'greenpathgardencare.co.uk': 'gardener allestree, garden maintenance derby, greenpath garden care',
+  'swanwickkidsclub.co.uk': 'holiday club swanwick, childcare swanwick, kids club derbyshire',
+  'muskengineering.co.uk': 'process services peterborough, industrial pipework contractors, musk engineering',
+  'woodlandwalkdaycare.co.uk': 'day nursery bottesford, childcare bottesford, woodland walk daycare',
+  'melanieparker.co.uk': 'physiotherapy belper, home visit physio derbyshire, private physiotherapist derby',
+  'williscooper.com': 'willis cooper',
+  'active-personnel.co.uk': 'recruitment agency, active personnel',
+};
+
 // Sites the owner manages but whose DOMAINS he doesn't control (so no
 // Hostinger DNS / no sc-domain). Rows are created here if missing; GA ids
 // and contacts fill from the maps above; Search Console verifies via the
@@ -260,6 +287,22 @@ export function loadClientContacts() {
       db.prepare('UPDATE sites SET ga4_property_id = ? WHERE id = ?').run(pid, site.id);
       console.log(`[ops] GA property ID loaded: ${site.client_name} → ${pid}`);
     }
+  }
+  // Target keywords: seed starter values ONCE (one-shot flag, not a
+  // fill-blanks loop) so the owner can trim or clear them without a
+  // reboot putting them back.
+  if (getSetting('target_keywords_seed_v1_done') !== 'true') {
+    for (const site of sites) {
+      const d = (site.domain || '').toLowerCase().replace(/^www\./, '');
+      const kws = TARGET_KEYWORDS[d];
+      if (!kws) continue;
+      const cur = db.prepare('SELECT target_keywords FROM sites WHERE id = ?').get(site.id);
+      if (cur && !cur.target_keywords) {
+        db.prepare('UPDATE sites SET target_keywords = ? WHERE id = ?').run(kws, site.id);
+        console.log(`[ops] target keywords seeded: ${site.client_name}`);
+      }
+    }
+    setSetting('target_keywords_seed_v1_done', 'true');
   }
   return loaded;
 }
