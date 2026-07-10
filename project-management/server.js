@@ -110,6 +110,27 @@ function seedUsers() {
 
 seedUsers();
 
+// ─── One-time seed: Willis Cooper July content list ─────
+// Runs once at boot (guarded by app_meta flag). The seed itself is idempotent
+// (dedupe by title) so a manual CLI run beforehand can't cause duplicates.
+// If the Willis Cooper client doesn't exist yet, the flag stays unset and it
+// retries on a later boot.
+try {
+  const wcDone = db.prepare("SELECT value FROM app_meta WHERE key='willis_cooper_seed_v1'").get();
+  if (!wcDone) {
+    const { seedWillisCooper } = await import('./scripts/seed-willis-cooper-tasks.js');
+    const report = seedWillisCooper(db);
+    if (report) {
+      db.prepare("INSERT INTO app_meta (key, value) VALUES ('willis_cooper_seed_v1', ?)").run(new Date().toISOString());
+      console.log(`[Seed] Willis Cooper content list: ${report.created} created, ${report.skipped.length} already present.`);
+    } else {
+      console.log('[Seed] Willis Cooper client not found — content list seed deferred to a later boot.');
+    }
+  }
+} catch (err) {
+  console.error('[Seed] Willis Cooper content list error:', err.message);
+}
+
 // ─── Error Handler ──────────────────────────────────────
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err.message);

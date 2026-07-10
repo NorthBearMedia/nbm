@@ -423,11 +423,6 @@
             <div class="nb-leg-hint">tap a line's marker to colour it</div>
           </div>
           <div id="notebookLines"></div>
-          <div class="nb-pagenav" id="nbPageNav" style="display:none">
-            <button class="nb-pagebtn" id="nbPrevPage" onclick="nbFlip(-1)">&#10229; earlier page</button>
-            <span class="nb-pagenum" id="nbPageNum"></span>
-            <button class="nb-pagebtn" id="nbNextPage" onclick="nbFlip(1)">later page &#10230;</button>
-          </div>
           <div class="nb-line nb-new" id="nbNewRow">
             <span class="nb-bullet" style="opacity:.35">&bull;</span>
             <input id="nbNewTask" type="text" placeholder="write a task, press Enter..." autocomplete="off" onkeydown="if(event.key==='Enter'){nbQuickAdd()}">
@@ -719,6 +714,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=75"></script>
+  <script src="app.js?v=77"></script>
 </body>
 </html>
