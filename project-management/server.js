@@ -131,6 +131,24 @@ try {
   console.error('[Seed] Willis Cooper content list error:', err.message);
 }
 
+// ─── One-time seed: Richford Motor Services July list ───
+// Same pattern as the Willis Cooper seed above.
+try {
+  const rmsDone = db.prepare("SELECT value FROM app_meta WHERE key='richford_seed_v1'").get();
+  if (!rmsDone) {
+    const { seedRichford } = await import('./scripts/seed-richford-tasks.js');
+    const report = seedRichford(db);
+    if (report) {
+      db.prepare("INSERT INTO app_meta (key, value) VALUES ('richford_seed_v1', ?)").run(new Date().toISOString());
+      console.log(`[Seed] Richford list: ${report.created} created, ${report.skipped.length} already present.`);
+    } else {
+      console.log('[Seed] Richford client not found — list seed deferred to a later boot.');
+    }
+  }
+} catch (err) {
+  console.error('[Seed] Richford list error:', err.message);
+}
+
 // ─── Error Handler ──────────────────────────────────────
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err.message);
