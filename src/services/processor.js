@@ -61,6 +61,15 @@ export async function processNewMessages(client) {
       `${tag} [ANALYSE] Conversation ${convo.conversationId} from ${convo.senderName} (${userMessages.length} user msgs)`
     );
 
+    // Mark the sender's message as read now that the bot is handling it, so the
+    // owner's inbox shows at a glance what's been dealt with. Best-effort and
+    // fire-and-forget — never let a read-receipt failure derail moderation.
+    if (config.facebook.markSeen) {
+      client.markSeen(convo.senderId).catch((err) =>
+        console.warn(`${tag} [WARN] Could not mark conversation seen: ${err.message}`)
+      );
+    }
+
     const extras = { pageId: client.pageId, pageName: client.pageName };
 
     // One helper for every "needs a human" outcome so no FLAG can silently

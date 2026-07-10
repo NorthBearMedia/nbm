@@ -242,6 +242,21 @@ export function createPageClient(page) {
   }
 
   /**
+   * Mark the conversation with a user as read ("Seen") in the Page inbox.
+   * Facebook has no public API for the inbox "Done" folder (a UI-only action),
+   * so this is the closest equivalent — it clears the unread state so the owner
+   * can see at a glance which conversations the bot has already handled.
+   */
+  async function markSeen(recipientId) {
+    return graphRequest(`/${pageId}/messages`, {
+      body: {
+        recipient: { id: recipientId },
+        sender_action: "mark_seen",
+      },
+    });
+  }
+
+  /**
    * Fetch DM conversations from the page inbox with their recent messages.
    * @param {(id: string, updatedTime: number) => boolean} [shouldSkip] —
    *   optional callback; return true to skip fetching messages for a conversation.
@@ -344,6 +359,7 @@ export function createPageClient(page) {
     getPermalink,
     deletePost,
     sendReply,
+    markSeen,
     fetchConversations,
   };
 }

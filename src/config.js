@@ -109,6 +109,9 @@ export const config = {
   facebook: {
     pages: parseFacebookPages(),
     graphApiBase: "https://graph.facebook.com/v21.0",
+    // Mark each handled conversation as "Seen" in the Page inbox (there is no
+    // API for the "Done" folder). Set MARK_SEEN=false to disable.
+    markSeen: process.env.MARK_SEEN !== "false",
   },
   anthropic: {
     apiKey: required("ANTHROPIC_API_KEY"),
