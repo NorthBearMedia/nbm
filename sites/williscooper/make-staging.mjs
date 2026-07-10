@@ -18,12 +18,20 @@
 //   outDir defaults to ../williscooper-staging-build
 //   (or ../williscooper-live-build with --production)
 
-import { readdirSync, statSync, mkdirSync, copyFileSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { readdirSync, statSync, mkdirSync, copyFileSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const flags = process.argv.slice(2).filter(a => a.startsWith('--'));
 const positional = process.argv.slice(2).filter(a => !a.startsWith('--'));
+for (const f of flags) {
+  if (f !== '--production') {
+    // A typo'd flag must not silently produce the wrong build (a staging
+    // build uploaded to the live site would noindex + de-analytics it).
+    console.error(`Unknown flag: ${f} (the only flag is --production)`);
+    process.exit(1);
+  }
+}
 const PRODUCTION = flags.includes('--production');
 
 const NOINDEX = !PRODUCTION;           // replace robots meta with noindex,nofollow
@@ -61,15 +69,12 @@ function transformHtml(html) {
   let robots = false, ga = false, fathom = false;
 
   if (NOINDEX) {
-    out = out.replace(
-      /<meta name="robots" content="[^"]*">/,
-      () => { robots = true; return '<meta name="robots" content="noindex, nofollow, noarchive">'; }
-    );
-    // Belt-and-braces: if a page somehow lacks a robots meta, inject one.
-    if (!robots) {
-      out = out.replace(/<head>/, '<head><meta name="robots" content="noindex, nofollow, noarchive">');
-      robots = true;
-    }
+    // Strip every robots meta (any attribute order), then inject exactly one
+    // noindex right after <head …>. `robots` is only set if the injection
+    // actually happened — the caller aborts the build if any page missed it.
+    out = out.replace(/<meta\b[^>]*\bname="robots"[^>]*>/gi, '');
+    out = out.replace(/<head[^>]*>/i,
+      m => { robots = true; return m + '<meta name="robots" content="noindex, nofollow, noarchive">'; });
   }
 
   if (DISABLE_ANALYTICS) {
@@ -84,19 +89,37 @@ function transformHtml(html) {
   return { out, robots, ga, fathom };
 }
 
-// Start clean so removed source files don't linger in a re-run.
-rmSync(OUT, { recursive: true, force: true });
-mkdirSync(OUT, { recursive: true });
+// Start clean so removed source files don't linger in a re-run — but OUT is
+// user-supplied and gets recursively DELETED, so refuse anything dangerous:
+// the source dir itself, any ancestor of it (would wipe the source), anything
+// inside it (would get re-copied as "source" next run), or an existing
+// directory that doesn't look like a previous build of this site.
+const OUT_ABS = resolve(OUT);
+const outPrefix = OUT_ABS.endsWith(sep) ? OUT_ABS : OUT_ABS + sep;
+if (OUT_ABS === SRC || SRC.startsWith(outPrefix) || OUT_ABS.startsWith(SRC + sep)) {
+  console.error(`Refusing outDir ${OUT_ABS}: it is, contains, or is inside the source directory ${SRC}.`);
+  process.exit(1);
+}
+if (existsSync(OUT_ABS)) {
+  const entries = readdirSync(OUT_ABS);
+  if (entries.length && !(entries.includes('index.html') && entries.includes('assets'))) {
+    console.error(`Refusing to delete ${OUT_ABS}: not empty and doesn't look like a previous build (expected index.html + assets/).`);
+    process.exit(1);
+  }
+}
+rmSync(OUT_ABS, { recursive: true, force: true });
+mkdirSync(OUT_ABS, { recursive: true });
 
 let htmlCount = 0, gaStripped = 0, fathomStripped = 0, noindexSet = 0, assetCount = 0;
 
 let droppedFiles = 0, robotsRewritten = 0;
+const failedPages = [];
 
 for (const abs of walk(SRC)) {
   const rel = relative(SRC, abs);
   if (SKIP.has(rel)) continue;
   if (NOINDEX && DROP_WHEN_NOINDEX.has(rel)) { droppedFiles++; continue; }
-  const dest = join(OUT, rel);
+  const dest = join(OUT_ABS, rel);
   mkdirSync(dirname(dest), { recursive: true });
 
   if (NOINDEX && rel === 'robots.txt') {
@@ -109,13 +132,18 @@ for (const abs of walk(SRC)) {
     if (robots) noindexSet++;
     if (ga) gaStripped++;
     if (fathom) fathomStripped++;
+    // Enforce the staging invariants per page — a transform regex that
+    // stopped matching (e.g. a future builder re-export changes markup)
+    // must fail the build, not silently ship an unsafe page.
+    if (NOINDEX && !robots) failedPages.push(`${rel}: noindex meta was not injected`);
+    if (DISABLE_ANALYTICS && /googletagmanager|usefathom/i.test(out)) failedPages.push(`${rel}: analytics still present after strip`);
   } else {
     copyFileSync(abs, dest);
     assetCount++;
   }
 }
 
-console.log(`${PRODUCTION ? 'PRODUCTION' : 'Staging'} build → ${OUT}`);
+console.log(`${PRODUCTION ? 'PRODUCTION' : 'Staging'} build → ${OUT_ABS}`);
 console.log(`  HTML pages processed : ${htmlCount}`);
 console.log(`  noindex applied      : ${noindexSet}`);
 console.log(`  GA tags removed      : ${gaStripped}`);
@@ -123,3 +151,10 @@ console.log(`  Fathom tags removed  : ${fathomStripped}`);
 console.log(`  robots.txt rewritten : ${robotsRewritten}`);
 console.log(`  sitemap/llms dropped : ${droppedFiles}`);
 console.log(`  assets copied        : ${assetCount}`);
+
+if (failedPages.length) {
+  console.error(`\nFATAL — staging invariants violated on ${failedPages.length} page(s):`);
+  for (const f of failedPages) console.error(`  - ${f}`);
+  console.error('The build output is NOT safe to deploy. Aborting with failure.');
+  process.exit(1);
+}

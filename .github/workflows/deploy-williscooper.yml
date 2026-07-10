@@ -4,9 +4,17 @@ name: Deploy Willis Cooper (LIVE)
 # clone: analytics on, indexable, robots.txt/sitemap kept) and uploads it
 # over FTPS to the williscooper.com document root on Hostinger.
 #
-# This deploys the LIVE site. It only writes inside the folder named by
-# HOSTINGER_LIVE_DIR — double-check that secret points at the
-# williscooper.com website's docroot.
+# This deploys the LIVE site. All writes happen inside the folder named by
+# HOSTINGER_LIVE_DIR (validated non-empty below — if it were empty the FTP
+# action would silently target the FTP account's login root). Double-check
+# that secret points at the williscooper.com website's docroot.
+#
+# Sync semantics (SamKirkland/FTP-Deploy-Action): the action keeps a
+# .ftp-deploy-sync-state.json manifest in the docroot (public but harmless —
+# it lists deployed file paths + hashes, all of which are public anyway).
+# Files IT previously uploaded that disappear from the build are deleted on
+# the next run; files it never uploaded (e.g. hPanel's default.php
+# placeholder) are left alone — remove those by hand once, in File Manager.
 #
 # Required repository secrets (Settings → Secrets and variables → Actions):
 #   HOSTINGER_FTP_SERVER    FTP host from hPanel → Files → FTP Accounts
@@ -19,7 +27,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type "deploy-live" to confirm you are deploying the LIVE williscooper.com site'
+        description: 'Type "deploy-live" (exactly, lowercase) to confirm you are deploying the LIVE williscooper.com site'
         required: true
         default: ''
 
@@ -27,11 +35,28 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Guard — require explicit confirmation
-        if: ${{ github.event.inputs.confirm != 'deploy-live' }}
+      - name: Guard — confirmation phrase + secrets sanity
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+          FTP_SERVER: ${{ secrets.HOSTINGER_FTP_SERVER }}
+          FTP_USER: ${{ secrets.HOSTINGER_FTP_USERNAME }}
+          FTP_PASS: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          LIVE_DIR: ${{ secrets.HOSTINGER_LIVE_DIR }}
+        # Shell string comparison (GitHub expression == is case-insensitive,
+        # this is not), plus fail-fast on unset/malformed secrets: an empty
+        # server-dir makes FTP-Deploy-Action default to "./" — the FTP root.
         run: |
-          echo "::error::You must type 'deploy-live' in the confirm box to run this."
-          exit 1
+          ok=1
+          [ "$CONFIRM" = "deploy-live" ] || { echo "::error::Type exactly 'deploy-live' in the confirm box."; ok=0; }
+          [ -n "$FTP_SERVER" ] || { echo "::error::HOSTINGER_FTP_SERVER secret is unset/empty."; ok=0; }
+          [ -n "$FTP_USER" ]   || { echo "::error::HOSTINGER_FTP_USERNAME secret is unset/empty."; ok=0; }
+          [ -n "$FTP_PASS" ]   || { echo "::error::HOSTINGER_FTP_PASSWORD secret is unset/empty."; ok=0; }
+          case "$LIVE_DIR" in
+            "") echo "::error::HOSTINGER_LIVE_DIR secret is unset/empty — the deploy would land in the FTP login root."; ok=0 ;;
+            */) ;;
+            *)  echo "::error::HOSTINGER_LIVE_DIR must end with a trailing slash."; ok=0 ;;
+          esac
+          [ "$ok" = 1 ]
 
       - uses: actions/checkout@v4
 
