@@ -2,21 +2,56 @@ import { config } from "../config.js";
 
 const { graphApiBase } = config.facebook;
 
+const REQUEST_TIMEOUT_MS = 30_000;
+// Codes worth retrying on a READ: 1/2 (unknown/service) + 4/17/32/613 (throttling).
+const TRANSIENT_FB_CODES = new Set([1, 2, 4, 17, 32, 613]);
+// Codes a WRITE may retry on: ONLY explicit throttle rejections. Codes 1 and 2
+// are ambiguous ("unknown"/"temporarily unavailable") — the write may already
+// have landed, so retrying them could publish a duplicate post or DM.
+const WRITE_RETRYABLE_FB_CODES = new Set([4, 17, 32, 613]);
+
+export class FacebookError extends Error {
+  constructor(message, { code = null, type = null, subcode = null, status = null } = {}) {
+    super(message);
+    this.name = "FacebookError";
+    this.code = code;
+    this.type = type;
+    this.subcode = subcode;
+    this.status = status;
+  }
+
+  /** Dead/expired token — the "bot silently down for days" failure. */
+  get isAuthError() {
+    return this.code === 190 || this.type === "OAuthException";
+  }
+
+  get isTransient() {
+    if (this.isAuthError) return false;
+    if (this.code !== null && TRANSIENT_FB_CODES.has(this.code)) return true;
+    return this.status !== null && this.status >= 500;
+  }
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
  * Create a Facebook API client bound to a specific page.
  * Returns an object with all API methods for that page.
  *
- * @param {{ id: string, token: string, name: string }} page
+ * @param {{ id: string, token: string, name: string, template?: string }} page
  */
 export function createPageClient(page) {
   const { id: pageId, token: pageAccessToken } = page;
 
   /**
    * Make an authenticated request to the Facebook Graph API.
+   * - Token travels in the Authorization header, not the URL (keeps it out of logs).
+   * - 30s timeout so one hung request can't stall the whole poll cycle.
+   * - Transient failures (network, 5xx, FB throttling codes) retry twice with
+   *   backoff. Auth errors surface immediately so token death is loud.
    */
   async function graphRequest(endpoint, options = {}) {
     const url = new URL(`${graphApiBase}${endpoint}`);
-    url.searchParams.set("access_token", pageAccessToken);
 
     if (options.params) {
       for (const [key, value] of Object.entries(options.params)) {
@@ -24,24 +59,92 @@ export function createPageClient(page) {
       }
     }
 
-    const fetchOptions = { method: options.method || "GET" };
+    const fetchOptions = {
+      method: options.method || "GET",
+      headers: { Authorization: `Bearer ${pageAccessToken}` },
+    };
 
     if (options.body) {
       fetchOptions.method = "POST";
-      fetchOptions.headers = { "Content-Type": "application/json" };
+      fetchOptions.headers["Content-Type"] = "application/json";
       fetchOptions.body = JSON.stringify(options.body);
     }
 
-    const response = await fetch(url, fetchOptions);
-    const data = await response.json();
+    const maxAttempts = 3;
+    // Writes (posts, replies, deletes) must NOT retry on ambiguous failures
+    // (timeout/5xx — the request may have landed, and a retry would double-post).
+    // They may only retry when Facebook explicitly REJECTED them with a
+    // throttle code. Reads can retry on anything transient.
+    const isWrite = (options.method || (options.body ? "POST" : "GET")) !== "GET";
+    let lastError;
 
-    if (data.error) {
-      throw new Error(
-        `Facebook API error: ${data.error.message} (code ${data.error.code})`
-      );
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const response = await fetch(url, {
+          ...fetchOptions,
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        });
+
+        const raw = await response.text();
+        let data;
+        try {
+          data = JSON.parse(raw);
+        } catch {
+          // A CDN 502 page etc. — not JSON. Treat as transient by status.
+          throw new FacebookError(
+            `Facebook returned non-JSON response (HTTP ${response.status})`,
+            { status: response.status || 500 }
+          );
+        }
+
+        if (data.error) {
+          throw new FacebookError(
+            `Facebook API error: ${data.error.message} (code ${data.error.code})`,
+            {
+              code: data.error.code ?? null,
+              type: data.error.type ?? null,
+              subcode: data.error.error_subcode ?? null,
+              status: response.status,
+            }
+          );
+        }
+
+        return data;
+      } catch (err) {
+        // Normalize network-level failures (timeout, DNS, reset) as transient
+        const fbErr =
+          err instanceof FacebookError
+            ? err
+            : new FacebookError(`Facebook request failed: ${err.message}`, { status: 599 });
+
+        lastError = fbErr;
+        const writeRetryable = fbErr.code !== null && WRITE_RETRYABLE_FB_CODES.has(fbErr.code);
+        const canRetry = fbErr.isTransient && (!isWrite || writeRetryable);
+        if (!canRetry || attempt === maxAttempts) {
+          throw fbErr;
+        }
+        const backoff = attempt * 2000 - 1000; // 1s, 3s
+        console.warn(
+          `[FB] [${page.name}] Transient error (attempt ${attempt}/${maxAttempts}), retrying in ${backoff}ms: ${fbErr.message}`
+        );
+        await sleep(backoff);
+      }
     }
 
-    return data;
+    throw lastError;
+  }
+
+  /**
+   * Verify the page token actually works. Used at boot so the startup email
+   * is a real health report, not unconditional good news.
+   */
+  async function verifyToken() {
+    try {
+      const data = await graphRequest(`/${pageId}`, { params: { fields: "name" } });
+      return { ok: true, name: data.name };
+    } catch (err) {
+      return { ok: false, error: err.message, isAuthError: err.isAuthError === true };
+    }
   }
 
   /**
@@ -56,9 +159,10 @@ export function createPageClient(page) {
   }
 
   /**
-   * Fetch messages within a specific conversation.
+   * Fetch messages within a specific conversation. 25 rather than the old 10 —
+   * a chatty thread was pushing the actual submission out of the AI's view.
    */
-  async function getMessages(conversationId, limit = 10) {
+  async function getMessages(conversationId, limit = 25) {
     const data = await graphRequest(`/${conversationId}/messages`, {
       params: {
         fields: "id,message,from,created_time,attachments",
@@ -69,21 +173,52 @@ export function createPageClient(page) {
   }
 
   /**
-   * Publish a text-only post to the Facebook page.
+   * Publish a post to the page feed — the single publish path for text-only,
+   * single-photo, and multi-photo posts, optionally scheduled.
+   *
+   * Photos are uploaded unpublished and attached to one feed post, which also
+   * fixes an old bug: POST /photos returns a PHOTO id, not a feed-post id, so
+   * corrections/deletions of photo posts were targeting the wrong object.
+   *
+   * @param {{ message: string, imageUrls?: string[], scheduledAt?: Date|null }} opts
+   * @returns {{ id: string }} the feed post id
    */
-  async function publishPost(message) {
-    return graphRequest(`/${pageId}/feed`, {
-      body: { message },
-    });
+  async function publishFeedPost({ message, imageUrls = [], scheduledAt = null }) {
+    const body = { message };
+
+    if (imageUrls.length > 0) {
+      const mediaIds = [];
+      for (const imageUrl of imageUrls) {
+        const photo = await graphRequest(`/${pageId}/photos`, {
+          body: { url: imageUrl, published: false },
+        });
+        mediaIds.push(photo.id);
+      }
+      body.attached_media = mediaIds.map((id) => ({ media_fbid: id }));
+    }
+
+    if (scheduledAt) {
+      body.published = false;
+      body.scheduled_publish_time = Math.floor(scheduledAt.getTime() / 1000);
+    }
+
+    return graphRequest(`/${pageId}/feed`, { body });
   }
 
   /**
-   * Publish a photo post to the Facebook page.
+   * Fetch the public permalink for a post (sent to submitters so they can
+   * like/share their own post).
    */
-  async function publishPhotoPost(imageUrl, caption) {
-    return graphRequest(`/${pageId}/photos`, {
-      body: { url: imageUrl, message: caption || "" },
-    });
+  async function getPermalink(postId) {
+    try {
+      const data = await graphRequest(`/${postId}`, {
+        params: { fields: "permalink_url" },
+      });
+      return data.permalink_url || null;
+    } catch (err) {
+      console.warn(`[FB] [${page.name}] Could not fetch permalink for ${postId}: ${err.message}`);
+      return null;
+    }
   }
 
   /**
@@ -115,9 +250,11 @@ export function createPageClient(page) {
     const conversations = await getConversations();
     const result = [];
 
-    console.log(
-      `[DEBUG] [${page.name}] Facebook returned ${conversations.length} conversation(s)`
-    );
+    if (config.logging.debug) {
+      console.log(
+        `[DEBUG] [${page.name}] Facebook returned ${conversations.length} conversation(s)`
+      );
+    }
 
     for (const convo of conversations) {
       const updatedTime = new Date(convo.updated_time).getTime();
@@ -126,7 +263,7 @@ export function createPageClient(page) {
         continue;
       }
 
-      const messages = await getMessages(convo.id, 10);
+      const messages = await getMessages(convo.id);
 
       const thread = [];
       for (const msg of messages.reverse()) {
@@ -199,10 +336,12 @@ export function createPageClient(page) {
   return {
     pageId,
     pageName: page.name,
+    template: page.template || "{text}",
+    verifyToken,
     getConversations,
     getMessages,
-    publishPost,
-    publishPhotoPost,
+    publishFeedPost,
+    getPermalink,
     deletePost,
     sendReply,
     fetchConversations,

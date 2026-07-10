@@ -1,25 +1,101 @@
+import { config } from "../config.js";
+
 /**
- * Format and publish an approved message as a page post.
- * If the submission includes images, publishes as a photo post.
- * The sender's name is not included (anonymous "Spotted" style).
+ * Apply the page's post template ("{text}" placeholder). split/join rather
+ * than replace() so user text containing "$" can't corrupt the output.
+ */
+function applyTemplate(template, text) {
+  return (template || "{text}").split("{text}").join(text);
+}
+
+/**
+ * If posting hours are configured and we're outside them, return the Date of
+ * the next window open (for Facebook native scheduling). Otherwise null —
+ * post immediately.
+ *
+ * Walks forward hour by hour using Intl so DST in the configured timezone is
+ * handled correctly without any offset math.
+ */
+export function nextPostingTime(now = new Date()) {
+  const hours = config.posting.hours;
+  if (!hours) return null;
+
+  const fmt = new Intl.DateTimeFormat("en-GB", {
+    timeZone: config.posting.timezone,
+    hour: "numeric",
+    hour12: false,
+  });
+  const hourOf = (d) => parseInt(fmt.format(d), 10) % 24;
+
+  if (hourOf(now) >= hours.start && hourOf(now) < hours.end) return null;
+
+  const target = new Date(now);
+  target.setMinutes(0, 30, 0); // land at hh:00:30, just inside the window
+  let guard = 0;
+  while (guard++ < 48) {
+    target.setTime(target.getTime() + 3600_000);
+    if (hourOf(target) === hours.start) break;
+  }
+
+  // Facebook needs scheduled_publish_time ≥ ~10 min out; if the window opens
+  // almost immediately, just post now.
+  if (target.getTime() - now.getTime() < 15 * 60_000) return null;
+  return target;
+}
+
+function formatLocalTime(date) {
+  return date.toLocaleString("en-GB", {
+    timeZone: config.posting.timezone,
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * Publish a submission to the page: template applied, all photos attached,
+ * scheduled if outside posting hours. Returns { id, scheduledAt, permalink }.
+ */
+export async function publishSubmission(submission, client) {
+  const message = applyTemplate(client.template, submission.text || "");
+  const scheduledAt = nextPostingTime();
+
+  const result = await client.publishFeedPost({
+    message,
+    imageUrls: submission.images || [],
+    scheduledAt,
+  });
+
+  let permalink = null;
+  if (!scheduledAt) {
+    permalink = await client.getPermalink(result.id);
+  }
+
+  return { id: result.id, scheduledAt, permalink };
+}
+
+/**
+ * Format and publish an approved message as a page post, then DM the sender —
+ * including a link to their live post (people immediately like and share
+ * their own post, and it stops the "did it go up?" resends).
  */
 export async function postApprovedMessage(submission, replyText, client) {
-  let result;
-  if (submission.images?.length > 0) {
-    result = await client.publishPhotoPost(submission.images[0], submission.text);
-  } else {
-    result = await client.publishPost(submission.text);
-  }
+  const { id, scheduledAt, permalink } = await publishSubmission(submission, client);
+
   console.log(
-    `[POSTED] Message ${submission.id} published as post ${result.id}`
+    `[POSTED] Message ${submission.id} published as post ${id}` +
+      (scheduledAt ? ` (scheduled for ${scheduledAt.toISOString()})` : "")
   );
 
-  // Reply to the sender via DM
+  let reply = replyText || "Your message has been approved and posted to the page!";
+  if (scheduledAt) {
+    reply += `\n\nIt will go live at ${formatLocalTime(scheduledAt)}.`;
+  } else if (permalink) {
+    reply += `\n\nHere's your post: ${permalink}`;
+  }
+
   try {
-    await client.sendReply(
-      submission.senderId,
-      replyText || "Your message has been approved and posted to the page!"
-    );
+    await client.sendReply(submission.senderId, reply);
     console.log(`[REPLY] Sent approval reply to ${submission.senderName}`);
   } catch (err) {
     console.warn(
@@ -27,7 +103,7 @@ export async function postApprovedMessage(submission, replyText, client) {
     );
   }
 
-  return result;
+  return { id, scheduledAt, permalink };
 }
 
 /**
@@ -62,30 +138,26 @@ export async function correctPost(oldPostId, submission, replyText, client) {
   }
 
   // Step 2: Repost with corrected content
-  let result;
-  if (submission.images?.length > 0) {
-    result = await client.publishPhotoPost(submission.images[0], submission.text);
-  } else {
-    result = await client.publishPost(submission.text);
-  }
-  console.log(
-    `[CORRECTED] Reposted as ${result.id} (replaced ${oldPostId})`
-  );
+  const { id, scheduledAt, permalink } = await publishSubmission(submission, client);
+  console.log(`[CORRECTED] Reposted as ${id} (replaced ${oldPostId})`);
 
   // Step 3: Notify the user
-  try {
-    await client.sendReply(
-      submission.senderId,
-      replyText || "No worries! The old post has been removed and the corrected version is now live."
-    );
-    console.log(`[REPLY] Sent correction confirmation to ${submission.senderName}`);
-  } catch (err) {
-    console.warn(
-      `[WARN] Could not reply to sender for correction: ${err.message}`
-    );
+  let reply =
+    replyText || "No worries! The old post has been removed and the corrected version is now live.";
+  if (scheduledAt) {
+    reply += `\n\nThe corrected post will go live at ${formatLocalTime(scheduledAt)}.`;
+  } else if (permalink) {
+    reply += `\n\nHere's the updated post: ${permalink}`;
   }
 
-  return result;
+  try {
+    await client.sendReply(submission.senderId, reply);
+    console.log(`[REPLY] Sent correction confirmation to ${submission.senderName}`);
+  } catch (err) {
+    console.warn(`[WARN] Could not reply to sender for correction: ${err.message}`);
+  }
+
+  return { id };
 }
 
 /**
@@ -107,9 +179,7 @@ export async function removePost(oldPostId, submission, replyText, client) {
     );
     console.log(`[REPLY] Sent deletion confirmation to ${submission.senderName}`);
   } catch (err) {
-    console.warn(
-      `[WARN] Could not reply to sender for deletion: ${err.message}`
-    );
+    console.warn(`[WARN] Could not reply to sender for deletion: ${err.message}`);
   }
 }
 

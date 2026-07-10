@@ -16,8 +16,14 @@ const required = (name) => {
  *   FACEBOOK_PAGE_ID   + FACEBOOK_PAGE_ACCESS_TOKEN   + FACEBOOK_PAGE_NAME
  *   FACEBOOK_PAGE_ID_2 + FACEBOOK_PAGE_ACCESS_TOKEN_2 + FACEBOOK_PAGE_NAME_2
  *   FACEBOOK_PAGE_ID_3 + ...
+ *
+ * Each page may set FACEBOOK_PAGE_TEMPLATE (or _2, _3...) to style its posts.
+ * The template must contain "{text}" — e.g. "📢 Spotted Submission\n\n{text}".
+ * Default is "{text}" (no change to the post body).
  */
 function parseFacebookPages() {
+  const defaultTemplate = process.env.POST_TEMPLATE || "{text}";
+
   // Option A: JSON array
   if (process.env.FACEBOOK_PAGES) {
     try {
@@ -32,6 +38,7 @@ function parseFacebookPages() {
           );
         }
         p.name = p.name || `Page ${p.id}`;
+        p.template = p.template || defaultTemplate;
       }
       return pages;
     } catch (err) {
@@ -51,6 +58,7 @@ function parseFacebookPages() {
       id: process.env.FACEBOOK_PAGE_ID,
       token: process.env.FACEBOOK_PAGE_ACCESS_TOKEN,
       name: process.env.FACEBOOK_PAGE_NAME || "Spotted",
+      template: process.env.FACEBOOK_PAGE_TEMPLATE || defaultTemplate,
     });
   }
 
@@ -63,6 +71,7 @@ function parseFacebookPages() {
         id,
         token,
         name: process.env[`FACEBOOK_PAGE_NAME_${i}`] || `Spotted ${i}`,
+        template: process.env[`FACEBOOK_PAGE_TEMPLATE_${i}`] || defaultTemplate,
       });
     }
   }
@@ -76,6 +85,26 @@ function parseFacebookPages() {
   return pages;
 }
 
+/**
+ * Parse POSTING_HOURS like "7-22" → { start: 7, end: 22 }.
+ * Unset or invalid → null (post immediately at any hour — current behaviour).
+ */
+function parsePostingHours(raw) {
+  if (!raw) return null;
+  const match = /^(\d{1,2})\s*-\s*(\d{1,2})$/.exec(raw.trim());
+  if (!match) {
+    console.warn(`[CONFIG] POSTING_HOURS "${raw}" is invalid (expected e.g. "7-22") — ignoring`);
+    return null;
+  }
+  const start = parseInt(match[1], 10);
+  const end = parseInt(match[2], 10);
+  if (start >= end || start < 0 || end > 24) {
+    console.warn(`[CONFIG] POSTING_HOURS "${raw}" is invalid — ignoring`);
+    return null;
+  }
+  return { start, end };
+}
+
 export const config = {
   facebook: {
     pages: parseFacebookPages(),
@@ -83,9 +112,19 @@ export const config = {
   },
   anthropic: {
     apiKey: required("ANTHROPIC_API_KEY"),
+    model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
   },
   server: {
     port: parseInt(process.env.PORT || "3000", 10),
+    // Public base URL of this service (e.g. https://nbm-production.up.railway.app).
+    // Needed for the approve/reject links in FLAG emails.
+    publicUrl: (process.env.PUBLIC_URL || "").replace(/\/$/, ""),
+    // Secret key required to read /stats, /messages, /flagged, /admin.
+    // While unset, those endpoints return 503 instead of exposing DM content.
+    adminKey: process.env.ADMIN_KEY || "",
+    // Secret for signing one-tap approve/reject links in FLAG emails.
+    // While unset, emails simply have no action buttons.
+    actionSecret: process.env.ACTION_SECRET || "",
   },
   polling: {
     intervalSeconds: parseInt(process.env.POLL_INTERVAL_SECONDS || "60", 10),
@@ -96,8 +135,17 @@ export const config = {
       process.env.CONFIDENCE_THRESHOLD || "0.7"
     ),
   },
+  posting: {
+    // e.g. "7-22" → posts only go live between 07:00 and 22:00 (timezone below);
+    // overnight submissions are scheduled for the next window open.
+    hours: parsePostingHours(process.env.POSTING_HOURS),
+    timezone: process.env.POSTING_TIMEZONE || "Europe/London",
+  },
   storage: {
     dataDir: process.env.DATA_DIR || "./data",
+  },
+  logging: {
+    debug: process.env.LOG_DEBUG === "true",
   },
   email: {
     resendApiKey: process.env.RESEND_API_KEY || "",

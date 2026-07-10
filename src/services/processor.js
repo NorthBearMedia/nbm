@@ -1,56 +1,58 @@
+import { config } from "../config.js";
 import { postApprovedMessage, notifyRejection, notifyFlagged, correctPost, removePost } from "../facebook/poster.js";
 import { moderateConversation } from "../moderation/moderator.js";
-import { resolveAction } from "../moderation/moderator.js";
-import { isConversationProcessed, getConversationUpdatedAt, getConversationPostId, saveConversation, getConversationProcessedAt } from "../db/database.js";
+import { resolveAction } from "../moderation/rules.js";
+import { shouldSkipConversation } from "./skiprules.js";
+import {
+  getConversationUpdatedAt,
+  getConversationPostId,
+  getConversationProcessedAt,
+  getConversation,
+  saveConversation,
+  isSubmissionPosted,
+  findRecentDuplicate,
+  getWatermark,
+} from "../db/database.js";
 import { sendNotification } from "./notifier.js";
-
-/**
- * Hard cutoff: only process conversations updated AFTER the bot started.
- * This prevents re-processing old conversations even if the database is wiped.
- */
-const BOOT_TIME = Date.now();
-console.log(`[PROCESSOR] Boot time recorded: ${new Date(BOOT_TIME).toISOString()} — ignoring all older conversations`);
+import { textsMatch } from "../utils/text.js";
 
 /**
  * Process updated conversations for a single page:
- * 1. Fetch conversations with new messages (only those updated after boot)
+ * 1. Fetch conversations with new messages (only those updated after the
+ *    persisted watermark — old conversations are never touched)
  * 2. Skip conversations already processed
- * 3. Give the AI the full thread to identify the submission
+ * 3. Give the AI the full thread (text + actual images) to identify the submission
  * 4. Post/reject/flag based on the AI decision
  * 5. Reply to the sender once per conversation
  *
  * @param {object} client — page client from createPageClient()
+ * @returns {{ processed: number, error?: Error }}
  */
 export async function processNewMessages(client) {
   const tag = `[${client.pageName}]`;
-  console.log(`${tag} [POLL] Checking for new messages...`);
 
-  // Skip rules:
-  // 1. ALWAYS skip anything last updated before we booted (hard cutoff — never touch old stuff)
-  // 2. If never seen before and updated after boot — process it (new conversation)
-  // 3. If already processed but updated_time changed — process it (follow-up message)
-  // 4. If already processed and updated_time unchanged — skip (nothing new)
-  const shouldSkip = (conversationId, updatedTime) => {
-    if (updatedTime < BOOT_TIME) return true;
-    if (!isConversationProcessed(conversationId)) return false;
-    const storedAt = getConversationUpdatedAt(conversationId);
-    return updatedTime <= storedAt;
-  };
+  const watermark = getWatermark();
+  const shouldSkip = (conversationId, updatedTime) =>
+    shouldSkipConversation({
+      updatedTime,
+      watermark,
+      storedUpdatedAt: getConversationUpdatedAt(conversationId),
+    });
 
   let conversations;
   try {
     conversations = await client.fetchConversations(shouldSkip);
   } catch (err) {
     console.error(`${tag} [ERROR] Failed to fetch conversations: ${err.message}`);
-    return { processed: 0 };
+    // Surface the error so the poller can track page health and alert the owner
+    return { processed: 0, error: err };
   }
 
   if (conversations.length === 0) {
-    console.log(`${tag} [POLL] No conversations found.`);
     return { processed: 0 };
   }
 
-  console.log(`${tag} [POLL] Found ${conversations.length} conversation(s).`);
+  console.log(`${tag} [POLL] Found ${conversations.length} conversation(s) with new activity.`);
 
   for (const convo of conversations) {
     const userMessages = convo.thread.filter((m) => !m.isPage);
@@ -59,6 +61,23 @@ export async function processNewMessages(client) {
       `${tag} [ANALYSE] Conversation ${convo.conversationId} from ${convo.senderName} (${userMessages.length} user msgs)`
     );
 
+    const extras = { pageId: client.pageId, pageName: client.pageName };
+
+    // One helper for every "needs a human" outcome so no FLAG can silently
+    // rot in the queue without the owner hearing about it.
+    const flagAndNotify = async (submission, moderation, kind) => {
+      try {
+        await notifyFlagged(submission, moderation.reply, client);
+      } catch (err) {
+        console.warn(`${tag} [WARN] Could not send flagged reply: ${err.message}`);
+      }
+      saveConversation(convo, moderation, "FLAG", null, {
+        ...extras,
+        images: submission.images,
+      });
+      await sendNotification(submission, moderation, "FLAG", { kind });
+    };
+
     // Mark messages as new if this is a follow-up to an already-processed conversation
     const lastProcessedAt = getConversationProcessedAt(convo.conversationId);
     const threadWithNewMarkers = convo.thread.map((msg) => ({
@@ -66,10 +85,17 @@ export async function processNewMessages(client) {
       isNew: lastProcessedAt > 0 && msg.timestamp > lastProcessedAt,
     }));
 
-    // Give the AI the full thread
+    // Tell the AI what the page already knows about this conversation
+    const existingRow = getConversation(convo.conversationId);
+    const pageState = {
+      livePostId: getConversationPostId(convo.conversationId),
+      lastAction: existingRow?.action || null,
+    };
+
+    // Give the AI the full thread (with real images)
     let moderation;
     try {
-      moderation = await moderateConversation(threadWithNewMarkers);
+      moderation = await moderateConversation(threadWithNewMarkers, pageState);
     } catch (err) {
       console.error(
         `${tag} [ERROR] Moderation failed for conversation ${convo.conversationId}: ${err.message}`
@@ -79,6 +105,7 @@ export async function processNewMessages(client) {
         submissionMessageId: null,
         submissionText: null,
         hasImages: false,
+        useImagesFromMessageId: null,
         reason: "Moderation error — flagged for manual review",
         confidence: 0,
         reply: "Thanks for your message! It's been queued for review.",
@@ -90,7 +117,7 @@ export async function processNewMessages(client) {
       console.log(
         `${tag} [SKIP] No submission found in conversation ${convo.conversationId}: ${moderation.reason}`
       );
-      saveConversation(convo, moderation, "SKIP", null);
+      saveConversation(convo, moderation, "SKIP", null, extras);
       continue;
     }
 
@@ -108,11 +135,11 @@ export async function processNewMessages(client) {
       }
       // Save as ASK — when the user replies, updated_at will change
       // and shouldSkip will let us re-process the conversation
-      saveConversation(convo, moderation, "ASK", null);
+      saveConversation(convo, moderation, "ASK", null, extras);
       continue;
     }
 
-    const action = resolveAction(moderation);
+    const action = resolveAction(moderation, config.moderation.confidenceThreshold);
 
     console.log(
       `${tag} [DECISION] ${action} (${moderation.decision} @ ${moderation.confidence}) — ${moderation.reason}`
@@ -123,12 +150,11 @@ export async function processNewMessages(client) {
       (m) => m.id === moderation.submissionMessageId
     );
 
-    // Resolve the image(s) to attach. The image MUST come from a message the AI
-    // explicitly identified — NEVER scavenged from elsewhere in the thread. That
-    // scavenging is what stapled old/unrelated images onto new submissions.
+    // Resolve the image(s) to attach. The image MUST come from a message the
+    // AI explicitly identified — NEVER scavenged from elsewhere in the thread.
     //
-    // For CORRECTION: if the AI pointed at a correction image we can't find, do
-    // NOT delete the live post and republish blind — ask the user to resend.
+    // For CORRECTION: if the AI pointed at a correction image we can't find,
+    // do NOT delete the live post and republish blind — ask the user to resend.
     if (action === "CORRECTION" && moderation.useImagesFromMessageId) {
       const correctionMsg = convo.thread.find(
         (m) => m.id === moderation.useImagesFromMessageId
@@ -140,19 +166,18 @@ export async function processNewMessages(client) {
         try {
           await client.sendReply(
             convo.senderId,
-            moderation.reply ||
-              "Could you resend the correct photo? I couldn't find it on my end."
+            "Could you resend the correct photo? I couldn't find it on my end."
           );
         } catch (err) {
           console.warn(`${tag} [WARN] Could not send CORRECTION resend request: ${err.message}`);
         }
-        saveConversation(convo, moderation, "ASK", null);
+        saveConversation(convo, moderation, "ASK", null, extras);
         continue;
       }
     }
 
-    // Images come ONLY from the AI-identified image message, or failing that the
-    // submission message's own attachments. We never reach across the thread.
+    // Images come ONLY from the AI-identified image message, or failing that
+    // the submission message's own attachments. We never reach across the thread.
     let images = [];
     if (moderation.useImagesFromMessageId) {
       const imageMsg = convo.thread.find(
@@ -168,32 +193,71 @@ export async function processNewMessages(client) {
       console.log(`${tag} [IMAGES] Found ${images.length} image(s) to post`);
     }
 
-    const submission = {
-      id: moderation.submissionMessageId || convo.conversationId,
-      conversationId: convo.conversationId,
-      text: moderation.submissionText || "",
-      images,
-      senderName: convo.senderName,
-      senderId: convo.senderId,
-      timestamp: submissionMsg?.timestamp || convo.updatedTime,
-      pageName: client.pageName,
-    };
+    let submissionText = moderation.submissionText || "";
 
-    // If the AI says this submission has an image but we couldn't bind one to the
-    // identified message, don't guess — flag for a human rather than post a wrong
-    // or missing image.
+    // Post exactly what the resident wrote: if the AI's transcription matches
+    // the original message, use the original; if it silently paraphrased,
+    // don't publish it under the community's name without review.
+    // Skip this for image-only submissions (the AI legitimately returns little
+    // or no caption) — otherwise an empty submissionText false-flags as a mismatch.
+    if (action === "POST" && submissionMsg?.text && submissionText.trim()) {
+      const match = textsMatch(submissionText, submissionMsg.text);
+      if (match === "exact") {
+        submissionText = submissionMsg.text;
+      } else if (match === "mismatch") {
+        console.warn(
+          `${tag} [WARN] AI transcription doesn't match the original message — flagging instead of posting`
+        );
+        moderation.reason = `Submission text mismatch (AI paraphrased?) — flagged for review. ${moderation.reason}`;
+        await flagAndNotify(
+          buildSubmission(convo, moderation, submissionMsg, submissionText, images, client),
+          moderation,
+          "text-mismatch"
+        );
+        continue;
+      }
+      // "subset" (the AI trimmed a greeting) is fine — keep the AI text.
+    }
+
+    const submission = buildSubmission(convo, moderation, submissionMsg, submissionText, images, client);
+
+    // If the AI says this submission has an image but we couldn't bind one to
+    // the identified message, don't guess — flag for a human.
     if (action === "POST" && moderation.hasImages && images.length === 0) {
       console.warn(
         `${tag} [WARN] hasImages=true but no image could be bound to the submission — flagging instead of posting`
       );
-      await notifyFlagged(submission, moderation.reply, client);
-      saveConversation(convo, moderation, "FLAG", null);
+      await flagAndNotify(submission, moderation, "image-binding-failed");
       continue;
     }
 
     let postId = null;
 
     if (action === "POST") {
+      // Ledger check: this exact message must never be published twice, no
+      // matter what the AI decides on a re-poll.
+      if (isSubmissionPosted(convo.conversationId, moderation.submissionMessageId)) {
+        console.log(
+          `${tag} [SKIP] Submission ${moderation.submissionMessageId} was already posted — not re-posting`
+        );
+        saveConversation(convo, { ...moderation, decision: "SKIP", reason: "Already posted" }, "SKIP", null, extras);
+        continue;
+      }
+
+      // Duplicate detection: same flyer resent, or two people submitting the
+      // same event → flag with a pointer instead of double-posting.
+      const duplicate = findRecentDuplicate(client.pageId, submissionText, {
+        excludeConversationId: convo.conversationId,
+      });
+      if (duplicate) {
+        console.warn(
+          `${tag} [WARN] Possible duplicate of post ${duplicate.postId} — flagging for review`
+        );
+        moderation.reason = `Possible duplicate of an existing post (${duplicate.postId}). ${moderation.reason}`;
+        await flagAndNotify(submission, moderation, "possible-duplicate");
+        continue;
+      }
+
       try {
         const result = await postApprovedMessage(submission, moderation.reply, client);
         postId = result.id;
@@ -201,7 +265,8 @@ export async function processNewMessages(client) {
         console.error(
           `${tag} [ERROR] Failed to post from conversation ${convo.conversationId}: ${err.message}`
         );
-        saveConversation(convo, moderation, "FLAG", null);
+        moderation.reason = `Facebook posting failed: ${err.message}`;
+        await flagAndNotify(submission, moderation, "posting-failed");
         continue;
       }
     } else if (action === "CORRECTION") {
@@ -217,7 +282,8 @@ export async function processNewMessages(client) {
           console.error(
             `${tag} [ERROR] Failed to post correction for conversation ${convo.conversationId}: ${err.message}`
           );
-          saveConversation(convo, moderation, "FLAG", null);
+          moderation.reason = `Facebook posting failed: ${err.message}`;
+          await flagAndNotify(submission, moderation, "posting-failed");
           continue;
         }
       } else {
@@ -228,7 +294,8 @@ export async function processNewMessages(client) {
           console.error(
             `${tag} [ERROR] Failed to correct post for conversation ${convo.conversationId}: ${err.message}`
           );
-          saveConversation(convo, moderation, "FLAG", null);
+          moderation.reason = `Facebook correction failed: ${err.message}`;
+          await flagAndNotify(submission, moderation, "posting-failed");
           continue;
         }
       }
@@ -253,25 +320,45 @@ export async function processNewMessages(client) {
           console.error(
             `${tag} [ERROR] Failed to delete post for conversation ${convo.conversationId}: ${err.message}`
           );
-          saveConversation(convo, moderation, "FLAG", null);
+          moderation.reason = `Facebook deletion failed: ${err.message}`;
+          await flagAndNotify(submission, moderation, "posting-failed");
           continue;
         }
       }
     } else if (action === "REJECT") {
       await notifyRejection(submission, moderation.reply, client);
     } else {
+      // FLAG (AI decision or low confidence)
       console.log(
         `${tag} [FLAG] Conversation ${convo.conversationId} flagged for manual review.`
       );
-      await notifyFlagged(submission, moderation.reply, client);
+      await flagAndNotify(submission, moderation, "ai-flagged");
+      continue;
     }
 
-    // Save to database
-    saveConversation(convo, moderation, action, postId);
+    // Save to database (records the submission in the ledger when posted)
+    saveConversation(convo, moderation, action, postId, {
+      ...extras,
+      images,
+      postedText: submissionText,
+    });
 
     // Send email notification
     await sendNotification(submission, moderation, action);
   }
 
   return { processed: conversations.length };
+}
+
+function buildSubmission(convo, moderation, submissionMsg, text, images, client) {
+  return {
+    id: moderation.submissionMessageId || convo.conversationId,
+    conversationId: convo.conversationId,
+    text,
+    images,
+    senderName: convo.senderName,
+    senderId: convo.senderId,
+    timestamp: submissionMsg?.timestamp || convo.updatedTime,
+    pageName: client.pageName,
+  };
 }
