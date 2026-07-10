@@ -149,6 +149,24 @@ try {
   console.error('[Seed] Richford list error:', err.message);
 }
 
+// ─── One-time amend: Richford v2 (Norton's answers + Dave's email) ───
+// Runs after the v1 seed so a fresh boot applies create-then-amend in order.
+try {
+  const rmsV2Done = db.prepare("SELECT value FROM app_meta WHERE key='richford_seed_v2'").get();
+  if (!rmsV2Done) {
+    const { amendRichfordV2 } = await import('./scripts/seed-richford-tasks.js');
+    const report = amendRichfordV2(db);
+    if (report) {
+      db.prepare("INSERT INTO app_meta (key, value) VALUES ('richford_seed_v2', ?)").run(new Date().toISOString());
+      console.log(`[Seed] Richford v2 amend: ${report.updated.length} updated, ${report.created.length} created, ${report.missing.length} not found.`);
+    } else {
+      console.log('[Seed] Richford client not found — v2 amend deferred to a later boot.');
+    }
+  }
+} catch (err) {
+  console.error('[Seed] Richford v2 amend error:', err.message);
+}
+
 // ─── Error Handler ──────────────────────────────────────
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err.message);

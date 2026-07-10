@@ -17,6 +17,7 @@ import { statusToProgress, bandToPriority } from '../lib/taskmap.js';
 const TASKS = [
   {
     title: 'World Cup truck images + write-up to Pro Rec',
+    aliases: ['1966 World Cup truck — imagery + write-up to Professional Recovery'],
     status: 'scheduled', band: 'this-week', type: 'ad-hoc',
     notes: 'Send the World Cup truck images and write-up to Paul Gregory and David at Pro Rec for editorial.',
   },
@@ -27,6 +28,7 @@ const TASKS = [
   },
   {
     title: 'Change contact number on Birdgehill ad', assignee: 'Norton',
+    aliases: ['Change contact number on Bridgehill ad'],
     status: 'scheduled', band: 'this-week', type: 'ad-hoc',
     notes: 'Update the number on the Birdgehill ad. (Name as written in notes — check spelling Birdgehill/Bridgehill.)',
   },
@@ -57,11 +59,13 @@ const TASKS = [
   },
   {
     title: 'Website changes — brief Dan',
+    aliases: ['RMS website changes (Dan’s list)'],
     status: 'scheduled', band: 'this-week', type: 'ad-hoc',
     notes: 'Changes needed: 1) remove the press brake machine pics; 2) take the pressure tester machine pic off; 3) engineering side needs its list going on the page; 4) move the pressure-testing content to the mechanic side; 5) CAD / SolidWorks design facilities (assume: add these to the engineering page). CONFIRM: is Dan making these changes or are we doing them and briefing him?',
   },
   {
     title: 'Visit RMS Derby — images + walkaround video of truck 66',
+    aliases: ['Visit RMS Derby — shoot the 1966 World Cup tribute truck'],
     status: 'inbox', band: '', type: 'ad-hoc',
     notes: 'Visit RMS Derby and capture images plus walkaround video footage. CONFIRM: truck fleet number 66, or 66 trucks?',
   },
@@ -114,6 +118,7 @@ const TASKS = [
   },
   {
     title: 'Inside front cover ad placement — take up opportunity',
+    aliases: ['Professional Recovery — take up inside-front-cover positioning'],
     status: 'inbox', band: '', type: 'sales',
     notes: 'Opportunity to put both ads inside the front cover. CONFIRM which magazine (AVRO?). Context from the meeting: Operator Focus is paid placement — that’s why RMS has never been in it.',
   },
@@ -162,6 +167,124 @@ export function seedRichford(db, { dry = false } = {}) {
   return { client, created, skipped };
 }
 
+// ─── v2 amendment: Norton's answers + Dave Lerpiniere's email ─────────────
+// The v1 seed may already have run on live before these answers arrived, so
+// corrections are applied as in-place UPDATEs (matched by title, client-scoped,
+// never touching done/cancelled state except where intended) plus new creates.
+// Safe to run any number of times.
+const V2_UPDATES = [
+  {
+    match: 'Visit RMS Derby — images + walkaround video of truck 66',
+    title: 'Visit RMS Derby — shoot the 1966 World Cup tribute truck',
+    deadline: '2026-07-14', status: 'scheduled', band: 'this-week',
+    notes: 'Capture images and walkaround video of the 1966 World Cup Winning Team tribute truck — the imagery feeds the Professional Recovery editorial, which needs everything by 15 July.',
+  },
+  {
+    match: 'Change contact number on Birdgehill ad',
+    title: 'Change contact number on Bridgehill ad',
+    notes: 'Update the number on the Bridgehill ad.',
+  },
+  {
+    match: 'Website changes — brief Dan',
+    title: 'RMS website changes (Dan’s list)', assignee: 'Norton',
+    notes: 'We’re making these ourselves: 1) remove the press brake machine pics; 2) take the pressure tester machine pic off; 3) engineering side’s list going on the page; 4) move the pressure-testing content to the mechanic side; 5) add CAD / SolidWorks design facilities to the engineering page.',
+  },
+  {
+    match: 'World Cup truck images + write-up to Pro Rec',
+    title: '1966 World Cup truck — imagery + write-up to Professional Recovery', assignee: 'Norton',
+    deadline: '2026-07-15', status: 'scheduled', band: 'this-week',
+    notes: 'Send imagery plus a written piece on the 1966 World Cup Winning Team branded truck to Professional Recovery — with them by 15 July to make the next issue. Liaise directly with Paul Gregory on the editorial (Dave copied him in).',
+  },
+  {
+    match: 'Tow Show ad campaign — run-up',
+    status: 'scheduled', planned: '2026-08-03',
+    notes: 'The Tow Show is in September — build the campaign and run it through August. (The Tow Show Guide full-page ad renewal is covered in the Professional Recovery renewals task.)',
+  },
+  {
+    match: 'Inside front cover ad placement — take up opportunity',
+    title: 'Professional Recovery — take up inside-front-cover positioning', assignee: 'Norton',
+    status: 'scheduled', band: 'this-week',
+    notes: 'The Professional Recovery director offered inside-front-cover placement for both RMS ads (conversation last week) — confirm and get it in place alongside the renewals. Context: Operator Focus is paid placement, which is why RMS has never been in it.',
+  },
+  {
+    match: 'Check tasks from David Lerpiniere email',
+    status: 'done', completed_at: '2026-07-10',
+    notes: 'Done — tasks extracted from Dave’s email onto Console: 15 July editorial deadline, advertising renewals, digital opportunities, advertorial content.',
+  },
+];
+
+const V2_CREATES = [
+  {
+    title: 'Professional Recovery renewals — agree with RMS', assignee: 'Norton',
+    status: 'scheduled', band: 'this-week', type: 'admin',
+    notes: 'Due for renewal per Dave Lerpiniere: 2× half-page ads in every issue of Professional Recovery at £200 per half (18 issues/yr) · full-page in the Tow Show Guide £400 · full-page in the 2027 Yearbook £450 · Gala Awards Dinner table of 10 £700. Forward features plan + group media pack attached to Dave’s email.',
+  },
+  {
+    title: 'Review Professional Recovery digital opportunities',
+    status: 'inbox', band: '', type: 'ad-hoc',
+    notes: 'Decide with RMS which are worth taking: 60/40 e-newsletter to 19,817 subscribers £475 · social amplification post with 25,000 guaranteed reach £450 · Tow Show interview with 10,000 guaranteed Facebook views £500 · bespoke videos (price on application).',
+  },
+  {
+    title: 'Send advertorial content to Professional Recovery',
+    status: 'inbox', band: '', type: 'ad-hoc',
+    notes: 'Dave: send over any advertorial content we’d like featured — they’re happy to support with it.',
+  },
+];
+
+export function amendRichfordV2(db, { dry = false } = {}) {
+  const client = db.prepare(
+    "SELECT id, name FROM clients WHERE is_system = 0 AND (lower(name) LIKE 'richford%' OR code = 'RMS') ORDER BY id LIMIT 1"
+  ).get();
+  if (!client) return null;
+
+  const all = () => db.prepare('SELECT * FROM tasks WHERE client_id = ? AND archived = 0').all(client.id);
+  const report = { updated: [], created: [], alreadyPresent: [], missing: [] };
+
+  const run = () => {
+    for (const u of V2_UPDATES) {
+      const t = all().find(r => norm(r.title) === norm(u.match) || (u.title && norm(r.title) === norm(u.title)));
+      if (!t) { report.missing.push(u.match); continue; }
+      const fields = {
+        title: u.title, notes: u.notes, assignee: u.assignee,
+        deadline: u.deadline, planned_date: u.planned,
+        task_status: u.status, task_band: u.band, completed_at: u.completed_at,
+        progress: u.status ? statusToProgress(u.status) : undefined,
+        priority: u.band ? bandToPriority(u.band) : undefined,
+      };
+      const sets = [], vals = [];
+      for (const [k, v] of Object.entries(fields)) {
+        if (v !== undefined) { sets.push(`${k} = ?`); vals.push(v); }
+      }
+      if (!sets.length) continue;
+      if (!dry) db.prepare(`UPDATE tasks SET ${sets.join(', ')} WHERE id = ?`).run(...vals, t.id);
+      report.updated.push(u.title || u.match);
+    }
+
+    const projectId = (() => {
+      const proj = db.prepare('SELECT id FROM projects WHERE client_id = ? ORDER BY id LIMIT 1').get(client.id);
+      return proj ? proj.id : db.prepare("INSERT INTO projects (client_id, name, status) VALUES (?, 'General', 'active')").run(client.id).lastInsertRowid;
+    })();
+    const existing = all().map(r => norm(r.title));
+    for (const t of V2_CREATES) {
+      if (existing.includes(norm(t.title))) { report.alreadyPresent.push(t.title); continue; }
+      if (!dry) {
+        db.prepare(
+          `INSERT INTO tasks (project_id, client_id, title, assignee, deadline, planned_date, progress, priority,
+             task_status, task_band, task_type, notes, is_recurring, recur_interval, recur_unit)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, '')`
+        ).run(
+          projectId, client.id, t.title, t.assignee || '', t.deadline || '', t.planned || '',
+          statusToProgress(t.status), t.band ? bandToPriority(t.band) : 'medium',
+          t.status, t.band || '', t.type, t.notes || ''
+        );
+      }
+      report.created.push(t.title);
+    }
+  };
+  dry ? run() : db.transaction(run)();
+  return { client, ...report };
+}
+
 // CLI entrypoint (kept for manual runs in the Railway shell)
 if (process.argv[1] && process.argv[1].endsWith('seed-richford-tasks.js')) {
   const { default: db } = await import('../database.js');
@@ -171,6 +294,12 @@ if (process.argv[1] && process.argv[1].endsWith('seed-richford-tasks.js')) {
   console.log(`\nRichford Motor Services list ${DRY ? '(DRY RUN)' : ''}`);
   console.log(`  client: #${report.client.id} ${report.client.name}`);
   console.log(`  tasks created: ${report.created}`);
-  console.log(`  skipped as already present: ${report.skipped.length}${report.skipped.length ? ' — ' + report.skipped.join(' | ') : ''}\n`);
+  console.log(`  skipped as already present: ${report.skipped.length}${report.skipped.length ? ' — ' + report.skipped.join(' | ') : ''}`);
+  const v2 = amendRichfordV2(db, { dry: DRY });
+  console.log(`\nv2 amendment ${DRY ? '(DRY RUN)' : ''}`);
+  console.log(`  updated: ${v2.updated.length}${v2.updated.length ? ' — ' + v2.updated.join(' | ') : ''}`);
+  console.log(`  created: ${v2.created.length}${v2.created.length ? ' — ' + v2.created.join(' | ') : ''}`);
+  console.log(`  already present: ${v2.alreadyPresent.length}`);
+  console.log(`  not found (skipped): ${v2.missing.length}${v2.missing.length ? ' — ' + v2.missing.join(' | ') : ''}\n`);
   process.exit(0);
 }
