@@ -1,0 +1,53 @@
+name: Deploy Willis Cooper (LIVE)
+
+# Manual-only. Builds the PRODUCTION copy of sites/williscooper (verbatim
+# clone: analytics on, indexable, robots.txt/sitemap kept) and uploads it
+# over FTPS to the williscooper.com document root on Hostinger.
+#
+# This deploys the LIVE site. It only writes inside the folder named by
+# HOSTINGER_LIVE_DIR — double-check that secret points at the
+# williscooper.com website's docroot.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   HOSTINGER_FTP_SERVER    FTP host from hPanel → Files → FTP Accounts
+#   HOSTINGER_FTP_USERNAME  the FTP account username
+#   HOSTINGER_FTP_PASSWORD  that FTP account's password
+#   HOSTINGER_LIVE_DIR      server path to the williscooper.com docroot,
+#                           e.g. /domains/williscooper.com/public_html/  (MUST end with /)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy-live" to confirm you are deploying the LIVE williscooper.com site'
+        required: true
+        default: ''
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard — require explicit confirmation
+        if: ${{ github.event.inputs.confirm != 'deploy-live' }}
+        run: |
+          echo "::error::You must type 'deploy-live' in the confirm box to run this."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build production site
+        run: node sites/williscooper/make-staging.mjs sites/williscooper-live-build --production
+
+      - name: Deploy over FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.HOSTINGER_FTP_SERVER }}
+          username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
+          password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./sites/williscooper-live-build/
+          server-dir: ${{ secrets.HOSTINGER_LIVE_DIR }}

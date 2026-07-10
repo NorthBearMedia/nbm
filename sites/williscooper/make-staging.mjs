@@ -1,29 +1,42 @@
 #!/usr/bin/env node
-// Build a STAGING-safe copy of the Willis Cooper static site.
+// Build a deployable copy of the Willis Cooper static site.
 //
-// The source under sites/williscooper/ is a faithful clone of the LIVE site,
-// so it still carries the live Google Analytics + Fathom tags and
-// robots=index. Serving that verbatim on a public staging subdomain would
-// pump test traffic into the live analytics and let search engines index a
-// duplicate of the live site. This script emits a copy with those two things
-// neutralised, leaving the source untouched.
+// Two modes:
 //
-// Usage:  node make-staging.mjs [outDir]
-//   outDir defaults to ../williscooper-staging-build (a sibling of this folder)
+// STAGING (default) — the source under sites/williscooper/ is a faithful
+// clone of the LIVE site, so it still carries the live Google Analytics +
+// Fathom tags and robots=index. Serving that verbatim on a public staging
+// URL would pump test traffic into the live analytics and let search engines
+// index a duplicate. Staging mode emits a copy with those neutralised.
 //
-// Flip either constant to false to opt out of that transform.
-const NOINDEX = true;          // replace robots meta with noindex,nofollow
-const DISABLE_ANALYTICS = true; // strip the live GA + Fathom tags
+// PRODUCTION (--production) — for deploying to williscooper.com itself:
+// pages are copied verbatim (analytics on, indexable, robots.txt/sitemap/
+// llms.txt kept). Only the repo tooling files (this script, README, deploy
+// docs, zips) are excluded.
+//
+// Usage:  node make-staging.mjs [outDir] [--production]
+//   outDir defaults to ../williscooper-staging-build
+//   (or ../williscooper-live-build with --production)
 
 import { readdirSync, statSync, mkdirSync, copyFileSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const flags = process.argv.slice(2).filter(a => a.startsWith('--'));
+const positional = process.argv.slice(2).filter(a => !a.startsWith('--'));
+const PRODUCTION = flags.includes('--production');
+
+const NOINDEX = !PRODUCTION;           // replace robots meta with noindex,nofollow
+const DISABLE_ANALYTICS = !PRODUCTION; // strip the live GA + Fathom tags
+
 const SRC = dirname(fileURLToPath(import.meta.url));
-const OUT = process.argv[2] || join(SRC, '..', 'williscooper-staging-build');
+const OUT = positional[0] || join(SRC, '..', PRODUCTION ? 'williscooper-live-build' : 'williscooper-staging-build');
 
 // Dev/tooling files that should never be published to the live-facing site.
-const SKIP = new Set(['make-staging.mjs', 'README.md', 'DEPLOY-STAGING.md', 'williscooper-staging.zip']);
+const SKIP = new Set([
+  'make-staging.mjs', 'README.md', 'DEPLOY.md', 'DEPLOY-STAGING.md',
+  'williscooper-staging.zip', 'williscooper-live.zip',
+]);
 
 // Crawler-facing files that describe the LIVE site. On staging we don't want a
 // sitemap or llms manifest advertising content, so drop them when noindexing.
@@ -102,7 +115,7 @@ for (const abs of walk(SRC)) {
   }
 }
 
-console.log(`Staging build → ${OUT}`);
+console.log(`${PRODUCTION ? 'PRODUCTION' : 'Staging'} build → ${OUT}`);
 console.log(`  HTML pages processed : ${htmlCount}`);
 console.log(`  noindex applied      : ${noindexSet}`);
 console.log(`  GA tags removed      : ${gaStripped}`);
