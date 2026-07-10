@@ -157,6 +157,27 @@ function render(d) {
         <div class="hint" style="margin-top:8px">"Movement" is places gained or lost on Google vs the previous period · "pg 1" means the first page of results.</div>
       </div>`;
     }
+    if (d.search.targets?.length) {
+      const tMove = t => {
+        if (t.position == null) return t.prevPosition != null ? '<span class="delta down" style="display:inline">dropped off</span>' : '<span class="delta flat" style="display:inline">—</span>';
+        if (t.movement == null) return t.prevPosition == null ? '<span class="delta up" style="display:inline">new</span>' : '<span class="delta flat" style="display:inline">—</span>';
+        if (Math.abs(t.movement) < 0.05) return '<span class="delta flat" style="display:inline">no change</span>';
+        const up = t.movement > 0;
+        return `<span class="delta ${up ? 'up' : 'down'}" style="display:inline">${up ? '▲ up' : '▼ down'} ${Math.abs(t.movement).toFixed(1)}</span>`;
+      };
+      html += `<div class="panel" style="margin-top:16px">
+        <h2 style="margin-bottom:10px">Where you rank for your target searches</h2>
+        <table class="data">
+          <thead><tr><th>Target search</th><th class="num">Position</th><th class="num">Times shown</th><th class="num">Movement</th></tr></thead>
+          <tbody>${d.search.targets.map(t => `
+            <tr><td class="trunc" title="${esc(t.keyword)}"><strong>${esc(t.keyword)}</strong></td>
+            <td class="num">${t.position != null ? t.position.toFixed(1) + (t.position <= 10 ? ' <span class="hint">pg 1</span>' : '') : '<span class="hint">not appearing yet</span>'}</td>
+            <td class="num">${fmtInt(t.impressions)}</td>
+            <td class="num">${tMove(t)}</td></tr>`).join('')}
+          </tbody></table>
+        <div class="hint" style="margin-top:8px">"Not appearing yet" means Google didn't show the site for that search this period — a clear opportunity to build content around it.</div>
+      </div>`;
+    }
   } else {
     html += section('Google search performance');
     html += `<div class="panel"><p class="hint">Google Search Console is being connected for your site — your Google rankings and search clicks will appear here soon.</p></div>`;

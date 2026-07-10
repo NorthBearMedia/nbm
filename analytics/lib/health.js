@@ -12,6 +12,22 @@ import { addDays, todayISO } from './dates.js';
 const ok = detail => ({ ok: true, detail });
 const bad = detail => ({ ok: false, detail });
 
+// Is the Clarity *tracking tag* actually on the live page? A saved API
+// token only reads data — without the tag on the site there is nothing to
+// read. Fetches the homepage (cache-busted) and looks for clarity.ms.
+// Returns true / false / null (couldn't check).
+async function clarityTagOnPage(domain) {
+  try {
+    const res = await fetch(`https://${domain}/?nbmv=${Date.now()}`, {
+      redirect: 'follow', signal: AbortSignal.timeout(10000),
+      headers: { 'User-Agent': 'Mozilla/5.0 (NBM Pulse health check)' },
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    return html.includes('clarity.ms') || /\bclarity\s*\(/.test(html);
+  } catch { return null; }
+}
+
 async function siteHealth(site, start, end) {
   const domain = (site.domain || '').toLowerCase().replace(/^www\./, '');
   const out = { id: site.id, client: site.client_name, domain };
@@ -33,17 +49,21 @@ async function siteHealth(site, start, end) {
         .then(s => ok(`${Math.round(s.clicks)} clicks, pos ${s.position ? s.position.toFixed(1) : '—'} (7d)`))
         .catch(e => bad(e.message.slice(0, 90)));
 
-  // Clarity: token → try a live sync (idempotent; surfaces bad tokens),
-  // then report stored snapshot depth.
+  // Clarity: two independent things must be true — the tracking TAG on the
+  // live page (collects data) and the API token here (reads it back).
+  // Check both so "not working" is never a mystery.
+  const tagOnPage = await clarityTagOnPage(domain);
+  const tagNote = tagOnPage === true ? 'tag on site ✓' : tagOnPage === false ? 'TAG NOT ON SITE ✗' : 'tag check inconclusive';
   if (!site.clarity_api_token) {
-    out.clarity = bad(site.clarity_project_id ? 'tag live, but no API token saved for this site' : 'not set up');
+    out.clarity = bad(`${site.clarity_project_id ? 'no API token saved for this site' : 'not set up'} · ${tagNote}`);
   } else {
     let syncErr = null;
     try { await syncSite(site); } catch (e) { syncErr = e.message.slice(0, 90); }
     const snaps = db.prepare('SELECT COUNT(*) AS n, MAX(snapshot_date) AS last FROM clarity_snapshots WHERE site_id = ?').get(site.id);
-    out.clarity = snaps.n > 0
-      ? ok(`${snaps.n} day(s) of data (latest ${snaps.last})${syncErr ? ' · last sync error: ' + syncErr : ''}`)
-      : bad(syncErr ? 'token errors: ' + syncErr : 'token saved, no data stored yet');
+    const base = snaps.n > 0
+      ? `${snaps.n} day(s) of data (latest ${snaps.last})${syncErr ? ' · last sync error: ' + syncErr : ''}`
+      : (syncErr ? 'token errors: ' + syncErr : 'token saved, no data stored yet');
+    out.clarity = (snaps.n > 0 && tagOnPage !== false) ? ok(`${base} · ${tagNote}`) : bad(`${base} · ${tagNote}`);
   }
   return out;
 }

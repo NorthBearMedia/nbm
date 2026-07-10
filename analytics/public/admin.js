@@ -499,6 +499,10 @@ function showSiteModal(site = null) {
         <div class="field"><label>Status</label>
           <select name="active"><option value="1" ${site?.active !== 0 ? 'selected' : ''}>Active</option><option value="0" ${site?.active === 0 ? 'selected' : ''}>Paused</option></select></div>
 
+        <div class="field full"><label>Target keywords (their ideal Google searches)</label>
+          <input name="target_keywords" value="${esc(site?.target_keywords)}" placeholder="e.g. care home derby, respite care ripley, dementia care">
+          <div class="help">Comma-separated. Reports & dashboard show where they rank for each — including "not appearing yet".</div></div>
+
         <div class="full" style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
           <strong style="font-size:13px">Data sources</strong>
           <div class="help" style="margin-top:2px">Tip: save with just the domain, then hit <strong>⚡ Auto-connect</strong> on the site card — it fills these in for you.</div>

@@ -237,7 +237,7 @@ app.get('/api/sites', requireAdmin, (req, res) => {
   res.json(sites.map(siteSummary));
 });
 
-const SITE_FIELDS = ['client_name', 'contact_name', 'contact_emails', 'domain', 'ga4_property_id', 'ga4_measurement_id', 'gsc_site_url', 'clarity_project_id', 'clarity_api_token', 'fathom_site_id', 'report_frequency', 'notes'];
+const SITE_FIELDS = ['client_name', 'contact_name', 'contact_emails', 'domain', 'ga4_property_id', 'ga4_measurement_id', 'gsc_site_url', 'clarity_project_id', 'clarity_api_token', 'fathom_site_id', 'report_frequency', 'notes', 'target_keywords'];
 
 function cleanSiteBody(body) {
   const out = {};
