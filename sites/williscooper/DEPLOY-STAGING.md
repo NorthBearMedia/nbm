@@ -33,23 +33,92 @@ node sites/williscooper/make-staging.mjs
 
 ---
 
-## Step 0 — create the subdomain in hPanel (required for every method)
+## Step 0 — subdomain + DNS (required for every method)
 
-The live site is a **Hostinger Website Builder** site, which can only serve
-pages built in the builder — it can't serve raw uploaded HTML. So the staging
-subdomain must live on a **Web Hosting** plan.
+Two facts shape this step:
 
-1. hPanel → **Domains → Subdomains**.
-2. Create subdomain `new` under `williscooper.com`.
-3. Note the **document root** it creates (something like
-   `public_html/new` or `domains/williscooper.com/public_html/new`).
-   That folder is where the site files go. Nothing outside it is touched.
-4. If `williscooper.com`'s DNS is managed elsewhere, add an A/CNAME record for
-   `new` pointing at the hosting server (hPanel shows the target).
+- The live site is a **Hostinger Website Builder** site, which can only serve
+  pages built in the builder — it can't serve raw uploaded HTML. So the
+  staging subdomain must live on a **Web Hosting** plan.
+- **williscooper.com's DNS is NOT in our Hostinger account** — the domain is
+  managed by Willis Cooper's external IT team (this is why Pulse verifies
+  their GSC via GA tag, not DNS). So the subdomain record has to be added by
+  them; we only host the files.
 
-> If you don't have a Web Hosting plan on this account (only Website Builder),
-> the subdomain option above won't serve raw HTML — tell me and we'll pick a
-> different host for staging (e.g. a separate static host) instead.
+The change we need from the IT team is **one additive A record**. Email
+(`MX`/`SPF`/`DKIM`/`DMARC`), the live website records (apex/`www`) and
+everything else in their zone stay untouched — adding a new record for the
+name `new` cannot affect existing records.
+
+Order matters (SSL issuance needs DNS resolving first):
+
+1. **hPanel:** Websites → **Add website** → use existing domain →
+   `new.williscooper.com` (the full hostname as an *external* domain —
+   Domains → Subdomains won't work because williscooper.com isn't on the
+   account). Note two things:
+   - the **document root** it creates — that folder is where the files go;
+   - the **Website IP address** shown on the hosting plan's dashboard.
+   - If hPanel asks to *verify domain ownership*, it will show a TXT record —
+     that's a second additive record to include in the email below.
+2. **Email the IT team** (template below) asking for the A record
+   `new` → that IP.
+3. Once `new.williscooper.com` resolves (minutes to ~1h;
+   check with `getent hosts new.williscooper.com` or any DNS lookup tool):
+   **hPanel → SSL** → install the free Let's Encrypt certificate for
+   `new.williscooper.com` and enable Force HTTPS.
+4. Deploy the files (Method A or B below).
+
+### Email template for the IT team
+
+> **Subject:** DNS addition for williscooper.com — one new A record (staging
+> preview, no changes to existing records)
+>
+> Hi,
+>
+> We're preparing an updated version of the williscooper.com website. Before
+> anything changes on the live site, we want to stage the new version on a
+> subdomain for Willis Cooper to review.
+>
+> Could you please **add** the following record to the williscooper.com DNS
+> zone:
+>
+> | Type | Name/Host | Value | TTL |
+> |---|---|---|---|
+> | A | `new` | `<IP from hPanel, step 1>` | 3600 (or your default) |
+>
+> This is an **additive change only** — please don't modify or remove any
+> existing records. Mail (MX/SPF/DKIM/DMARC), the current website records
+> (apex and www) and everything else stay exactly as they are. The new record
+> only makes `new.williscooper.com` resolve to our hosting for the preview.
+>
+> Once it resolves we'll issue the SSL certificate from our side (Let's
+> Encrypt) — no further action needed from you.
+>
+> Thanks!
+
+*(If hPanel required ownership verification in step 1, add its TXT record to
+the table — also purely additive.)*
+
+### Later: pointing the LIVE domain at the new site (not now)
+
+When the staging site is approved and it's time to cut williscooper.com over,
+that is a second, separate request to the IT team — kept here for reference:
+
+- *(day before)* lower the TTL on the apex `A` record and the `www` record to
+  300 for a fast rollback window;
+- *(cutover)* change the apex `A` record — currently `34.120.137.41`, the
+  Hostinger builder — to the new hosting IP, and point `www` the same way;
+- **touch nothing else** — MX/SPF/DKIM/DMARC and all other records stay,
+  so email is unaffected;
+- rollback = revert those two records;
+- afterwards, restore the TTL.
+
+The cutover deploy must be the **production** build (analytics on, indexable):
+set `NOINDEX = false` and `DISABLE_ANALYTICS = false` in `make-staging.mjs`.
+The pages' canonical URLs already point at `https://williscooper.com/…`, so
+they're correct for live. Note the old builder site stops rendering the moment
+the apex record moves — that's the point, but coordinate timing with the
+client.
 
 ---
 
