@@ -157,10 +157,11 @@ function startFocus(label, minutes, taskId) {
   persistFocus();
   // Unlock audio on this user gesture so the end chime can play later.
   try { focusAudioCtx = focusAudioCtx || new (window.AudioContext || window.webkitAudioContext)(); } catch {}
-  // Focusing a task moves it to In Progress (single-tasking reinforcement).
+  // Focusing a task moves it to In Progress (single-tasking reinforcement) —
+  // reload so the notebook draws its NOW ring straight away.
   if (taskId) {
     api(`/api/tasks/${taskId}`, { method: 'PUT', body: { task_status: 'in-progress' } })
-      .then(() => { if (currentView === 'dashboard') loadDashboard(); }).catch(() => {});
+      .then(() => loadClients()).catch(() => {});
   }
   document.getElementById('focusStartPanel')?.classList.remove('open');
   renderFocusPill();
@@ -178,6 +179,8 @@ function renderFocusPill() {
   taskEl.textContent = focusState.label;
   taskEl.style.cursor = focusState.taskId ? 'pointer' : 'default';
   document.getElementById('ftPause').innerHTML = focusState.paused ? '&#9654;' : '&#10073;&#10073;';
+  const pop = document.getElementById('ftPop');
+  if (pop) pop.style.display = focusPipSupported() ? '' : 'none';
 }
 
 function focusTick() {
@@ -190,6 +193,7 @@ function focusTick() {
   pill.classList.toggle('ft-urgent', !focusState.paused && rem <= 60000 && rem > 0);
   pill.classList.toggle('ft-over', rem <= 0);
   document.title = (rem <= 0 ? '⏰ ' : '⏱ ') + focusFmt(rem) + ' · ' + (focusState.label || 'Focus');
+  focusPipRender();
   if (rem <= 0 && !focusState.dinged) { focusState.dinged = true; persistFocus(); focusChime(); }
 }
 
@@ -211,8 +215,10 @@ function focusAdd(mins) {
 function focusStop() {
   clearInterval(focusInterval); focusInterval = null;
   focusState = null; persistFocus();
+  focusPipClose();
   document.getElementById('focusTimer').style.display = 'none';
   document.title = 'North Bear Console';
+  if (currentView === 'notebook') loadNotebookView();
 }
 
 function focusComplete() {
@@ -225,6 +231,106 @@ function focusComplete() {
 }
 
 function focusOpenTask() { if (focusState?.taskId) editTask(focusState.taskId); }
+
+// ─── Pop-out timer — floats on top of EVERY window, park it by the camera ──
+// Prefers Document Picture-in-Picture (Chrome); falls back to canvas→video
+// PiP (Safari). Both give a small always-on-top countdown you can drag
+// anywhere on screen — it keeps ticking over email, Photoshop, whatever.
+let focusPipWin = null;
+let focusPipCanvas = null;
+let focusPipVideo = null;
+
+function focusPipSupported() {
+  return !!(window.documentPictureInPicture ||
+    (document.pictureInPictureEnabled && HTMLCanvasElement.prototype.captureStream));
+}
+
+async function focusPopOut() {
+  if (!focusState) return;
+  try {
+    if (window.documentPictureInPicture) {
+      if (focusPipWin) { try { focusPipWin.focus(); } catch {} return; }
+      const win = await documentPictureInPicture.requestWindow({ width: 250, height: 96 });
+      focusPipWin = win;
+      const st = win.document.createElement('style');
+      st.textContent = `
+        body{margin:0;background:#141a17;color:#eee;font-family:system-ui,sans-serif;
+          display:flex;flex-direction:column;align-items:center;justify-content:center;
+          height:100vh;overflow:hidden;user-select:none}
+        #l{font-size:11px;color:#9ab5a6;max-width:92%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        #t{font-size:44px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.05;color:#3eaf84}
+        .warn #t{color:#e7b549}
+        .urgent #t,.over #t{color:#e05252}
+        .over #t{animation:fl 1s steps(2) infinite}
+        .paused #t{color:#8a938e}
+        @keyframes fl{50%{opacity:.35}}`;
+      win.document.head.appendChild(st);
+      win.document.body.innerHTML = '<div id="l"></div><div id="t"></div>';
+      win.addEventListener('pagehide', () => { focusPipWin = null; });
+      focusPipRender();
+    } else if (document.pictureInPictureEnabled && HTMLCanvasElement.prototype.captureStream) {
+      if (!focusPipCanvas) {
+        focusPipCanvas = document.createElement('canvas');
+        focusPipCanvas.width = 480; focusPipCanvas.height = 180;
+        focusPipVideo = document.createElement('video');
+        focusPipVideo.muted = true; focusPipVideo.playsInline = true;
+        focusPipVideo.srcObject = focusPipCanvas.captureStream(2);
+        focusPipVideo.style.cssText = 'position:fixed;left:-9999px;bottom:0;width:2px;height:2px;';
+        document.body.appendChild(focusPipVideo);
+      }
+      focusPipRender();
+      await focusPipVideo.play();
+      await focusPipVideo.requestPictureInPicture();
+    }
+  } catch (e) { console.warn('Pop-out timer unavailable:', e.message); focusFlashPill(); }
+}
+
+function focusPipRender() {
+  if (!focusState) return;
+  const rem = focusRemaining();
+  const cls = focusState.paused ? 'paused' : rem <= 0 ? 'over' : rem <= 60000 ? 'urgent' : rem <= 300000 ? 'warn' : '';
+  if (focusPipWin) {
+    try {
+      focusPipWin.document.body.className = cls;
+      focusPipWin.document.getElementById('l').textContent = focusState.label || '';
+      focusPipWin.document.getElementById('t').textContent = focusFmt(rem);
+    } catch {}
+  }
+  if (focusPipCanvas && document.pictureInPictureElement === focusPipVideo) {
+    const c = focusPipCanvas.getContext('2d');
+    c.fillStyle = '#141a17'; c.fillRect(0, 0, 480, 180);
+    c.textAlign = 'center';
+    c.fillStyle = '#9ab5a6'; c.font = '20px system-ui';
+    c.fillText((focusState.label || '').slice(0, 36), 240, 42);
+    c.fillStyle = focusState.paused ? '#8a938e' : rem <= 60000 ? '#e05252' : rem <= 300000 ? '#e7b549' : '#3eaf84';
+    c.font = '700 88px system-ui';
+    c.fillText(focusFmt(rem), 240, 142);
+  }
+}
+
+function focusPipClose() {
+  if (focusPipWin) { try { focusPipWin.close(); } catch {} focusPipWin = null; }
+  if (focusPipVideo && document.pictureInPictureElement === focusPipVideo) {
+    document.exitPictureInPicture().catch(() => {});
+  }
+}
+
+// No pop-out available (or it failed): pulse the pill so the eye finds it.
+function focusFlashPill() {
+  const pill = document.getElementById('focusTimer');
+  if (!pill) return;
+  pill.classList.remove('ft-flash'); void pill.offsetWidth;
+  pill.classList.add('ft-flash');
+}
+
+// Clicking a NOW-ringed line in the notebook: bring the timer up.
+function nbNowClick(id) {
+  if (focusState && focusState.taskId === id) {
+    if (focusPipSupported()) focusPopOut(); else focusFlashPill();
+    return;
+  }
+  focusForTask(id);
+}
 
 function focusChime() {
   try {
@@ -267,7 +373,11 @@ function focusForTask(id) {
   setTimeout(() => document.getElementById('fsMins').focus(), 30);
 }
 document.addEventListener('click', (e) => {
-  if (!e.target.closest('.focus-wrap') && !e.target.closest('.focus-start')) {
+  // Ignore clicks inside the notebook menu/palette — their items OPEN this
+  // panel, and the same click would otherwise bubble here and shut it again.
+  if (!e.target.closest('.focus-wrap') && !e.target.closest('.focus-start')
+    && !e.target.closest('#nbMenu') && !e.target.closest('#nbPalette')
+    && !e.target.closest('.nb-now-ring') && !e.target.closest('.nb-now-tag')) {
     document.getElementById('focusStartPanel')?.classList.remove('open');
   }
 });
@@ -1580,9 +1690,17 @@ function loadNotebookView() {
     const overdue = !done && t.deadline && t.deadline < today;
     const client = t.client_name && !t.client_is_system ? `<span class="nb-client">&nbsp;&mdash; ${esc(t.client_name)}</span>` : '';
     const due = overdue ? `<span class="nb-due">&nbsp;(${relDate(t.deadline)}!)</span>` : '';
+    // "I'm on this NOW": in-progress tasks that are mine get a red ink ring +
+    // NOW tag; clicking the ring summons the countdown instead of the modal.
+    const isNow = !done && t.task_status === 'in-progress'
+      && (!t.assignee || (currentUser && t.assignee === currentUser.display_name));
+    const nowTag = isNow ? `<span class="nb-now-tag" onclick="nbNowClick(${t.id});event.stopPropagation()" title="Working on this now — click for the countdown">NOW</span>` : '';
+    const titleCls = [hlc ? 'nb-hl nb-hl-' + hlc : '', isNow ? 'nb-now-ring' : ''].join(' ').trim();
+    const titleClick = isNow ? `nbNowClick(${t.id})` : `editTask(${t.id})`;
+    const titleTip = isNow ? 'Working on this NOW — click to bring up the timer' : 'Open task';
     return `<div class="nb-line ${done ? 'nb-done' : ''}" data-id="${t.id}" draggable="true">
       <button class="nb-bullet ${done ? 'nb-ticked' : ''}" onclick="nbTick(${t.id})" title="${done ? 'Untick' : 'Tick off'}">${done ? '&#10003;' : '&bull;'}</button>
-      <span class="nb-text"><span class="${hlc ? 'nb-hl nb-hl-' + hlc : ''}" onclick="editTask(${t.id})" title="Open task">${esc(t.title)}</span>${client}${due}</span>
+      <span class="nb-text">${nowTag}<span class="${titleCls}" onclick="${titleClick}" title="${titleTip}">${esc(t.title)}</span>${client}${due}</span>
       ${done ? '' : nbDatesHtml(t)}
       <button class="nb-marker ${hlc ? 'nb-marker-' + hlc : ''}" onclick="nbOpenPalette(${t.id}, event)" title="Colour-code this line"></button>
     </div>`;
@@ -1657,6 +1775,7 @@ function nbMenuEl() {
     <button class="nb-menu-item" onclick="nbMenuDue('')">Clear due date</button>
     <button class="nb-menu-item" onclick="nbMenuPush1()">Push both dates +1 day</button>
     <div class="nb-menu-sep"></div>
+    <button class="nb-menu-item nb-menu-now" onclick="nbMenuNow()">&#9654; I&rsquo;m on this NOW</button>
     <button class="nb-menu-item" id="nbMenuHl" onclick="nbMenuColour(event)">Colour-code&hellip;</button>
     <button class="nb-menu-item" onclick="nbMenuOpen()">Open full task</button>
     <div class="nb-menu-sep"></div>
@@ -1700,6 +1819,13 @@ async function nbMenuDue(when) {
 function nbMenuColour(ev) {
   const id = nbMenuTaskId; nbCloseMenu();
   if (id !== null) nbOpenPalette(id, ev);
+}
+
+// "I'm on this NOW" — opens the focus launcher prefilled with this task
+// (starting it marks the task In Progress, which draws the NOW ring).
+function nbMenuNow() {
+  const id = nbMenuTaskId; nbCloseMenu();
+  if (id !== null) nbNowClick(id);
 }
 
 function nbMenuPush1() {

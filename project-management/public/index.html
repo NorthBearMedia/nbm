@@ -12,7 +12,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=80">
+  <link rel="stylesheet" href="styles.css?v=81">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -46,6 +46,7 @@
       <div id="focusTimer" class="focus-timer" style="display:none">
         <span class="ft-task" id="ftTask" onclick="focusOpenTask()" title="Open the task you're focusing on"></span>
         <span class="ft-time" id="ftTime">25:00</span>
+        <button class="ft-btn" id="ftPop" onclick="focusPopOut()" title="Pop out — a floating countdown that stays on top of every window">&#8599;</button>
         <button class="ft-btn" id="ftPause" onclick="focusTogglePause()" title="Pause / resume">&#10073;&#10073;</button>
         <button class="ft-btn" onclick="focusAdd(5)" title="Add 5 minutes">+5</button>
         <button class="ft-btn ft-done" onclick="focusComplete()" title="Mark done &amp; stop">&#10003;</button>
@@ -714,6 +715,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=80"></script>
+  <script src="app.js?v=81"></script>
 </body>
 </html>
