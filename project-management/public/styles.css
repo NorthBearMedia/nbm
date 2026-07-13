@@ -3373,6 +3373,33 @@ select { color-scheme:dark; }
 .nb-line:hover .nb-push1 { opacity: .8; }
 .nb-push1:hover { color: #2d6a4f; border-color: #2d6a4f; opacity: 1 !important; }
 
+/* ─── NOTEBOOK v10: "I'm on this NOW" ring + floating countdown ── */
+/* Red-ink annotations for the one task you're doing right now: a hand-drawn
+   ring around the words and a scribbled NOW tag. Clicking either summons the
+   countdown (pop-out stays on top of every window). Sized to live inside the
+   fixed ruled-row height. */
+.nb-now-tag {
+  display: inline-block; cursor: pointer;
+  font-size: calc(var(--nb-small, 17px) - 3px); font-weight: 700; letter-spacing: .06em;
+  color: #b3372f; border: 1.5px solid rgba(179,55,47,.7); border-radius: 4px;
+  padding: 0 4px; margin-right: 8px; line-height: 1.25;
+  transform: rotate(-4deg) translateY(-2px);
+  animation: nbNowPulse 2.4s ease-in-out infinite;
+}
+.nb-now-ring {
+  display: inline-block; cursor: pointer;
+  border: 2px solid rgba(179,55,47,.75);
+  border-radius: 255px 12px 225px 12px / 12px 225px 12px 255px;  /* hand-drawn wobble */
+  padding: 0 9px 1px; margin: 0 -3px;
+  transform: rotate(-.4deg);
+}
+@keyframes nbNowPulse { 50% { box-shadow: 0 0 8px rgba(179,55,47,.45); } }
+.nb-menu-now { color: #b3372f; font-weight: 600; }
+
+/* Pill flash when the pop-out isn't available — the eye still finds the timer */
+@keyframes ftFlash { 50% { transform: scale(1.12); box-shadow: 0 0 16px rgba(224,82,82,.85); } }
+.focus-timer.ft-flash { animation: ftFlash .45s ease 3; }
+
 /* Touch: no hover, so keep the push + add gently visible and shrink the type */
 @media (max-width: 600px) {
   .nb-dates { font-size: 13px; gap: 7px; }
