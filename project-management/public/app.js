@@ -323,6 +323,12 @@ function focusFlashPill() {
   pill.classList.add('ft-flash');
 }
 
+// A task is "NOW" when it's in progress and on my plate.
+function nbIsNow(t) {
+  return t && t.task_status === 'in-progress'
+    && (!t.assignee || (currentUser && t.assignee === currentUser.display_name));
+}
+
 // Clicking a NOW-ringed line in the notebook: bring the timer up.
 function nbNowClick(id) {
   if (focusState && focusState.taskId === id) {
@@ -330,6 +336,21 @@ function nbNowClick(id) {
     return;
   }
   focusForTask(id);
+}
+
+// Take the NOW ring off: back to Scheduled, and stop its timer if running.
+async function nbNowOff(id) {
+  const t = findTaskById(id);
+  if (!t) return;
+  const prevStatus = t.task_status;
+  if (focusState && focusState.taskId === id) focusStop();
+  try {
+    await api(`/api/tasks/${id}`, { method: 'PUT', body: { task_status: 'scheduled' } });
+    nbPushUndo('take off NOW', async () => {
+      await api(`/api/tasks/${id}`, { method: 'PUT', body: { task_status: prevStatus } });
+    });
+    await loadClients();
+  } catch {}
 }
 
 function focusChime() {
@@ -1457,11 +1478,12 @@ async function nbPaint(colour) {
     if (t.task_type === 'urgent') body.task_type = 'ad-hoc';
     if (isWaiting) body.task_status = 'scheduled';
   } else {
-    // Eraser: strip whatever is giving this line its colour. Real deadlines
-    // stay put — an overdue line stays pink until it's rescheduled or done.
+    // Eraser: strip whatever is giving this line its colour — including the
+    // NOW ring (in-progress → scheduled). Real deadlines stay put — an
+    // overdue line stays pink until it's rescheduled or done.
     if (t.task_type === 'urgent') body.task_type = 'ad-hoc';
     if (t.task_band === 'today') body.task_band = 'scheduled';
-    if (isWaiting) body.task_status = 'scheduled';
+    if (isWaiting || nbIsNow(t)) body.task_status = 'scheduled';
     if (isDelegated) body.assignee = currentUser.display_name;
     if (t.planned_date === today && (!t.deadline || t.deadline !== today)) body.planned_date = '';
     if (!Object.keys(body).length) return;
@@ -1692,8 +1714,7 @@ function loadNotebookView() {
     const due = overdue ? `<span class="nb-due">&nbsp;(${relDate(t.deadline)}!)</span>` : '';
     // "I'm on this NOW": in-progress tasks that are mine get a red ink ring +
     // NOW tag; clicking the ring summons the countdown instead of the modal.
-    const isNow = !done && t.task_status === 'in-progress'
-      && (!t.assignee || (currentUser && t.assignee === currentUser.display_name));
+    const isNow = !done && nbIsNow(t);
     const nowTag = isNow ? `<span class="nb-now-tag" onclick="nbNowClick(${t.id});event.stopPropagation()" title="Working on this now — click for the countdown">NOW</span>` : '';
     const titleCls = [hlc ? 'nb-hl nb-hl-' + hlc : '', isNow ? 'nb-now-ring' : ''].join(' ').trim();
     const titleClick = isNow ? `nbNowClick(${t.id})` : `editTask(${t.id})`;
@@ -1775,7 +1796,7 @@ function nbMenuEl() {
     <button class="nb-menu-item" onclick="nbMenuDue('')">Clear due date</button>
     <button class="nb-menu-item" onclick="nbMenuPush1()">Push both dates +1 day</button>
     <div class="nb-menu-sep"></div>
-    <button class="nb-menu-item nb-menu-now" onclick="nbMenuNow()">&#9654; I&rsquo;m on this NOW</button>
+    <button class="nb-menu-item nb-menu-now" id="nbMenuNowBtn" onclick="nbMenuNow()">&#9654; I&rsquo;m on this NOW</button>
     <button class="nb-menu-item" id="nbMenuHl" onclick="nbMenuColour(event)">Colour-code&hellip;</button>
     <button class="nb-menu-item" onclick="nbMenuOpen()">Open full task</button>
     <div class="nb-menu-sep"></div>
@@ -1792,6 +1813,8 @@ function nbOpenMenu(taskId, x, y) {
   document.getElementById('nbMenuTitle').textContent = t.title.length > 34 ? t.title.slice(0, 34) + '…' : t.title;
 
   document.getElementById('nbMenuDate').value = t.deadline || '';
+  document.getElementById('nbMenuNowBtn').innerHTML = nbIsNow(t)
+    ? '&#10005; Not on this any more' : '&#9654; I&rsquo;m on this NOW';
   m.style.display = 'block';
   const mw = 240, mh = m.offsetHeight || 320;
   m.style.left = Math.min(x, window.innerWidth - mw - 12) + 'px';
@@ -1821,11 +1844,12 @@ function nbMenuColour(ev) {
   if (id !== null) nbOpenPalette(id, ev);
 }
 
-// "I'm on this NOW" — opens the focus launcher prefilled with this task
-// (starting it marks the task In Progress, which draws the NOW ring).
+// "I'm on this NOW" toggle — on: opens the focus launcher prefilled with this
+// task (starting marks it In Progress → NOW ring). Off: ring + timer removed.
 function nbMenuNow() {
   const id = nbMenuTaskId; nbCloseMenu();
-  if (id !== null) nbNowClick(id);
+  if (id === null) return;
+  nbIsNow(findTaskById(id)) ? nbNowOff(id) : nbNowClick(id);
 }
 
 function nbMenuPush1() {
