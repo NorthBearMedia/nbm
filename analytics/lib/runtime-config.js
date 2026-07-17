@@ -100,7 +100,7 @@ export function saveGoogleServiceAccount(json) {
   return parsed;
 }
 
-const SETTING_KEYS = ['smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'email_from', 'email_bcc', 'email_reply_to', 'owner_email', 'app_url', 'gsc_reader_email', 'hostinger_api_token', 'fathom_api_token', 'delivery_mode', 'anthropic_api_key', 'insights_model'];
+const SETTING_KEYS = ['smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'email_from', 'email_bcc', 'email_reply_to', 'owner_email', 'app_url', 'gsc_reader_email', 'hostinger_api_token', 'fathom_api_token', 'delivery_mode', 'anthropic_api_key', 'insights_model', 'consent_banner'];
 const KEEP_IF_BLANK = new Set(['smtp_pass', 'hostinger_api_token', 'fathom_api_token', 'anthropic_api_key']);
 
 export function saveSettings(body) {
@@ -140,6 +140,7 @@ export function setupStatus() {
       delivery_mode: getDeliveryMode(),
       anthropic_key_set: Boolean(getAnthropicKey()),
       insights_model: getInsightsModel(),
+      consent_banner: getSetting('consent_banner') === 'true',
     },
   };
 }

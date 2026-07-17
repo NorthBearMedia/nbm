@@ -21,7 +21,7 @@ import { autoConnectSite } from './lib/autoconnect.js';
 import { seedFirstCustomer } from './lib/seed.js';
 import * as hostinger from './lib/hostinger.js';
 import * as fathom from './lib/fathom.js';
-import { scheduleOpsSweep, runOpsSweep, runInjectionTest, runInjectionRollout } from './lib/ops.js';
+import { scheduleOpsSweep, runOpsSweep, runInjectionTest, runInjectionRollout, managedMetaTags } from './lib/ops.js';
 import { buildInjectorScript, buildSnippet, rootDirFor } from './lib/inject.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -335,6 +335,19 @@ app.post('/api/sites/:id/test-connections', requireAdmin, async (req, res) => {
   });
 });
 
+// The canonical tag block for a site — exactly what the file injector
+// serves, so the builder-paste version and the auto-injected version can
+// never drift apart. Used by the admin Tracking-code window.
+app.get('/api/sites/:id/snippet', requireAdmin, (req, res) => {
+  const site = db.prepare('SELECT * FROM sites WHERE id = ?').get(req.params.id);
+  if (!site) return res.status(404).json({ error: 'Site not found' });
+  const consentBanner = getSetting('consent_banner') === 'true';
+  res.json({
+    consentBanner,
+    snippet: buildSnippet(site.ga4_measurement_id || '', site.clarity_project_id || '', { consentBanner }),
+  });
+});
+
 // Rotate a client's dashboard link (e.g. after a report email was forwarded
 // outside the business). The old token URL stops working immediately; the
 // next report email carries the new link.
@@ -387,7 +400,17 @@ app.post('/api/sync-clarity', requireAdmin, async (req, res) => {
 app.get('/api/connections', requireAdmin, async (req, res) => {
   try {
     const { connectionsHealth } = await import('./lib/health.js');
-    res.json(await connectionsHealth());
+    const health = await connectionsHealth();
+    // For managed sites still waiting on Search Console: include the exact
+    // META tag to paste into the builder, right where the ❌ is shown.
+    try {
+      const metas = await managedMetaTags();
+      for (const s of health.sites) {
+        const d = (s.domain || '').toLowerCase().replace(/^www\./, '');
+        if (metas[d]) s.metaTag = metas[d];
+      }
+    } catch { /* panel still renders without them */ }
+    res.json(health);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -601,7 +624,8 @@ app.get('/ix/:token/:domain', (req, res) => {
       measurementId = site.ga4_measurement_id;
       clarityId = site.clarity_project_id || null;
     }
-    const script = buildInjectorScript(rootDirFor(domain), buildSnippet(measurementId, clarityId));
+    const consentBanner = getSetting('consent_banner') === 'true';
+    const script = buildInjectorScript(rootDirFor(domain), buildSnippet(measurementId, clarityId, { consentBanner }));
     res.type('text/x-shellscript').send(script);
   } catch (e) {
     // Never hard-500 the injector — a 500 makes curl write nothing and the
