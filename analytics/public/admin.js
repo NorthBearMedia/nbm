@@ -342,6 +342,12 @@ function showSettingsModal() {
             <option value="live" ${s.delivery_mode === 'live' ? 'selected' : ''}>Live — reports go to clients (I'm BCC'd)</option>
           </select>
           <div class="help">Start in Test, review the reports landing in your inbox, then switch to Live when happy — that's the moment clients start receiving them.</div></div>
+        <div class="field full"><label>Cookie consent banner (GDPR)</label>
+          <select name="consent_banner">
+            <option value="false" ${s.consent_banner ? '' : 'selected'}>Off — tags load for every visitor (current risk accepted)</option>
+            <option value="true" ${s.consent_banner ? 'selected' : ''}>On — visitors see an Accept/No thanks bar; tags only load after Accept</option>
+          </select>
+          <div class="help">Turning this on rolls a North Bear-styled consent banner out to every <strong>file-hosted</strong> site automatically (within the hour, no re-publishing needed). Builder sites (Horizons) need the banner snippet pasted once — it's in each site's <em>Tracking code</em> window. Turning it off rolls the banner back off file-hosted sites the same way.</div></div>
         <div class="field full"><label>App address (used in email links)</label>
           <input name="app_url" value="${esc(s.app_url)}" placeholder="${esc(location.origin)}"></div>
         <div class="field full"><label>Search Console reader (optional)</label>
@@ -605,7 +611,17 @@ function showSiteModal(site = null) {
 }
 
 // ─── Tracking snippet modal ───────────────────────────────────────
-function showSnippetModal(site) {
+async function showSnippetModal(site) {
+  // With the consent banner on, the paste-code IS the banner-gated block
+  // (same code the file injector installs), so builder sites match the
+  // file-hosted fleet exactly.
+  if (setup?.settings?.consent_banner) {
+    try {
+      const r = await api(`/api/sites/${site.id}/snippet`);
+      if (r.snippet) return showSnippetModalContent(site, r.snippet,
+        'Cookie consent banner is ON — this single block shows the Accept bar and only loads Analytics/Clarity after the visitor accepts.');
+    } catch { /* fall through to the plain snippet */ }
+  }
   const parts = [];
   if (site.ga4_measurement_id) {
     parts.push(`<!-- Google Analytics 4 -->
@@ -627,28 +643,42 @@ function showSnippetModal(site) {
   })(window, document, "clarity", "script", "${site.clarity_project_id}");
 <\/script>`);
   }
-  const snippet = parts.join('\n\n');
+  showSnippetModalContent(site, parts.join('\n\n'), '');
+}
+
+const PRIVACY_PARA = (domain) => `Cookies & analytics: ${domain} uses Google Analytics and Microsoft Clarity to understand visitor numbers and how the site is used, so we can keep improving it. These tools are run on our behalf by North Bear Media and may set cookies in your browser. Data is aggregated and never sold. Questions or requests: contact us via the details on this site.`;
+
+function showSnippetModalContent(site, snippet, banner) {
   $('#modalRoot').innerHTML = `
   <div class="modal-backdrop" id="backdrop">
-    <div class="modal">
+    <div class="modal" style="max-width:680px">
       <h3>Tracking code — ${esc(site.client_name)}</h3>
       ${snippet ? `
+        ${banner ? `<p class="hint" style="margin-bottom:8px;color:var(--green-light)">${esc(banner)}</p>` : ''}
         <p class="hint" style="margin-bottom:12px">Paste this just before the closing <strong>&lt;/head&gt;</strong> tag on every page.
         In Hostinger Website Builder: <em>Settings → Integrations → Custom code → Head</em>. In WordPress: use the theme's header.php or a "header scripts" plugin.</p>
-        <code class="snippet" id="snippetCode">${esc(snippet)}</code>` :
+        <code class="snippet" id="snippetCode">${esc(snippet)}</code>
+        <p class="hint" style="margin:14px 0 6px"><strong>Privacy policy line</strong> — drop this into the site's privacy/cookies page so the policy names the tools:</p>
+        <code class="snippet" id="privacyCode">${esc(PRIVACY_PARA(site.domain || 'this site'))}</code>` :
         `<p class="hint">Add a <strong>GA4 measurement ID</strong> and/or <strong>Clarity project ID</strong> to this site first (⚡ Auto-connect usually finds them), then the code to paste will appear here.</p>`}
       <div class="modal-actions">
-        ${snippet ? '<button class="btn primary" id="copySnippet">Copy code</button>' : ''}
+        ${snippet ? '<button class="btn primary" id="copySnippet">Copy code</button><button class="btn" id="copyPrivacy">Copy privacy line</button>' : ''}
         <button class="btn" id="cancelBtn">Close</button>
       </div>
     </div>
   </div>`;
   $('#cancelBtn').onclick = closeModal;
   $('#backdrop').onclick = e => { if (e.target.id === 'backdrop') closeModal(); };
-  if (snippet) $('#copySnippet').onclick = async () => {
-    await navigator.clipboard.writeText(snippet);
-    toast('Tracking code copied');
-  };
+  if (snippet) {
+    $('#copySnippet').onclick = async () => {
+      await navigator.clipboard.writeText(snippet);
+      toast('Tracking code copied');
+    };
+    $('#copyPrivacy').onclick = async () => {
+      await navigator.clipboard.writeText(PRIVACY_PARA(site.domain || 'this site'));
+      toast('Privacy wording copied');
+    };
+  }
 }
 
 // ─── History modal ────────────────────────────────────────────────
@@ -734,11 +764,14 @@ $('#connectionsBtn').onclick = async (e) => {
       <p class="hint" style="margin:4px 0 12px">Checked ${new Date(h.checkedAt).toLocaleTimeString('en-GB')} · ✅ pulling data · ❌ needs attention (reason shown)</p>
       <div style="overflow:auto;max-height:65vh">
       <table class="data" style="width:100%">
-        <thead><tr><th style="text-align:left;padding:6px 10px">Site</th><th style="text-align:left;padding:6px 10px">Google Analytics</th><th style="text-align:left;padding:6px 10px">Search Console</th><th style="text-align:left;padding:6px 10px">Clarity</th><th style="text-align:left;padding:6px 10px">Fathom</th></tr></thead>
+        <thead><tr><th style="text-align:left;padding:6px 10px">Site</th><th style="text-align:left;padding:6px 10px">Google Analytics</th><th style="text-align:left;padding:6px 10px">Search Console</th><th style="text-align:left;padding:6px 10px">Clarity</th><th style="text-align:left;padding:6px 10px">Fathom</th><th style="text-align:left;padding:6px 10px">Reports</th></tr></thead>
         <tbody>${h.sites.map(r => `<tr>
           <td style="padding:6px 10px"><strong>${esc(r.client)}</strong><br><span class="hint">${esc(r.domain)}</span></td>
-          ${r.error ? `<td colspan="4" style="padding:6px 10px">❌ ${esc(r.error)}</td>` : cell(r.ga) + cell(r.search) + cell(r.clarity) + cell(r.fathom)}
-        </tr>`).join('')}</tbody>
+          ${r.error ? `<td colspan="5" style="padding:6px 10px">❌ ${esc(r.error)}</td>` : cell(r.ga) + cell(r.search) + cell(r.clarity) + cell(r.fathom) + cell(r.delivery)}
+        </tr>${r.metaTag ? `<tr><td colspan="6" style="padding:2px 10px 10px">
+          <div class="grant-box" style="margin:0"><strong>To finish Search Console for ${esc(r.domain)}:</strong> paste this into the site builder's custom-code/head section, then Publish — Pulse verifies automatically within the hour.<br>
+          <code style="user-select:all;display:inline-block;margin-top:6px;word-break:break-all">${esc(r.metaTag)}</code></div>
+        </td></tr>` : ''}`).join('')}</tbody>
       </table></div>
       <div class="modal-actions" style="margin-top:14px"><button class="btn" onclick="document.getElementById('modalRoot').innerHTML=''">Close</button></div>
     </div></div>`;

@@ -34,16 +34,42 @@ async function hg(path, method = 'GET', body) {
 }
 
 // The tag, as a single line (keeps the server-side awk replace simple).
-export function buildSnippet(measurementId, clarityId) {
-  let s = '<!-- NBM-GA-TAG -->';
+// IMPORTANT: the snippet must never contain '&' or '\' — it travels through
+// awk sub()/-v where both are escape-active. (No '&&' in the banner JS.)
+//
+// v2 blocks carry an end marker so the injector can REPLACE an existing
+// block in place (upgrades: adding Clarity later, turning the consent
+// banner on/off) — v1 blocks (start marker only) sit immediately before
+// </head> or </body> by construction, so they're replaceable too.
+export function buildSnippet(measurementId, clarityId, { consentBanner = false } = {}) {
+  let load = '';
   if (measurementId) {
-    s += `<script async src="https://www.googletagmanager.com/gtag/js?id=${measurementId}"></script>`
+    load += consentBanner
+      ? `var g=d.createElement('script');g.async=1;g.src='https://www.googletagmanager.com/gtag/js?id=${measurementId}';d.head.appendChild(g);w.dataLayer=w.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${measurementId}');`
+      : `<script async src="https://www.googletagmanager.com/gtag/js?id=${measurementId}"></script>`
       + `<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${measurementId}');</script>`;
   }
   if (clarityId) {
-    s += `<script type="text/javascript">(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","${clarityId}");</script>`;
+    const clarityJs = `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","${clarityId}");`;
+    load += consentBanner ? clarityJs : `<script type="text/javascript">${clarityJs}</script>`;
   }
-  return s;
+  if (!consentBanner) return `<!-- NBM-GA-TAG -->${load}<!-- /NBM-GA-TAG -->`;
+  // Consent-gated variant: nothing loads until the visitor accepts; the
+  // choice is remembered. Stricter than Consent Mode, dead simple, and
+  // compliant for UK PECR. (nbmConsent doubles as the retrofit's marker
+  // that the banner build is live on a page.)
+  return `<!-- NBM-GA-TAG --><script>(function(){var w=window,d=document;function go(){${load}}`
+    + `var c=null;try{c=localStorage.getItem('nbmConsent');}catch(e){}`
+    + `if(c==='yes'){go();return;}if(c==='no'){return;}`
+    + `function fin(v){try{localStorage.setItem('nbmConsent',v);}catch(e){}var el=d.getElementById('nbm-consent');if(el){el.parentNode.removeChild(el);}if(v==='yes'){go();}}`
+    + `function show(){if(d.getElementById('nbm-consent')){return;}var b=d.createElement('div');b.id='nbm-consent';`
+    + `b.setAttribute('style','position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#221f20;color:#fff;font-family:Arial,sans-serif;font-size:14px;line-height:1.5;padding:14px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;box-shadow:0 -2px 12px rgba(0,0,0,0.35)');`
+    + `b.innerHTML='<span>This site uses cookies to understand visitor numbers and improve the site (Google Analytics, Microsoft Clarity).</span>'`
+    + `+'<button id="nbm-consent-yes" style="background:#2eaa7b;color:#fff;border:0;border-radius:6px;padding:9px 18px;font-size:14px;font-weight:bold;cursor:pointer">Accept</button>'`
+    + `+'<button id="nbm-consent-no" style="background:transparent;color:#c9cdd4;border:1px solid #555;border-radius:6px;padding:9px 14px;font-size:14px;cursor:pointer">No thanks</button>';`
+    + `d.body.appendChild(b);d.getElementById('nbm-consent-yes').onclick=function(){fin('yes');};d.getElementById('nbm-consent-no').onclick=function(){fin('no');};}`
+    + `if(d.readyState==='loading'){d.addEventListener('DOMContentLoaded',show);}else{show();}`
+    + `})();</script><!-- /NBM-GA-TAG -->`;
 }
 
 // The full idempotent, backup-first injector as a POSIX-sh script. Served
@@ -60,6 +86,18 @@ export function buildInjectorScript(rootDir, snippet) {
   // Fallback for pages with no </head> (minified/odd builds): put the
   // snippet before </body> instead — GA and Clarity work from there too.
   const awkBody = 'BEGIN{d=0}{if(!d&&index($0,"</body>")>0){sub(/<\\/body>/,s"</body>");d=1}print}';
+  // Replace an existing NBM block in place (upgrades: Clarity added later,
+  // consent banner toggled). v2 blocks span start→end marker; v1 blocks
+  // (no end marker) sit immediately before </head> or </body> by
+  // construction, so marker→close-tag bounds them exactly.
+  const awkRepl = 'BEGIN{d=0}{'
+    + 'if(!d){i=index($0,"<!-- NBM-GA-TAG -->");'
+    + 'if(i>0){r=substr($0,i);'
+    + 'e=index(r,"<!-- /NBM-GA-TAG -->");'
+    + 'if(e>0){$0=substr($0,1,i-1) s substr(r,e+20);d=1}'
+    + 'else{h=index(r,"</head>");if(h==0){h=index(r,"</body>")}'
+    + 'if(h>0){$0=substr($0,1,i-1) s substr(r,h);d=1}}'
+    + '}}print}';
   return (
     `D='${rootDir}'\n` +
     // Diagnostic lines land in the captured cron output: distinguish
@@ -70,12 +108,19 @@ export function buildInjectorScript(rootDir, snippet) {
     `echo "NBM-HTML-COUNT $(find "$D" -type f -name '*.html' 2>/dev/null | wc -l)"\n` +
     `S=$(printf %s '${b64}' | base64 -d)\n` +
     `find "$D" -type f -name '*.html' 2>/dev/null | while read f; do\n` +
-    `  if grep -q 'NBM-GA-TAG' "$f"; then echo "already $f"\n` +
+    // The original pre-NBM backup is precious — never overwrite it on a
+    // replace pass.
+    `  if grep -q 'NBM-GA-TAG' "$f"; then\n` +
+    `    if grep -qF "$S" "$f"; then echo "already $f"\n` +
+    `    else\n` +
+    `      [ -f "$f.nbmbak" ] || cp "$f" "$f.nbmbak"\n` +
+    `      awk -v s="$S" '${awkRepl}' "$f" > "$f.nbmtmp" && mv "$f.nbmtmp" "$f" && echo "replaced $f"\n` +
+    `    fi\n` +
     `  elif grep -q '</head>' "$f"; then\n` +
-    `    cp "$f" "$f.nbmbak"\n` +
+    `    [ -f "$f.nbmbak" ] || cp "$f" "$f.nbmbak"\n` +
     `    awk -v s="$S" '${awkHead}' "$f" > "$f.nbmtmp" && mv "$f.nbmtmp" "$f" && echo "injected $f"\n` +
     `  elif grep -q '</body>' "$f"; then\n` +
-    `    cp "$f" "$f.nbmbak"\n` +
+    `    [ -f "$f.nbmbak" ] || cp "$f" "$f.nbmbak"\n` +
     `    awk -v s="$S" '${awkBody}' "$f" > "$f.nbmtmp" && mv "$f.nbmtmp" "$f" && echo "injected-body $f"\n` +
     `  else echo "NBM-NO-HEAD $f"\n` +
     `  fi\n` +

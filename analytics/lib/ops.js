@@ -679,6 +679,93 @@ export async function reconcileRolloutCrons() {
   return { placed: placed.length, noId: noId.length };
 }
 
+// ── Tag retrofit: keep every file-hosted site's live page matching the
+// snippet it SHOULD have — GA present, Clarity present when the site has a
+// project ID, consent banner present exactly when the owner's toggle is on.
+// The original rollout was one-shot per site, so a Clarity ID added later
+// (or the banner toggle) would otherwise never reach the page. Uses the
+// same cron+injector machinery (which now replaces existing blocks), runs
+// hourly, retries capped, all state in settings. Console-only: results
+// show in the Connections panel, not the inbox.
+async function fetchLivePage(domain) {
+  for (const url of [`https://${domain}/?nbmv=${Date.now()}`, `https://www.${domain}/?nbmv=${Date.now()}`]) {
+    try {
+      const res = await fetch(url, { headers: { 'User-Agent': 'NorthBearPulse/1.0', 'Cache-Control': 'no-cache' }, redirect: 'follow', signal: AbortSignal.timeout(15000) });
+      if (res.ok) return (await res.text()).slice(0, 2_000_000);
+    } catch { /* try next */ }
+  }
+  return null;
+}
+
+export async function retrofitTags() {
+  if (!getHostingerToken()) return { skipped: 'no Hostinger token' };
+  if (injectState()['nbmdemosite2.co.uk']?.status !== 'verified') return { skipped: 'demo not verified' };
+  const banner = getSetting('consent_banner') === 'true';
+  let state = {};
+  try { state = JSON.parse(getSetting('retrofit_state') || '{}'); } catch { /* fresh */ }
+  const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND domain != '' AND ga4_measurement_id != ''").all();
+  let checked = 0, placed = 0;
+  for (const site of sites) {
+    const domain = (site.domain || '').toLowerCase().replace(/^www\./, '');
+    if (!AUTO_TAGGABLE.has(domain)) continue;
+    const want = `${site.ga4_measurement_id}|${site.clarity_project_id || ''}|${banner ? 1 : 0}`;
+    const rec = state[domain] || {};
+    if (rec.want !== want) { state[domain] = { want, tries: 0, done: false }; }
+    const cur = state[domain];
+    if (cur.done) continue;
+    if (cur.tries >= 15) continue; // gave up — visible in Connections, not retried forever
+    checked++;
+    const html = await fetchLivePage(domain);
+    if (html == null) { continue; } // unreachable right now — try next pass, doesn't burn a retry
+    const ok = html.includes(site.ga4_measurement_id)
+      && (!site.clarity_project_id || html.includes(site.clarity_project_id))
+      && (banner === html.includes('nbmConsent'));
+    if (ok) {
+      cur.done = true;
+      cur.tries = 0;
+      await deleteInjectCrons(HOSTINGER_USER, domain).catch(() => {});
+      console.log('[retrofit]', domain, 'live page matches desired tags ✓');
+    } else {
+      try {
+        await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
+        cur.tries++;
+        placed++;
+        console.log('[retrofit]', domain, `mismatch — injector placed (try ${cur.tries})`);
+      } catch (e) { console.error('[retrofit]', domain, e.message.slice(0, 90)); }
+    }
+  }
+  setSetting('retrofit_state', JSON.stringify(state));
+  return { checked, placed };
+}
+
+// The META verification tag each managed (no-DNS) site needs pasted into
+// its builder — fetched once from Google and cached, then shown in the
+// Connections panel so the paste job is self-serve instead of buried in a
+// chat log. Only surfaced while the site's Search Console is unlinked.
+export async function managedMetaTags() {
+  const out = {};
+  for (const m of MANAGED_SITES) {
+    const row = db.prepare("SELECT gsc_site_url FROM sites WHERE lower(replace(domain,'www.','')) = ?").get(m.domain);
+    if (!row || row.gsc_site_url) continue; // linked (or absent) — nothing to paste
+    const cacheKey = `managed_meta_${m.domain}`;
+    let tag = getSetting(cacheKey);
+    if (!tag) {
+      try {
+        const client = googleClient({ scopes: ['https://www.googleapis.com/auth/siteverification'], subject: getGscReaderEmail() || 'norton@northbearmedia.co.uk' });
+        const res = await client.request({
+          url: 'https://www.googleapis.com/siteVerification/v1/token',
+          method: 'POST',
+          data: { verificationMethod: 'META', site: { type: 'SITE', identifier: `https://${m.domain}/` } },
+        });
+        tag = res?.data?.token || '';
+        if (tag) setSetting(cacheKey, tag);
+      } catch (e) { console.log('[gsc-managed] meta token fetch failed:', m.domain, String(e.message || e).slice(0, 80)); }
+    }
+    if (tag) out[m.domain] = tag;
+  }
+  return out;
+}
+
 // One-shot probe: does Hostinger expose website traffic/visitor stats
 // anywhere our API token can reach, and do raw access logs exist on the
 // server? The hPanel Analytics data would give visitor HISTORY that
@@ -1034,6 +1121,12 @@ export function scheduleOpsSweep() {
   try {
     cron.schedule('7 * * * *', () => { finalizeSearchConsole().catch(e => console.error('[gsc]', e.message)); verifyManagedSitesGsc().catch(e => console.error('[gsc-managed]', e.message)); }, { timezone: config.timezone });
   } catch (e) { console.error('[gsc] schedule failed:', e.message); }
+  // Keep live pages matching their intended tag set (Clarity added later,
+  // consent banner toggled) — hourly, offset from the GSC pass.
+  try {
+    cron.schedule('23 * * * *', () => retrofitTags().catch(e => console.error('[retrofit]', e.message)), { timezone: config.timezone });
+  } catch (e) { console.error('[retrofit] schedule failed:', e.message); }
+  setTimeout(() => retrofitTags().catch(e => console.error('[retrofit]', e.message)), 480_000);
   try {
     cron.schedule('*/10 * * * *', () => verifyPendingInjections().catch(e => console.error('[inject]', e.message)), { timezone: config.timezone });
     // Self-heal a stalled rollout: place crons for any unverified client
