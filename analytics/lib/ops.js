@@ -738,30 +738,79 @@ export async function retrofitTags() {
   return { checked, placed };
 }
 
-// The META verification tag each managed (no-DNS) site needs pasted into
-// its builder — fetched once from Google and cached, then shown in the
-// Connections panel so the paste job is self-serve instead of buried in a
-// chat log. Only surfaced while the site's Search Console is unlinked.
-export async function managedMetaTags() {
+// Search Console diagnosis for managed (no-DNS) sites, shown in the
+// Connections panel while unlinked. Goes far beyond "here's the tag":
+// fetches the LIVE page, reports which verification tag is actually being
+// served and whether it's in <head> (Google requires that), spots
+// bare-domain → www serving mismatches, compares served vs expected token,
+// and includes the last verification error. Turns "still connecting?!"
+// into a specific, one-line instruction.
+async function metaTokenFor(client, identifier) {
+  const cacheKey = `managed_meta_${identifier}`;
+  let tag = getSetting(cacheKey);
+  if (tag) return tag;
+  try {
+    const res = await client.request({
+      url: 'https://www.googleapis.com/siteVerification/v1/token',
+      method: 'POST',
+      data: { verificationMethod: 'META', site: { type: 'SITE', identifier } },
+    });
+    tag = res?.data?.token || '';
+    if (tag) setSetting(cacheKey, tag);
+  } catch (e) { console.log('[gsc-managed] meta token fetch failed:', identifier, String(e.message || e).slice(0, 80)); }
+  return tag;
+}
+
+export async function managedGscDiagnosis() {
   const out = {};
+  let client = null;
   for (const m of MANAGED_SITES) {
     const row = db.prepare("SELECT gsc_site_url FROM sites WHERE lower(replace(domain,'www.','')) = ?").get(m.domain);
-    if (!row || row.gsc_site_url) continue; // linked (or absent) — nothing to paste
-    const cacheKey = `managed_meta_${m.domain}`;
-    let tag = getSetting(cacheKey);
-    if (!tag) {
+    if (!row || row.gsc_site_url) continue; // linked (or absent) — nothing to diagnose
+    if (!client) {
       try {
-        const client = googleClient({ scopes: ['https://www.googleapis.com/auth/siteverification'], subject: getGscReaderEmail() || 'norton@northbearmedia.co.uk' });
-        const res = await client.request({
-          url: 'https://www.googleapis.com/siteVerification/v1/token',
-          method: 'POST',
-          data: { verificationMethod: 'META', site: { type: 'SITE', identifier: `https://${m.domain}/` } },
-        });
-        tag = res?.data?.token || '';
-        if (tag) setSetting(cacheKey, tag);
-      } catch (e) { console.log('[gsc-managed] meta token fetch failed:', m.domain, String(e.message || e).slice(0, 80)); }
+        client = googleClient({ scopes: ['https://www.googleapis.com/auth/siteverification'], subject: getGscReaderEmail() || 'norton@northbearmedia.co.uk' });
+      } catch { client = null; }
     }
-    if (tag) out[m.domain] = tag;
+    const d = { domain: m.domain, findings: [] };
+    // 1 — what is the live page actually serving, and from which host?
+    let html = null, finalHost = '';
+    for (const url of [`https://${m.domain}/?nbmv=${Date.now()}`, `https://www.${m.domain}/?nbmv=${Date.now()}`]) {
+      try {
+        const res = await fetch(url, { headers: { 'User-Agent': 'NorthBearPulse/1.0', 'Cache-Control': 'no-cache' }, redirect: 'follow', signal: AbortSignal.timeout(15000) });
+        if (res.ok) { html = (await res.text()).slice(0, 2_000_000); finalHost = new URL(res.url).host; break; }
+      } catch { /* try next */ }
+    }
+    const apexToken = client ? await metaTokenFor(client, `https://${m.domain}/`) : '';
+    const wwwToken = client ? await metaTokenFor(client, `https://www.${m.domain}/`) : '';
+    if (html == null) {
+      d.findings.push('Could not fetch the live page just now — will keep retrying hourly.');
+    } else {
+      if (finalHost.replace(/^www\./, '') === m.domain && finalHost !== m.domain) {
+        d.findings.push(`Site serves at ${finalHost} (redirect) — verification now tries both hosts automatically.`);
+      }
+      const metas = [...html.matchAll(/<meta[^>]*google-site-verification[^>]*content=["']([^"']+)["']/gi)].map(x => x[1]);
+      const headEnd = html.indexOf('</head>');
+      const firstIdx = html.search(/google-site-verification/i);
+      if (!metas.length) {
+        d.findings.push('NO verification tag found on the served page — the paste may not have published, or the builder stripped it. Re-paste the tag below into the builder’s HEAD custom-code section and publish.');
+      } else {
+        const inHead = firstIdx !== -1 && headEnd !== -1 && firstIdx < headEnd;
+        if (!inHead) d.findings.push('A verification tag IS on the page but sits in the BODY, and Google only accepts it inside <head>. In the builder, move the custom code to the Head section and publish.');
+        const expected = [apexToken, wwwToken].map(t => (t.match(/content=["']([^"']+)["']/) || [])[1]).filter(Boolean);
+        const match = metas.some(mv => expected.includes(mv));
+        if (inHead && !match && expected.length) {
+          d.findings.push(`A tag is in <head> but its value doesn’t match what Google expects from your account (found "${metas[0].slice(0, 12)}…"). Replace it with the tag below and publish.`);
+        }
+        if (inHead && match) d.findings.push('Tag looks correct and in <head> — Google should verify on the next hourly pass. If this persists a day, tell North Bear.');
+      }
+    }
+    const lastErr = getSetting('managed_gsc_last_' + m.domain) || '';
+    if (lastErr) d.findings.push(`Last Google response: ${lastErr}`);
+    // Offer the token for the host the site actually serves from — Google's
+    // tokens are per-URL, so the www site needs the www token.
+    d.tag = (finalHost.startsWith('www.') ? (wwwToken || apexToken) : (apexToken || wwwToken)) || '';
+    out[m.domain] = d;
   }
   return out;
 }
@@ -913,30 +962,41 @@ async function verifyManagedSitesGsc() {
     await client.getAccessToken();
   } catch (e) { console.log('[gsc-managed] scopes unavailable:', e.message.slice(0, 60)); return; }
   for (const m of pending) {
-    const siteUrl = 'https://' + m.domain + '/';
-    // Google's ANALYTICS method doesn't work with Hostinger-builder GA4
-    // tags (confirmed: tag live, method still fails), so try META too —
-    // the owner pastes the meta tag into the builder's Search Console
-    // integration and this verifies on the next hourly pass.
-    let done = false;
-    for (const method of ['META', 'ANALYTICS']) {
-      try {
-        await client.request({
-          url: 'https://www.googleapis.com/siteVerification/v1/webResource?verificationMethod=' + method,
-          method: 'POST',
-          data: { site: { type: 'SITE', identifier: siteUrl } },
-        });
-        done = true; break;
-      } catch { /* try next method */ }
+    // Google's checks are exact-URL: a site that SERVES at www while we
+    // verify the bare domain (or vice versa) fails forever even with a
+    // perfect tag. Try both hosts × both methods (META first — the
+    // ANALYTICS method doesn't work with Hostinger-builder GA4 tags).
+    let verifiedUrl = null, lastErr = '';
+    for (const host of [m.domain, 'www.' + m.domain]) {
+      const siteUrl = 'https://' + host + '/';
+      for (const method of ['META', 'ANALYTICS']) {
+        try {
+          await client.request({
+            url: 'https://www.googleapis.com/siteVerification/v1/webResource?verificationMethod=' + method,
+            method: 'POST',
+            data: { site: { type: 'SITE', identifier: siteUrl } },
+          });
+          verifiedUrl = siteUrl; break;
+        } catch (e) { lastErr = `${host}/${method}: ${String(e.message || e).slice(0, 70)}`; }
+      }
+      if (verifiedUrl) break;
     }
-    if (!done) { console.log('[gsc-managed]', m.domain, 'not verifiable yet (paste the meta tag)'); continue; }
+    if (!verifiedUrl) {
+      setSetting('managed_gsc_last_' + m.domain, lastErr);
+      console.log('[gsc-managed]', m.domain, 'not verifiable yet —', lastErr);
+      continue;
+    }
     try {
-      await client.request({ url: 'https://www.googleapis.com/webmasters/v3/sites/' + encodeURIComponent(siteUrl), method: 'PUT' });
+      await client.request({ url: 'https://www.googleapis.com/webmasters/v3/sites/' + encodeURIComponent(verifiedUrl), method: 'PUT' });
       // Verified at last: link the property AND release the delivery hold so
       // this site now behaves exactly like the rest of the fleet.
-      db.prepare("UPDATE sites SET gsc_site_url = ?, delivery_hold = 0 WHERE lower(replace(domain,'www.','')) = ?").run(siteUrl, m.domain);
-      console.log('[gsc-managed] verified + registered + delivery released:', siteUrl);
-    } catch (e) { console.log('[gsc-managed]', m.domain, 'register failed:', String(e.message || e).slice(0, 90)); }
+      db.prepare("UPDATE sites SET gsc_site_url = ?, delivery_hold = 0 WHERE lower(replace(domain,'www.','')) = ?").run(verifiedUrl, m.domain);
+      setSetting('managed_gsc_last_' + m.domain, '');
+      console.log('[gsc-managed] verified + registered + delivery released:', verifiedUrl);
+    } catch (e) {
+      setSetting('managed_gsc_last_' + m.domain, 'verified but register failed: ' + String(e.message || e).slice(0, 70));
+      console.log('[gsc-managed]', m.domain, 'register failed:', String(e.message || e).slice(0, 90));
+    }
   }
 }
 

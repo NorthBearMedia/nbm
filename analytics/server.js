@@ -21,7 +21,7 @@ import { autoConnectSite } from './lib/autoconnect.js';
 import { seedFirstCustomer } from './lib/seed.js';
 import * as hostinger from './lib/hostinger.js';
 import * as fathom from './lib/fathom.js';
-import { scheduleOpsSweep, runOpsSweep, runInjectionTest, runInjectionRollout, managedMetaTags } from './lib/ops.js';
+import { scheduleOpsSweep, runOpsSweep, runInjectionTest, runInjectionRollout, managedGscDiagnosis } from './lib/ops.js';
 import { buildInjectorScript, buildSnippet, rootDirFor } from './lib/inject.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -401,15 +401,16 @@ app.get('/api/connections', requireAdmin, async (req, res) => {
   try {
     const { connectionsHealth } = await import('./lib/health.js');
     const health = await connectionsHealth();
-    // For managed sites still waiting on Search Console: include the exact
-    // META tag to paste into the builder, right where the ❌ is shown.
+    // For managed sites still waiting on Search Console: a live diagnosis
+    // (what the page serves, head vs body, token match, Google's last
+    // answer) plus the exact tag to paste, right where the ❌ is shown.
     try {
-      const metas = await managedMetaTags();
+      const diag = await managedGscDiagnosis();
       for (const s of health.sites) {
         const d = (s.domain || '').toLowerCase().replace(/^www\./, '');
-        if (metas[d]) s.metaTag = metas[d];
+        if (diag[d]) s.gscDiag = diag[d];
       }
-    } catch { /* panel still renders without them */ }
+    } catch { /* panel still renders without it */ }
     res.json(health);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

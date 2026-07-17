@@ -768,9 +768,11 @@ $('#connectionsBtn').onclick = async (e) => {
         <tbody>${h.sites.map(r => `<tr>
           <td style="padding:6px 10px"><strong>${esc(r.client)}</strong><br><span class="hint">${esc(r.domain)}</span></td>
           ${r.error ? `<td colspan="5" style="padding:6px 10px">❌ ${esc(r.error)}</td>` : cell(r.ga) + cell(r.search) + cell(r.clarity) + cell(r.fathom) + cell(r.delivery)}
-        </tr>${r.metaTag ? `<tr><td colspan="6" style="padding:2px 10px 10px">
-          <div class="grant-box" style="margin:0"><strong>To finish Search Console for ${esc(r.domain)}:</strong> paste this into the site builder's custom-code/head section, then Publish — Pulse verifies automatically within the hour.<br>
-          <code style="user-select:all;display:inline-block;margin-top:6px;word-break:break-all">${esc(r.metaTag)}</code></div>
+        </tr>${r.gscDiag ? `<tr><td colspan="6" style="padding:2px 10px 10px">
+          <div class="grant-box" style="margin:0"><strong>Search Console — ${esc(r.domain)}:</strong>
+          <ul class="wizard-list" style="margin:6px 0">${(r.gscDiag.findings || []).map(f => `<li>${esc(f)}</li>`).join('')}</ul>
+          ${r.gscDiag.tag ? `<div class="hint">The tag Google expects (paste into the builder's HEAD custom-code, then Publish — Pulse verifies within the hour):</div>
+          <code style="user-select:all;display:inline-block;margin-top:6px;word-break:break-all">${esc(r.gscDiag.tag)}</code>` : ''}</div>
         </td></tr>` : ''}`).join('')}</tbody>
       </table></div>
       <div class="modal-actions" style="margin-top:14px"><button class="btn" onclick="document.getElementById('modalRoot').innerHTML=''">Close</button></div>
