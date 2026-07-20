@@ -12,19 +12,17 @@ import { addDays, todayISO } from './dates.js';
 const ok = detail => ({ ok: true, detail });
 const bad = detail => ({ ok: false, detail });
 
-// Is the Clarity *tracking tag* actually on the live page? A saved API
-// token only reads data — without the tag on the site there is nothing to
-// read. Fetches the homepage (cache-busted) and looks for clarity.ms.
-// Returns true / false / null (couldn't check).
-async function clarityTagOnPage(domain) {
+// The live homepage (cache-busted), for tag-presence checks: a saved API
+// token or property ID says nothing about whether the tracking code is
+// actually being SERVED. Returns html or null (couldn't fetch).
+async function fetchHomepage(domain) {
   try {
     const res = await fetch(`https://${domain}/?nbmv=${Date.now()}`, {
       redirect: 'follow', signal: AbortSignal.timeout(10000),
       headers: { 'User-Agent': 'Mozilla/5.0 (NBM Pulse health check)' },
     });
     if (!res.ok) return null;
-    const html = await res.text();
-    return html.includes('clarity.ms') || /\bclarity\s*\(/.test(html);
+    return await res.text();
   } catch { return null; }
 }
 
@@ -39,10 +37,15 @@ async function siteHealth(site, start, end) {
         .then(m => m?.overview ? ok(`${Math.round(m.overview.sessions)} visits (7d)`) : bad('no data returned'))
         .catch(e => bad(e.message.slice(0, 90)));
 
+  // One homepage fetch feeds both tag checks (GA + Clarity below).
+  const homepage = await fetchHomepage(domain);
+  const gaTagNote = !site.ga4_measurement_id || homepage == null ? ''
+    : homepage.includes(site.ga4_measurement_id) ? ' · tag on site ✓'
+    : ' · tag NOT detected on the page — paste this site’s Tracking code into the builder';
   out.ga = !site.ga4_property_id ? bad('no property ID')
     : await ga4.fetchOverview(site.ga4_property_id, start, end)
-        .then(o => ok(`${Math.round(o.sessions)} visits (7d)`))
-        .catch(e => bad(e.message.slice(0, 90)));
+        .then(o => ok(`${Math.round(o.sessions)} visits (7d)${gaTagNote}`))
+        .catch(e => bad(e.message.slice(0, 90) + gaTagNote));
 
   out.search = !site.gsc_site_url ? bad('not linked')
     : await gsc.fetchSummary(site.gsc_site_url, start, end)
@@ -54,7 +57,8 @@ async function siteHealth(site, start, end) {
   // Check both so "not working" is never a mystery. A tag loaded through
   // Google Tag Manager won't show in raw HTML, so "not found" is only
   // damning when there's also no data arriving.
-  const tagOnPage = await clarityTagOnPage(domain);
+  const tagOnPage = homepage == null ? null
+    : (homepage.includes('clarity.ms') || /\bclarity\s*\(/.test(homepage));
   const tagNote = tagOnPage === true ? 'tag on site ✓'
     : tagOnPage === false ? 'tag not found in page HTML (fine if loaded via Tag Manager)'
     : 'tag check inconclusive';
