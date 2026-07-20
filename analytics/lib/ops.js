@@ -238,6 +238,8 @@ const TARGET_KEYWORDS = {
   'melanieparker.co.uk': 'physiotherapy belper, home visit physio derbyshire, private physiotherapist derby',
   'williscooper.com': 'willis cooper',
   'active-personnel.co.uk': 'recruitment agency, active personnel',
+  'ensohr.co.uk': 'enso hr, hr consultant',
+  'cn-maintenance.com': 'cn maintenance, property maintenance',
 };
 
 // Sites the owner manages but whose DOMAINS he doesn't control (so no
@@ -249,18 +251,31 @@ const MANAGED_SITES = [
   { name: 'Active Personnel', domain: 'active-personnel.co.uk' },
 ];
 
+// New client sites to bring into the fleet: rows are created held
+// (owner-only reports until reviewed), then onboardNewSites() wires up
+// GA4 (find or CREATE the property), Search Console (DNS route when the
+// domain is on our Hostinger, tag route otherwise) and the tag install —
+// all hands-off. Add a name+domain here and the machinery does the rest.
+const NEW_SITES = [
+  { name: 'Enso HR', domain: 'ensohr.co.uk' },
+  { name: 'CN Maintenance', domain: 'cn-maintenance.com' },
+];
+
 function ensureManagedSites() {
-  for (const m of MANAGED_SITES) {
+  // Managed sites are held until their GSC verifies (verifyManagedSitesGsc
+  // releases); new fleet sites are held until the owner reviews and
+  // unticks "Hold back" — either way nothing half-set-up reaches a client.
+  const wanted = [
+    ...MANAGED_SITES.map(m => ({ ...m, note: 'Managed site (domain not ours) — added by ops' })),
+    ...NEW_SITES.map(m => ({ ...m, note: 'New site — auto-onboarding by ops' })),
+  ];
+  for (const m of wanted) {
     const existing = db.prepare("SELECT id FROM sites WHERE lower(replace(domain,'www.','')) = ?").get(m.domain);
     if (existing) continue;
-    // Held back until their Search Console verifies (owner still has to
-    // paste the META tag into the builder): reports stay owner-only even in
-    // Live mode, so the fleet can go live without these two going out half
-    // finished. verifyManagedSitesGsc() releases the hold on success.
     db.prepare(`INSERT INTO sites (client_name, domain, report_frequency, notes, dashboard_token, next_report_at, delivery_hold)
                 VALUES (?, ?, 'monthly', ?, ?, ?, 1)`)
-      .run(m.name, m.domain, 'Managed site (domain not ours) — added by ops', newDashboardToken(), nextRunAt('monthly'));
-    console.log('[ops] managed site created (delivery held until GSC verifies):', m.domain);
+      .run(m.name, m.domain, m.note, newDashboardToken(), nextRunAt('monthly'));
+    console.log('[ops] site created (delivery held):', m.domain);
   }
 }
 
@@ -292,10 +307,12 @@ export function loadClientContacts() {
       console.log(`[ops] GA property ID loaded: ${site.client_name} → ${pid}`);
     }
   }
-  // Target keywords: seed starter values ONCE (one-shot flag, not a
-  // fill-blanks loop) so the owner can trim or clear them without a
-  // reboot putting them back.
-  if (getSetting('target_keywords_seed_v1_done') !== 'true') {
+  // Target keywords: seed starter values into BLANK fields, re-running
+  // only when the map itself changes (new sites added) — keyed on the
+  // map's domains so the owner's edits/clears are never overwritten by
+  // a mere reboot.
+  const seedKey = Object.keys(TARGET_KEYWORDS).sort().join(',');
+  if (getSetting('target_keywords_seed_hash') !== seedKey) {
     for (const site of sites) {
       const d = (site.domain || '').toLowerCase().replace(/^www\./, '');
       const kws = TARGET_KEYWORDS[d];
@@ -306,7 +323,7 @@ export function loadClientContacts() {
         console.log(`[ops] target keywords seeded: ${site.client_name}`);
       }
     }
-    setSetting('target_keywords_seed_v1_done', 'true');
+    setSetting('target_keywords_seed_hash', seedKey);
   }
   return loaded;
 }
@@ -629,6 +646,16 @@ const AUTO_TAGGABLE = new Set([
   'melanieparker.co.uk',
 ]);
 
+// New sites aren't in the July survey above — onboardNewSites() classifies
+// them from the Hostinger website inventory (builder = no files to edit)
+// and records file-hosted ones here. The injector is harmless on a false
+// positive (NBM-NO-DOCROOT diagnostic, exit 0), so this errs inclusive.
+function isAutoTaggable(domain) {
+  if (AUTO_TAGGABLE.has(domain)) return true;
+  try { return JSON.parse(getSetting('file_hosted_extra') || '[]').includes(domain); }
+  catch { return false; }
+}
+
 // Self-healing rollout reconciler. Runs every 10 min once the demo has
 // proven the mechanism. For every file-hosted client site that has a GA
 // measurement ID and isn't already verified or mid-attempt, make sure an
@@ -649,7 +676,7 @@ export async function reconcileRolloutCrons() {
     const rec = state[domain];
     if (rec && (rec.status === 'verified' || rec.status === 'pending')) continue;
     if (!site.ga4_measurement_id) { noId.push(domain); continue; }
-    if (AUTO_TAGGABLE.has(domain)) {
+    if (isAutoTaggable(domain)) {
       try {
         await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
         state[domain] = { ...(state[domain] || {}), status: 'pending', tries: 0, measurementId: site.ga4_measurement_id, at: Date.now() };
@@ -707,7 +734,7 @@ export async function retrofitTags() {
   let checked = 0, placed = 0;
   for (const site of sites) {
     const domain = (site.domain || '').toLowerCase().replace(/^www\./, '');
-    if (!AUTO_TAGGABLE.has(domain)) continue;
+    if (!isAutoTaggable(domain)) continue;
     const want = `${site.ga4_measurement_id}|${site.clarity_project_id || ''}|${banner ? 1 : 0}`;
     const rec = state[domain] || {};
     if (rec.want !== want) { state[domain] = { want, tries: 0, done: false }; }
@@ -738,6 +765,142 @@ export async function retrofitTags() {
   return { checked, placed };
 }
 
+// ── Generic new-site onboarding: any active site missing its GA4 or
+// Search Console wiring gets completed hands-off, hourly, idempotently.
+// GA4: adopt an existing property whose web stream matches the domain, or
+// CREATE property + web stream in the agency's GA account (delegated).
+// GSC: register sc-domain if already verified; else plant a DNS TXT via
+// Hostinger and verify (domains on our DNS); else fall back to the tag
+// route (META/ANALYTICS, both hosts) like the managed sites. Platform is
+// classified from the Hostinger website inventory so file-hosted sites
+// flow into the tag injector automatically.
+async function onboardNewSites() {
+  const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND domain != ''").all()
+    .map(s => ({ ...s, d: (s.domain || '').toLowerCase().replace(/^www\./, '') }))
+    .filter(s => s.d !== 'nbmdemosite2.co.uk')
+    .filter(s => !MANAGED_SITES.some(m => m.domain === s.d) || s.ga4_property_id === '');
+  const needy = sites.filter(s => !s.ga4_property_id || !s.ga4_measurement_id || !s.gsc_site_url);
+  if (!needy.length) return { done: true };
+  const subject = getGscReaderEmail() || 'norton@northbearmedia.co.uk';
+  let state = {};
+  try { state = JSON.parse(getSetting('onboard_state') || '{}'); } catch { /* fresh */ }
+  const save = () => setSetting('onboard_state', JSON.stringify(state));
+
+  // Platform classification (once per unknown domain): builder sites can't
+  // take the file injector; everything else can try (harmless if wrong).
+  const unknown = needy.filter(s => !isAutoTaggable(s.d) && !(state[s.d] || {}).classified);
+  if (unknown.length && getHostingerToken()) {
+    try {
+      const inv = await hostingerWebsiteInventory();
+      const extra = new Set(JSON.parse(getSetting('file_hosted_extra') || '[]'));
+      for (const s of unknown) {
+        const row = (inv || []).find(w => (w.domain || '').toLowerCase().replace(/^www\./, '') === s.d);
+        const builder = row && /builder|horizons/i.test(String(row.type || row.platform || ''));
+        if (row && !builder) extra.add(s.d);
+        state[s.d] = { ...(state[s.d] || {}), classified: true, platform: row ? String(row.type || row.platform || 'unknown') : 'not-on-hostinger' };
+        console.log('[onboard]', s.d, 'platform:', state[s.d].platform, builder ? '(builder — tag via paste)' : '(file injector eligible)');
+      }
+      setSetting('file_hosted_extra', JSON.stringify([...extra]));
+      save();
+    } catch (e) { console.log('[onboard] inventory failed:', e.message.slice(0, 80)); }
+  }
+
+  // GA4 — adopt or create.
+  for (const s of needy.filter(x => !x.ga4_property_id || !x.ga4_measurement_id)) {
+    try {
+      const summaries = (await gReq({ url: 'https://analyticsadmin.googleapis.com/v1beta/accountSummaries?pageSize=200', method: 'GET' },
+        { scopes: ['https://www.googleapis.com/auth/analytics.edit'], subject })).accountSummaries || [];
+      // Adopt: an existing property whose web stream URI matches the domain.
+      let adopted = false;
+      outer: for (const acc of summaries) {
+        for (const p of (acc.propertySummaries || [])) {
+          const streams = (await gReq({ url: `https://analyticsadmin.googleapis.com/v1beta/${p.property}/dataStreams`, method: 'GET' },
+            { scopes: ['https://www.googleapis.com/auth/analytics.edit'], subject }).catch(() => ({}))).dataStreams || [];
+          const web = streams.find(st => st.type === 'WEB_DATA_STREAM' && (st.webStreamData?.defaultUri || '').toLowerCase().includes(s.d));
+          if (web) {
+            db.prepare('UPDATE sites SET ga4_property_id = ?, ga4_measurement_id = ? WHERE id = ?')
+              .run(p.property.replace('properties/', ''), web.webStreamData.measurementId || '', s.id);
+            console.log('[onboard]', s.d, 'adopted existing GA4 property', p.property);
+            adopted = true; break outer;
+          }
+        }
+      }
+      if (adopted) continue;
+      // Create: in the account that owns the agency's own property.
+      const home = summaries.find(a => (a.propertySummaries || []).some(p => p.property === 'properties/526994009')) || summaries[0];
+      if (!home) { console.log('[onboard]', s.d, 'no GA account visible — cannot create property'); continue; }
+      const prop = await gReq({
+        url: 'https://analyticsadmin.googleapis.com/v1beta/properties', method: 'POST',
+        data: { parent: home.account, displayName: s.client_name || s.d, timeZone: 'Europe/London', currencyCode: 'GBP' },
+      }, { scopes: ['https://www.googleapis.com/auth/analytics.edit'], subject });
+      const stream = await gReq({
+        url: `https://analyticsadmin.googleapis.com/v1beta/${prop.name}/dataStreams`, method: 'POST',
+        data: { type: 'WEB_DATA_STREAM', displayName: s.client_name || s.d, webStreamData: { defaultUri: 'https://' + s.d } },
+      }, { scopes: ['https://www.googleapis.com/auth/analytics.edit'], subject });
+      db.prepare('UPDATE sites SET ga4_property_id = ?, ga4_measurement_id = ? WHERE id = ?')
+        .run(prop.name.replace('properties/', ''), stream.webStreamData?.measurementId || '', s.id);
+      console.log('[onboard]', s.d, 'created GA4 property', prop.name, 'stream', stream.webStreamData?.measurementId);
+    } catch (e) { console.log('[onboard] GA4 failed for', s.d, ':', String(e.message || e).slice(0, 100)); }
+  }
+
+  // Search Console — sc-domain register → DNS TXT → tag-route fallback.
+  for (const s of needy.filter(x => !x.gsc_site_url && !MANAGED_SITES.some(m => m.domain === x.d))) {
+    const st = state[s.d] = state[s.d] || {};
+    try {
+      const auth = { scopes: ['https://www.googleapis.com/auth/siteverification', 'https://www.googleapis.com/auth/webmasters'], subject };
+      try {
+        await gReq({ url: 'https://www.googleapis.com/webmasters/v3/sites/' + encodeURIComponent('sc-domain:' + s.d), method: 'PUT' }, auth);
+        db.prepare('UPDATE sites SET gsc_site_url = ? WHERE id = ?').run('sc-domain:' + s.d, s.id);
+        console.log('[onboard]', s.d, 'Search Console linked (sc-domain)');
+        continue;
+      } catch { /* not verified yet — earn it below */ }
+      if (!st.txtPlanted && !st.noDns) {
+        try {
+          const tok = await gReq({ url: 'https://www.googleapis.com/siteVerification/v1/token', method: 'POST',
+            data: { verificationMethod: 'DNS_TXT', site: { type: 'INET_DOMAIN', identifier: s.d } } }, auth);
+          await hostingerAddTxt(s.d, tok.token);
+          st.txtPlanted = true; save();
+          console.log('[onboard]', s.d, 'DNS TXT planted — verification on next pass');
+        } catch (e) {
+          st.noDns = true; save(); // domain not on our Hostinger DNS — tag route below
+          console.log('[onboard]', s.d, 'DNS route unavailable (' + String(e.message || e).slice(0, 60) + ') — using tag route');
+        }
+      }
+      if (st.txtPlanted) {
+        await gReq({ url: 'https://www.googleapis.com/siteVerification/v1/webResource?verificationMethod=DNS_TXT', method: 'POST',
+          data: { site: { type: 'INET_DOMAIN', identifier: s.d } } }, auth);
+        await gReq({ url: 'https://www.googleapis.com/webmasters/v3/sites/' + encodeURIComponent('sc-domain:' + s.d), method: 'PUT' }, auth);
+        db.prepare('UPDATE sites SET gsc_site_url = ? WHERE id = ?').run('sc-domain:' + s.d, s.id);
+        setSetting('managed_gsc_last_' + s.d, '');
+        console.log('[onboard]', s.d, 'Search Console VERIFIED via DNS + linked');
+      } else if (st.noDns) {
+        // Tag route (same as managed sites): both hosts × META/ANALYTICS.
+        let verifiedUrl = null, lastErr = '';
+        for (const host of [s.d, 'www.' + s.d]) {
+          for (const method of ['META', 'ANALYTICS']) {
+            try {
+              await gReq({ url: 'https://www.googleapis.com/siteVerification/v1/webResource?verificationMethod=' + method,
+                method: 'POST', data: { site: { type: 'SITE', identifier: `https://${host}/` } } }, auth);
+              verifiedUrl = `https://${host}/`; break;
+            } catch (e) { lastErr = `${host}/${method}: ${String(e.message || e).slice(0, 60)}`; }
+          }
+          if (verifiedUrl) break;
+        }
+        if (verifiedUrl) {
+          await gReq({ url: 'https://www.googleapis.com/webmasters/v3/sites/' + encodeURIComponent(verifiedUrl), method: 'PUT' }, auth);
+          db.prepare('UPDATE sites SET gsc_site_url = ? WHERE id = ?').run(verifiedUrl, s.id);
+          setSetting('managed_gsc_last_' + s.d, '');
+          console.log('[onboard]', s.d, 'Search Console verified via tag + linked:', verifiedUrl);
+        } else {
+          setSetting('managed_gsc_last_' + s.d, lastErr);
+          st.metaFallback = true; save(); // surfaces in the Connections diagnosis
+        }
+      }
+    } catch (e) { setSetting('managed_gsc_last_' + s.d, String(e.message || e).slice(0, 80)); console.log('[onboard] GSC pending for', s.d, ':', String(e.message || e).slice(0, 80)); }
+  }
+  return { pending: needy.length };
+}
+
 // Search Console diagnosis for managed (no-DNS) sites, shown in the
 // Connections panel while unlinked. Goes far beyond "here's the tag":
 // fetches the LIVE page, reports which verification tag is actually being
@@ -764,7 +927,15 @@ async function metaTokenFor(client, identifier) {
 export async function managedGscDiagnosis() {
   const out = {};
   let client = null;
-  for (const m of MANAGED_SITES) {
+  // Managed sites, plus any onboarded site that fell back to the tag route
+  // (domain not on our DNS) — both verify through the served page.
+  let onboardState = {};
+  try { onboardState = JSON.parse(getSetting('onboard_state') || '{}'); } catch { /* none */ }
+  const targets = [
+    ...MANAGED_SITES,
+    ...Object.entries(onboardState).filter(([, v]) => v.metaFallback).map(([domain]) => ({ domain })),
+  ];
+  for (const m of targets) {
     const row = db.prepare("SELECT gsc_site_url FROM sites WHERE lower(replace(domain,'www.','')) = ?").get(m.domain);
     if (!row || row.gsc_site_url) continue; // linked (or absent) — nothing to diagnose
     if (!client) {
@@ -1187,6 +1358,12 @@ export function scheduleOpsSweep() {
     cron.schedule('23 * * * *', () => retrofitTags().catch(e => console.error('[retrofit]', e.message)), { timezone: config.timezone });
   } catch (e) { console.error('[retrofit] schedule failed:', e.message); }
   setTimeout(() => retrofitTags().catch(e => console.error('[retrofit]', e.message)), 480_000);
+  // Complete the wiring for any site added to the fleet (GA4 adopt/create,
+  // Search Console DNS-or-tag, platform classification) — hourly.
+  try {
+    cron.schedule('37 * * * *', () => onboardNewSites().catch(e => console.error('[onboard]', e.message)), { timezone: config.timezone });
+  } catch (e) { console.error('[onboard] schedule failed:', e.message); }
+  setTimeout(() => onboardNewSites().catch(e => console.error('[onboard]', e.message)), 240_000);
   try {
     cron.schedule('*/10 * * * *', () => verifyPendingInjections().catch(e => console.error('[inject]', e.message)), { timezone: config.timezone });
     // Self-heal a stalled rollout: place crons for any unverified client
