@@ -19,23 +19,29 @@ function makeOAuth2(req) {
   return new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, getRedirectUri(req));
 }
 
-function getAuthenticatedClient(req) {
-  const row = db.prepare('SELECT * FROM gmail_tokens WHERE user_id = ?').get(req.user.id);
+// Token-refresh needs only client id/secret + the stored refresh token — no
+// redirect URI — so this works without a request context. Exported for The
+// Bear's email tools (routes/ai.js), which run per-user server-side.
+export function gmailClientForUser(userId) {
+  if (!CLIENT_ID || !CLIENT_SECRET) return null;
+  const row = db.prepare('SELECT * FROM gmail_tokens WHERE user_id = ?').get(userId);
   if (!row) return null;
-  const oauth2 = makeOAuth2(req);
+  const oauth2 = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET);
   oauth2.setCredentials({
     access_token: row.access_token,
     refresh_token: row.refresh_token,
     expiry_date: row.expiry_date,
   });
   oauth2.on('tokens', (tokens) => {
-    const updates = { access_token: tokens.access_token, expiry_date: tokens.expiry_date };
-    if (tokens.refresh_token) updates.refresh_token = tokens.refresh_token;
     db.prepare(
       'UPDATE gmail_tokens SET access_token = ?, expiry_date = ?, refresh_token = COALESCE(?, refresh_token) WHERE user_id = ?'
-    ).run(updates.access_token, updates.expiry_date, tokens.refresh_token || null, req.user.id);
+    ).run(tokens.access_token, tokens.expiry_date, tokens.refresh_token || null, userId);
   });
   return oauth2;
+}
+
+function getAuthenticatedClient(req) {
+  return gmailClientForUser(req.user.id);
 }
 
 // Check if Gmail is configured and user is connected
