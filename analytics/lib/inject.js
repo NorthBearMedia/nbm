@@ -41,24 +41,22 @@ async function hg(path, method = 'GET', body) {
 // block in place (upgrades: adding Clarity later, turning the consent
 // banner on/off) — v1 blocks (start marker only) sit immediately before
 // </head> or </body> by construction, so they're replaceable too.
+// Every loader is DEDUPLICATING at runtime: if any copy of that tool is
+// already on the page — hand-pasted by the owner, added by the site
+// builder, or an older NBM block — ours stands down. Without this, a
+// manually-tagged site that also gets the injected block counts every
+// visit twice (found live: the owner's own site had a hand-installed
+// Fathom script, and the injector was about to add a second).
 export function buildSnippet(measurementId, clarityId, { consentBanner = false, fathomId = '' } = {}) {
-  let load = '';
-  if (measurementId) {
-    load += consentBanner
-      ? `var g=d.createElement('script');g.async=1;g.src='https://www.googletagmanager.com/gtag/js?id=${measurementId}';d.head.appendChild(g);w.dataLayer=w.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${measurementId}');`
-      : `<script async src="https://www.googletagmanager.com/gtag/js?id=${measurementId}"></script>`
-      + `<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${measurementId}');</script>`;
-  }
-  if (clarityId) {
-    const clarityJs = `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","${clarityId}");`;
-    load += consentBanner ? clarityJs : `<script type="text/javascript">${clarityJs}</script>`;
-  }
-  if (fathomId) {
-    load += consentBanner
-      ? `var f=d.createElement('script');f.src='https://cdn.usefathom.com/script.js';f.setAttribute('data-site','${fathomId}');f.defer=true;d.head.appendChild(f);`
-      : `<script src="https://cdn.usefathom.com/script.js" data-site="${fathomId}" defer></script>`;
-  }
-  if (!consentBanner) return `<!-- NBM-GA-TAG -->${load}<!-- /NBM-GA-TAG -->`;
+  const gaJs = measurementId
+    ? `(function(d,w){if(d.querySelector('script[src*="googletagmanager.com/gtag/js"]'))return;var g=d.createElement('script');g.async=true;g.src='https://www.googletagmanager.com/gtag/js?id=${measurementId}';d.head.appendChild(g);w.dataLayer=w.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${measurementId}');})(document,window);` : '';
+  const clarityJs = clarityId
+    ? `(function(d,w){if(d.querySelector('script[src*="clarity.ms"]'))return;if(w.clarity)return;(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(w,d,"clarity","script","${clarityId}");})(document,window);` : '';
+  const fathomJs = fathomId
+    ? `(function(d){if(d.querySelector('script[src*="usefathom.com"]'))return;var f=d.createElement('script');f.src='https://cdn.usefathom.com/script.js';f.setAttribute('data-site','${fathomId}');f.defer=true;d.head.appendChild(f);})(document);` : '';
+  const load = gaJs + clarityJs + fathomJs;
+  if (!load) return '<!-- NBM-GA-TAG --><!-- /NBM-GA-TAG -->';
+  if (!consentBanner) return `<!-- NBM-GA-TAG --><script>${load}</script><!-- /NBM-GA-TAG -->`;
   // Consent-gated variant: nothing loads until the visitor accepts; the
   // choice is remembered. Stricter than Consent Mode, dead simple, and
   // compliant for UK PECR. (nbmConsent doubles as the retrofit's marker
@@ -69,7 +67,7 @@ export function buildSnippet(measurementId, clarityId, { consentBanner = false, 
     + `function fin(v){try{localStorage.setItem('nbmConsent',v);}catch(e){}var el=d.getElementById('nbm-consent');if(el){el.parentNode.removeChild(el);}if(v==='yes'){go();}}`
     + `function show(){if(d.getElementById('nbm-consent')){return;}var b=d.createElement('div');b.id='nbm-consent';`
     + `b.setAttribute('style','position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#221f20;color:#fff;font-family:Arial,sans-serif;font-size:14px;line-height:1.5;padding:14px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;box-shadow:0 -2px 12px rgba(0,0,0,0.35)');`
-    + `b.innerHTML='<span>This site uses cookies to understand visitor numbers and improve the site (Google Analytics, Microsoft Clarity).</span>'`
+    + `b.innerHTML='<span>This site uses cookies and analytics to understand visitor numbers and improve the site (Google Analytics, Microsoft Clarity, Fathom).</span>'`
     + `+'<button id="nbm-consent-yes" style="background:#2eaa7b;color:#fff;border:0;border-radius:6px;padding:9px 18px;font-size:14px;font-weight:bold;cursor:pointer">Accept</button>'`
     + `+'<button id="nbm-consent-no" style="background:transparent;color:#c9cdd4;border:1px solid #555;border-radius:6px;padding:9px 14px;font-size:14px;cursor:pointer">No thanks</button>';`
     + `d.body.appendChild(b);d.getElementById('nbm-consent-yes').onclick=function(){fin('yes');};d.getElementById('nbm-consent-no').onclick=function(){fin('no');};}`

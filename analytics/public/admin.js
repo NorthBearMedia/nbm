@@ -612,16 +612,18 @@ function showSiteModal(site = null) {
 
 // ─── Tracking snippet modal ───────────────────────────────────────
 async function showSnippetModal(site) {
-  // With the consent banner on, the paste-code IS the banner-gated block
-  // (same code the file injector installs), so builder sites match the
-  // file-hosted fleet exactly.
-  if (setup?.settings?.consent_banner) {
-    try {
-      const r = await api(`/api/sites/${site.id}/snippet`);
-      if (r.snippet) return showSnippetModalContent(site, r.snippet,
-        'Cookie consent banner is ON — this single block shows the Accept bar and only loads Analytics/Clarity after the visitor accepts.');
-    } catch { /* fall through to the plain snippet */ }
-  }
+  // ALWAYS serve the canonical block from the server — identical to what
+  // the file injector installs, and self-deduplicating at runtime (if a
+  // copy of GA/Clarity/Fathom is already on the page, ours stands down),
+  // so a paste can never double-count. The hand-built fallback below only
+  // renders if the endpoint is unreachable.
+  try {
+    const r = await api(`/api/sites/${site.id}/snippet`);
+    if (r.snippet) return showSnippetModalContent(site, r.snippet,
+      r.consentBanner
+        ? 'Cookie consent banner is ON — this single block shows the Accept bar and only loads the analytics after the visitor accepts.'
+        : 'One combined block: Google Analytics + Clarity + Fathom, safe to paste even if a tag already exists on the page (it self-deduplicates).');
+  } catch { /* fall through to the plain snippet */ }
   const parts = [];
   if (site.ga4_measurement_id) {
     parts.push(`<!-- Google Analytics 4 -->
