@@ -39,13 +39,21 @@ async function siteHealth(site, start, end) {
 
   // One homepage fetch feeds both tag checks (GA + Clarity below).
   const homepage = await fetchHomepage(domain);
-  const gaTagNote = !site.ga4_measurement_id || homepage == null ? ''
-    : homepage.includes(site.ga4_measurement_id) ? ' · tag on site ✓'
-    : ' · tag NOT detected on the page — paste this site’s Tracking code into the builder';
+  const gaTagFound = Boolean(site.ga4_measurement_id) && homepage != null && homepage.includes(site.ga4_measurement_id);
   out.ga = !site.ga4_property_id ? bad('no property ID')
     : await ga4.fetchOverview(site.ga4_property_id, start, end)
-        .then(o => ok(`${Math.round(o.sessions)} visits (7d)${gaTagNote}`))
-        .catch(e => bad(e.message.slice(0, 90) + gaTagNote));
+        .then(o => {
+          // Real data flowing is the only proof that matters — if the tag
+          // isn't visible in raw HTML but sessions are non-zero, it's loaded
+          // via Tag Manager, a plugin, or the builder's own hook, not
+          // missing. Only flag "not detected" when there's ALSO no data,
+          // where the paste instruction is actually the right next step.
+          const note = gaTagFound ? ' · tag on site ✓'
+            : o.sessions > 0 ? ' · data flowing (tag likely loaded via Tag Manager/plugin, not a plain script)'
+            : (site.ga4_measurement_id && homepage != null) ? ' · tag NOT detected on the page — paste this site’s Tracking code into the builder' : '';
+          return ok(`${Math.round(o.sessions)} visits (7d)${note}`);
+        })
+        .catch(e => bad(e.message.slice(0, 90)));
 
   out.search = !site.gsc_site_url ? bad('not linked')
     : await gsc.fetchSummary(site.gsc_site_url, start, end)
