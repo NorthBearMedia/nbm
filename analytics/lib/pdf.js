@@ -261,7 +261,9 @@ function footers(doc, data) {
 
 function plainEnglishSummary(data) {
   const lines = [];
-  const o = data.ga4?.overview;
+  // When the traffic tag under-counted (proven wrong by Search Console/
+  // Clarity), lead with the search story — never "visited 1 times".
+  const o = (data.ga4?.overview && !data.ga4.unreliable) ? data.ga4.overview : null;
   if (o) {
     const delta = pctChange(o.sessions, data.ga4.prevOverview?.sessions);
     let s = `Your website was visited ${fmtInt(o.sessions)} times by ${fmtInt(o.totalUsers)} people`;
@@ -313,7 +315,11 @@ export async function generateReportPdf(data) {
   // ── At a glance (GA4 KPIs) ──
   y = sectionTitle(doc, y, 'Your website at a glance',
     'Visits are the number of times people opened your website; visitors are the individual people behind them.');
-  if (data.ga4?.overview) {
+  if (data.ga4?.overview && data.ga4.unreliable) {
+    // The tag under-counted vs Search Console/Clarity — show the honest
+    // reason, not a wrong "1 visit", and let the real story below stand.
+    y = emptyNote(doc, y, `Visitor tracking is being reconnected on this site, so the visit count here isn't complete yet — but Google Search Console shows your site was found ${fmtInt(data.ga4.independentTraffic)}+ times this period, and your search and behaviour data below are fully live.`);
+  } else if (data.ga4?.overview) {
     const o = data.ga4.overview, p = data.ga4.prevOverview || {};
     // GA4 reports new visitors; Fathom doesn't, so show pages-per-visit there.
     const thirdCard = o.newUsers != null
@@ -337,15 +343,15 @@ export async function generateReportPdf(data) {
     y = emptyNote(doc, y, 'Google Analytics is not connected for this site yet — once connected, visits, visitors and engagement will appear here.');
   }
 
-  // ── Daily traffic chart ──
-  if (data.ga4?.timeseries?.length > 1) {
+  // ── Daily traffic chart ── (suppressed when the source under-counted)
+  if (data.ga4?.timeseries?.length > 1 && !data.ga4.unreliable) {
     y = ensureSpace(doc, data, y, 180);
     y = sectionTitle(doc, y, 'Daily visits');
     y = lineChart(doc, y + 2, data.ga4.timeseries) + 10;
   }
 
   // ── Traffic sources + devices ──
-  if (data.ga4?.channels?.length) {
+  if (data.ga4?.channels?.length && !data.ga4.unreliable) {
     const channels = data.ga4.channels.slice(0, 6).map(c => ({ label: friendlyChannel(c.channel), value: c.sessions }));
     const devices = (data.ga4.devices || []).slice(0, 3);
     const blockH = Math.max(channels.length, devices.length + 1) * 18 + 36;
@@ -447,8 +453,8 @@ export async function generateReportPdf(data) {
     y = emptyNote(doc, y, 'Google Search Console is not connected for this site yet — once connected, your Google rankings and search clicks will appear here.');
   }
 
-  // ── Most viewed pages ──
-  if (data.ga4?.topPages?.length) {
+  // ── Most viewed pages ── (from the traffic tag; hide when it under-counted)
+  if (data.ga4?.topPages?.length && !data.ga4.unreliable) {
     const rows = data.ga4.topPages.slice(0, 7);
     y = ensureSpace(doc, data, y, 60 + rows.length * 16);
     y = sectionTitle(doc, y, 'Most viewed pages');

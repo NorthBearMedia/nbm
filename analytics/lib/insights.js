@@ -12,20 +12,26 @@ const pct = n => `${(n || 0).toFixed(1)}%`;
 
 // Compact, factual snapshot handed to the model (and used by the fallback).
 function snapshot(data) {
-  const o = data.ga4?.overview, p = data.ga4?.prevOverview || {}, s = data.search?.summary;
+  // If the traffic tag under-counted (proven wrong by Search Console/
+  // Clarity), don't feed the model its visit numbers or page titles — it
+  // would write a "only 1 visitor / coming-soon" story about a live site.
+  const o = (data.ga4?.overview && !data.ga4.unreliable) ? data.ga4.overview : null;
+  const ga = data.ga4?.unreliable ? null : data.ga4;
+  const p = data.ga4?.prevOverview || {}, s = data.search?.summary;
   const f = {
     site: data.site.clientName,
     domain: data.site.domain,
-    source: data.ga4?.sourceLabel || null,
+    source: o ? data.ga4?.sourceLabel : null,
+    trafficTagBeingFixed: Boolean(data.ga4?.unreliable) || undefined,
     visits: o?.sessions ?? null,
     visitsChangePct: o ? pctChange(o.sessions, p.sessions) : null,
     visitors: o?.totalUsers ?? null,
     pageViews: o?.screenPageViews ?? null,
     engagementRatePct: o ? o.engagementRate * 100 : null,
     avgVisitSeconds: o?.averageSessionDuration ?? null,
-    topChannels: (data.ga4?.channels || []).slice(0, 4).map(c => ({ channel: c.channel, visits: c.sessions })),
-    devices: (data.ga4?.devices || []).map(d => ({ device: d.device, visits: d.sessions })),
-    topPages: (data.ga4?.topPages || []).slice(0, 3).map(pg => ({ page: pg.title || pg.path, views: pg.views })),
+    topChannels: (ga?.channels || []).slice(0, 4).map(c => ({ channel: c.channel, visits: c.sessions })),
+    devices: (ga?.devices || []).map(d => ({ device: d.device, visits: d.sessions })),
+    topPages: (ga?.topPages || []).slice(0, 3).map(pg => ({ page: pg.title || pg.path, views: pg.views })),
     search: s ? { clicks: s.clicks, impressions: s.impressions, avgPosition: s.position } : null,
     topQueries: (data.search?.topQueries || []).slice(0, 5).map(q => ({ query: q.query, clicks: q.clicks, position: q.position })),
     clarity: data.clarity ? { deadClicks: data.clarity.deadClicks, rageClicks: data.clarity.rageClicks, avgScrollDepth: data.clarity.avgScrollDepth } : null,
@@ -40,6 +46,7 @@ Rules:
 - Ground EVERY statement in the numbers provided. Never invent data. If a number isn't provided, don't reference it.
 - Be genuinely useful: highlight what's working, flag what isn't, and give specific, doable recommendations for THIS business.
 - Mind the time of year (the covering dates are given): quiet spells over Christmas/New Year, Easter or summer holidays are normal for many small businesses — frame a seasonal dip as expected seasonality, not a problem to fix.
+- If "trafficTagBeingFixed" is true, the visitor-count tag is being reconnected, so visit/page numbers are absent — DO NOT say the site had few visitors, is a placeholder, or is "coming soon". Lead the analysis on the search performance and behaviour (Clarity) data, which are accurate.
 - Reply with ONLY a JSON object, no prose around it:
   {"headline": "one encouraging plain-English sentence summarising the month",
    "recommendations": [{"title": "3-5 word bold label", "detail": "1-2 sentence specific insight or action"}]}

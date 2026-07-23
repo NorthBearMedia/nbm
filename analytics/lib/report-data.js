@@ -141,6 +141,29 @@ export async function gatherReportData(site, start, end, opts = {}) {
     data.prevClarity = clarity.aggregate(site.id, prev.start, prev.end);
   }
 
+  // Cross-source truth check. A tag-based traffic source (GA especially)
+  // can massively under-count when its tag isn't firing on the real live
+  // site — but Search Console clicks and Clarity's human sessions are
+  // INDEPENDENT proof of real traffic. If the chosen source reports far
+  // fewer visits than those independent signals, it's broken for this
+  // period: flag it so the report leads with the true search + behaviour
+  // story instead of headlining a wrong "1 visit / coming soon" number.
+  // (This is exactly the North Bear Media case: GA=1, but GSC=33 clicks
+  // and Clarity=55 sessions on a fully-live site.)
+  if (data.ga4?.overview) {
+    const sessions = Number(data.ga4.overview.sessions || 0);
+    const gscClicks = Number(data.search?.summary?.clicks || 0);
+    const clarityHumans = Number(data.clarity?.humanSessions ?? data.clarity?.sessions ?? 0);
+    const independent = Math.max(gscClicks, clarityHumans);
+    // Only with solid independent evidence, and only when the source
+    // captured under a third of it — a genuine tag failure, not noise.
+    if (independent >= 10 && sessions < independent * 0.34) {
+      data.ga4.unreliable = true;
+      data.ga4.independentTraffic = independent;
+      warnings.push(`Traffic source under-counting: ${data.ga4.sourceLabel} shows ${sessions} sessions but Search Console/Clarity independently show ~${independent} — the tracking tag likely isn't firing on the live site.`);
+    }
+  }
+
   // AI-written (or rules-based) insights, computed once the data is in.
   try {
     const { generateInsights } = await import('./insights.js');
