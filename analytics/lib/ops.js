@@ -989,6 +989,42 @@ async function verifySourceIntegrity() {
   return verdicts;
 }
 
+// ── Self-heal a wrong Search Console property. Google exposes a site as
+// up to four separate "properties" — https / http × bare / www — plus a
+// domain property (sc-domain:) that needs DNS verification. Only some are
+// actually verified for us. finalizeSearchConsole could store the
+// sc-domain form because Google's "add site" call SUCCEEDS even while the
+// property stays unverified — so every read then fails "insufficient
+// permission" (hit live on evccitysprint: its sc-domain never verified,
+// but its https URL-prefix property is owned). This probes the stored
+// property and, if reads are denied, switches gsc_site_url to whichever
+// form actually reads. Generic, so it fixes any such mismatch, forever.
+export async function healGscProperties() {
+  const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND gsc_site_url != '' AND gsc_site_url IS NOT NULL").all();
+  if (!sites.length) return { checked: 0 };
+  const { fetchSummary } = await import('./gsc.js');
+  const end = addDays(todayISO(), -1), start = addDays(end, -6);
+  const reads = async url => { try { await fetchSummary(url, start, end); return true; } catch { return false; } };
+  let fixed = 0;
+  for (const site of sites) {
+    if (await reads(site.gsc_site_url)) continue; // current property is fine
+    const d = (site.domain || '').toLowerCase().replace(/^www\./, '');
+    if (!d) continue;
+    const candidates = [`https://${d}/`, `https://www.${d}/`, `sc-domain:${d}`, `http://${d}/`, `http://www.${d}/`]
+      .filter(c => c !== site.gsc_site_url);
+    for (const c of candidates) {
+      if (await reads(c)) {
+        db.prepare('UPDATE sites SET gsc_site_url = ? WHERE id = ?').run(c, site.id);
+        setSetting('managed_gsc_last_' + d, '');
+        console.log('[gsc-heal]', d, 'unreadable property', site.gsc_site_url, '→ switched to working', c);
+        fixed++;
+        break;
+      }
+    }
+  }
+  return { checked: sites.length, fixed };
+}
+
 // Search Console diagnosis for managed (no-DNS) sites, shown in the
 // Connections panel while unlinked. Goes far beyond "here's the tag":
 // fetches the LIVE page, reports which verification tag is actually being
@@ -1438,8 +1474,9 @@ export function scheduleOpsSweep() {
   setTimeout(() => finalizeSearchConsole().catch(e => console.error('[gsc]', e.message)), 150_000);
   setTimeout(() => verifyManagedSitesGsc().catch(e => console.error('[gsc-managed]', e.message)), 165_000);
   try {
-    cron.schedule('7 * * * *', () => { finalizeSearchConsole().catch(e => console.error('[gsc]', e.message)); verifyManagedSitesGsc().catch(e => console.error('[gsc-managed]', e.message)); }, { timezone: config.timezone });
+    cron.schedule('7 * * * *', () => { finalizeSearchConsole().catch(e => console.error('[gsc]', e.message)); verifyManagedSitesGsc().catch(e => console.error('[gsc-managed]', e.message)); healGscProperties().catch(e => console.error('[gsc-heal]', e.message)); }, { timezone: config.timezone });
   } catch (e) { console.error('[gsc] schedule failed:', e.message); }
+  setTimeout(() => healGscProperties().catch(e => console.error('[gsc-heal]', e.message)), 120_000);
   // Keep live pages matching their intended tag set (Clarity added later,
   // consent banner toggled) — hourly, offset from the GSC pass.
   try {
