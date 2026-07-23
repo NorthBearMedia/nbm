@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
+import { google } from 'googleapis';
 import db from '../database.js';
 import { requireAuth, requireWrite, aiMediaUpload } from '../middleware.js';
 import { logActivity } from '../lib/activity.js';
 import { statusToProgress, bandToPriority, isValidStatus, isValidBand, isValidType } from '../lib/taskmap.js';
+import { gmailClientForUser } from './gmail.js';
 
 const router = Router();
 
@@ -116,6 +118,28 @@ const TOOLS = [
     input_schema: { type: 'object', properties: {} }
   },
   {
+    name: 'list_recent_emails',
+    description: 'List the user\'s recent Gmail messages (metadata + snippet only). Use when asked to check the inbox, e.g. to compare emails against console tasks and find what\'s missing. Requires Gmail to be connected in the Email tab.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        max: { type: 'integer', description: 'How many messages (default 20, max 40)' },
+        query: { type: 'string', description: 'Optional Gmail search query, e.g. "newer_than:14d -category:promotions"' }
+      }
+    }
+  },
+  {
+    name: 'read_email_thread',
+    description: 'Read the full text of one Gmail thread by thread_id (from list_recent_emails). Use to pull task details out of a specific email.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        thread_id: { type: 'string' }
+      },
+      required: ['thread_id']
+    }
+  },
+  {
     name: 'list_tasks_for_user',
     description: 'List all active (not completed/invoiced) tasks assigned to a given person. Use to review someone\'s workload.',
     input_schema: {
@@ -159,7 +183,7 @@ function createOneTask(input, user, isOwner) {
   return { task_id: r.lastInsertRowid, ref: 'NB' + String(r.lastInsertRowid).padStart(3, '0'), title: input.title };
 }
 
-export function executeTool(name, input, user) {
+export async function executeTool(name, input, user) {
   const isOwner = user.role === 'owner';
   const canWrite = user.role === 'owner' || user.role === 'editor';
   const priv = isOwner ? '' : 'AND c.is_private = 0';
@@ -301,6 +325,57 @@ export function executeTool(name, input, user) {
         return { today_hours, tomorrow_hours, week_hours, total_hours, overdue_tasks: overdue, hours_by_person: byPerson };
       }
 
+      case 'list_recent_emails': {
+        const auth = gmailClientForUser(user.id);
+        if (!auth) return { error: 'Gmail is not connected — connect it from the Email tab first.' };
+        const gmail = google.gmail({ version: 'v1', auth });
+        const max = Math.min(Math.max(parseInt(input.max) || 20, 1), 40);
+        const list = await gmail.users.messages.list({
+          userId: 'me',
+          labelIds: input.query ? undefined : ['INBOX'],
+          q: input.query || undefined,
+          maxResults: max,
+        });
+        if (!list.data.messages?.length) return { messages: [] };
+        const details = await Promise.all(list.data.messages.map(m =>
+          gmail.users.messages.get({ userId: 'me', id: m.id, format: 'metadata', metadataHeaders: ['From', 'Subject', 'Date'] })
+        ));
+        return {
+          messages: details.map(d => {
+            const headers = d.data.payload?.headers || [];
+            const get = n => headers.find(h => h.name.toLowerCase() === n.toLowerCase())?.value || '';
+            return {
+              thread_id: d.data.threadId,
+              from: get('From'), subject: get('Subject'), date: get('Date'),
+              snippet: d.data.snippet,
+              unread: (d.data.labelIds || []).includes('UNREAD'),
+            };
+          })
+        };
+      }
+
+      case 'read_email_thread': {
+        const auth = gmailClientForUser(user.id);
+        if (!auth) return { error: 'Gmail is not connected — connect it from the Email tab first.' };
+        const gmail = google.gmail({ version: 'v1', auth });
+        const thread = await gmail.users.threads.get({ userId: 'me', id: input.thread_id, format: 'full' });
+        const messages = (thread.data.messages || []).map(m => {
+          const headers = m.payload?.headers || [];
+          const get = n => headers.find(h => h.name.toLowerCase() === n.toLowerCase())?.value || '';
+          let body = '';
+          if (m.payload?.body?.data) body = Buffer.from(m.payload.body.data, 'base64url').toString('utf-8');
+          else if (m.payload?.parts) {
+            const p = m.payload.parts.find(x => x.mimeType === 'text/plain') || m.payload.parts.find(x => x.mimeType === 'text/html');
+            if (p?.body?.data) body = Buffer.from(p.body.data, 'base64url').toString('utf-8');
+          }
+          // Strip tags from HTML bodies and cap length — the model needs the
+          // words, not 200KB of markup.
+          body = body.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 6000);
+          return { from: get('From'), date: get('Date'), subject: get('Subject'), body };
+        });
+        return { messages };
+      }
+
       case 'list_tasks_for_user': {
         const rows = db.prepare(`SELECT t.id, t.title, t.deadline, t.planned_date, t.estimated_hours, t.priority, t.progress, c.name as client_name FROM tasks t JOIN clients c ON t.client_id=c.id WHERE t.archived=0 AND t.progress NOT IN ('completed','invoiced') AND (t.assignee=? OR t.secondary_assignee=?) ${priv} ORDER BY COALESCE(NULLIF(t.planned_date,''), t.deadline), t.priority`).all(input.assignee, input.assignee);
         return { tasks: rows };
@@ -345,6 +420,12 @@ Pasted task lists (emails, bullet points, meeting notes — typed or pasted text
 - Dates: convert anything like "Thursday 9th", "end of month", "next week" to YYYY-MM-DD against today's date. Items with a date → status "scheduled" (+ band "today"/"this-week" if it falls there); undated items → status "inbox".
 - Make sensible assumptions rather than asking; record any assumption in that task's notes so the user can correct it later.
 - Afterwards, reply with a tight summary: one line per task (NB ref — title — date), plus any skipped duplicates or failures.
+
+Checking the inbox against the console ("what's missing from my console"):
+- Use list_recent_emails (filter noise with a query like "newer_than:14d -category:promotions -category:social"). Read full threads with read_email_thread only for emails that look like they contain real work.
+- Ignore newsletters, receipts, notifications and anything purely informational. You're hunting for asks, promises, deadlines and follow-ups involving ${user.display_name} or clients.
+- Compare against existing open tasks (search_tasks per candidate, matching loosely on topic — a differently-worded task for the same piece of work counts as covered).
+- Reply with a short list of what's genuinely missing — sender, the ask, suggested client + deadline — and ask ONE question: "Shall I add these?" Create them with create_tasks only after a yes. (Unlike a pasted list, a scanned inbox is your interpretation — confirm before writing.)
 
 Voice / Image input:
 - When the user sends a voice transcription or an image, interpret the content and present your understanding as a clear summary BEFORE creating any tasks.
@@ -400,7 +481,7 @@ router.post('/api/ai/chat', requireAuth, requireWrite, async (req, res) => {
       const toolUses = response.content.filter(b => b.type === 'tool_use');
       const toolResults = [];
       for (const tu of toolUses) {
-        const result = executeTool(tu.name, tu.input || {}, req.user);
+        const result = await executeTool(tu.name, tu.input || {}, req.user);
         toolLog.push({ tool: tu.name, input: tu.input, result });
         toolResults.push({
           type: 'tool_result',
@@ -493,7 +574,7 @@ router.post('/api/ai/chat-media', requireAuth, requireWrite, (req, res, next) =>
       const toolUses = response.content.filter(b => b.type === 'tool_use');
       const toolResults = [];
       for (const tu of toolUses) {
-        const result = executeTool(tu.name, tu.input || {}, req.user);
+        const result = await executeTool(tu.name, tu.input || {}, req.user);
         toolLog.push({ tool: tu.name, input: tu.input, result });
         toolResults.push({ type: 'tool_result', tool_use_id: tu.id, content: JSON.stringify(result) });
       }
