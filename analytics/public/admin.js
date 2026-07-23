@@ -87,7 +87,7 @@ function renderSetup() {
         <span class="chip ok">Google ✓</span>
         <span class="chip ok">${setup.sitesGoogleConnected}/${setup.sitesTotal} sites connected</span>
         ${setup.sitesMissingEmail ? `<span class="chip warn">${setup.sitesMissingEmail} site(s) need a client email</span>` : ''}
-        <span class="hint">Reports go out automatically at 07:00 ${esc(setup.timezone)} on each client's schedule.</span>
+        <span class="hint">Reports run automatically at 07:00 ${esc(setup.timezone)} on each schedule — coming to you as a preview until you press <strong>● Go Live</strong> on a site.</span>
       </div>`;
     return;
   }
@@ -336,12 +336,8 @@ function showSettingsModal() {
     <form id="settingsForm">
       ${emailFormFields(s)}
       <div class="form-grid" style="margin-top:14px">
-        <div class="field full"><label>Delivery mode</label>
-          <select name="delivery_mode">
-            <option value="test" ${s.delivery_mode !== 'live' ? 'selected' : ''}>Test — every report comes to me only (tagged with its intended client)</option>
-            <option value="live" ${s.delivery_mode === 'live' ? 'selected' : ''}>Live — reports go to clients (I'm BCC'd)</option>
-          </select>
-          <div class="help">Start in Test, review the reports landing in your inbox, then switch to Live when happy — that's the moment clients start receiving them.</div></div>
+        <div class="field full"><label>Report delivery</label>
+          <div class="help">Delivery is now controlled <strong>per site</strong>: each one is in <em>preview</em> (reports come to you only) until you press <strong>● Go Live to client</strong> on that site's card. There's no single switch that releases everyone at once — you decide site by site, and you're always BCC'd on live reports.</div></div>
         <div class="field full"><label>Cookie consent banner (GDPR)</label>
           <select name="consent_banner">
             <option value="false" ${s.consent_banner ? '' : 'selected'}>Off — tags load for every visitor (current risk accepted)</option>
@@ -422,7 +418,10 @@ function renderSites() {
   grid.innerHTML = sites.map(s => `
     <div class="site-card ${s.active ? '' : 'inactive'}" data-id="${s.id}">
       <div>
-        <div class="name">${esc(s.client_name)} ${s.active ? '' : '<span class="chip warn">paused</span>'}</div>
+        <div class="name">${esc(s.client_name)} ${s.active ? '' : '<span class="chip warn">paused</span>'}
+          ${s.delivery_live
+            ? '<span class="chip ok" title="Reports are being sent to this client">● LIVE → client</span>'
+            : '<span class="chip" title="Reports come to you only until you set this site Live">preview (you only)</span>'}</div>
         ${s.domain ? `<a class="domain" href="https://${esc(s.domain)}" target="_blank" rel="noopener">${esc(s.domain)}</a>` : '<span class="meta">no domain set</span>'}
       </div>
       <div class="row">
@@ -438,6 +437,9 @@ function renderSites() {
           : 'No reports sent yet'}
       </div>
       <div class="actions">
+        ${s.delivery_live
+          ? '<button class="btn small" data-act="delivery" data-live="0" title="Stop sending to the client; reports come to you again">■ Set to preview</button>'
+          : `<button class="btn small primary" data-act="delivery" data-live="1" ${s.contact_emails ? '' : 'disabled title="Add a client email first"'}>● Go Live to client</button>`}
         ${(!s.ga4_property_id || !s.gsc_site_url) ? '<button class="btn small primary" data-act="autoconnect">⚡ Auto-connect</button>' : ''}
         <button class="btn small" data-act="copy-link">Copy dashboard link</button>
         <button class="btn small" data-act="rotate-link">New link</button>
@@ -460,7 +462,20 @@ $('#sitesGrid').addEventListener('click', async (e) => {
   const site = sites.find(s => s.id === Number(card.dataset.id));
   const act = btn.dataset.act;
 
-  if (act === 'copy-link') {
+  if (act === 'delivery') {
+    const goLive = btn.dataset.live === '1';
+    if (goLive) {
+      if (!confirm(`Go LIVE for ${site.client_name}?\n\nFrom now on their reports will be emailed to:\n${site.contact_emails}\n(You stay BCC'd.)\n\nUntil now these came only to you. Continue?`)) return;
+    } else {
+      if (!confirm(`Set ${site.client_name} back to preview?\n\nReports will stop going to the client and come to you only.`)) return;
+    }
+    btn.disabled = true; btn.textContent = goLive ? 'Going live…' : 'Updating…';
+    try {
+      await api(`/api/sites/${site.id}/delivery`, { method: 'POST', body: { live: goLive } });
+      toast(goLive ? `${site.client_name} is LIVE — reports now go to the client (you're BCC'd)` : `${site.client_name} set back to preview — reports come to you only`, 'ok', 8000);
+      await loadSites();
+    } catch (err) { toast(err.message, 'err', 8000); await loadSites(); }
+  } else if (act === 'copy-link') {
     await navigator.clipboard.writeText(site.dashboardUrl);
     toast('Dashboard link copied — safe to send to the client');
   } else if (act === 'rotate-link') {
@@ -530,8 +545,8 @@ function showSiteModal(site = null) {
         <div class="field"><label>Status</label>
           <select name="active"><option value="1" ${site?.active !== 0 ? 'selected' : ''}>Active</option><option value="0" ${site?.active === 0 ? 'selected' : ''}>Paused</option></select></div>
         <div class="field"><label>Client delivery</label>
-          <select name="delivery_hold"><option value="0" ${site?.delivery_hold ? '' : 'selected'}>Send to client when Live</option><option value="1" ${site?.delivery_hold ? 'selected' : ''}>Hold back (owner only)</option></select>
-          <div class="help">"Hold back" keeps this site's reports coming only to you even in Live mode — for sites not yet finished.</div></div>
+          <select name="delivery_live"><option value="0" ${site?.delivery_live ? '' : 'selected'}>Preview — reports come to me only</option><option value="1" ${site?.delivery_live ? 'selected' : ''}>LIVE — reports go to the client</option></select>
+          <div class="help">You can also flip this from the site card with the <strong>Go Live</strong> button. Nothing reaches a client until this is set to LIVE.</div></div>
 
         <div class="field full"><label>Target keywords (their ideal Google searches)</label>
           <input name="target_keywords" value="${esc(site?.target_keywords)}" placeholder="e.g. care home derby, respite care ripley, dementia care">
@@ -588,7 +603,7 @@ function showSiteModal(site = null) {
     if (!form.reportValidity()) return;
     const body = Object.fromEntries(new FormData(form).entries());
     body.active = body.active === '1';
-    body.delivery_hold = body.delivery_hold === '1';
+    body.delivery_live = body.delivery_live === '1';
     try {
       const saved = isNew
         ? await api('/api/sites', { method: 'POST', body })
