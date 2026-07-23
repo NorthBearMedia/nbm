@@ -643,10 +643,14 @@ async function showSnippetModal(site) {
   })(window, document, "clarity", "script", "${site.clarity_project_id}");
 <\/script>`);
   }
+  if (site.fathom_site_id) {
+    parts.push(`<!-- Fathom Analytics -->
+<script src="https://cdn.usefathom.com/script.js" data-site="${site.fathom_site_id}" defer><\/script>`);
+  }
   showSnippetModalContent(site, parts.join('\n\n'), '');
 }
 
-const PRIVACY_PARA = (domain) => `Cookies & analytics: ${domain} uses Google Analytics and Microsoft Clarity to understand visitor numbers and how the site is used, so we can keep improving it. These tools are run on our behalf by North Bear Media and may set cookies in your browser. Data is aggregated and never sold. Questions or requests: contact us via the details on this site.`;
+const PRIVACY_PARA = (domain) => `Cookies & analytics: ${domain} uses Google Analytics, Fathom Analytics and Microsoft Clarity to understand visitor numbers and how the site is used, so we can keep improving it. These tools are run on our behalf by North Bear Media and may set cookies in your browser. Data is aggregated and never sold. Questions or requests: contact us via the details on this site.`;
 
 function showSnippetModalContent(site, snippet, banner) {
   $('#modalRoot').innerHTML = `

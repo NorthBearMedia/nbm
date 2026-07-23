@@ -344,7 +344,7 @@ app.get('/api/sites/:id/snippet', requireAdmin, (req, res) => {
   const consentBanner = getSetting('consent_banner') === 'true';
   res.json({
     consentBanner,
-    snippet: buildSnippet(site.ga4_measurement_id || '', site.clarity_project_id || '', { consentBanner }),
+    snippet: buildSnippet(site.ga4_measurement_id || '', site.clarity_project_id || '', { consentBanner, fathomId: site.fathom_site_id || '' }),
   });
 });
 
@@ -611,7 +611,7 @@ app.get('/ix/:token/:domain', (req, res) => {
   const domain = String(req.params.domain).toLowerCase().replace(/[^a-z0-9.-]/g, '');
   const demoId = 'G-MS3V4KS3PB';
   try {
-    let measurementId, clarityId = null;
+    let measurementId, clarityId = null, fathomId = '';
     if (domain === 'nbmdemosite2.co.uk') {
       measurementId = demoId;
     } else {
@@ -624,9 +624,10 @@ app.get('/ix/:token/:domain', (req, res) => {
       }
       measurementId = site.ga4_measurement_id;
       clarityId = site.clarity_project_id || null;
+      fathomId = site.fathom_site_id || '';
     }
     const consentBanner = getSetting('consent_banner') === 'true';
-    const script = buildInjectorScript(rootDirFor(domain), buildSnippet(measurementId, clarityId, { consentBanner }));
+    const script = buildInjectorScript(rootDirFor(domain), buildSnippet(measurementId, clarityId, { consentBanner, fathomId }));
     res.type('text/x-shellscript').send(script);
   } catch (e) {
     // Never hard-500 the injector — a 500 makes curl write nothing and the
