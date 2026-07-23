@@ -296,6 +296,12 @@ app.put('/api/sites/:id', requireAdmin, (req, res) => {
   if (req.body?.clear_clarity_token) data.clarity_api_token = '';
   if (req.body?.active !== undefined) data.active = req.body.active ? 1 : 0;
   if (req.body?.delivery_hold !== undefined) data.delivery_hold = req.body.delivery_hold ? 1 : 0;
+  if (req.body?.delivery_live !== undefined) {
+    if (req.body.delivery_live && !(data.contact_emails ?? site.contact_emails)) {
+      return res.status(400).json({ error: 'Add a client report email before setting this site Live — otherwise there is nowhere to send.' });
+    }
+    data.delivery_live = req.body.delivery_live ? 1 : 0;
+  }
   if (data.report_frequency && data.report_frequency !== site.report_frequency) {
     data.next_report_at = nextRunAt(data.report_frequency);
   }
@@ -346,6 +352,20 @@ app.get('/api/sites/:id/snippet', requireAdmin, (req, res) => {
     consentBanner,
     snippet: buildSnippet(site.ga4_measurement_id || '', site.clarity_project_id || '', { consentBanner, fathomId: site.fathom_site_id || '' }),
   });
+});
+
+// Per-site LIVE switch: flip one site between owner-preview and
+// client-delivery. The authenticated, deliberate action that starts
+// (or stops) reports actually reaching a client. Admin-only.
+app.post('/api/sites/:id/delivery', requireAdmin, (req, res) => {
+  const site = db.prepare('SELECT * FROM sites WHERE id = ?').get(req.params.id);
+  if (!site) return res.status(404).json({ error: 'Site not found' });
+  const live = req.body?.live ? 1 : 0;
+  if (live && !site.contact_emails) {
+    return res.status(400).json({ error: 'Add a client report email before going Live — otherwise there is nowhere to send.' });
+  }
+  db.prepare('UPDATE sites SET delivery_live = ? WHERE id = ?').run(live, site.id);
+  res.json(siteSummary(db.prepare('SELECT * FROM sites WHERE id = ?').get(site.id)));
 });
 
 // Rotate a client's dashboard link (e.g. after a report email was forwarded

@@ -4,7 +4,7 @@
 import nodemailer from 'nodemailer';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { getSmtp, getEmailFrom, getEmailBcc, getAppUrl, getDeliveryMode, getOwnerEmail, getReplyTo } from './runtime-config.js';
+import { getSmtp, getEmailFrom, getEmailBcc, getAppUrl, getOwnerEmail, getReplyTo } from './runtime-config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LOGO = join(__dirname, '..', 'public', 'assets', 'nbm-logo-light-trimmed.png');
@@ -130,15 +130,16 @@ function reportEmailText(site, data, periodText) {
 export async function sendReportEmail(site, data, pdfBuffer, periodText, filename) {
   const realTo = site.contact_emails.split(',').map(e => e.trim()).filter(Boolean);
   if (!realTo.length) throw new Error('No contact email set for this client');
-  // Test mode (default): the full report is produced on the real schedule
-  // but delivered ONLY to the owner, tagged with its intended recipients.
-  // Flipping Settings → Delivery mode to Live is the owner's arming action.
-  // A site with delivery_hold stays owner-only even in Live mode, so the
-  // fleet can go live while unfinished sites are held back.
-  const held = site.delivery_hold === 1;
-  const test = getDeliveryMode() !== 'live' || held;
+  // A site reaches its actual CLIENT only when the owner has switched THAT
+  // site Live (per-site, from its card in the admin console). Otherwise the
+  // full report is produced on its real schedule but delivered to the owner
+  // only, tagged as a preview — so nothing ever lands in a client's inbox
+  // without a deliberate, per-site, authenticated click. No global switch
+  // can release the whole fleet at once.
+  const live = site.delivery_live === 1;
+  const test = !live;
   const to = test ? [getOwnerEmail()] : realTo;
-  const subject = (test ? `[${held && getDeliveryMode() === 'live' ? 'HELD' : 'TEST'} — would send to ${realTo.join(', ')}] ` : '')
+  const subject = (test ? `[PREVIEW — would send to ${realTo.join(', ')}] ` : '')
     + `Your website report — ${site.client_name} (${periodText})`;
   const replyTo = getReplyTo();
   await mailer().sendMail({

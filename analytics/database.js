@@ -81,8 +81,15 @@ function addColumnIfMissing(table, column, definition) {
 addColumnIfMissing('sites', 'fathom_site_id', "TEXT DEFAULT ''");
 addColumnIfMissing('sites', 'target_keywords', "TEXT DEFAULT ''");
 // Per-site Live holdback: 1 = reports for this site go only to the owner
-// even when the global delivery mode is Live.
+// even when the global delivery mode is Live. (Legacy — superseded by
+// delivery_live below; kept so no migration is destructive.)
 addColumnIfMissing('sites', 'delivery_hold', 'INTEGER NOT NULL DEFAULT 0');
+// Per-site LIVE switch — the authoritative delivery control. 0 (default) =
+// reports are produced but delivered to the OWNER only, as a preview.
+// 1 = this one site sends to its actual client. The owner flips each site
+// Live himself, from its card, when he's happy — nothing reaches a client
+// without a deliberate per-site click.
+addColumnIfMissing('sites', 'delivery_live', 'INTEGER NOT NULL DEFAULT 0');
 
 export function newDashboardToken() {
   return randomBytes(24).toString('hex');
