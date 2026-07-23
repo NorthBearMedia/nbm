@@ -901,6 +901,60 @@ async function onboardNewSites() {
   return { pending: needy.length };
 }
 
+// ── Source integrity: prove, machine-side, that each connected source is
+// really carrying THIS domain's traffic — the question a human would
+// otherwise have to answer with view-source or a GA Realtime self-test.
+// GA4 and Fathom both record the serving hostname with every hit, so ask
+// them. Verdicts land in the Connections panel; a Fathom source feeding a
+// DIFFERENT domain's data is disconnected on the spot (wrong numbers in a
+// client report is the one unforgivable failure), falling back to GA.
+async function verifySourceIntegrity() {
+  const subject = getGscReaderEmail() || 'norton@northbearmedia.co.uk';
+  const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND domain != ''").all();
+  let verdicts = {};
+  try { verdicts = JSON.parse(getSetting('source_integrity') || '{}'); } catch { /* fresh */ }
+  const end = addDays(todayISO(), -1), start = addDays(end, -13);
+  for (const site of sites) {
+    const d = (site.domain || '').toLowerCase().replace(/^www\./, '');
+    if (!d || d === 'nbmdemosite2.co.uk') continue;
+    const v = verdicts[d] = verdicts[d] || {};
+    const own = rows => rows.filter(r => r.host === d || r.host.endsWith('.' + d)).reduce((a, r) => a + r.n, 0);
+    if (site.ga4_property_id) {
+      try {
+        const rep = await gReq({
+          url: `https://analyticsdata.googleapis.com/v1beta/properties/${site.ga4_property_id}:runReport`,
+          method: 'POST',
+          data: { dateRanges: [{ startDate: start, endDate: end }], dimensions: [{ name: 'hostName' }], metrics: [{ name: 'sessions' }], limit: 10 },
+        }, { scopes: ['https://www.googleapis.com/auth/analytics.readonly'], subject });
+        const rows = (rep.rows || [])
+          .map(r => ({ host: String(r.dimensionValues?.[0]?.value || '').toLowerCase().replace(/^www\./, ''), n: Number(r.metricValues?.[0]?.value || 0) }))
+          .filter(r => r.host);
+        const total = rows.reduce((a, r) => a + r.n, 0);
+        v.ga = !total ? { status: 'no-data' }
+          : own(rows) / total >= 0.5 ? { status: 'verified' }
+          : { status: 'mismatch', hosts: rows.slice(0, 3).map(r => r.host) };
+        if (v.ga.status === 'mismatch') console.log('[integrity]', d, 'GA property carries traffic for', v.ga.hosts.join(','));
+      } catch (e) { v.ga = { status: 'error', err: String(e.message || e).slice(0, 60) }; }
+    } else v.ga = undefined;
+    if (site.fathom_site_id && getFathomToken()) {
+      try {
+        const { fathomHostnames } = await import('./fathom.js');
+        const rows = await fathomHostnames(site.fathom_site_id, start, end);
+        const total = rows.reduce((a, r) => a + r.n, 0);
+        if (!total) v.fathom = { status: 'no-data' };
+        else if (own(rows) / total >= 0.5) v.fathom = { status: 'verified' };
+        else {
+          v.fathom = { status: 'mismatch', hosts: rows.slice(0, 3).map(r => r.host) };
+          db.prepare("UPDATE sites SET fathom_site_id = '' WHERE id = ?").run(site.id);
+          console.log('[integrity]', d, 'Fathom site was carrying', v.fathom.hosts.join(','), '— disconnected, reports fall back to GA');
+        }
+      } catch (e) { v.fathom = { status: 'error', err: String(e.message || e).slice(0, 60) }; }
+    } else if (!site.fathom_site_id && v.fathom?.status !== 'mismatch') v.fathom = undefined;
+  }
+  setSetting('source_integrity', JSON.stringify(verdicts));
+  return verdicts;
+}
+
 // Search Console diagnosis for managed (no-DNS) sites, shown in the
 // Connections panel while unlinked. Goes far beyond "here's the tag":
 // fetches the LIVE page, reports which verification tag is actually being
@@ -1364,6 +1418,11 @@ export function scheduleOpsSweep() {
     cron.schedule('37 * * * *', () => onboardNewSites().catch(e => console.error('[onboard]', e.message)), { timezone: config.timezone });
   } catch (e) { console.error('[onboard] schedule failed:', e.message); }
   setTimeout(() => onboardNewSites().catch(e => console.error('[onboard]', e.message)), 240_000);
+  // Prove each source carries the right domain's traffic — hourly.
+  try {
+    cron.schedule('43 * * * *', () => verifySourceIntegrity().catch(e => console.error('[integrity]', e.message)), { timezone: config.timezone });
+  } catch (e) { console.error('[integrity] schedule failed:', e.message); }
+  setTimeout(() => verifySourceIntegrity().catch(e => console.error('[integrity]', e.message)), 300_000);
   try {
     cron.schedule('*/10 * * * *', () => verifyPendingInjections().catch(e => console.error('[inject]', e.message)), { timezone: config.timezone });
     // Self-heal a stalled rollout: place crons for any unverified client

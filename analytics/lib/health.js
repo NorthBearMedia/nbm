@@ -1,7 +1,7 @@
 // Per-site connections health — live-checked on demand from the admin
 // console ("Connections" button). Replaces diagnostic emails: the owner
 // looks when he wants, nothing lands in his inbox.
-import db from '../database.js';
+import db, { getSetting } from '../database.js';
 import * as ga4 from './ga4.js';
 import * as gsc from './gsc.js';
 import { syncSite } from './clarity.js';
@@ -30,26 +30,36 @@ async function siteHealth(site, start, end) {
   const domain = (site.domain || '').toLowerCase().replace(/^www\./, '');
   const out = { id: site.id, client: site.client_name, domain };
 
+  // Hourly machine-verified answer to "is this really THIS domain's
+  // traffic?" (GA4/Fathom hostname data, computed by ops) — the check a
+  // human would otherwise do with view-source or a GA Realtime self-test.
+  let integ = {};
+  try { integ = JSON.parse(getSetting('source_integrity') || '{}')[domain] || {}; } catch { /* none yet */ }
+
   // Google Analytics (or Fathom, which takes precedence as traffic source)
-  out.fathom = !site.fathom_site_id ? bad('no site ID')
+  out.fathom = integ.fathom?.status === 'mismatch'
+    ? bad(`was matched to the WRONG Fathom site (its data was from ${(integ.fathom.hosts || []).join(', ')}) — disconnected automatically; reports use Google Analytics instead`)
+    : !site.fathom_site_id ? bad('no site ID')
     : !getFathomToken() ? bad('site ID set but no API key in Settings')
     : await gatherFathom(site.fathom_site_id, start, end)
-        .then(m => m?.overview ? ok(`${Math.round(m.overview.sessions)} visits (7d)`) : bad('no data returned'))
+        .then(m => m?.overview ? ok(`${Math.round(m.overview.sessions)} visits (7d)${integ.fathom?.status === 'verified' ? ' · traffic verified from this domain ✓' : ''}`) : bad('no data returned'))
         .catch(e => bad(e.message.slice(0, 90)));
 
   // One homepage fetch feeds both tag checks (GA + Clarity below).
   const homepage = await fetchHomepage(domain);
   const gaTagFound = Boolean(site.ga4_measurement_id) && homepage != null && homepage.includes(site.ga4_measurement_id);
-  out.ga = !site.ga4_property_id ? bad('no property ID')
+  out.ga = integ.ga?.status === 'mismatch'
+    ? bad(`WRONG PROPERTY — its traffic is from ${(integ.ga.hosts || []).join(', ')}, not this site. North Bear is on it; don't paste anything.`)
+    : !site.ga4_property_id ? bad('no property ID')
     : await ga4.fetchOverview(site.ga4_property_id, start, end)
         .then(o => {
           // Real data flowing is the only proof that matters — if the tag
           // isn't visible in raw HTML but sessions are non-zero, it's loaded
           // via Tag Manager, a plugin, or the builder's own hook, not
-          // missing. Only flag "not detected" when there's ALSO no data,
-          // where the paste instruction is actually the right next step.
-          const note = gaTagFound ? ' · tag on site ✓'
-            : o.sessions > 0 ? ' · data flowing (tag likely loaded via Tag Manager/plugin, not a plain script)'
+          // missing. The hourly hostname verification settles it outright.
+          const note = integ.ga?.status === 'verified' ? ' · traffic verified from this domain ✓'
+            : gaTagFound ? ' · tag on site ✓'
+            : o.sessions > 0 ? ' · data flowing (tag loads via the builder/Tag Manager, so it won’t show in page source)'
             : (site.ga4_measurement_id && homepage != null) ? ' · tag NOT detected on the page — paste this site’s Tracking code into the builder' : '';
           return ok(`${Math.round(o.sessions)} visits (7d)${note}`);
         })
