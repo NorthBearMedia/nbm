@@ -111,6 +111,11 @@ async function siteHealth(site, start, end) {
 }
 
 export async function connectionsHealth() {
+  // Opening the panel first self-heals any wrong Search Console property
+  // (e.g. an unverified sc-domain stored over a working URL-prefix), so a
+  // permission ✗ corrects itself by the time the rows render — no wait for
+  // the hourly pass.
+  try { const { healGscProperties } = await import('./ops.js'); await healGscProperties(); } catch { /* panel still renders */ }
   const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND domain != '' ORDER BY client_name").all()
     .filter(s => (s.domain || '') !== 'nbmdemosite2.co.uk');
   const end = addDays(todayISO(), -1), start = addDays(end, -6);
