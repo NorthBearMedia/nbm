@@ -57,7 +57,10 @@ const FRIENDLY_CHANNEL = {
 };
 
 function render(d) {
-  const o = d.ga4?.overview, p = d.ga4?.prevOverview || {};
+  // Traffic tag under-counting (proven wrong by Search Console/Clarity) →
+  // don't render its numbers; lead with the true search + behaviour story.
+  const gaBad = Boolean(d.ga4?.unreliable);
+  const o = gaBad ? null : d.ga4?.overview, p = d.ga4?.prevOverview || {};
   const s = d.search?.summary, sp = d.search?.prevSummary || {};
   let html = `
     <div class="client-hero">
@@ -94,17 +97,20 @@ function render(d) {
       ${kpi('Avg. visit length', fmtDur(o.averageSessionDuration), pctChange(o.averageSessionDuration, p.averageSessionDuration))}
     </div>`;
     if (d.ga4.sourceLabel) html += `<div class="hint" style="margin-top:6px">Source: ${esc(d.ga4.sourceLabel)}</div>`;
+  } else if (gaBad) {
+    html += `<div class="panel"><h2>Visitor tracking is being reconnected</h2>
+      <p class="hint">The visitor-count tag is being reinstalled on your site, so the visit total isn't complete yet — but your Google search performance and behaviour insights below are fully live and accurate${s && s.impressions > 0 ? `. Google showed your site <strong>${fmtInt(s.impressions)}</strong> times this period` : ''}.</p></div>`;
   } else {
     html += `<div class="panel"><h2>Analytics warming up</h2>
       <p class="hint">Google Analytics isn't connected for your site yet — North Bear Media is on it. Your visits and visitors will appear here soon.</p></div>`;
   }
 
-  if (d.ga4?.timeseries?.length > 1) {
+  if (!gaBad && d.ga4?.timeseries?.length > 1) {
     html += section('Daily visits');
     html += `<div class="panel"><div class="chart-wrap"><canvas id="trafficChart"></canvas></div></div>`;
   }
 
-  if (d.ga4?.channels?.length || d.ga4?.devices?.length) {
+  if (!gaBad && (d.ga4?.channels?.length || d.ga4?.devices?.length)) {
     html += section('Where your visits came from');
     html += `<div class="two-col">`;
     if (d.ga4.channels?.length) {
@@ -186,7 +192,7 @@ function render(d) {
     html += `<div class="panel"><p class="hint">Google Search Console is being connected for your site — your Google rankings and search clicks will appear here soon.</p></div>`;
   }
 
-  if (d.ga4?.topPages?.length) {
+  if (!gaBad && d.ga4?.topPages?.length) {
     html += section('Most viewed pages');
     html += `<div class="panel"><table class="data">
       <thead><tr><th>Page</th><th class="num">Views</th><th class="num">Visits</th></tr></thead>
@@ -242,7 +248,7 @@ function render(d) {
     b.onclick = () => { currentRange = Number(b.dataset.range); load(); };
   });
 
-  if (d.ga4?.timeseries?.length > 1) drawChart(d.ga4.timeseries);
+  if (!gaBad && d.ga4?.timeseries?.length > 1) drawChart(d.ga4.timeseries);
 }
 
 function drawChart(points) {
