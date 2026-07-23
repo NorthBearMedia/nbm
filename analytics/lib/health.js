@@ -36,18 +36,23 @@ async function siteHealth(site, start, end) {
   let integ = {};
   try { integ = JSON.parse(getSetting('source_integrity') || '{}')[domain] || {}; } catch { /* none yet */ }
 
-  // Google Analytics (or Fathom, which takes precedence as traffic source)
-  out.fathom = integ.fathom?.status === 'mismatch'
-    ? bad(`was matched to the WRONG Fathom site (its data was from ${(integ.fathom.hosts || []).join(', ')}) — disconnected automatically; reports use Google Analytics instead`)
-    : !site.fathom_site_id ? bad('no site ID')
-    : !getFathomToken() ? bad('site ID set but no API key in Settings')
-    : await gatherFathom(site.fathom_site_id, start, end)
-        .then(m => m?.overview ? ok(`${Math.round(m.overview.sessions)} visits (7d)${integ.fathom?.status === 'verified' ? ' · traffic verified from this domain ✓' : ''}`) : bad('no data returned'))
-        .catch(e => bad(e.message.slice(0, 90)));
-
-  // One homepage fetch feeds both tag checks (GA + Clarity below).
+  // One homepage fetch feeds every tag check (Fathom, GA, Clarity).
   const homepage = await fetchHomepage(domain);
   const gaTagFound = Boolean(site.ga4_measurement_id) && homepage != null && homepage.includes(site.ga4_measurement_id);
+
+  // Fathom (takes precedence over GA as the report's traffic source)
+  const fathomEnsureErr = getSetting('fathom_ensure_last') || '';
+  const fathomTagOn = homepage != null && homepage.includes('usefathom.com');
+  const noDataNote = fathomTagOn
+    ? 'script is on the site — data appears within a day of the first visitor'
+    : 'script not on the page yet — file-hosted sites get it automatically within the hour; builder sites: paste the Tracking code';
+  out.fathom = integ.fathom?.status === 'mismatch'
+    ? bad(`was matched to the WRONG Fathom site (its data was from ${(integ.fathom.hosts || []).join(', ')}) — disconnected automatically; reports use Google Analytics instead`)
+    : !site.fathom_site_id ? bad(fathomEnsureErr ? `auto-setup blocked: ${fathomEnsureErr}` : 'being set up automatically — check back within the hour')
+    : !getFathomToken() ? bad('site ID set but no API key in Settings')
+    : await gatherFathom(site.fathom_site_id, start, end)
+        .then(m => m?.overview ? ok(`${Math.round(m.overview.sessions)} visits (7d)${integ.fathom?.status === 'verified' ? ' · traffic verified from this domain ✓' : ''}`) : bad(noDataNote))
+        .catch(e => bad(e.message.slice(0, 90)));
   out.ga = integ.ga?.status === 'mismatch'
     ? bad(`WRONG PROPERTY — its traffic is from ${(integ.ga.hosts || []).join(', ')}, not this site. North Bear is on it; don't paste anything.`)
     : !site.ga4_property_id ? bad('no property ID')

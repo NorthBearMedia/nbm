@@ -735,7 +735,7 @@ export async function retrofitTags() {
   for (const site of sites) {
     const domain = (site.domain || '').toLowerCase().replace(/^www\./, '');
     if (!isAutoTaggable(domain)) continue;
-    const want = `${site.ga4_measurement_id}|${site.clarity_project_id || ''}|${banner ? 1 : 0}`;
+    const want = `${site.ga4_measurement_id}|${site.clarity_project_id || ''}|${banner ? 1 : 0}|${site.fathom_site_id || ''}`;
     const rec = state[domain] || {};
     if (rec.want !== want) { state[domain] = { want, tries: 0, done: false }; }
     const cur = state[domain];
@@ -746,6 +746,7 @@ export async function retrofitTags() {
     if (html == null) { continue; } // unreachable right now — try next pass, doesn't burn a retry
     const ok = html.includes(site.ga4_measurement_id)
       && (!site.clarity_project_id || html.includes(site.clarity_project_id))
+      && (!site.fathom_site_id || html.includes(site.fathom_site_id))
       && (banner === html.includes('nbmConsent'));
     if (ok) {
       cur.done = true;
@@ -899,6 +900,39 @@ async function onboardNewSites() {
     } catch (e) { setSetting('managed_gsc_last_' + s.d, String(e.message || e).slice(0, 80)); console.log('[onboard] GSC pending for', s.d, ':', String(e.message || e).slice(0, 80)); }
   }
   return { pending: needy.length };
+}
+
+// ── Fathom everywhere: every active site gets a Fathom site created in
+// the agency account (match an existing one by name first, else create
+// via the API) and its ID stored. The retrofit loop then serves the
+// Fathom script on file-hosted sites automatically; builder sites get it
+// in their Tracking-code block. Hourly, idempotent, quiet. A read-only
+// API key can't create — the error is stored and shown in Connections.
+async function ensureFathomSites() {
+  const { getFathomToken: tok } = await import('./runtime-config.js');
+  if (!tok()) return { skipped: 'no API key' };
+  const missing = db.prepare("SELECT * FROM sites WHERE active = 1 AND domain != '' AND (fathom_site_id = '' OR fathom_site_id IS NULL)").all()
+    .filter(s => (s.domain || '') !== 'nbmdemosite2.co.uk');
+  if (!missing.length) { setSetting('fathom_ensure_last', ''); return { done: true }; }
+  const { listSites, createSite } = await import('./fathom.js');
+  let existing = [];
+  try { existing = await listSites(); } catch (e) { setSetting('fathom_ensure_last', 'list failed: ' + e.message.slice(0, 80)); return { error: true }; }
+  const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  for (const site of missing) {
+    const d = (site.domain || '').toLowerCase().replace(/^www\./, '');
+    try {
+      const match = existing.find(f => norm(f.name) === norm(site.client_name) || norm(f.name) === norm(d));
+      const id = match ? match.id : await createSite(site.client_name || d);
+      db.prepare('UPDATE sites SET fathom_site_id = ? WHERE id = ?').run(String(id), site.id);
+      setSetting('fathom_ensure_last', '');
+      console.log('[fathom-ensure]', d, match ? 'matched existing Fathom site' : 'created Fathom site', id);
+    } catch (e) {
+      setSetting('fathom_ensure_last', String(e.message || e).slice(0, 120));
+      console.log('[fathom-ensure]', d, 'failed:', String(e.message || e).slice(0, 100));
+      break; // a key-permission problem will fail for every site — stop, retry next hour
+    }
+  }
+  return { done: true };
 }
 
 // ── Source integrity: prove, machine-side, that each connected source is
@@ -1423,6 +1457,12 @@ export function scheduleOpsSweep() {
     cron.schedule('43 * * * *', () => verifySourceIntegrity().catch(e => console.error('[integrity]', e.message)), { timezone: config.timezone });
   } catch (e) { console.error('[integrity] schedule failed:', e.message); }
   setTimeout(() => verifySourceIntegrity().catch(e => console.error('[integrity]', e.message)), 300_000);
+  // Fathom on every site: create/match Fathom sites and store IDs — the
+  // retrofit then serves the script on file-hosted sites automatically.
+  try {
+    cron.schedule('53 * * * *', () => ensureFathomSites().catch(e => console.error('[fathom-ensure]', e.message)), { timezone: config.timezone });
+  } catch (e) { console.error('[fathom-ensure] schedule failed:', e.message); }
+  setTimeout(() => ensureFathomSites().catch(e => console.error('[fathom-ensure]', e.message)), 270_000);
   try {
     cron.schedule('*/10 * * * *', () => verifyPendingInjections().catch(e => console.error('[inject]', e.message)), { timezone: config.timezone });
     // Self-heal a stalled rollout: place crons for any unverified client

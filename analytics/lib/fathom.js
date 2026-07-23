@@ -26,6 +26,25 @@ async function fathomGet(path, params) {
 const rows = d => Array.isArray(d?.data) ? d.data : (Array.isArray(d) ? d : (d?.data ? [d.data] : []));
 const num = v => { const n = Number(v); return isFinite(n) ? n : 0; };
 
+// Create a Fathom site (returns its ID) — lets Pulse wire Fathom onto
+// every client automatically instead of stopping at the 4 hand-connected
+// ones. Requires the API key to have write access; a read-only key gets a
+// clear 403 the caller surfaces.
+export async function createSite(name) {
+  const token = getFathomToken();
+  if (!token) throw new Error('Fathom API key not set');
+  const res = await fetch(BASE + '/sites', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error(`Fathom create ${res.status}: ${(await res.text().catch(() => '')).slice(0, 160)}`);
+  const j = await res.json();
+  const id = j?.id || j?.data?.id;
+  if (!id) throw new Error('Fathom create: no site id in response');
+  return String(id);
+}
+
 export async function listSites() {
   const all = [];
   let after = null, guard = 0;

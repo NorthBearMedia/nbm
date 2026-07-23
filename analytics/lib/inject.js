@@ -41,7 +41,7 @@ async function hg(path, method = 'GET', body) {
 // block in place (upgrades: adding Clarity later, turning the consent
 // banner on/off) — v1 blocks (start marker only) sit immediately before
 // </head> or </body> by construction, so they're replaceable too.
-export function buildSnippet(measurementId, clarityId, { consentBanner = false } = {}) {
+export function buildSnippet(measurementId, clarityId, { consentBanner = false, fathomId = '' } = {}) {
   let load = '';
   if (measurementId) {
     load += consentBanner
@@ -52,6 +52,11 @@ export function buildSnippet(measurementId, clarityId, { consentBanner = false }
   if (clarityId) {
     const clarityJs = `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","${clarityId}");`;
     load += consentBanner ? clarityJs : `<script type="text/javascript">${clarityJs}</script>`;
+  }
+  if (fathomId) {
+    load += consentBanner
+      ? `var f=d.createElement('script');f.src='https://cdn.usefathom.com/script.js';f.setAttribute('data-site','${fathomId}');f.defer=true;d.head.appendChild(f);`
+      : `<script src="https://cdn.usefathom.com/script.js" data-site="${fathomId}" defer></script>`;
   }
   if (!consentBanner) return `<!-- NBM-GA-TAG -->${load}<!-- /NBM-GA-TAG -->`;
   // Consent-gated variant: nothing loads until the visitor accepts; the
