@@ -2,18 +2,21 @@
 // Accepts either a URL-prefix property ("https://example.com/") or a
 // domain property ("sc-domain:example.com").
 //
-// If a "Search Console reader" email is configured (Settings) and
-// domain-wide delegation is authorised, queries run AS that user,
-// read-only — no per-site robot grants needed. Otherwise the robot
-// queries directly and must have been added to each property.
+// Reads always delegate as the owner (explicit "Search Console reader"
+// setting, falling back to norton@ — the same default every WRITE path in
+// ops.js already uses to verify/register properties). Without this
+// fallback, a property registered via delegated auth (which works because
+// the owner already has access in his own Search Console) would then fail
+// every read with "insufficient permission", because the bare robot
+// service account was never individually granted that specific property —
+// a real bug that broke every newly onboarded site until a human noticed
+// and manually granted the robot. Domain-wide delegation covers every
+// property the owner can see, so this needs no per-site grant, ever.
 import { googleRequest } from './google.js';
 import { getGscReaderEmail } from './runtime-config.js';
 
 export function gscAuth() {
-  const subject = getGscReaderEmail();
-  return subject
-    ? { scopes: ['https://www.googleapis.com/auth/webmasters.readonly'], subject }
-    : undefined;
+  return { scopes: ['https://www.googleapis.com/auth/webmasters.readonly'], subject: getGscReaderEmail() || 'norton@northbearmedia.co.uk' };
 }
 
 async function query(siteUrl, body) {
