@@ -112,6 +112,20 @@ export async function gatherFathom(fathomSiteId, start, end) {
   };
 }
 
+// Which hostnames actually produced this Fathom site's pageviews — the
+// ground truth for "is this really <domain>'s data?" A mis-matched site ID
+// would otherwise feed another business's numbers into a client report.
+export async function fathomHostnames(fathomSiteId, start, end) {
+  const d = await fathomGet('/aggregations', {
+    entity: 'pageview', entity_id: fathomSiteId, aggregates: 'pageviews',
+    field_grouping: 'hostname', sort_by: 'pageviews:desc', limit: 10,
+    date_from: dt(start), date_to: dt(end, true), timezone: 'Europe/London',
+  });
+  return rows(d)
+    .map(r => ({ host: String(r.hostname || '').toLowerCase().replace(/^www\./, ''), n: num(r.pageviews) }))
+    .filter(r => r.host);
+}
+
 export async function testConnection() {
   await listSites();
   return true;
