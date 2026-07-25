@@ -57,7 +57,7 @@ async function siteHealth(site, start, end) {
     ? 'script is on the site — data appears within a day of the first visitor'
     : 'script not on the page yet — file-hosted sites get it automatically within the hour; builder sites: paste the Tracking code';
   out.fathom = integ.fathom?.status === 'mismatch'
-    ? bad(`was matched to the WRONG Fathom site (its data was from ${(integ.fathom.hosts || []).join(', ')}) — disconnected automatically; reports use Google Analytics instead`)
+    ? bad(`this Fathom site's traffic is from ${(integ.fathom.hosts || []).join(', ')}, not this domain — excluded from reports (which use Google Analytics) until it's pointed at the right site. Connection kept, nothing deleted.`)
     : !site.fathom_site_id ? bad(fathomEnsureErr ? `auto-setup blocked: ${fathomEnsureErr}` : 'being set up automatically — check back within the hour')
     : !getFathomToken() ? bad('site ID set but no API key in Settings')
     : await gatherFathom(site.fathom_site_id, start, end)

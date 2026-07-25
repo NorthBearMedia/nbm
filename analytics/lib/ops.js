@@ -985,15 +985,28 @@ async function verifySourceIntegrity() {
         const { fathomHostnames } = await import('./fathom.js');
         const rows = await fathomHostnames(site.fathom_site_id, start, end);
         const total = rows.reduce((a, r) => a + r.n, 0);
+        const share = total ? own(rows) / total : 0;
+        // NEVER delete the connection. An earlier version wiped
+        // fathom_site_id on a single failed check — one unexpected API
+        // response shape (or a site legitimately serving several
+        // hostnames) would silently tear Fathom off a client, which is
+        // both destructive and the opposite of "every site has Fathom".
+        // Flag instead; report-data refuses to USE a mismatched source,
+        // so wrong numbers still never reach a report, and the connection
+        // repairs itself the moment the data looks right again.
         if (!total) v.fathom = { status: 'no-data' };
-        else if (own(rows) / total >= 0.5) v.fathom = { status: 'verified' };
+        else if (share >= 0.5) v.fathom = { status: 'verified' };
+        else if (share > 0.02) v.fathom = { status: 'shared', hosts: rows.slice(0, 3).map(r => r.host) };
         else {
-          v.fathom = { status: 'mismatch', hosts: rows.slice(0, 3).map(r => r.host) };
-          db.prepare("UPDATE sites SET fathom_site_id = '' WHERE id = ?").run(site.id);
-          console.log('[integrity]', d, 'Fathom site was carrying', v.fathom.hosts.join(','), '— disconnected, reports fall back to GA');
+          // Essentially NONE of this Fathom site's traffic is this domain,
+          // on meaningful volume — the ID really is pointing elsewhere.
+          v.fathom = total >= 20
+            ? { status: 'mismatch', hosts: rows.slice(0, 3).map(r => r.host) }
+            : { status: 'unclear', hosts: rows.slice(0, 3).map(r => r.host) };
+          if (v.fathom.status === 'mismatch') console.log('[integrity]', d, 'Fathom site carries', v.fathom.hosts.join(','), '— flagged; reports will use GA until corrected (connection kept)');
         }
       } catch (e) { v.fathom = { status: 'error', err: String(e.message || e).slice(0, 60) }; }
-    } else if (!site.fathom_site_id && v.fathom?.status !== 'mismatch') v.fathom = undefined;
+    } else if (!site.fathom_site_id) v.fathom = undefined;
   }
   setSetting('source_integrity', JSON.stringify(verdicts));
   return verdicts;
