@@ -751,14 +751,24 @@ export async function retrofitTags() {
     if (ok) {
       cur.done = true;
       cur.tries = 0;
+      cur.missing = undefined;
       await deleteInjectCrons(HOSTINGER_USER, domain).catch(() => {});
       console.log('[retrofit]', domain, 'live page matches desired tags ✓');
     } else {
+      // Record WHICH tags are missing from the live page — the difference
+      // between "not installed yet" and "we keep installing but visitors
+      // never see it" (docroot the injector edits isn't what's served,
+      // e.g. the site moved to the builder). Surfaced in Connections.
+      cur.missing = [
+        !html.includes(site.ga4_measurement_id) ? 'Google Analytics' : null,
+        site.clarity_project_id && !html.includes(site.clarity_project_id) ? 'Clarity' : null,
+        site.fathom_site_id && !html.includes(site.fathom_site_id) ? 'Fathom' : null,
+      ].filter(Boolean);
       try {
         await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
         cur.tries++;
         placed++;
-        console.log('[retrofit]', domain, `mismatch — injector placed (try ${cur.tries})`);
+        console.log('[retrofit]', domain, `mismatch — injector placed (try ${cur.tries})`, cur.missing.join('+'));
       } catch (e) { console.error('[retrofit]', domain, e.message.slice(0, 90)); }
     }
   }

@@ -35,6 +35,16 @@ async function siteHealth(site, start, end) {
   // human would otherwise do with view-source or a GA Realtime self-test.
   let integ = {};
   try { integ = JSON.parse(getSetting('source_integrity') || '{}')[domain] || {}; } catch { /* none yet */ }
+  // The auto-installer's own verdict. Repeated failures mean the files it
+  // edits are NOT what visitors are served (the classic cause: the site
+  // moved to the site builder, leaving a stale docroot) — previously this
+  // state was recorded and never shown to anyone.
+  let retro = {};
+  try { retro = JSON.parse(getSetting('retrofit_state') || '{}')[domain] || {}; } catch { /* none yet */ }
+  const installerStuck = retro.tries >= 4 && !retro.done;
+  const stuckNote = installerStuck
+    ? ` · auto-installer has tried ${retro.tries}× without the tag appearing on the live page — the files it edits aren't what visitors see (site likely served by the builder). Paste this site's Tracking code into the builder to finish it.`
+    : '';
 
   // One homepage fetch feeds every tag check (Fathom, GA, Clarity).
   const homepage = await fetchHomepage(domain);
@@ -66,6 +76,9 @@ async function siteHealth(site, start, end) {
             : gaTagFound ? ' · tag on site ✓'
             : o.sessions > 0 ? ' · data flowing (tag loads via the builder/Tag Manager, so it won’t show in page source)'
             : (site.ga4_measurement_id && homepage != null) ? ' · tag NOT detected on the page — paste this site’s Tracking code into the builder' : '';
+          // A stuck auto-installer outranks a reassuring visit count: it
+          // means the tag genuinely isn't reaching visitors.
+          if (installerStuck && !gaTagFound) return bad(`${Math.round(o.sessions)} visits (7d)${stuckNote}`);
           return ok(`${Math.round(o.sessions)} visits (7d)${note}`);
         })
         .catch(e => bad(e.message.slice(0, 90)));
