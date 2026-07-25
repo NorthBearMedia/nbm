@@ -340,7 +340,7 @@ export async function executeTool(name, input, user) {
           FROM activity_log a
           JOIN tasks t ON t.id = a.entity_id AND a.entity_type = 'task'
           JOIN clients c ON c.id = t.client_id
-          WHERE a.action = 'updated' AND a.details LIKE '%deadline changed%'
+          WHERE a.action = 'updated' AND (a.details LIKE '%deadline changed%' OR a.details LIKE '%planned date changed%')
             AND t.archived = 0 AND t.task_status NOT IN ('done','cancelled') ${priv}
           GROUP BY t.id HAVING times_moved >= 3
           ORDER BY times_moved DESC LIMIT 10

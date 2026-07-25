@@ -160,6 +160,7 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   if (task_status && task_status !== old.task_status) changes.push(`status: ${old.task_status} → ${task_status}`);
   if (task_band && task_band !== old.task_band) changes.push(`band: ${old.task_band || 'none'} → ${task_band}`);
   if (deadline !== undefined && deadline !== old.deadline) changes.push('deadline changed');
+  if (planned_date !== undefined && planned_date !== old.planned_date) changes.push('planned date changed');
   if (changes.length) logActivity('task', req.params.id, 'updated', req.user.display_name, changes.join(', '));
 
   // Recurring auto-create fires on the canonical "done" transition.

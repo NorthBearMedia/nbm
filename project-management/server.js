@@ -3,7 +3,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { mkdirSync, readdirSync, unlinkSync, readFileSync } from 'fs';
 import { gzipSync } from 'zlib';
-import { createHash } from 'crypto';
+import { createHash, randomBytes, scryptSync, createCipheriv } from 'crypto';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
 import db, { dbPath } from './database.js';
@@ -58,14 +58,26 @@ setInterval(backupDatabase, 60 * 60 * 1000);
 // last-upload tracked in app_meta so restarts never double-upload). With the
 // env vars unset this is entirely dormant.
 async function offsiteBackup() {
-  const { B2_KEY_ID, B2_APP_KEY, B2_BUCKET_ID } = process.env;
+  const { B2_KEY_ID, B2_APP_KEY, B2_BUCKET_ID, B2_BACKUP_PASSPHRASE } = process.env;
   if (!B2_KEY_ID || !B2_APP_KEY || !B2_BUCKET_ID) return;
+  // The DB holds session tokens and Gmail/Xero OAuth refresh tokens — it must
+  // never leave the box unencrypted. No passphrase, no upload.
+  if (!B2_BACKUP_PASSPHRASE) {
+    console.error('[Backup] Off-site backup skipped — set B2_BACKUP_PASSPHRASE to enable (backups are encrypted before upload).');
+    return;
+  }
   try {
     const last = db.prepare("SELECT value FROM app_meta WHERE key='last_offsite_backup'").get();
     if (last && Date.now() - new Date(last.value).getTime() < 23.5 * 3600 * 1000) return;
 
     db.pragma('wal_checkpoint(TRUNCATE)');
-    const body = gzipSync(readFileSync(dbPath));
+    // AES-256-GCM over the gzipped DB; file layout: salt(16) iv(12) tag(16) data.
+    // Recover with scripts/decrypt-backup.js and the same passphrase.
+    const gz = gzipSync(readFileSync(dbPath));
+    const salt = randomBytes(16), iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', scryptSync(B2_BACKUP_PASSPHRASE, salt, 32), iv);
+    const enc = Buffer.concat([cipher.update(gz), cipher.final()]);
+    const body = Buffer.concat([salt, iv, cipher.getAuthTag(), enc]);
     const sha1 = createHash('sha1').update(body).digest('hex');
 
     const authRes = await fetch('https://api.backblazeb2.com/b2api/v2/b2_authorize_account', {
@@ -82,7 +94,7 @@ async function offsiteBackup() {
     if (!urlRes.ok) throw new Error(`get_upload_url failed (${urlRes.status})`);
     const up = await urlRes.json();
 
-    const name = `nbm-console/nbm-projects-${new Date().toISOString().slice(0, 10)}.db.gz`;
+    const name = `nbm-console/nbm-projects-${new Date().toISOString().slice(0, 10)}.db.gz.enc`;
     const upRes = await fetch(up.uploadUrl, {
       method: 'POST',
       headers: {

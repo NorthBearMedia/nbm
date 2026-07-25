@@ -62,12 +62,14 @@ function toggleQuickTask(e) {
   }
 }
 async function qtSave() {
+  if (qtSave.busy) return;  // double-Enter on a slow connection must not double-capture
   const inp = document.getElementById('qtTitle');
   const title = inp.value.trim();
   if (!title) return;
   const body = { title, task_status: 'inbox' };
   const cid = document.getElementById('qtClient').value;
   if (cid) body.client_id = +cid;
+  qtSave.busy = true;
   try {
     await api('/api/tasks', { method: 'POST', body });
     inp.value = '';
@@ -75,6 +77,7 @@ async function qtSave() {
     toast('Captured — it’s in your Inbox', true);
     loadClients();
   } catch (e) { toast('Not saved — ' + e.message); }
+  finally { qtSave.busy = false; }
 }
 document.addEventListener('click', (e) => {
   if (!e.target.closest('#quickTaskPanel') && !e.target.closest('#quickTaskBtn')) {
