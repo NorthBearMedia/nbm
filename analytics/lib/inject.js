@@ -41,19 +41,22 @@ async function hg(path, method = 'GET', body) {
 // block in place (upgrades: adding Clarity later, turning the consent
 // banner on/off) — v1 blocks (start marker only) sit immediately before
 // </head> or </body> by construction, so they're replaceable too.
-// Every loader is DEDUPLICATING at runtime: if any copy of that tool is
-// already on the page — hand-pasted by the owner, added by the site
-// builder, or an older NBM block — ours stands down. Without this, a
-// manually-tagged site that also gets the injected block counts every
-// visit twice (found live: the owner's own site had a hand-installed
-// Fathom script, and the injector was about to add a second).
+// Every loader deduplicates at runtime, but ONLY against its own exact ID.
+// The first version guarded on "any gtag script" / "any clarity script",
+// which was wrong: a site carrying a different GA property (a client's own
+// tag, or the builder's built-in analytics) made ours stand down silently
+// — the measurement ID sat in the page source looking installed while the
+// property recorded nothing. Found live on northbearmedia.co.uk: tag
+// verified on the page, GA reporting 0 visits.
+// Two DIFFERENT properties on one page is legitimate and common; the same
+// property twice is the only thing that double-counts. So match on the ID.
 export function buildSnippet(measurementId, clarityId, { consentBanner = false, fathomId = '' } = {}) {
   const gaJs = measurementId
-    ? `(function(d,w){if(d.querySelector('script[src*="googletagmanager.com/gtag/js"]'))return;var g=d.createElement('script');g.async=true;g.src='https://www.googletagmanager.com/gtag/js?id=${measurementId}';d.head.appendChild(g);w.dataLayer=w.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${measurementId}');})(document,window);` : '';
+    ? `(function(d,w){if(d.querySelector('script[src*="gtag/js?id=${measurementId}"]'))return;var g=d.createElement('script');g.async=true;g.src='https://www.googletagmanager.com/gtag/js?id=${measurementId}';d.head.appendChild(g);w.dataLayer=w.dataLayer||[];function gtag(){w.dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${measurementId}');})(document,window);` : '';
   const clarityJs = clarityId
-    ? `(function(d,w){if(d.querySelector('script[src*="clarity.ms"]'))return;if(w.clarity)return;(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(w,d,"clarity","script","${clarityId}");})(document,window);` : '';
+    ? `(function(d,w){if(d.querySelector('script[src*="clarity.ms/tag/${clarityId}"]'))return;(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(w,d,"clarity","script","${clarityId}");})(document,window);` : '';
   const fathomJs = fathomId
-    ? `(function(d){if(d.querySelector('script[src*="usefathom.com"]'))return;var f=d.createElement('script');f.src='https://cdn.usefathom.com/script.js';f.setAttribute('data-site','${fathomId}');f.defer=true;d.head.appendChild(f);})(document);` : '';
+    ? `(function(d){if(d.querySelector('script[data-site="${fathomId}"]'))return;var f=d.createElement('script');f.src='https://cdn.usefathom.com/script.js';f.setAttribute('data-site','${fathomId}');f.defer=true;d.head.appendChild(f);})(document);` : '';
   const load = gaJs + clarityJs + fathomJs;
   if (!load) return '<!-- NBM-GA-TAG --><!-- /NBM-GA-TAG -->';
   if (!consentBanner) return `<!-- NBM-GA-TAG --><script>${load}</script><!-- /NBM-GA-TAG -->`;
