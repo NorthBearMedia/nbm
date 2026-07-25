@@ -12,7 +12,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=82">
+  <link rel="stylesheet" href="styles.css?v=84">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -51,6 +51,16 @@
         <button class="ft-btn" onclick="focusAdd(5)" title="Add 5 minutes">+5</button>
         <button class="ft-btn ft-done" onclick="focusComplete()" title="Mark done &amp; stop">&#10003;</button>
         <button class="ft-btn ft-stop" onclick="focusStop()" title="Stop timer">&times;</button>
+      </div>
+      <!-- Global quick task capture — works from any view, hotkey: n -->
+      <div class="focus-wrap" style="position:relative">
+        <button class="nav-action" id="quickTaskBtn" title="Quick task — capture from anywhere (press n)" onclick="toggleQuickTask(event)">&#9998;</button>
+        <div class="focus-start" id="quickTaskPanel">
+          <div class="fs-title">&#9998; Quick task</div>
+          <input type="text" id="qtTitle" placeholder="What needs doing?" onkeydown="if(event.key==='Enter'){qtSave()}">
+          <div class="fs-custom"><label for="qtClient">Client</label><select id="qtClient" style="flex:1"></select></div>
+          <button class="btn btn-primary btn-sm fs-go" onclick="qtSave()">Capture &#10148;</button>
+        </div>
       </div>
       <!-- Focus launcher -->
       <div class="focus-wrap" style="position:relative">
@@ -700,8 +710,9 @@
     </div>
     <div id="aiMessages" class="ai-messages"></div>
     <div class="ai-suggestions" id="aiSuggestions">
+      <button class="ai-chip" onclick="sendAIPrompt('What patterns do you notice in my tasks? Any suggestions?')">&#128161; What do you notice?</button>
       <button class="ai-chip" onclick="sendAIPrompt('What do I have on this week?')">What's on this week?</button>
-      <button class="ai-chip" onclick="sendAIPrompt('Give me a workload summary for the team.')">Team workload</button>
+      <button class="ai-chip" onclick="sendAIPrompt('Check my inbox and see what is missing from my console.')">Check my email</button>
       <button class="ai-chip" onclick="sendAIPrompt('Create a task for me: ')">Create a task...</button>
     </div>
     <div id="aiMediaPreview" class="ai-media-preview" style="display:none"></div>
@@ -715,6 +726,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=82"></script>
+  <script src="app.js?v=85"></script>
 </body>
 </html>
