@@ -140,6 +140,11 @@ const TOOLS = [
     }
   },
   {
+    name: 'get_activity_patterns',
+    description: 'Compute behavioural patterns from the task data and activity log: tasks repeatedly pushed, stale inbox items, clients gone quiet, overdue clusters, long-waiting chases, overdue recurring tasks, and the completion-by-weekday rhythm. Use when asked what you notice, for suggestions, or proactively when a weekly-review type question comes up. Interpret the signals — do not just recite them.',
+    input_schema: { type: 'object', properties: {} }
+  },
+  {
     name: 'list_tasks_for_user',
     description: 'List all active (not completed/invoiced) tasks assigned to a given person. Use to review someone\'s workload.',
     input_schema: {
@@ -325,6 +330,85 @@ export async function executeTool(name, input, user) {
         return { today_hours, tomorrow_hours, week_hours, total_hours, overdue_tasks: overdue, hours_by_person: byPerson };
       }
 
+      case 'get_activity_patterns': {
+        const today = new Date().toISOString().split('T')[0];
+        const daysAgo = n => new Date(Date.now() - n * 864e5).toISOString().split('T')[0];
+
+        // Tasks whose deadline has been moved 3+ times (open only)
+        const often_pushed = db.prepare(`
+          SELECT t.id, t.title, c.name AS client, t.deadline, COUNT(*) AS times_moved
+          FROM activity_log a
+          JOIN tasks t ON t.id = a.entity_id AND a.entity_type = 'task'
+          JOIN clients c ON c.id = t.client_id
+          WHERE a.action = 'updated' AND a.details LIKE '%deadline changed%'
+            AND t.archived = 0 AND t.task_status NOT IN ('done','cancelled') ${priv}
+          GROUP BY t.id HAVING times_moved >= 3
+          ORDER BY times_moved DESC LIMIT 10
+        `).all();
+
+        // Inbox items sitting untriaged for over a week
+        const stale_inbox = db.prepare(`
+          SELECT t.id, t.title, c.name AS client, t.created_at
+          FROM tasks t JOIN clients c ON c.id = t.client_id
+          WHERE t.archived = 0 AND t.task_status = 'inbox' AND t.created_at < ? ${priv}
+          ORDER BY t.created_at ASC LIMIT 15
+        `).all(daysAgo(7));
+
+        // Clients with open work but no activity in 14+ days
+        const quiet_clients = db.prepare(`
+          SELECT c.id, c.name, c.last_contact_date,
+            (SELECT COUNT(*) FROM tasks t WHERE t.client_id = c.id AND t.archived = 0 AND t.task_status NOT IN ('done','cancelled')) AS open_tasks,
+            (SELECT MAX(a.created_at) FROM activity_log a JOIN tasks t2 ON t2.id = a.entity_id AND a.entity_type='task' WHERE t2.client_id = c.id) AS last_activity
+          FROM clients c
+          WHERE c.archived = 0 AND c.is_system = 0 ${isOwner ? '' : 'AND c.is_private = 0'}
+        `).all().filter(c => c.open_tasks > 0 && (!c.last_activity || c.last_activity < daysAgo(14))).slice(0, 10);
+
+        // Clients with 3+ overdue open tasks
+        const overdue_clusters = db.prepare(`
+          SELECT c.name AS client, COUNT(*) AS overdue_count
+          FROM tasks t JOIN clients c ON c.id = t.client_id
+          WHERE t.archived = 0 AND t.task_status NOT IN ('done','cancelled')
+            AND t.deadline != '' AND t.deadline < ? ${priv}
+          GROUP BY c.id HAVING overdue_count >= 3
+          ORDER BY overdue_count DESC
+        `).all(today);
+
+        // Waiting-on-client for 14+ days (chase candidates), judged by last update
+        const stuck_waiting = db.prepare(`
+          SELECT t.id, t.title, c.name AS client,
+            (SELECT MAX(a.created_at) FROM activity_log a WHERE a.entity_type='task' AND a.entity_id = t.id) AS last_touched
+          FROM tasks t JOIN clients c ON c.id = t.client_id
+          WHERE t.archived = 0 AND t.task_status = 'waiting-on-client' ${priv}
+        `).all().filter(t => !t.last_touched || t.last_touched < daysAgo(14)).slice(0, 10);
+
+        // Recurring tasks running late
+        const late_recurring = db.prepare(`
+          SELECT t.id, t.title, c.name AS client, t.deadline, t.planned_date
+          FROM tasks t JOIN clients c ON c.id = t.client_id
+          WHERE t.archived = 0 AND t.task_status NOT IN ('done','cancelled')
+            AND (t.is_recurring = 1 OR t.task_type = 'recurring')
+            AND ((t.deadline != '' AND t.deadline < ?) OR (t.deadline = '' AND t.planned_date != '' AND t.planned_date < ?)) ${priv}
+          LIMIT 10
+        `).all(today, today);
+
+        // Completion rhythm: which weekdays things actually get done (last 60d)
+        const rhythm = {};
+        for (const r of db.prepare(`
+          SELECT completed_at FROM tasks
+          WHERE completed_at != '' AND completed_at >= ?
+        `).all(daysAgo(60))) {
+          const d = new Date(r.completed_at + 'T12:00:00Z');
+          const day = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getUTCDay()];
+          rhythm[day] = (rhythm[day] || 0) + 1;
+        }
+
+        return {
+          as_of: today,
+          often_pushed, stale_inbox, quiet_clients, overdue_clusters,
+          stuck_waiting, late_recurring, completions_by_weekday: rhythm,
+        };
+      }
+
       case 'list_recent_emails': {
         const auth = gmailClientForUser(user.id);
         if (!auth) return { error: 'Gmail is not connected — connect it from the Email tab first.' };
@@ -420,6 +504,12 @@ Pasted task lists (emails, bullet points, meeting notes — typed or pasted text
 - Dates: convert anything like "Thursday 9th", "end of month", "next week" to YYYY-MM-DD against today's date. Items with a date → status "scheduled" (+ band "today"/"this-week" if it falls there); undated items → status "inbox".
 - Make sensible assumptions rather than asking; record any assumption in that task's notes so the user can correct it later.
 - Afterwards, reply with a tight summary: one line per task (NB ref — title — date), plus any skipped duplicates or failures.
+
+Noticing patterns ("what do you notice?", "any suggestions?", weekly-review questions):
+- Call get_activity_patterns and INTERPRET it — never recite the raw lists. Pick the 3-5 signals that matter most right now and turn each into one concrete, kind suggestion with an action you can do: a task pushed 4 times probably wants breaking into a smaller first step, rescheduling to a realistic day, or cancelling honestly; a stale inbox wants a 5-minute triage offer; a quiet client wants a check-in task; a cluster of overdue tasks for one client wants a bulk reshuffle offer.
+- ${user.display_name} has ADHD: patterns are information, not failings. No guilt-tripping, no "you should have". Frame suggestions as easy next moves, lead with the single highest-value one.
+- Offer the action, then act on a yes using your normal tools (update_task, create_task, create_tasks). For anything touching more than 3 tasks, list what you'd change and confirm once first.
+- If the data shows no meaningful pattern, say so — a short "nothing worrying this week" is a perfectly good answer.
 
 Checking the inbox against the console ("what's missing from my console"):
 - Use list_recent_emails (filter noise with a query like "newer_than:14d -category:promotions -category:social"). Read full threads with read_email_thread only for emails that look like they contain real work.
