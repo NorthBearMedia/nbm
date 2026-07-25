@@ -782,6 +782,26 @@ $('#connectionsBtn').onclick = async (e) => {
     $('#modalRoot').innerHTML = `
     <div class="modal-backdrop" id="backdrop"><div class="modal" style="max-width:1050px">
       <h3>Connections — live check (last 7 days)</h3>
+      ${(() => {
+        // One-line fleet answer to "is everything hooked up?", plus the
+        // exact list of sites still needing something — so the state of
+        // the whole estate is readable without scanning every row.
+        const four = ['ga', 'search', 'clarity', 'fathom'];
+        const full = h.sites.filter(r => !r.error && four.every(k => r[k]?.ok));
+        const partial = h.sites.filter(r => r.error || !four.every(k => r[k]?.ok));
+        const need = partial.map(r => {
+          const missing = r.error ? ['check failed'] : four.filter(k => !r[k]?.ok)
+            .map(k => ({ ga: 'Analytics', search: 'Search Console', clarity: 'Clarity', fathom: 'Fathom' }[k]));
+          return `<li><strong>${esc(r.client)}</strong> — ${esc(missing.join(', '))}</li>`;
+        }).join('');
+        return `<div class="panel" style="margin:6px 0 12px;border-color:${partial.length ? 'var(--border)' : 'var(--green)'}">
+          <strong style="font-size:15px">${full.length} of ${h.sites.length} sites fully connected on all four sources</strong>
+          ${partial.length ? `<div class="hint" style="margin-top:8px">Still needing something:</div>
+          <ul class="wizard-list" style="margin:6px 0 0">${need}</ul>
+          <div class="hint" style="margin-top:8px">Reasons and the exact fix for each are in the rows below.</div>`
+          : '<div class="hint" style="margin-top:6px">Every site is reporting data from Google Analytics, Search Console, Clarity and Fathom. ✓</div>'}
+        </div>`;
+      })()}
       <p class="hint" style="margin:4px 0 12px">Checked ${new Date(h.checkedAt).toLocaleTimeString('en-GB')} · ✅ pulling data · ❌ needs attention (reason shown)</p>
       <div style="overflow:auto;max-height:65vh">
       <table class="data" style="width:100%">
