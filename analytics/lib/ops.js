@@ -320,6 +320,14 @@ export function loadClientContacts() {
       const cur = db.prepare('SELECT target_keywords FROM sites WHERE id = ?').get(site.id);
       if (cur && !cur.target_keywords) {
         db.prepare('UPDATE sites SET target_keywords = ? WHERE id = ?').run(kws, site.id);
+        // Record the seed as OURS, so deriveTargetKeywords may later
+        // upgrade it from real Search Console data — while still never
+        // overwriting anything the owner types himself.
+        try {
+          const auto = JSON.parse(getSetting('target_keywords_auto') || '{}');
+          auto[d] = kws;
+          setSetting('target_keywords_auto', JSON.stringify(auto));
+        } catch { /* non-fatal */ }
         console.log(`[ops] target keywords seeded: ${site.client_name}`);
       }
     }
@@ -1012,6 +1020,77 @@ async function verifySourceIntegrity() {
   return verdicts;
 }
 
+// ── Target keywords, learned from the site's OWN Google data.
+//
+// Hand-written keyword guesses are worthless to a client paying for SEO:
+// only Google knows what a business is actually being searched for. This
+// reads 90 days of real Search Console queries per site and picks the
+// terms worth reporting on and chasing:
+//   · "striking distance" (position ~4-40): real commercial opportunity —
+//     already visible, one push from page one. These are the money terms.
+//   · a couple of established winners (top 3) so progress is visible.
+//   · multi-word/local phrases preferred over vague one-word heads.
+// Junk is stripped (search operators, URLs, gibberish, single characters).
+//
+// PROVENANCE-SAFE: a value is only ever replaced when the current field is
+// blank or is exactly what we last wrote ourselves. The moment the owner
+// edits a site's keywords by hand, this stops touching that site forever.
+const KW_JUNK = /(^|\s)(-site|site:|https?:|www\.|\.com|\.co\.uk)|[<>{}[\]|\\^~`]/i;
+
+function pickKeywords(rows, domain, clientName) {
+  const brandWords = new Set(String(clientName || '').toLowerCase().split(/\s+/).filter(w => w.length > 2)
+    .concat(domain.replace(/\.(co\.uk|com|uk|net|org)$/,'').split(/[-.]/).filter(w => w.length > 2)));
+  const clean = (rows || [])
+    .map(r => ({ ...r, q: String(r.query || '').trim().toLowerCase() }))
+    .filter(r => r.q.length >= 6 && r.q.length <= 60 && !KW_JUNK.test(r.q) && /[a-z]/.test(r.q))
+    .filter(r => r.impressions >= 3);
+  const words = q => q.split(/\s+/).length;
+  const isBrand = q => [...brandWords].some(b => q.includes(b));
+  // Opportunity: visible but not yet winning — the terms worth working on.
+  const striking = clean.filter(r => r.position > 3.5 && r.position <= 40 && !isBrand(r.q))
+    .sort((a, b) => (b.impressions * (words(b.q) > 1 ? 1.6 : 1)) - (a.impressions * (words(a.q) > 1 ? 1.6 : 1)));
+  // Established: already strong, worth showing as retained ground.
+  const winning = clean.filter(r => r.position <= 3.5)
+    .sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions);
+  const out = [];
+  const push = q => { if (out.length < 8 && !out.some(x => x.includes(q) || q.includes(x))) out.push(q); };
+  striking.slice(0, 20).forEach(r => push(r.q));
+  winning.slice(0, 4).forEach(r => push(r.q));
+  return out;
+}
+
+export async function deriveTargetKeywords() {
+  const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND gsc_site_url != '' AND gsc_site_url IS NOT NULL").all()
+    .filter(s => (s.domain || '') !== 'nbmdemosite2.co.uk');
+  if (!sites.length) return { checked: 0 };
+  const { fetchTopQueries } = await import('./gsc.js');
+  const end = addDays(todayISO(), -3); // Search Console lags ~2-3 days
+  const start = addDays(end, -89);
+  let auto = {};
+  try { auto = JSON.parse(getSetting('target_keywords_auto') || '{}'); } catch { /* fresh */ }
+  let updated = 0;
+  for (const site of sites) {
+    const d = (site.domain || '').toLowerCase().replace(/^www\./, '');
+    const current = (site.target_keywords || '').trim();
+    // Owner-edited? Never touch it again.
+    if (current && auto[d] !== undefined && current !== auto[d]) continue;
+    if (current && auto[d] === undefined) continue; // pre-existing manual value
+    let rows = [];
+    try { rows = await fetchTopQueries(site.gsc_site_url, start, end, 500); }
+    catch (e) { console.log('[keywords]', d, 'query fetch failed:', String(e.message || e).slice(0, 70)); continue; }
+    const picked = pickKeywords(rows, d, site.client_name);
+    if (picked.length < 3) continue; // not enough real signal yet — leave the seed alone
+    const value = picked.join(', ');
+    if (value === current) continue;
+    db.prepare('UPDATE sites SET target_keywords = ? WHERE id = ?').run(value, site.id);
+    auto[d] = value;
+    updated++;
+    console.log('[keywords]', d, '→', value);
+  }
+  setSetting('target_keywords_auto', JSON.stringify(auto));
+  return { checked: sites.length, updated };
+}
+
 // ── Self-heal a wrong Search Console property. Google exposes a site as
 // up to four separate "properties" — https / http × bare / www — plus a
 // domain property (sc-domain:) that needs DNS verification. Only some are
@@ -1523,6 +1602,12 @@ export function scheduleOpsSweep() {
     cron.schedule('53 * * * *', () => ensureFathomSites().catch(e => console.error('[fathom-ensure]', e.message)), { timezone: config.timezone });
   } catch (e) { console.error('[fathom-ensure] schedule failed:', e.message); }
   setTimeout(() => ensureFathomSites().catch(e => console.error('[fathom-ensure]', e.message)), 270_000);
+  // Learn each site's real target keywords from its own Search Console
+  // queries — daily (the data moves slowly) plus once after boot.
+  try {
+    cron.schedule('20 6 * * *', () => deriveTargetKeywords().catch(e => console.error('[keywords]', e.message)), { timezone: config.timezone });
+  } catch (e) { console.error('[keywords] schedule failed:', e.message); }
+  setTimeout(() => deriveTargetKeywords().catch(e => console.error('[keywords]', e.message)), 420_000);
   try {
     cron.schedule('*/10 * * * *', () => verifyPendingInjections().catch(e => console.error('[inject]', e.message)), { timezone: config.timezone });
     // Self-heal a stalled rollout: place crons for any unverified client
