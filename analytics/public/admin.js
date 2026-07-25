@@ -823,6 +823,37 @@ $('#connectionsBtn').onclick = async (e) => {
   e.target.disabled = false; e.target.textContent = 'Connections';
 };
 
+// One click → the entire estate's status on the clipboard as plain text,
+// ready to paste to whoever is helping. The server sees Google, Fathom,
+// Clarity and its own internals; a support session usually can't.
+$('#diagnosticBtn').onclick = async (e) => {
+  e.target.disabled = true; e.target.textContent = 'Gathering…';
+  try {
+    const res = await fetch('/api/diagnostic');
+    if (res.status === 401) { location.href = '/login'; return; }
+    const text = await res.text();
+    let copied = false;
+    try { await navigator.clipboard.writeText(text); copied = true; } catch { /* fall back to the on-screen copy */ }
+    $('#modalRoot').innerHTML = `
+    <div class="modal-backdrop" id="backdrop"><div class="modal" style="max-width:900px">
+      <h3>Full diagnostic</h3>
+      <p class="hint" style="margin:4px 0 10px">${copied ? 'Copied to your clipboard — paste it straight into the chat.' : 'Select all and copy, then paste it into the chat.'} Contains no passwords or API keys.</p>
+      <textarea id="diagText" rows="18" style="width:100%;font-family:ui-monospace,Menlo,monospace;font-size:11.5px">${esc(text)}</textarea>
+      <div class="modal-actions" style="margin-top:12px">
+        <button class="btn primary" id="diagCopy">Copy again</button>
+        <button class="btn" onclick="document.getElementById('modalRoot').innerHTML=''">Close</button>
+      </div>
+    </div></div>`;
+    $('#backdrop').onclick = ev => { if (ev.target.id === 'backdrop') closeModal(); };
+    $('#diagCopy').onclick = async () => {
+      const ta = $('#diagText'); ta.select();
+      try { await navigator.clipboard.writeText(ta.value); toast('Copied'); }
+      catch { document.execCommand('copy'); toast('Copied'); }
+    };
+  } catch (err) { toast(err.message, 'err', 8000); }
+  e.target.disabled = false; e.target.textContent = 'Copy diagnostic';
+};
+
 $('#syncClarityBtn').onclick = async (e) => {
   e.target.disabled = true; e.target.textContent = 'Syncing…';
   try {

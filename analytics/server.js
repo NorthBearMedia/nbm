@@ -415,6 +415,57 @@ app.post('/api/sync-clarity', requireAdmin, async (req, res) => {
   res.json({ ok: true, synced });
 });
 
+// Plain-text diagnostic of the entire estate, designed to be copied in one
+// click and pasted to whoever is helping. The server can see everything
+// (Google, Fathom, Clarity, its own state); a support session usually
+// can't. Secrets are never included — only whether each is present.
+app.get('/api/diagnostic', requireAdmin, async (req, res) => {
+  try {
+    const { connectionsHealth } = await import('./lib/health.js');
+    const health = await connectionsHealth();
+    const s = setupStatus();
+    const L = [];
+    L.push('NORTH BEAR PULSE — FULL DIAGNOSTIC');
+    L.push(`generated ${new Date().toISOString()} · timezone ${config.timezone}`);
+    L.push(`app ${getAppUrl()}`);
+    L.push('');
+    L.push('SETUP');
+    L.push(`  email configured=${s.smtp} verified=${s.smtpVerified} · google=${s.google} apiOk=${s.googleApiOk}`);
+    L.push(`  keys present — hostinger=${s.settings.hostinger_token_set} fathom=${s.settings.fathom_token_set} anthropic=${s.settings.anthropic_key_set}`);
+    L.push(`  gsc reader=${s.settings.gsc_reader_email || '(unset)'} · consent banner=${s.settings.consent_banner}`);
+    L.push('');
+    const four = ['ga', 'search', 'clarity', 'fathom'];
+    const label = { ga: 'Analytics', search: 'SearchConsole', clarity: 'Clarity', fathom: 'Fathom' };
+    const full = health.sites.filter(r => !r.error && four.every(k => r[k]?.ok));
+    L.push(`FLEET: ${full.length}/${health.sites.length} fully connected on all four sources`);
+    L.push('');
+    for (const r of health.sites) {
+      const site = db.prepare("SELECT * FROM sites WHERE lower(replace(domain,'www.','')) = ?").get(r.domain) || {};
+      L.push(`── ${r.client} (${r.domain})`);
+      L.push(`   live=${site.delivery_live ? 'LIVE→client' : 'preview'} freq=${site.report_frequency || '?'} next=${site.next_report_at || '—'} email=${site.contact_emails ? 'set' : 'MISSING'}`);
+      L.push(`   ids: ga4prop=${site.ga4_property_id || '—'} ga4meas=${site.ga4_measurement_id || '—'} gsc=${site.gsc_site_url || '—'} clarity=${site.clarity_project_id || '—'} fathom=${site.fathom_site_id || '—'}`);
+      L.push(`   keywords: ${site.target_keywords || '(none)'}`);
+      if (r.error) { L.push(`   CHECK FAILED: ${r.error}`); }
+      else for (const k of four) L.push(`   ${(r[k]?.ok ? 'OK  ' : 'BAD ')}${label[k]}: ${r[k]?.detail || '—'}`);
+      if (r.delivery) L.push(`   ${r.delivery.ok ? 'OK  ' : 'BAD '}Reports: ${r.delivery.detail}`);
+      if (r.gscDiag?.findings?.length) r.gscDiag.findings.forEach(f => L.push(`   GSC-DIAG: ${f}`));
+      L.push('');
+    }
+    const failed = db.prepare(`SELECT s.client_name, r.error, r.created_at FROM reports r JOIN sites s ON s.id = r.site_id
+      WHERE r.status = 'failed' AND r.created_at > datetime('now','-7 day') ORDER BY r.id DESC LIMIT 15`).all();
+    if (failed.length) {
+      L.push('FAILED REPORT SENDS (7d)');
+      failed.forEach(f => L.push(`  ${f.created_at} ${f.client_name}: ${String(f.error || '').slice(0, 160)}`));
+      L.push('');
+    }
+    for (const key of ['last_crash', 'fathom_ensure_last', 'retrofit_state', 'source_integrity', 'onboard_state']) {
+      const v = getSetting(key);
+      if (v) L.push(`${key}: ${String(v).slice(0, 900)}`);
+    }
+    res.type('text/plain').send(L.join('\n'));
+  } catch (err) { res.status(500).type('text/plain').send('diagnostic failed: ' + err.message); }
+});
+
 // Per-site connections health for the admin "Connections" panel — the
 // no-email replacement for diagnostic emails.
 app.get('/api/connections', requireAdmin, async (req, res) => {
