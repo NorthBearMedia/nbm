@@ -38,7 +38,16 @@ export async function gatherReportData(site, start, end, opts = {}) {
   // (real, bot-filtered, with history); fall back to GA4 if Fathom isn't set
   // up or returns nothing. Resolved in one sequential job so the preference
   // is deterministic; Search Console (below) still runs in parallel.
-  const useFathom = Boolean(getFathomToken() && site.fathom_site_id);
+  // Integrity verdicts (hourly, hostname-based) gate which source we TRUST.
+  // A source flagged as carrying another domain's traffic is skipped here
+  // rather than disconnected — the connection stays, the wrong numbers
+  // never reach a report, and it self-clears when the data looks right.
+  let integrity = {};
+  try {
+    const { getSetting } = await import('../database.js');
+    integrity = JSON.parse(getSetting('source_integrity') || '{}')[(site.domain || '').toLowerCase().replace(/^www\./, '')] || {};
+  } catch { /* no verdicts yet — trust the sources */ }
+  const useFathom = Boolean(getFathomToken() && site.fathom_site_id) && integrity.fathom?.status !== 'mismatch';
   jobs.push((async () => {
     if (useFathom) {
       const block = await attempt('Fathom analytics', warnings, () => gatherFathom(site.fathom_site_id, start, end));
@@ -59,7 +68,11 @@ export async function gatherReportData(site, start, end, opts = {}) {
       // client a branded report headlining "0 visits".
       const dead = overview && !(overview.sessions > 0) && !(overview.screenPageViews > 0) && !(overview.totalUsers > 0);
       if (dead) warnings.push('Analytics: property returned zero traffic for the whole period — treating as not yet recording');
-      if (overview && !dead) data.ga4 = { sourceLabel: 'Google Analytics', overview, prevOverview, timeseries: timeseries || [], topPages: topPages || [], channels: channels || [], devices: devices || [] };
+      // A property proven (hourly, by hostname) to carry a DIFFERENT
+      // domain's traffic must never supply a client's numbers.
+      const wrongProperty = integrity.ga?.status === 'mismatch';
+      if (wrongProperty) warnings.push(`Analytics: property carries traffic for ${(integrity.ga.hosts || []).join(', ')}, not this site — excluded from the report.`);
+      if (overview && !dead && !wrongProperty) data.ga4 = { sourceLabel: 'Google Analytics', overview, prevOverview, timeseries: timeseries || [], topPages: topPages || [], channels: channels || [], devices: devices || [] };
     }
   })());
 
