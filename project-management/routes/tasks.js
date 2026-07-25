@@ -145,7 +145,7 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   const nowDone = task_status === 'done';
   let completedAt = undefined;
   if (task_status !== undefined) {
-    if (nowDone && !wasDone) completedAt = new Date().toISOString().split('T')[0];
+    if (nowDone && !wasDone) completedAt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date()); // UK calendar date — matches the UI's local 'today'
     else if (!nowDone && wasDone) completedAt = '';
   }
 
@@ -160,6 +160,7 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   if (task_status && task_status !== old.task_status) changes.push(`status: ${old.task_status} → ${task_status}`);
   if (task_band && task_band !== old.task_band) changes.push(`band: ${old.task_band || 'none'} → ${task_band}`);
   if (deadline !== undefined && deadline !== old.deadline) changes.push('deadline changed');
+  if (planned_date !== undefined && planned_date !== old.planned_date) changes.push('planned date changed');
   if (changes.length) logActivity('task', req.params.id, 'updated', req.user.display_name, changes.join(', '));
 
   // Recurring auto-create fires on the canonical "done" transition.

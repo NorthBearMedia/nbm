@@ -1,13 +1,18 @@
 import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { mkdirSync, readdirSync, unlinkSync } from 'fs';
+import { mkdirSync, readdirSync, unlinkSync, readFileSync } from 'fs';
+import { gzipSync } from 'zlib';
+import { createHash, randomBytes, scryptSync, createCipheriv } from 'crypto';
 import cookieParser from 'cookie-parser';
-import db from './database.js';
+import compression from 'compression';
+import db, { dbPath } from './database.js';
 import { securityHeaders, apiAuthGuard, getSessionUser, hashPassword, requireAuth, requireRole, requireWrite, dataDir, uploadsDir, attachmentsDir } from './middleware.js';
 import authRoutes from './routes/auth.js';
 import clientRoutes from './routes/clients.js';
-import projectRoutes from './routes/projects.js';
+// routes/projects.js is retired — the UI dropped the projects layer, and its
+// delete/duplicate endpoints were an unused cascade-delete risk. File kept for
+// history; deliberately not mounted.
 import taskRoutes, { deleteAttachmentHandler } from './routes/tasks.js';
 import userRoutes from './routes/users.js';
 import systemRoutes, { createBackupRoutes } from './routes/system.js';
@@ -46,10 +51,78 @@ function backupDatabase() {
 backupDatabase();
 setInterval(backupDatabase, 60 * 60 * 1000);
 
+// ─── Off-site backup (Backblaze B2) ─────────────────────
+// The hourly backups above live on the SAME volume as the database — one
+// volume failure loses both. Set B2_KEY_ID, B2_APP_KEY and B2_BUCKET_ID and
+// a gzipped copy of the database uploads to B2 once a day (checked hourly,
+// last-upload tracked in app_meta so restarts never double-upload). With the
+// env vars unset this is entirely dormant.
+async function offsiteBackup() {
+  const { B2_KEY_ID, B2_APP_KEY, B2_BUCKET_ID, B2_BACKUP_PASSPHRASE } = process.env;
+  if (!B2_KEY_ID || !B2_APP_KEY || !B2_BUCKET_ID) return;
+  // The DB holds session tokens and Gmail/Xero OAuth refresh tokens — it must
+  // never leave the box unencrypted. No passphrase, no upload.
+  if (!B2_BACKUP_PASSPHRASE) {
+    console.error('[Backup] Off-site backup skipped — set B2_BACKUP_PASSPHRASE to enable (backups are encrypted before upload).');
+    return;
+  }
+  try {
+    const last = db.prepare("SELECT value FROM app_meta WHERE key='last_offsite_backup'").get();
+    if (last && Date.now() - new Date(last.value).getTime() < 23.5 * 3600 * 1000) return;
+
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    // AES-256-GCM over the gzipped DB; file layout: salt(16) iv(12) tag(16) data.
+    // Recover with scripts/decrypt-backup.js and the same passphrase.
+    const gz = gzipSync(readFileSync(dbPath));
+    const salt = randomBytes(16), iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', scryptSync(B2_BACKUP_PASSPHRASE, salt, 32), iv);
+    const enc = Buffer.concat([cipher.update(gz), cipher.final()]);
+    const body = Buffer.concat([salt, iv, cipher.getAuthTag(), enc]);
+    const sha1 = createHash('sha1').update(body).digest('hex');
+
+    const authRes = await fetch('https://api.backblazeb2.com/b2api/v2/b2_authorize_account', {
+      headers: { Authorization: 'Basic ' + Buffer.from(`${B2_KEY_ID}:${B2_APP_KEY}`).toString('base64') },
+    });
+    if (!authRes.ok) throw new Error(`auth failed (${authRes.status})`);
+    const auth = await authRes.json();
+
+    const urlRes = await fetch(`${auth.apiUrl}/b2api/v2/b2_get_upload_url`, {
+      method: 'POST',
+      headers: { Authorization: auth.authorizationToken },
+      body: JSON.stringify({ bucketId: B2_BUCKET_ID }),
+    });
+    if (!urlRes.ok) throw new Error(`get_upload_url failed (${urlRes.status})`);
+    const up = await urlRes.json();
+
+    const name = `nbm-console/nbm-projects-${new Date().toISOString().slice(0, 10)}.db.gz.enc`;
+    const upRes = await fetch(up.uploadUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: up.authorizationToken,
+        'X-Bz-File-Name': encodeURIComponent(name),
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': String(body.length),
+        'X-Bz-Content-Sha1': sha1,
+      },
+      body,
+    });
+    if (!upRes.ok) throw new Error(`upload failed (${upRes.status}): ${(await upRes.text()).slice(0, 200)}`);
+
+    db.prepare("INSERT INTO app_meta (key, value) VALUES ('last_offsite_backup', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+      .run(new Date().toISOString());
+    console.log(`[Backup] Off-site copy uploaded to B2: ${name} (${Math.round(body.length / 1024)} KB)`);
+  } catch (err) {
+    console.error('[Backup] Off-site backup failed:', err.message);
+  }
+}
+offsiteBackup();
+setInterval(offsiteBackup, 60 * 60 * 1000);
+
 // ─── Core Middleware ─────────────────────────────────────
 // Railway terminates TLS at a proxy: trust one hop so req.ip is the real
 // client (login rate limiting) and secure cookies work correctly.
 app.set('trust proxy', 1);
+app.use(compression());
 // Keep the raw request body so webhook signatures (Meta X-Hub-Signature-256)
 // can be verified against exactly what was sent.
 app.use(express.json({ limit: '1mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
@@ -63,7 +136,16 @@ app.get('/', (req, res) => {
   res.sendFile(join(__dirname, 'public', 'index.html'));
 });
 
-app.use(express.static(join(__dirname, 'public'), { maxAge: 0, etag: false }));
+// Only assets requested with a ?v=N cache-buster may cache forever — a bump
+// changes the URL. Everything else (HTML, manifest, logos, fixed-name PWA
+// icons, fonts) revalidates with cheap ETag 304s, so an in-place replacement
+// can never go silently stale for a year.
+app.use(express.static(join(__dirname, 'public'), {
+  setHeaders: (res) => {
+    if (res.req.query.v) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    else res.setHeader('Cache-Control', 'no-cache');
+  },
+}));
 // User-uploaded content is served inert: the sandbox CSP means a crafted file
 // (e.g. SVG/HTML masquerading as an image) can never run script in our origin.
 const inertUploads = {
@@ -80,7 +162,7 @@ app.use('/api', apiAuthGuard);
 // ─── Routes ─────────────────────────────────────────────
 app.use(authRoutes);
 app.use('/api/clients', clientRoutes);
-app.use('/api/projects', projectRoutes);
+
 app.use('/api/tasks', taskRoutes);
 app.use('/api/users', userRoutes);
 app.delete('/api/attachments/:id', requireAuth, requireWrite, deleteAttachmentHandler);

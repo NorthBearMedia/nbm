@@ -77,22 +77,41 @@ router.get('/', requireAuth, (req, res) => {
     clients = db.prepare(`SELECT * FROM clients WHERE 1=1 ${arc} ${privateFilter} ORDER BY sort_order, name`).all();
   }
 
-  const tasksStmt = db.prepare('SELECT * FROM tasks WHERE client_id = ? AND archived = 0 ORDER BY sort_order, created_at');
-  const archivedTasksStmt = db.prepare('SELECT * FROM tasks WHERE client_id = ? AND archived = 1 ORDER BY sort_order, created_at');
-  const commentsStmt = db.prepare('SELECT * FROM comments WHERE task_id = ? ORDER BY created_at DESC');
-  const attachStmt = db.prepare('SELECT * FROM task_attachments WHERE task_id = ? ORDER BY created_at DESC');
+  // Bulk-load everything in 3 queries instead of 2 + 2-per-task (the old
+  // shape was ~240 queries per request and grew with every task forever).
+  // Output shape is unchanged.
+  const cids = clients.map(c => c.id);
+  const ph = cids.map(() => '?').join(',');
+  const allTasks = cids.length
+    ? db.prepare(`SELECT * FROM tasks WHERE client_id IN (${ph}) ORDER BY sort_order, created_at`).all(...cids)
+    : [];
+  const byClient = new Map(), byClientArchived = new Map();
+  for (const t of allTasks) {
+    const m = t.archived ? byClientArchived : byClient;
+    if (!m.has(t.client_id)) m.set(t.client_id, []);
+    m.get(t.client_id).push(t);
+  }
+  const commentsByTask = new Map(), attachByTask = new Map();
+  for (const c of db.prepare('SELECT * FROM comments ORDER BY created_at DESC').all()) {
+    if (!commentsByTask.has(c.task_id)) commentsByTask.set(c.task_id, []);
+    commentsByTask.get(c.task_id).push(c);
+  }
+  for (const a of db.prepare('SELECT * FROM task_attachments ORDER BY created_at DESC').all()) {
+    if (!attachByTask.has(a.task_id)) attachByTask.set(a.task_id, []);
+    attachByTask.get(a.task_id).push(a);
+  }
 
   const now = new Date().toISOString().split('T')[0];
   const doneStatuses = ['completed', 'invoiced'];
 
   for (const client of clients) {
-    client.tasks = tasksStmt.all(client.id);
-    client.archivedTasks = archivedTasksStmt.all(client.id);
+    client.tasks = byClient.get(client.id) || [];
+    client.archivedTasks = byClientArchived.get(client.id) || [];
     let totalTasks = 0, completedTasks = 0, overdueTasks = 0, inProgressTasks = 0, blockedTasks = 0, awaitingManager = 0;
 
     for (const task of client.tasks) {
-      task.comments = commentsStmt.all(task.id);
-      task.attachments = attachStmt.all(task.id);
+      task.comments = commentsByTask.get(task.id) || [];
+      task.attachments = attachByTask.get(task.id) || [];
       totalTasks++;
       if (doneStatuses.includes(task.progress)) completedTasks++;
       if (task.progress === 'in-progress') inProgressTasks++;
@@ -101,8 +120,8 @@ router.get('/', requireAuth, (req, res) => {
       if (task.deadline && task.deadline < now && !doneStatuses.includes(task.progress)) overdueTasks++;
     }
     for (const task of client.archivedTasks) {
-      task.comments = commentsStmt.all(task.id);
-      task.attachments = attachStmt.all(task.id);
+      task.comments = commentsByTask.get(task.id) || [];
+      task.attachments = attachByTask.get(task.id) || [];
     }
     client.stats = { totalTasks, completedTasks, overdueTasks, inProgressTasks, blockedTasks, awaitingManager, outstandingTasks: totalTasks - completedTasks };
 
