@@ -1234,14 +1234,25 @@ export async function healGscProperties({ reads: readsFn = null } = {}) {
     if (!d) continue;
     const candidates = [`https://${d}/`, `https://www.${d}/`, `sc-domain:${d}`, `http://${d}/`, `http://www.${d}/`]
       .filter(c => c !== site.gsc_site_url);
+    let switched = false;
     for (const c of candidates) {
       if (await reads(c)) {
         db.prepare('UPDATE sites SET gsc_site_url = ? WHERE id = ?').run(c, site.id);
         setSetting('managed_gsc_last_' + d, '');
         console.log('[gsc-heal]', d, 'unreadable property', site.gsc_site_url, '→ switched to working', c);
-        fixed++;
+        fixed++; switched = true;
         break;
       }
+    }
+    // DEADLOCK BREAKER: nothing readable. Leaving the dead value looks
+    // harmless but strands the site forever — onboardNewSites only tries
+    // to VERIFY sites whose property is empty, so a site holding a broken
+    // property is skipped by the very job that could fix it (live: CN
+    // Maintenance and Enso HR sat unreadable for a day). Clear it so the
+    // verification path picks the site up on its next pass.
+    if (!switched) {
+      db.prepare("UPDATE sites SET gsc_site_url = '' WHERE id = ?").run(site.id);
+      console.log('[gsc-heal]', d, 'no readable property — cleared', site.gsc_site_url, 'so verification retries');
     }
   }
   return { checked: sites.length, fixed };
