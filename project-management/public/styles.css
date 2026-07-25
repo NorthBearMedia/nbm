@@ -3425,3 +3425,9 @@ select { color-scheme:dark; }
   max-width: min(480px, calc(100vw - 40px));
 }
 #appToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#appToast.ok { border-color: rgba(62,175,132,.6); border-left-color: var(--primary, #3eaf84); }
+#quickTaskPanel select {
+  background: var(--bg-glass, rgba(255,255,255,.06)); color: var(--text, #eee);
+  border: 1px solid var(--border, rgba(255,255,255,.15)); border-radius: 6px;
+  padding: 7px 8px; font-size: 13px; font-family: inherit; outline: none;
+}

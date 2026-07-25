@@ -36,15 +36,60 @@ async function logout() {
 }
 
 // Small bottom-centre toast — failed saves must be SEEN, never swallowed.
+// ok=true renders the green success variant (used sparingly, e.g. capture).
 let toastTimer = null;
-function toast(msg) {
+function toast(msg, ok) {
   let el = document.getElementById('appToast');
   if (!el) { el = document.createElement('div'); el.id = 'appToast'; document.body.appendChild(el); }
   el.textContent = msg;
+  el.classList.toggle('ok', !!ok);
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ok ? 1800 : 3500);
 }
+
+// ─── Global quick capture — a task from ANY view, two keystrokes ─────────
+function toggleQuickTask(e) {
+  if (e) e.stopPropagation();
+  const p = document.getElementById('quickTaskPanel');
+  const opening = !p.classList.contains('open');
+  p.classList.toggle('open');
+  if (opening) {
+    const sel = document.getElementById('qtClient');
+    const realClients = clients.filter(c => !c.is_system && !c.archived).sort((a, b) => a.name.localeCompare(b.name));
+    sel.innerHTML = '<option value="">📥 Inbox (no client)</option>' + realClients.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+    setTimeout(() => document.getElementById('qtTitle').focus(), 30);
+  }
+}
+async function qtSave() {
+  const inp = document.getElementById('qtTitle');
+  const title = inp.value.trim();
+  if (!title) return;
+  const body = { title, task_status: 'inbox' };
+  const cid = document.getElementById('qtClient').value;
+  if (cid) body.client_id = +cid;
+  try {
+    await api('/api/tasks', { method: 'POST', body });
+    inp.value = '';
+    document.getElementById('quickTaskPanel').classList.remove('open');
+    toast('Captured — it’s in your Inbox', true);
+    loadClients();
+  } catch (e) { toast('Not saved — ' + e.message); }
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#quickTaskPanel') && !e.target.closest('#quickTaskBtn')) {
+    document.getElementById('quickTaskPanel')?.classList.remove('open');
+  }
+});
+// Hotkey: plain "n" (no modifiers) opens quick capture when you're not typing.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'n' || e.metaKey || e.ctrlKey || e.altKey) return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+  if (document.querySelector('.modal.active')) return;
+  e.preventDefault();
+  toggleQuickTask();
+});
 
 async function api(url, options = {}) {
   const res = await fetch(url, {
