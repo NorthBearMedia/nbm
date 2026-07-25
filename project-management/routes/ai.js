@@ -254,7 +254,7 @@ export async function executeTool(name, input, user) {
         const nowDone = status === 'done';
         let completedAt = undefined;
         if (status !== null) {
-          if (nowDone && !wasDone) completedAt = new Date().toISOString().split('T')[0];
+          if (nowDone && !wasDone) completedAt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date()); // UK calendar date — matches the UI's local 'today'
           else if (!nowDone && wasDone) completedAt = '';
         }
 

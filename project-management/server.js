@@ -136,13 +136,14 @@ app.get('/', (req, res) => {
   res.sendFile(join(__dirname, 'public', 'index.html'));
 });
 
-// Versioned assets (?v=N in index.html) can cache forever — a version bump
-// changes the URL. HTML + manifest stay no-cache so a deploy shows up on the
-// next load without a hard refresh.
+// Only assets requested with a ?v=N cache-buster may cache forever — a bump
+// changes the URL. Everything else (HTML, manifest, logos, fixed-name PWA
+// icons, fonts) revalidates with cheap ETag 304s, so an in-place replacement
+// can never go silently stale for a year.
 app.use(express.static(join(__dirname, 'public'), {
-  setHeaders: (res, path) => {
-    if (path.endsWith('.html') || path.endsWith('.json')) res.setHeader('Cache-Control', 'no-cache');
-    else res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  setHeaders: (res) => {
+    if (res.req.query.v) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    else res.setHeader('Cache-Control', 'no-cache');
   },
 }));
 // User-uploaded content is served inert: the sandbox CSP means a crafted file

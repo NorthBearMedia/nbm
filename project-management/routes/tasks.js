@@ -145,7 +145,7 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   const nowDone = task_status === 'done';
   let completedAt = undefined;
   if (task_status !== undefined) {
-    if (nowDone && !wasDone) completedAt = new Date().toISOString().split('T')[0];
+    if (nowDone && !wasDone) completedAt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date()); // UK calendar date — matches the UI's local 'today'
     else if (!nowDone && wasDone) completedAt = '';
   }
 
