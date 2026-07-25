@@ -7,7 +7,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Use RAILWAY_VOLUME_MOUNT_PATH if available for persistent storage
 const dataDir = process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname;
-const dbPath = process.env.DB_PATH || join(dataDir, 'nbm-projects.db');
+export const dbPath = process.env.DB_PATH || join(dataDir, 'nbm-projects.db');
 console.log(`Database path: ${dbPath}`);
 const db = new Database(dbPath);
 
@@ -284,6 +284,16 @@ try {
 } catch (err) {
   console.error('[DB] completed_at backfill error:', err.message);
 }
+
+// Indexes for the hot query paths (additive, idempotent — explicitly allowed
+// by the migration rules). tasks.client_id is hit for every client on every
+// /api/clients request; comments/attachments/activity_log are joined per task.
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_tasks_client ON tasks(client_id, archived);
+  CREATE INDEX IF NOT EXISTS idx_comments_task ON comments(task_id);
+  CREATE INDEX IF NOT EXISTS idx_attachments_task ON task_attachments(task_id);
+  CREATE INDEX IF NOT EXISTS idx_activity_entity ON activity_log(entity_type, entity_id);
+`);
 
 // One-time migration flags
 db.exec(`CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT)`);

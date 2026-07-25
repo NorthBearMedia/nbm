@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import { readdirSync, copyFileSync, statSync } from 'fs';
+import { readdirSync, copyFileSync, statSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import Database from 'better-sqlite3';
 import XLSX from 'xlsx';
-import db from '../database.js';
+import db, { dbPath } from '../database.js';
 import { requireAuth } from '../middleware.js';
 
 const router = Router();
@@ -272,6 +272,14 @@ export function createBackupRoutes(backupDir, backupFn) {
     }
 
     try {
+      // Snapshot CURRENT state before any DELETE — a wrong file pick must
+      // always be reversible. Keeps the last 5 pre-restore snapshots.
+      db.pragma('wal_checkpoint(TRUNCATE)');
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      copyFileSync(dbPath, join(backupDir, `pre-restore-${ts}.db`));
+      const preRestores = readdirSync(backupDir).filter(f => f.startsWith('pre-restore-')).sort();
+      while (preRestores.length > 5) { try { unlinkSync(join(backupDir, preRestores.shift())); } catch {} }
+
       const bdb = new Database(backupPath, { readonly: true });
       const tables = ['clients', 'projects', 'tasks', 'comments', 'task_attachments', 'checklist_items', 'team_members', 'activity_log'];
       const counts = {};
