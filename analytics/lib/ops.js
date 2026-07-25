@@ -738,6 +738,14 @@ export async function retrofitTags() {
   const banner = getSetting('consent_banner') === 'true';
   let state = {};
   try { state = JSON.parse(getSetting('retrofit_state') || '{}'); } catch { /* fresh */ }
+  // The success criteria changed (a tool that is demonstrably delivering
+  // data now counts as installed), so sites that exhausted their retries
+  // under the old, unsatisfiable rule deserve a fresh assessment.
+  if (getSetting('retrofit_criteria_v2') !== 'true') {
+    for (const rec of Object.values(state)) if (rec && rec.tries >= 4) { rec.tries = 0; rec.done = false; }
+    setSetting('retrofit_criteria_v2', 'true');
+    console.log('[retrofit] criteria updated — stuck sites reset for reassessment');
+  }
   const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND domain != '' AND ga4_measurement_id != ''").all();
   let checked = 0, placed = 0;
   for (const site of sites) {
@@ -752,10 +760,20 @@ export async function retrofitTags() {
     checked++;
     const html = await fetchLivePage(domain);
     if (html == null) { continue; } // unreachable right now — try next pass, doesn't burn a retry
-    const ok = html.includes(site.ga4_measurement_id)
-      && (!site.clarity_project_id || html.includes(site.clarity_project_id))
-      && (!site.fathom_site_id || html.includes(site.fathom_site_id))
-      && (banner === html.includes('nbmConsent'));
+    // A tool is SATISFIED if its ID is in the page HTML *or* it is
+    // demonstrably delivering data — a tag loaded via Tag Manager, a
+    // plugin or the site builder never appears as a literal string, so
+    // demanding it made the check unsatisfiable and the installer spent
+    // all its retries chasing a tool that was already working (live:
+    // richfordvehiclesales, 15 wasted tries over a Clarity tag that was
+    // feeding 22 days of data). Only genuinely absent tools are chased.
+    const clarityWorking = site.clarity_project_id
+      ? db.prepare("SELECT COUNT(*) AS n FROM clarity_snapshots WHERE site_id = ? AND snapshot_date >= ?").get(site.id, addDays(todayISO(), -10)).n > 0
+      : true;
+    const gaOk = html.includes(site.ga4_measurement_id);
+    const clarityOk = !site.clarity_project_id || html.includes(site.clarity_project_id) || clarityWorking;
+    const fathomOk = !site.fathom_site_id || html.includes(site.fathom_site_id);
+    const ok = gaOk && clarityOk && fathomOk && (banner === html.includes('nbmConsent'));
     if (ok) {
       cur.done = true;
       cur.tries = 0;
@@ -768,9 +786,9 @@ export async function retrofitTags() {
       // never see it" (docroot the injector edits isn't what's served,
       // e.g. the site moved to the builder). Surfaced in Connections.
       cur.missing = [
-        !html.includes(site.ga4_measurement_id) ? 'Google Analytics' : null,
-        site.clarity_project_id && !html.includes(site.clarity_project_id) ? 'Clarity' : null,
-        site.fathom_site_id && !html.includes(site.fathom_site_id) ? 'Fathom' : null,
+        !gaOk ? 'Google Analytics' : null,
+        !clarityOk ? 'Clarity' : null,
+        !fathomOk ? 'Fathom' : null,
       ].filter(Boolean);
       try {
         await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
