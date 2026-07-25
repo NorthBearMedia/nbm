@@ -1102,6 +1102,15 @@ export async function deriveTargetKeywords() {
 // but its https URL-prefix property is owned). This probes the stored
 // property and, if reads are denied, switches gsc_site_url to whichever
 // form actually reads. Generic, so it fixes any such mismatch, forever.
+// "Can this Search Console property actually be READ?" — the only proof
+// that matters. Injectable so the selection logic is directly testable
+// (it has caused three separate live incidents, so it earns real tests).
+async function defaultGscReader() {
+  const { fetchSummary } = await import('./gsc.js');
+  const end = addDays(todayISO(), -3), start = addDays(end, -6);
+  return async url => { try { await fetchSummary(url, start, end); return true; } catch { return false; } };
+}
+
 // Store a Search Console property ONLY if it can actually be read.
 // Google's "add site" PUT succeeds even when the property is UNVERIFIED,
 // so trusting it wrote an unreadable sc-domain: value over a perfectly
@@ -1109,10 +1118,8 @@ export async function deriveTargetKeywords() {
 // "User does not have sufficient permission" on the panel forever.
 // Returns the stored value, or null when nothing readable exists yet
 // (leaving the field empty so the verification path keeps trying).
-async function storeReadableGscProperty(siteId, domain, preferred) {
-  const { fetchSummary } = await import('./gsc.js');
-  const end = addDays(todayISO(), -3), start = addDays(end, -6);
-  const reads = async url => { try { await fetchSummary(url, start, end); return true; } catch { return false; } };
+async function storeReadableGscProperty(siteId, domain, preferred, readsFn = null) {
+  const reads = readsFn || await defaultGscReader();
   const candidates = [preferred, `https://${domain}/`, `https://www.${domain}/`, `sc-domain:${domain}`, `http://${domain}/`, `http://www.${domain}/`]
     .filter((c, i, a) => c && a.indexOf(c) === i);
   for (const c of candidates) {
@@ -1126,12 +1133,10 @@ async function storeReadableGscProperty(siteId, domain, preferred) {
   return null;
 }
 
-export async function healGscProperties() {
+export async function healGscProperties({ reads: readsFn = null } = {}) {
   const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND gsc_site_url != '' AND gsc_site_url IS NOT NULL").all();
   if (!sites.length) return { checked: 0 };
-  const { fetchSummary } = await import('./gsc.js');
-  const end = addDays(todayISO(), -1), start = addDays(end, -6);
-  const reads = async url => { try { await fetchSummary(url, start, end); return true; } catch { return false; } };
+  const reads = readsFn || await defaultGscReader();
   let fixed = 0;
   for (const site of sites) {
     if (await reads(site.gsc_site_url)) continue; // current property is fine
