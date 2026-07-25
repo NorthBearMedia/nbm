@@ -937,12 +937,19 @@ async function ensureFathomSites() {
   let existing = [];
   try { existing = await listSites(); } catch (e) { setSetting('fathom_ensure_last', 'list failed: ' + e.message.slice(0, 80)); return { error: true }; }
   const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  // A Fathom site ID belongs to exactly ONE client. Two sites sharing one
+  // means a client's report shows another client's traffic — found live
+  // (CN Maintenance was carrying Melanie Parker's numbers). Never hand out
+  // an ID another site already holds.
+  const taken = new Set(db.prepare("SELECT fathom_site_id FROM sites WHERE fathom_site_id != '' AND fathom_site_id IS NOT NULL").all().map(r => String(r.fathom_site_id)));
   for (const site of missing) {
     const d = (site.domain || '').toLowerCase().replace(/^www\./, '');
     try {
-      const match = existing.find(f => norm(f.name) === norm(site.client_name) || norm(f.name) === norm(d));
-      const id = match ? match.id : await createSite(site.client_name || d);
-      db.prepare('UPDATE sites SET fathom_site_id = ? WHERE id = ?').run(String(id), site.id);
+      const match = existing.find(f => !taken.has(String(f.id)) && (norm(f.name) === norm(site.client_name) || norm(f.name) === norm(d)));
+      const id = String(match ? match.id : await createSite(site.client_name || d));
+      if (taken.has(id)) { console.log('[fathom-ensure]', d, 'skipped — id', id, 'already belongs to another site'); continue; }
+      db.prepare('UPDATE sites SET fathom_site_id = ? WHERE id = ?').run(id, site.id);
+      taken.add(id);
       setSetting('fathom_ensure_last', '');
       console.log('[fathom-ensure]', d, match ? 'matched existing Fathom site' : 'created Fathom site', id);
     } catch (e) {
@@ -952,6 +959,89 @@ async function ensureFathomSites() {
     }
   }
   return { done: true };
+}
+
+// Repair Fathom IDs shared by more than one site. A shared ID is not a
+// heuristic judgement — it is definitively wrong for at least one of them,
+// and means a client sees another client's visitor numbers. The site whose
+// Fathom site NAME matches keeps it (else the earliest-created one); the
+// others are released so ensureFathomSites gives them their own.
+export async function fixDuplicateFathomIds() {
+  const dupes = db.prepare(`SELECT fathom_site_id AS id, COUNT(*) AS n FROM sites
+    WHERE fathom_site_id != '' AND fathom_site_id IS NOT NULL AND active = 1
+    GROUP BY fathom_site_id HAVING n > 1`).all();
+  if (!dupes.length) return { duplicates: 0 };
+  const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  let names = [];
+  try { const { listSites } = await import('./fathom.js'); names = await listSites(); } catch { /* name hint optional */ }
+  let released = 0;
+  for (const dupe of dupes) {
+    const sites = db.prepare('SELECT * FROM sites WHERE fathom_site_id = ? AND active = 1 ORDER BY id').all(dupe.id);
+    const fathomName = names.find(f => String(f.id) === String(dupe.id))?.name;
+    const keeper = (fathomName && sites.find(s => norm(s.client_name) === norm(fathomName)
+      || norm((s.domain || '').replace(/^www\./, '')) === norm(fathomName))) || sites[0];
+    for (const s of sites) {
+      if (s.id === keeper.id) continue;
+      db.prepare("UPDATE sites SET fathom_site_id = '' WHERE id = ?").run(s.id);
+      released++;
+      console.log('[fathom-dupe]', s.domain, 'released shared Fathom id', dupe.id,
+        `(kept by ${keeper.domain}${fathomName ? ` — Fathom site is named "${fathomName}"` : ''}); a fresh site will be created`);
+    }
+  }
+  setSetting('fathom_dupes_fixed', String(released));
+  return { duplicates: dupes.length, released };
+}
+
+// ── The tag is on the page, but the property reports nothing.
+// That combination means the stored ga4_property_id does NOT own the
+// measurement ID the site is actually sending to — data is pouring into a
+// different property while reports read an empty one. (Live case: North
+// Bear Media, tag verified on the page, property returning 0 visits.)
+// Asks GA which property owns that measurement ID and repoints the site.
+export async function healGa4Properties() {
+  const subject = getGscReaderEmail() || 'norton@northbearmedia.co.uk';
+  const auth = { scopes: ['https://www.googleapis.com/auth/analytics.readonly'], subject };
+  const end = addDays(todayISO(), -1), start = addDays(end, -13);
+  const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND ga4_measurement_id != '' AND ga4_property_id != ''").all()
+    .filter(s => (s.domain || '') !== 'nbmdemosite2.co.uk');
+  let fixed = 0, streamCache = null;
+  for (const site of sites) {
+    // Only investigate silent properties — a property with traffic is fine.
+    let silent = false;
+    try {
+      const rep = await gReq({
+        url: `https://analyticsdata.googleapis.com/v1beta/properties/${site.ga4_property_id}:runReport`,
+        method: 'POST',
+        data: { dateRanges: [{ startDate: start, endDate: end }], metrics: [{ name: 'sessions' }] },
+      }, auth);
+      silent = !Number(rep.rows?.[0]?.metricValues?.[0]?.value || 0);
+    } catch { continue; }
+    if (!silent) continue;
+    // Which property actually owns this measurement ID?
+    if (!streamCache) {
+      streamCache = new Map();
+      try {
+        const summaries = (await gReq({ url: 'https://analyticsadmin.googleapis.com/v1beta/accountSummaries?pageSize=200', method: 'GET' },
+          { scopes: ['https://www.googleapis.com/auth/analytics.readonly'], subject })).accountSummaries || [];
+        for (const acc of summaries) {
+          for (const p of (acc.propertySummaries || [])) {
+            const streams = (await gReq({ url: `https://analyticsadmin.googleapis.com/v1beta/${p.property}/dataStreams`, method: 'GET' }, auth).catch(() => ({}))).dataStreams || [];
+            for (const st of streams) {
+              const mid = st.webStreamData?.measurementId;
+              if (mid) streamCache.set(mid, p.property.replace('properties/', ''));
+            }
+          }
+        }
+      } catch (e) { console.log('[ga-heal] could not list properties:', String(e.message || e).slice(0, 70)); return { fixed }; }
+    }
+    const owner = streamCache.get(site.ga4_measurement_id);
+    if (owner && owner !== String(site.ga4_property_id)) {
+      db.prepare('UPDATE sites SET ga4_property_id = ? WHERE id = ?').run(owner, site.id);
+      fixed++;
+      console.log('[ga-heal]', site.domain, `property ${site.ga4_property_id} reports nothing but ${site.ga4_measurement_id} belongs to ${owner} — repointed`);
+    }
+  }
+  return { fixed };
 }
 
 // ── Source integrity: prove, machine-side, that each connected source is
@@ -1632,6 +1722,13 @@ export function scheduleOpsSweep() {
     cron.schedule('53 * * * *', () => ensureFathomSites().catch(e => console.error('[fathom-ensure]', e.message)), { timezone: config.timezone });
   } catch (e) { console.error('[fathom-ensure] schedule failed:', e.message); }
   setTimeout(() => ensureFathomSites().catch(e => console.error('[fathom-ensure]', e.message)), 270_000);
+  // Repair shared Fathom IDs (one client seeing another's numbers) and GA
+  // properties that report nothing because the tag feeds a different one.
+  try {
+    cron.schedule('47 * * * *', () => { fixDuplicateFathomIds().catch(e => console.error('[fathom-dupe]', e.message)); healGa4Properties().catch(e => console.error('[ga-heal]', e.message)); }, { timezone: config.timezone });
+  } catch (e) { console.error('[heal] schedule failed:', e.message); }
+  setTimeout(() => fixDuplicateFathomIds().catch(e => console.error('[fathom-dupe]', e.message)), 90_000);
+  setTimeout(() => healGa4Properties().catch(e => console.error('[ga-heal]', e.message)), 200_000);
   // Learn each site's real target keywords from its own Search Console
   // queries — daily (the data moves slowly) plus once after boot.
   try {
