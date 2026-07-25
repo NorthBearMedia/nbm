@@ -869,9 +869,10 @@ async function onboardNewSites() {
       const auth = { scopes: ['https://www.googleapis.com/auth/siteverification', 'https://www.googleapis.com/auth/webmasters'], subject };
       try {
         await gReq({ url: 'https://www.googleapis.com/webmasters/v3/sites/' + encodeURIComponent('sc-domain:' + s.d), method: 'PUT' }, auth);
-        db.prepare('UPDATE sites SET gsc_site_url = ? WHERE id = ?').run('sc-domain:' + s.d, s.id);
-        console.log('[onboard]', s.d, 'Search Console linked (sc-domain)');
-        continue;
+        // Only keep it if it genuinely reads — an unverified property
+        // "adds" successfully and then denies every query.
+        const stored = await storeReadableGscProperty(s.id, s.d, 'sc-domain:' + s.d);
+        if (stored) { console.log('[onboard]', s.d, 'Search Console linked:', stored); continue; }
       } catch { /* not verified yet — earn it below */ }
       if (!st.txtPlanted && !st.noDns) {
         try {
@@ -889,7 +890,7 @@ async function onboardNewSites() {
         await gReq({ url: 'https://www.googleapis.com/siteVerification/v1/webResource?verificationMethod=DNS_TXT', method: 'POST',
           data: { site: { type: 'INET_DOMAIN', identifier: s.d } } }, auth);
         await gReq({ url: 'https://www.googleapis.com/webmasters/v3/sites/' + encodeURIComponent('sc-domain:' + s.d), method: 'PUT' }, auth);
-        db.prepare('UPDATE sites SET gsc_site_url = ? WHERE id = ?').run('sc-domain:' + s.d, s.id);
+        await storeReadableGscProperty(s.id, s.d, 'sc-domain:' + s.d);
         setSetting('managed_gsc_last_' + s.d, '');
         console.log('[onboard]', s.d, 'Search Console VERIFIED via DNS + linked');
       } else if (st.noDns) {
@@ -1101,6 +1102,30 @@ export async function deriveTargetKeywords() {
 // but its https URL-prefix property is owned). This probes the stored
 // property and, if reads are denied, switches gsc_site_url to whichever
 // form actually reads. Generic, so it fixes any such mismatch, forever.
+// Store a Search Console property ONLY if it can actually be read.
+// Google's "add site" PUT succeeds even when the property is UNVERIFIED,
+// so trusting it wrote an unreadable sc-domain: value over a perfectly
+// good URL-prefix one — every hour, undoing healGscProperties and leaving
+// "User does not have sufficient permission" on the panel forever.
+// Returns the stored value, or null when nothing readable exists yet
+// (leaving the field empty so the verification path keeps trying).
+async function storeReadableGscProperty(siteId, domain, preferred) {
+  const { fetchSummary } = await import('./gsc.js');
+  const end = addDays(todayISO(), -3), start = addDays(end, -6);
+  const reads = async url => { try { await fetchSummary(url, start, end); return true; } catch { return false; } };
+  const candidates = [preferred, `https://${domain}/`, `https://www.${domain}/`, `sc-domain:${domain}`, `http://${domain}/`, `http://www.${domain}/`]
+    .filter((c, i, a) => c && a.indexOf(c) === i);
+  for (const c of candidates) {
+    if (await reads(c)) {
+      db.prepare('UPDATE sites SET gsc_site_url = ? WHERE id = ?').run(c, siteId);
+      if (c !== preferred) console.log('[gsc]', domain, 'stored readable property', c, '(preferred', preferred, 'was not readable)');
+      return c;
+    }
+  }
+  console.log('[gsc]', domain, 'no readable property yet — leaving unset so verification keeps trying');
+  return null;
+}
+
 export async function healGscProperties() {
   const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND gsc_site_url != '' AND gsc_site_url IS NOT NULL").all();
   if (!sites.length) return { checked: 0 };
@@ -1316,15 +1341,15 @@ async function finalizeSearchConsole() {
     if (!d || d === 'nbmdemosite2.co.uk') continue;
     try {
       await client.request({ url: 'https://www.googleapis.com/webmasters/v3/sites/' + encodeURIComponent('sc-domain:' + d), method: 'PUT' });
-      db.prepare('UPDATE sites SET gsc_site_url = ? WHERE id = ?').run('sc-domain:' + d, site.id);
-      added.push(d);
+      // The PUT succeeding proves nothing — only a successful READ does.
+      // Whichever property form actually reads is the one worth storing.
+      const stored = await storeReadableGscProperty(site.id, d, 'sc-domain:' + d);
+      if (stored) added.push(stored === 'sc-domain:' + d ? d : `${d} (${stored})`);
+      else failed.push(`${d} (added but not verified yet)`);
     } catch (e) {
-      // evccitysprint's sc-domain never verified, but its URL-prefix
-      // property exists and is owned — use that instead.
-      if (d === 'evccitysprint.co.uk') {
-        db.prepare('UPDATE sites SET gsc_site_url = ? WHERE id = ?').run('https://evccitysprint.co.uk/', site.id);
-        added.push(d + ' (url-prefix)');
-      } else failed.push(`${d} (${e.message.slice(0, 50)})`);
+      const stored = await storeReadableGscProperty(site.id, d, null);
+      if (stored) added.push(`${d} (${stored})`);
+      else failed.push(`${d} (${e.message.slice(0, 50)})`);
     }
   }
   if (added.length) {

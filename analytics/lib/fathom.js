@@ -7,19 +7,47 @@ import { previousPeriod } from './dates.js';
 
 const BASE = 'https://api.usefathom.com/v1';
 
+// Fathom allows only 5 CONCURRENT API requests per account. Pulse checks
+// ~21 sites at once and each site's gather fires six calls, so an
+// unthrottled sweep meant ~126 simultaneous requests and every single one
+// came back 429 api_concurrency_limit_reached — Fathom looked "broken" on
+// the whole fleet when nothing was wrong with it. A process-wide gate of 3
+// (headroom under 5 for any other caller) plus polite retry on 429 fixes
+// the entire column.
+const MAX_CONCURRENT = 3;
+let active = 0;
+const waiting = [];
+function acquire() {
+  if (active < MAX_CONCURRENT) { active++; return Promise.resolve(); }
+  return new Promise(resolve => waiting.push(resolve));
+}
+function release() {
+  const next = waiting.shift();
+  if (next) next(); else active--;
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 async function fathomGet(path, params) {
   const token = getFathomToken();
   if (!token) throw new Error('Fathom is not connected yet — add your Fathom API key in Settings');
   const url = new URL(BASE + path);
   for (const [k, v] of Object.entries(params || {})) if (v != null && v !== '') url.searchParams.set(k, v);
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 25_000);
+  await acquire();
   try {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, signal: controller.signal });
-    if (res.status === 401) throw new Error('Fathom rejected the API key — generate a new one in Fathom → Settings → API');
-    if (!res.ok) throw new Error(`Fathom API ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
-    return res.json();
-  } finally { clearTimeout(timer); }
+    // Up to 4 attempts, backing off, so a brief burst never surfaces as a
+    // connection failure to the owner or a client.
+    for (let attempt = 0; ; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 25_000);
+      try {
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, signal: controller.signal });
+        if (res.status === 401) throw new Error('Fathom rejected the API key — generate a new one in Fathom → Settings → API');
+        if (res.status === 429 && attempt < 3) { clearTimeout(timer); await sleep(700 * (attempt + 1) ** 2); continue; }
+        if (!res.ok) throw new Error(`Fathom API ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
+        return await res.json();
+      } finally { clearTimeout(timer); }
+    }
+  } finally { release(); }
 }
 
 // Fathom responses are { object:"list", data:[...] }; be tolerant of shapes.
