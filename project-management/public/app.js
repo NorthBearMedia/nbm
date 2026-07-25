@@ -35,6 +35,17 @@ async function logout() {
   window.location.href = '/login';
 }
 
+// Small bottom-centre toast — failed saves must be SEEN, never swallowed.
+let toastTimer = null;
+function toast(msg) {
+  let el = document.getElementById('appToast');
+  if (!el) { el = document.createElement('div'); el.id = 'appToast'; document.body.appendChild(el); }
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
+}
+
 async function api(url, options = {}) {
   const res = await fetch(url, {
     headers: { 'Content-Type': 'application/json' },
@@ -161,7 +172,7 @@ function startFocus(label, minutes, taskId) {
   // reload so the notebook draws its NOW ring straight away.
   if (taskId) {
     api(`/api/tasks/${taskId}`, { method: 'PUT', body: { task_status: 'in-progress' } })
-      .then(() => loadClients()).catch(() => {});
+      .then(() => loadClients()).catch(e => toast('Not saved — ' + e.message));
   }
   document.getElementById('focusStartPanel')?.classList.remove('open');
   renderFocusPill();
@@ -225,7 +236,7 @@ function focusComplete() {
   const id = focusState?.taskId;
   if (id) {
     api(`/api/tasks/${id}`, { method: 'PUT', body: { task_status: 'done' } })
-      .then(() => { try { celebrate(); } catch {} ; loadClients(); }).catch(() => {});
+      .then(() => { try { celebrate(); } catch {} ; loadClients(); }).catch(e => toast('Not saved — ' + e.message));
   }
   focusStop();
 }
@@ -713,7 +724,8 @@ function renderBattlePlan() {
 }
 
 async function bpDone(id) {
-  try { await api(`/api/tasks/${id}`, { method: 'PUT', body: { task_status: 'done' } }); await loadClients(); } catch (e) {}
+  try { await api(`/api/tasks/${id}`, { method: 'PUT', body: { task_status: 'done' } }); await loadClients(); }
+  catch (e) { toast('Not saved — ' + e.message); loadClients(); }
 }
 
 async function bpReschedule(id, when) {
@@ -723,8 +735,9 @@ async function bpReschedule(id, when) {
   if (when === 'tomorrow') { d.setDate(d.getDate() + 1); }
   else if (when === 'this-week') { const dow = d.getDay(); const toFri = (5 - dow + 7) % 7 || 3; d.setDate(d.getDate() + toFri); }
   else if (when === 'next-week') { const dow = d.getDay(); const toMon = ((8 - dow) % 7) || 7; d.setDate(d.getDate() + toMon); band = 'scheduled'; }
-  const planned = d.toISOString().split('T')[0];
-  try { await api(`/api/tasks/${id}`, { method: 'PUT', body: { planned_date: planned, task_band: band } }); await loadClients(); } catch (e) {}
+  const planned = localDateStr(d);
+  try { await api(`/api/tasks/${id}`, { method: 'PUT', body: { planned_date: planned, task_band: band } }); await loadClients(); }
+  catch (e) { toast('Not saved — ' + e.message); loadClients(); }
 }
 
 function renderControlBoard() {
@@ -908,7 +921,7 @@ function renderDashMomentum() {
 }
 
 function renderDashStats() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateStr(new Date());
   let overdue = 0, dueToday = 0, waiting = 0, inbox = 0;
   for (const c of clients) {
     for (const t of (c.tasks || [])) {
@@ -939,7 +952,7 @@ function openIntegrationsStrip() {
 }
 
 function renderDashUrgentTasks() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateStr(new Date());
   const tasks = [];
   for (const c of clients) {
     if (c.is_system) continue;
@@ -960,7 +973,7 @@ function renderDashUrgentTasks() {
 }
 
 function renderDashSchedule() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateStr(new Date());
   const tasks = [];
   for (const c of clients) {
     if (c.is_system) continue;
@@ -1254,7 +1267,7 @@ async function nbUndo() {
   const entry = nbUndoStack.pop();
   nbUpdateUndoBtn();
   if (!entry) return;
-  try { await entry.undoFn(); } catch {}
+  try { await entry.undoFn(); } catch (e) { toast('Undo failed — ' + e.message); }
   await loadClients();
 }
 document.addEventListener('keydown', (e) => {
@@ -1345,7 +1358,7 @@ async function nbSetDate(id, field, value) {
       await api(`/api/tasks/${id}`, { method: 'PUT', body: { [field]: prevVal } });
     });
     await loadClients();
-  } catch (e) { alert(e.message || 'Could not set the date.'); }
+  } catch (e) { toast('Not saved — ' + (e.message || 'could not set the date')); }
 }
 
 // One-click "+1 day": shift whichever of planned/deadline exists forward a day.
@@ -1361,7 +1374,7 @@ async function nbPush1(id) {
     await api(`/api/tasks/${id}`, { method: 'PUT', body });
     nbPushUndo('push +1 day', async () => { await api(`/api/tasks/${id}`, { method: 'PUT', body: prevBody }); });
     await loadClients();
-  } catch (e) { alert(e.message || 'Could not push the dates.'); }
+  } catch (e) { toast('Not saved — ' + (e.message || 'could not push the dates')); }
 }
 
 // "Push all deadlines": didn't finish Friday? Shift every open task's
@@ -1488,13 +1501,22 @@ async function nbPaint(colour) {
     if (t.planned_date === today && (!t.deadline || t.deadline !== today)) body.planned_date = '';
     if (!Object.keys(body).length) return;
   }
+  // Optimistic: the ink changes the moment you pick a colour.
+  const revert = {};
+  for (const k of Object.keys(body)) revert[k] = t[k] ?? '';
+  Object.assign(t, body);
+  loadNotebookView();
   try {
     await api(`/api/tasks/${id}`, { method: 'PUT', body });
     nbPushUndo(colour ? 'highlight' : 'rub out', async () => {
       await api(`/api/tasks/${prev.id}`, { method: 'PUT', body: { task_status: prev.task_status, task_band: prev.task_band, task_type: prev.task_type, assignee: prev.assignee, planned_date: prev.planned_date } });
     });
-    await loadClients();
-  } catch {}
+    loadClients(); // background reconcile
+  } catch (e) {
+    Object.assign(t, revert);
+    toast('Not saved — ' + e.message);
+    loadNotebookView();
+  }
 }
 async function nbDelegate(name) {
   const id = nbPaletteTaskId;
@@ -1515,7 +1537,7 @@ async function nbDelegate(name) {
       await api(`/api/tasks/${id}`, { method: 'PUT', body: { assignee: prev.assignee || '', task_status: prev.task_status, task_band: prev.task_band, task_type: prev.task_type } });
     });
     await loadClients();
-  } catch {}
+  } catch (e) { toast('Not saved — ' + e.message); loadClients(); }
 }
 document.addEventListener('click', (e) => {
   // A click on "Delegate to…" re-renders the palette, detaching the clicked
@@ -1543,7 +1565,7 @@ async function nbDrop(targetId) {
     await api('/api/tasks/reorder', { method: 'PUT', body: { order: ids } });
     if (nbOrder !== 'manual') { nbOrder = 'manual'; setPref('nbm_nb_order', 'manual'); }
     await loadClients();
-  } catch {}
+  } catch (e) { toast('Order not saved — ' + e.message); loadClients(); }
 }
 function nbSetFont(f) {
   nbFont = NB_PENS[f] ? f : 'Caveat';
@@ -1733,14 +1755,24 @@ async function nbTick(id) {
   if (!t) return;
   const done = t.task_status === 'done';
   const prevStatus = t.task_status;
+  const prevCompleted = t.completed_at || '';
+  // Optimistic: flip the bullet instantly from the local cache, save behind it.
+  t.task_status = done ? 'scheduled' : 'done';
+  t.completed_at = done ? '' : localDateStr(new Date());
+  loadNotebookView();
+  if (!done) { try { celebrate(); } catch {} }
   try {
-    await api(`/api/tasks/${id}`, { method: 'PUT', body: { task_status: done ? 'scheduled' : 'done' } });
+    await api(`/api/tasks/${id}`, { method: 'PUT', body: { task_status: t.task_status } });
     nbPushUndo(done ? 'untick' : 'tick off', async () => {
       await api(`/api/tasks/${id}`, { method: 'PUT', body: { task_status: prevStatus } });
     });
-    if (!done) { try { celebrate(); } catch {} }
-    await loadClients();
-  } catch {}
+    loadClients(); // background reconcile (stats, recurring auto-create)
+  } catch (e) {
+    t.task_status = prevStatus;
+    t.completed_at = prevCompleted;
+    toast('Not saved — ' + e.message);
+    loadNotebookView();
+  }
 }
 
 async function nbHighlight(id) {
@@ -1766,14 +1798,18 @@ async function nbQuickAdd() {
     if (chosen) { body.client_id = +chosen; setPref('nbm_nb_newclient', chosen); }
     else { setPref('nbm_nb_newclient', ''); }
   }
-  // Writing on the "today" page = it's for today.
+  // Writing on a filtered page must produce a task that page SHOWS — otherwise
+  // it vanishes on Enter. Today page → today band; This week → this-week band;
+  // Waiting → waiting-on-client status.
   if (nbTab === 'today') body.task_band = 'today';
+  else if (nbTab === 'week') { body.task_status = 'scheduled'; body.task_band = 'this-week'; }
+  else if (nbTab === 'waiting') body.task_status = 'waiting-on-client';
   try {
     await api('/api/tasks', { method: 'POST', body });
     inp.value = '';
     await loadClients();
     inp.focus();
-  } catch {}
+  } catch (e) { toast('Not saved — ' + e.message); }  // typed text stays in the input
 }
 
 // ─── Notebook right-click menu ──────────────────────────
@@ -1836,7 +1872,7 @@ async function nbMenuDue(when) {
   else if (when === 'next-week') { const dow = d.getDay(); d.setDate(d.getDate() + (((8 - dow) % 7) || 7)); deadline = localDateStr(d); }
   const id = nbMenuTaskId;
   nbCloseMenu();
-  try { await api(`/api/tasks/${id}`, { method: 'PUT', body: { deadline } }); await loadClients(); } catch (e) { alert(e.message || 'Could not update'); }
+  try { await api(`/api/tasks/${id}`, { method: 'PUT', body: { deadline } }); await loadClients(); } catch (e) { toast('Not saved — ' + (e.message || 'could not update')); }
 }
 
 function nbMenuColour(ev) {
