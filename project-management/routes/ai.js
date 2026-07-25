@@ -394,8 +394,8 @@ export async function executeTool(name, input, user) {
         // Completion rhythm: which weekdays things actually get done (last 60d)
         const rhythm = {};
         for (const r of db.prepare(`
-          SELECT completed_at FROM tasks
-          WHERE completed_at != '' AND completed_at >= ?
+          SELECT t.completed_at FROM tasks t JOIN clients c ON c.id = t.client_id
+          WHERE t.completed_at != '' AND t.completed_at >= ? ${priv}
         `).all(daysAgo(60))) {
           const d = new Date(r.completed_at + 'T12:00:00Z');
           const day = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getUTCDay()];
