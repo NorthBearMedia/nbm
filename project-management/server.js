@@ -7,7 +7,9 @@ import db from './database.js';
 import { securityHeaders, apiAuthGuard, getSessionUser, hashPassword, requireAuth, requireRole, requireWrite, dataDir, uploadsDir, attachmentsDir } from './middleware.js';
 import authRoutes from './routes/auth.js';
 import clientRoutes from './routes/clients.js';
-import projectRoutes from './routes/projects.js';
+// routes/projects.js is retired — the UI dropped the projects layer, and its
+// delete/duplicate endpoints were an unused cascade-delete risk. File kept for
+// history; deliberately not mounted.
 import taskRoutes, { deleteAttachmentHandler } from './routes/tasks.js';
 import userRoutes from './routes/users.js';
 import systemRoutes, { createBackupRoutes } from './routes/system.js';
@@ -80,7 +82,7 @@ app.use('/api', apiAuthGuard);
 // ─── Routes ─────────────────────────────────────────────
 app.use(authRoutes);
 app.use('/api/clients', clientRoutes);
-app.use('/api/projects', projectRoutes);
+
 app.use('/api/tasks', taskRoutes);
 app.use('/api/users', userRoutes);
 app.delete('/api/attachments/:id', requireAuth, requireWrite, deleteAttachmentHandler);
