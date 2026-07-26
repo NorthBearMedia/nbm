@@ -21,7 +21,7 @@ import { googleClient } from './google.js';
 import { getGscReaderEmail, getHostingerToken, getEmailBcc, getSmtp, getEmailFrom, getAppUrl } from './runtime-config.js';
 import { mailer } from './email.js';
 import { randomBytes } from 'crypto';
-import { ensureInjectCron, deleteInjectCrons, injectCronOutput, verifyTag, ensureCron, cronOutputMatching, deleteCronsMatching, HOSTINGER_USER, rootDirFor } from './inject.js';
+import { ensureInjectCron, deleteInjectCrons, injectCronOutput, verifyTag, ensureCron, cronOutputMatching, deleteCronsMatching, HOSTINGER_USER, rootDirFor, SNIPPET_VERSION } from './inject.js';
 
 // Per-install secret guarding the injector-script endpoint. Created once.
 function injectToken() {
@@ -751,7 +751,9 @@ export async function retrofitTags() {
   for (const site of sites) {
     const domain = (site.domain || '').toLowerCase().replace(/^www\./, '');
     if (!isAutoTaggable(domain)) continue;
-    const want = `${site.ga4_measurement_id}|${site.clarity_project_id || ''}|${banner ? 1 : 0}|${site.fathom_site_id || ''}`;
+    // Includes SNIPPET_VERSION so a change to the tag CODE (not just the
+    // IDs) re-deploys to sites already marked done.
+    const want = `v${SNIPPET_VERSION}|${site.ga4_measurement_id}|${site.clarity_project_id || ''}|${banner ? 1 : 0}|${site.fathom_site_id || ''}`;
     const rec = state[domain] || {};
     if (rec.want !== want) { state[domain] = { want, tries: 0, done: false }; }
     const cur = state[domain];

@@ -50,6 +50,13 @@ async function hg(path, method = 'GET', body) {
 // verified on the page, GA reporting 0 visits.
 // Two DIFFERENT properties on one page is legitimate and common; the same
 // property twice is the only thing that double-counts. So match on the ID.
+// Bump whenever the GENERATED CODE changes (not just the IDs in it), so
+// already-tagged sites receive the new block. Without this, a fix to the
+// snippet only reached sites that happened to change an ID afterwards —
+// northbearmedia.co.uk sat on a block whose over-broad guard suppressed
+// its own Google tag, reporting 0 visits, with no path to ever update.
+export const SNIPPET_VERSION = 2;
+
 export function buildSnippet(measurementId, clarityId, { consentBanner = false, fathomId = '' } = {}) {
   const gaJs = measurementId
     ? `(function(d,w){if(d.querySelector('script[src*="gtag/js?id=${measurementId}"]'))return;var g=d.createElement('script');g.async=true;g.src='https://www.googletagmanager.com/gtag/js?id=${measurementId}';d.head.appendChild(g);w.dataLayer=w.dataLayer||[];function gtag(){w.dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${measurementId}');})(document,window);` : '';
