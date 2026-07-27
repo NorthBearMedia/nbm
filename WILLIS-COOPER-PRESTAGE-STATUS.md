@@ -154,6 +154,40 @@ renders nothing) found four real defects, all now fixed in
   visible). Acceptable for cutover; would need a small scroll-reveal script
   if the animated feel is wanted back.
 
+## Pre-attach attempt (2026-07-27 late afternoon): domain is platform-locked
+
+Tried to complete the cutover's Hostinger side in advance so the IT email
+could be a pure two-record ask. Result: **blocked, exactly as DEPLOY.md
+predicted.**
+
+- `hosting_createWebsiteV1(williscooper.com)` returned "Request accepted"
+  but the job silently never created the website.
+- `hosting_verifyDomainOwnershipV1(williscooper.com)` ->
+  `is_accessible: false` (empty TXT challenge).
+- Parking williscooper.com onto the wcpreview website ->
+  error `[Hosting:9999] Domain is already hosted`.
+
+Conclusion: the dead Website Builder site still holds williscooper.com at
+platform level, in an account that is NOT this one. Until whoever owns that
+account releases the domain (hPanel -> the old builder site -> disconnect /
+remove domain, or deletes the builder site), the domain cannot be attached
+or parked in this account. If no login can be found, Hostinger support can
+release it (ticket must come from that account's owner, or via support with
+proof from Willis Cooper).
+
+Fresh DNS facts (verified via authoritative ui-dns.* / IONOS servers,
+2026-07-27): apex and www are both A records to 34.120.137.41 with TTL
+**60 seconds** already, so no TTL-lowering lead time is needed; the switch
+and any rollback propagate in about a minute.
+
+Cutover order therefore stays: (1) builder account releases the domain,
+(2) we attach williscooper.com in THIS account (create website with order
+1005262292, deploy the current build zip, or use hPanel Change domain on
+the wcpreview site), (3) IT team flips the two A records to 31.170.164.41,
+(4) SSL auto-issues. An email asking the IT team for the two-record change
+(with the builder-release ask to Willis Cooper in the same message) is
+drafted in Norton's Gmail.
+
 ## What the cutover session still does (DEPLOY.md Steps 1, 3, 4)
 
 1. Send the TTL-drop email (template in DEPLOY.md) — consider adding the
