@@ -6,7 +6,10 @@
 // We keep them as synced "shadow" values so legacy logic (Excel export, The Bear,
 // recurring-task triggers, completed_at) never sees an illegal value.
 
-export const TASK_STATUSES = ['inbox', 'scheduled', 'in-progress', 'waiting-on-client', 'waiting-on-me', 'done', 'cancelled'];
+// 'review' = staff have finished their part and want the owner's sign-off.
+// task_status has no CHECK constraint, so this is safe to add; its legacy
+// shadow is 'awaiting-manager' (which the old Focus sign-off flow used).
+export const TASK_STATUSES = ['inbox', 'scheduled', 'in-progress', 'waiting-on-client', 'waiting-on-me', 'review', 'done', 'cancelled'];
 export const TASK_BANDS = ['today', 'this-week', 'scheduled', 'waiting', 'someday'];
 export const TASK_TYPES = ['recurring', 'ad-hoc', 'urgent', 'sales', 'admin', 'waiting', 'idea'];
 export const CLIENT_TYPES = ['retainer', 'project', 'ad-hoc', 'prospect'];
@@ -20,6 +23,7 @@ const STATUS_TO_PROGRESS = {
   'in-progress': 'in-progress',
   'waiting-on-client': 'awaiting-client',
   'waiting-on-me': 'awaiting-manager',
+  'review': 'awaiting-manager',
   'done': 'completed',
   'cancelled': 'completed',
 };
@@ -50,7 +54,7 @@ const PROGRESS_TO_STATUS = {
   'invoiced': 'done',
   'ready-to-invoice': 'done',
   'stuck': 'waiting-on-me',
-  'awaiting-manager': 'waiting-on-me',
+  'awaiting-manager': 'review',
   'awaiting-client': 'waiting-on-client',
 };
 const PRIORITY_TO_BAND = { 'critical': 'today', 'high': 'this-week', 'medium': 'scheduled', 'low': 'someday' };

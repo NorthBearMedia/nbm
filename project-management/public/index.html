@@ -12,7 +12,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=84">
+  <link rel="stylesheet" href="styles.css?v=86">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -379,6 +379,7 @@
           <button class="nb-tab" data-nbtab="today" onclick="nbSetTab('today')">Today</button>
           <button class="nb-tab" data-nbtab="week" onclick="nbSetTab('week')">This week</button>
           <button class="nb-tab" data-nbtab="waiting" onclick="nbSetTab('waiting')">Waiting</button>
+          <button class="nb-tab" data-nbtab="review" onclick="nbSetTab('review')">Review</button>
           <button class="nb-tab" data-nbtab="done" onclick="nbSetTab('done')">Ticked off</button>
         </div>
         <div class="nb-paper">
@@ -430,6 +431,7 @@
             <div class="nb-leg-row"><span class="nb-leg-chip nb-chip-green"></span> due today</div>
             <div class="nb-leg-row"><span class="nb-leg-chip nb-chip-blue"></span> awaiting client</div>
             <div class="nb-leg-row"><span class="nb-leg-chip nb-chip-orange"></span> waiting on me</div>
+            <div class="nb-leg-row"><span class="nb-leg-chip nb-chip-purple"></span> for review</div>
             <div class="nb-leg-row"><span class="nb-leg-chip nb-chip-yellow"></span> delegated</div>
             <div class="nb-leg-hint">tap a line's marker to colour it</div>
           </div>
@@ -494,9 +496,9 @@
       <div class="form-row"><div class="form-group"><label>Client Name</label><input type="text" id="clientName" required></div><div class="form-group"><label>Code (exactly 3 letters)</label><input type="text" id="clientCode" minlength="3" maxlength="3" pattern="[A-Za-z]{3}" placeholder="e.g. NBM" required style="text-transform:uppercase"></div></div>
       <div class="form-row">
         <div class="form-group"><label>Client Type</label><select id="clientTypeBand"><option value="retainer">Retainer</option><option value="project">Project</option><option value="ad-hoc">Ad hoc</option><option value="prospect">Prospect</option></select></div>
-        <div class="form-group"><label>Monthly Value (£)</label><input type="number" id="clientMonthlyValue" min="0" step="50" placeholder="0"></div>
+        <div class="form-group money-owner-only"><label>Monthly Value (£)</label><input type="number" id="clientMonthlyValue" min="0" step="50" placeholder="0"></div>
       </div>
-      <div class="form-group"><label>Agreement Summary</label><input type="text" id="clientAgreementSummary" placeholder="e.g. 12-mo retainer — 4 reels + 8 posts / month"></div>
+      <div class="form-group money-owner-only"><label>Agreement Summary</label><input type="text" id="clientAgreementSummary" placeholder="e.g. 12-mo retainer — 4 reels + 8 posts / month"></div>
       <div class="form-group"><label>Recurring Deliverables</label><textarea id="clientRecurringDeliverables" rows="2" placeholder="One per line"></textarea></div>
       <div class="form-row">
         <div class="form-group"><label>Last Contact</label><input type="date" id="clientLastContact"></div>
@@ -726,6 +728,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=85"></script>
+  <script src="app.js?v=86"></script>
 </body>
 </html>

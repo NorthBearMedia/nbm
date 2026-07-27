@@ -140,6 +140,13 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   }
   if (task_type !== undefined && !isValidType(task_type)) return res.status(400).json({ error: 'Invalid task_type' });
 
+  // Sending a task for review tags the owner as secondary so it lands in
+  // their sign-off queue (and their notebook Review tab).
+  if (task_status === 'review' && secondary_assignee === undefined && !old.secondary_assignee) {
+    const owner = db.prepare("SELECT display_name FROM users WHERE role='owner' ORDER BY id LIMIT 1").get();
+    if (owner) secondary_assignee = owner.display_name;
+  }
+
   // completed_at tracks the canonical "done" transition (not cancelled).
   const wasDone = old.task_status === 'done';
   const nowDone = task_status === 'done';

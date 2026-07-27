@@ -867,6 +867,7 @@ a:hover { color: #6dd4a8; }
 .status-scheduled         { background: rgba(59, 130, 246, 0.15);  color: #60a5fa; }
 .status-waiting-on-client { background: rgba(251, 191, 36, 0.15);  color: #fbbf24; }
 .status-waiting-on-me     { background: rgba(168, 85, 247, 0.15);  color: #a855f7; }
+.status-review            { background: rgba(147, 51, 234, 0.18);  color: #c084fc; }
 .status-done              { background: rgba(34, 197, 94, 0.15);   color: #4ade80; }
 .status-cancelled         { background: rgba(156, 163, 175, 0.12); color: #6b7280; }
 
@@ -3053,7 +3054,8 @@ select { color-scheme:dark; }
 .nb-tab:nth-child(2) { background:#f6e08a; }
 .nb-tab:nth-child(3) { background:#cfe3c2; }
 .nb-tab:nth-child(4) { background:#d9d2ec; }
-.nb-tab:nth-child(5) { background:#e9c9c0; }
+.nb-tab:nth-child(5) { background:#dcc7ee; }
+.nb-tab:nth-child(6) { background:#e9c9c0; }
 .nb-tab:hover { transform:translateY(2px); opacity:.9; }
 .nb-tab-active { transform:translateY(0); opacity:1; box-shadow:0 -3px 8px rgba(0,0,0,.18); font-weight:600; }
 
@@ -3305,6 +3307,7 @@ select { color-scheme:dark; }
 .nb-text .nb-hl.nb-hl-blue   { background: linear-gradient(100deg, transparent .5%, rgba(143,208,255,.8) 3%, rgba(143,208,255,.8) 97%, transparent 99.5%) !important; }
 .nb-text .nb-hl.nb-hl-orange { background: linear-gradient(100deg, transparent .5%, rgba(255,180,94,.8) 3%, rgba(255,180,94,.8) 97%, transparent 99.5%) !important; }
 .nb-text .nb-hl.nb-hl-yellow { background: linear-gradient(100deg, transparent .5%, rgba(255,228,58,.8) 3%, rgba(255,228,58,.8) 97%, transparent 99.5%) !important; }
+.nb-text .nb-hl.nb-hl-purple { background: linear-gradient(100deg, transparent .5%, rgba(206,163,255,.8) 3%, rgba(206,163,255,.8) 97%, transparent 99.5%) !important; }
 
 /* Uncoloured lines get a faint empty marker; coloured lines show their colour */
 .nb-line .nb-marker { background: transparent !important; border: 1px dashed rgba(28,28,28,.3); box-shadow: none !important; }
@@ -3313,6 +3316,7 @@ select { color-scheme:dark; }
 .nb-line .nb-marker.nb-marker-blue   { background: linear-gradient(180deg,#8fd0ff,#6cb8f2) !important; border-style: solid; opacity: .95; }
 .nb-line .nb-marker.nb-marker-orange { background: linear-gradient(180deg,#ffb45e,#f29b3f) !important; border-style: solid; opacity: .95; }
 .nb-line .nb-marker.nb-marker-yellow { background: linear-gradient(180deg,#ffe43a,#f6cf22) !important; border-style: solid; opacity: .95; }
+.nb-line .nb-marker.nb-marker-purple { background: linear-gradient(180deg,#cea3ff,#b07fe8) !important; border-style: solid; opacity: .95; }
 
 /* Legend chips (options panel + palette) */
 .nb-leg-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 17px; color: rgba(28,28,28,.7); }
@@ -3322,6 +3326,7 @@ select { color-scheme:dark; }
 .nb-chip-blue   { background: linear-gradient(180deg,#8fd0ff,#6cb8f2); }
 .nb-chip-orange { background: linear-gradient(180deg,#ffb45e,#f29b3f); }
 .nb-chip-yellow { background: linear-gradient(180deg,#ffe43a,#f6cf22); }
+.nb-chip-purple { background: linear-gradient(180deg,#cea3ff,#b07fe8); }
 .nb-leg-hint { font-size: 15px; color: rgba(28,28,28,.4); padding-top: 4px; }
 .nb-palette .nb-menu-item { display: flex; align-items: center; gap: 10px; }
 

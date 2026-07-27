@@ -186,6 +186,7 @@ try { db.exec("ALTER TABLE tasks ADD COLUMN task_band TEXT DEFAULT ''"); } catch
 try { db.exec("ALTER TABLE tasks ADD COLUMN task_type TEXT DEFAULT ''"); } catch {}
 try { db.exec("ALTER TABLE tasks ADD COLUMN suggested_block TEXT DEFAULT ''"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN prefs TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active'"); } catch {}
 
 // Gmail OAuth tokens per user
 db.exec(`CREATE TABLE IF NOT EXISTS gmail_tokens (
