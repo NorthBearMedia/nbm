@@ -50,18 +50,38 @@ async function siteHealth(site, start, end) {
   const homepage = await fetchHomepage(domain);
   const gaTagFound = Boolean(site.ga4_measurement_id) && homepage != null && homepage.includes(site.ga4_measurement_id);
 
-  // Fathom (takes precedence over GA as the report's traffic source)
+  // Fathom (takes precedence over GA as the report's traffic source).
+  // A site whose script is confirmed on the page but has not yet recorded
+  // a visit is INSTALLED, not broken — counting it as a failure made the
+  // fleet read "8 of 20 connected" when 19 were fully tagged. It stays OK
+  // for a grace period; if Fathom is still empty after that while the site
+  // demonstrably has traffic, it becomes a real fault worth chasing.
   const fathomEnsureErr = getSetting('fathom_ensure_last') || '';
   const fathomTagOn = homepage != null && homepage.includes('usefathom.com');
-  const noDataNote = fathomTagOn
-    ? 'script is on the site — data appears within a day of the first visitor'
-    : 'script not on the page yet — file-hosted sites get it automatically within the hour; builder sites: paste the Tracking code';
+  const GRACE_MS = 48 * 3600_000;
+  let pending = {};
+  try { pending = JSON.parse(getSetting('fathom_pending') || '{}'); } catch { /* fresh */ }
+  const noData = () => {
+    if (!fathomTagOn) return bad('script not on the page yet — file-hosted sites get it automatically within the hour; builder sites: paste the Tracking code');
+    const since = pending[domain] || Date.now();
+    if (pending[domain] !== since) { pending[domain] = since; setSetting('fathom_pending', JSON.stringify(pending)); }
+    const waited = Date.now() - since;
+    return waited < GRACE_MS
+      ? ok('script installed ✓ — waiting on the first visitor for data')
+      : bad(`script is on the page but Fathom has recorded nothing in ${Math.round(waited / 3600_000)}h — check this site's ID matches the right site in your Fathom account`);
+  };
   out.fathom = integ.fathom?.status === 'mismatch'
     ? bad(`this Fathom site's traffic is from ${(integ.fathom.hosts || []).join(', ')}, not this domain — excluded from reports (which use Google Analytics) until it's pointed at the right site. Connection kept, nothing deleted.`)
     : !site.fathom_site_id ? bad(fathomEnsureErr ? `auto-setup blocked: ${fathomEnsureErr}` : 'being set up automatically — check back within the hour')
     : !getFathomToken() ? bad('site ID set but no API key in Settings')
     : await gatherFathom(site.fathom_site_id, start, end)
-        .then(m => m?.overview ? ok(`${Math.round(m.overview.sessions)} visits (7d)${integ.fathom?.status === 'verified' ? ' · traffic verified from this domain ✓' : ''}`) : bad(noDataNote))
+        .then(m => {
+          if (m?.overview) {
+            if (pending[domain]) { delete pending[domain]; setSetting('fathom_pending', JSON.stringify(pending)); }
+            return ok(`${Math.round(m.overview.sessions)} visits (7d)${integ.fathom?.status === 'verified' ? ' · traffic verified from this domain ✓' : ''}`);
+          }
+          return noData();
+        })
         .catch(e => bad(e.message.slice(0, 90)));
   out.ga = integ.ga?.status === 'mismatch'
     ? bad(`WRONG PROPERTY — its traffic is from ${(integ.ga.hosts || []).join(', ')}, not this site. North Bear is on it; don't paste anything.`)
