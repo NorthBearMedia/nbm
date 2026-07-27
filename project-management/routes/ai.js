@@ -4,6 +4,7 @@ import { google } from 'googleapis';
 import db from '../database.js';
 import { requireAuth, requireWrite, aiMediaUpload } from '../middleware.js';
 import { logActivity } from '../lib/activity.js';
+import { notifyReview } from '../lib/notify.js';
 import { statusToProgress, bandToPriority, isValidStatus, isValidBand, isValidType } from '../lib/taskmap.js';
 import { gmailClientForUser } from './gmail.js';
 
@@ -40,7 +41,7 @@ const TOOLS = [
         deadline: { type: 'string', description: 'YYYY-MM-DD' },
         planned_date: { type: 'string', description: 'YYYY-MM-DD — day you plan to work on it' },
         estimated_hours: { type: 'number' },
-        status: { type: 'string', enum: ['inbox', 'scheduled', 'in-progress', 'waiting-on-client', 'waiting-on-me', 'done', 'cancelled'], description: 'Defaults to inbox' },
+        status: { type: 'string', enum: ['inbox', 'scheduled', 'in-progress', 'waiting-on-client', 'waiting-on-me', 'review', 'done', 'cancelled'], description: 'Defaults to inbox' },
         band: { type: 'string', enum: ['today', 'this-week', 'scheduled', 'waiting', 'someday'], description: 'When it needs doing' },
         task_type: { type: 'string', enum: ['recurring', 'ad-hoc', 'urgent', 'sales', 'admin', 'waiting', 'idea'] },
         notes: { type: 'string' },
@@ -67,7 +68,7 @@ const TOOLS = [
               deadline: { type: 'string', description: 'YYYY-MM-DD' },
               planned_date: { type: 'string', description: 'YYYY-MM-DD' },
               estimated_hours: { type: 'number' },
-              status: { type: 'string', enum: ['inbox', 'scheduled', 'in-progress', 'waiting-on-client', 'waiting-on-me', 'done', 'cancelled'] },
+              status: { type: 'string', enum: ['inbox', 'scheduled', 'in-progress', 'waiting-on-client', 'waiting-on-me', 'review', 'done', 'cancelled'] },
               band: { type: 'string', enum: ['today', 'this-week', 'scheduled', 'waiting', 'someday'] },
               task_type: { type: 'string', enum: ['recurring', 'ad-hoc', 'urgent', 'sales', 'admin', 'waiting', 'idea'] },
               notes: { type: 'string' },
@@ -94,7 +95,7 @@ const TOOLS = [
         planned_date: { type: 'string' },
         estimated_hours: { type: 'number' },
         band: { type: 'string', enum: ['today', 'this-week', 'scheduled', 'waiting', 'someday'] },
-        status: { type: 'string', enum: ['inbox', 'scheduled', 'in-progress', 'waiting-on-client', 'waiting-on-me', 'done', 'cancelled'] },
+        status: { type: 'string', enum: ['inbox', 'scheduled', 'in-progress', 'waiting-on-client', 'waiting-on-me', 'review', 'done', 'cancelled'] },
         task_type: { type: 'string', enum: ['recurring', 'ad-hoc', 'urgent', 'sales', 'admin', 'waiting', 'idea'] },
         notes: { type: 'string' }
       },
@@ -282,6 +283,14 @@ export async function executeTool(name, input, user) {
           logActivity('task', nt.lastInsertRowid, 'created', 'System', `Auto-created recurring task "${old.title}" (next: ${nextDate})`);
         }
 
+        if (status !== null && status !== old.task_status) {
+          const nt = { id: +input.task_id, title: input.title || old.title, assignee: input.assignee !== undefined ? input.assignee : old.assignee };
+          try {
+            if (status === 'review') notifyReview(db, user, nt, 'requested');
+            else if (old.task_status === 'review' && status === 'done') notifyReview(db, user, nt, 'approved');
+            else if (old.task_status === 'review') notifyReview(db, user, nt, 'returned');
+          } catch (e) { console.error('[Notify]', e.message); }
+        }
         logActivity('task', input.task_id, 'updated', user.display_name, `Updated via AI assistant`);
         return { success: true, task_id: input.task_id };
       }
@@ -491,7 +500,7 @@ Guidelines:
 - After creating items, confirm briefly with the NB### reference number.
 - If a request is ambiguous (e.g. which client), ask a short clarifying question before acting.
 - Do not invent clients — always look them up first. If one doesn't exist, tell the user and suggest creating it.
-- Task status flow: inbox (just captured) → scheduled → in-progress → done. Use waiting-on-client or waiting-on-me when blocked, and cancelled to drop a task. New captures default to "inbox".
+- Task status flow: inbox (just captured) → scheduled → in-progress → done. Use waiting-on-client or waiting-on-me when blocked, "review" when staff have finished something and want the owner's sign-off (it lands in the owner's Review tab and Focus sign-off queue), and cancelled to drop a task. New captures default to "inbox".
 - Task band = when it needs doing: today, this-week, scheduled, waiting, someday. Use this instead of urgency words.
 - Task type categorises work: recurring, ad-hoc, urgent, sales, admin, waiting, idea.
 - When the user dumps a quick task without detail, just capture it to the inbox (status inbox) — don't over-question.

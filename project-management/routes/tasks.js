@@ -2,6 +2,7 @@ import { Router } from 'express';
 import db from '../database.js';
 import { requireAuth, requireRole, requireWrite, attachUpload } from '../middleware.js';
 import { logActivity } from '../lib/activity.js';
+import { notifyReview } from '../lib/notify.js';
 import {
   statusToProgress, bandToPriority, progressToStatus, priorityToBand,
   isValidStatus, isValidBand, isValidType,
@@ -140,6 +141,13 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   }
   if (task_type !== undefined && !isValidType(task_type)) return res.status(400).json({ error: 'Invalid task_type' });
 
+  // Sending a task for review tags the owner as secondary so it lands in
+  // their sign-off queue (and their notebook Review tab).
+  if (task_status === 'review' && secondary_assignee === undefined && !old.secondary_assignee) {
+    const owner = db.prepare("SELECT display_name FROM users WHERE role='owner' ORDER BY id LIMIT 1").get();
+    if (owner) secondary_assignee = owner.display_name;
+  }
+
   // completed_at tracks the canonical "done" transition (not cancelled).
   const wasDone = old.task_status === 'done';
   const nowDone = task_status === 'done';
@@ -152,6 +160,17 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   db.prepare(
     'UPDATE tasks SET title=COALESCE(?,title), assignee=COALESCE(?,assignee), secondary_assignee=COALESCE(?,secondary_assignee), deadline=COALESCE(?,deadline), planned_date=COALESCE(?,planned_date), estimated_hours=COALESCE(?,estimated_hours), progress=COALESCE(?,progress), priority=COALESCE(?,priority), task_status=COALESCE(?,task_status), task_band=COALESCE(?,task_band), task_type=COALESCE(?,task_type), suggested_block=COALESCE(?,suggested_block), references_text=COALESCE(?,references_text), notes=COALESCE(?,notes), is_recurring=COALESCE(?,is_recurring), recur_interval=COALESCE(?,recur_interval), recur_unit=COALESCE(?,recur_unit), completed_at=COALESCE(?,completed_at) WHERE id=?'
   ).run(title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, progress, priority, task_status, task_band, task_type, suggested_block, references_text, notes, is_recurring !== undefined ? (is_recurring ? 1 : 0) : null, recur_interval, recur_unit, completedAt, req.params.id);
+
+  // Review-flow notifications (in-app + best-effort email)
+  if (task_status !== undefined && task_status !== old.task_status) {
+    const nt = { id: +req.params.id, title: title || old.title, assignee: assignee !== undefined ? assignee : old.assignee };
+    const origin = `${req.headers['x-forwarded-proto'] || req.protocol}://${req.headers['x-forwarded-host'] || req.headers.host}`;
+    try {
+      if (task_status === 'review') notifyReview(db, req.user, nt, 'requested', origin);
+      else if (old.task_status === 'review' && task_status === 'done') notifyReview(db, req.user, nt, 'approved', origin);
+      else if (old.task_status === 'review') notifyReview(db, req.user, nt, 'returned', origin);
+    } catch (e) { console.error('[Notify]', e.message); }
+  }
 
   const changes = [];
   if (title && title !== old.title) changes.push('title changed');

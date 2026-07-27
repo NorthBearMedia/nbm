@@ -186,6 +186,7 @@ try { db.exec("ALTER TABLE tasks ADD COLUMN task_band TEXT DEFAULT ''"); } catch
 try { db.exec("ALTER TABLE tasks ADD COLUMN task_type TEXT DEFAULT ''"); } catch {}
 try { db.exec("ALTER TABLE tasks ADD COLUMN suggested_block TEXT DEFAULT ''"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN prefs TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active'"); } catch {}
 
 // Gmail OAuth tokens per user
 db.exec(`CREATE TABLE IF NOT EXISTS gmail_tokens (
@@ -284,6 +285,20 @@ try {
 } catch (err) {
   console.error('[DB] completed_at backfill error:', err.message);
 }
+
+// In-app notifications (review requests/approvals). Additive, no FKs.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    type TEXT DEFAULT '',
+    task_id INTEGER,
+    message TEXT NOT NULL,
+    is_read INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read);
+`);
 
 // Indexes for the hot query paths (additive, idempotent — explicitly allowed
 // by the migration rules). tasks.client_id is hit for every client on every

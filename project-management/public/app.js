@@ -48,6 +48,55 @@ function toast(msg, ok) {
   toastTimer = setTimeout(() => el.classList.remove('show'), ok ? 1800 : 3500);
 }
 
+// ─── Notifications: review requests/approvals, bell + toast + 60s poll ───
+let notifState = { unread: 0, list: [], loadedOnce: false };
+async function fetchNotifications() {
+  try {
+    const r = await api('/api/notifications');
+    const prevUnread = notifState.unread;
+    notifState.list = r.notifications; notifState.unread = r.unread;
+    const badge = document.getElementById('notifCount');
+    if (badge) { badge.textContent = r.unread > 9 ? '9+' : r.unread; badge.style.display = r.unread ? '' : 'none'; }
+    // A ping (not a nag): toast only when something NEW arrives mid-session.
+    if (notifState.loadedOnce && r.unread > prevUnread && r.notifications[0]) {
+      toast(r.notifications[0].message, true);
+    }
+    notifState.loadedOnce = true;
+  } catch {}
+}
+function toggleNotifs(e) {
+  if (e) e.stopPropagation();
+  const d = document.getElementById('notifDropdown');
+  if (d.classList.toggle('open')) renderNotifs();
+}
+function renderNotifs() {
+  const d = document.getElementById('notifDropdown');
+  d.innerHTML = notifState.list.length
+    ? notifState.list.map(n =>
+        `<button class="nav-dropdown-item notif-item ${n.is_read ? '' : 'notif-unread'}" onclick="openNotif(${n.id}, ${n.task_id || 'null'})">
+          <span class="notif-msg">${esc(n.message)}</span>
+          <span class="notif-time">${timeAgo(n.created_at)}</span>
+        </button>`).join('')
+      + `<div class="nav-dropdown-sep"></div><button class="nav-dropdown-item" onclick="markAllNotifsRead()">Mark all read</button>`
+    : '<div class="nav-dropdown-item" style="color:var(--text-muted);cursor:default">Nothing yet — review requests and approvals land here.</div>';
+}
+async function openNotif(id, taskId) {
+  document.getElementById('notifDropdown').classList.remove('open');
+  try { await api('/api/notifications/read', { method: 'PUT', body: { id } }); } catch {}
+  fetchNotifications();
+  if (taskId && findTaskById(taskId)) editTask(taskId);
+}
+async function markAllNotifsRead() {
+  try { await api('/api/notifications/read', { method: 'PUT', body: {} }); } catch {}
+  document.getElementById('notifDropdown').classList.remove('open');
+  fetchNotifications();
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.notif-wrap')) document.getElementById('notifDropdown')?.classList.remove('open');
+});
+fetchNotifications();
+setInterval(fetchNotifications, 60000);
+
 // ─── Global quick capture — a task from ANY view, two keystrokes ─────────
 function toggleQuickTask(e) {
   if (e) e.stopPropagation();
@@ -1454,8 +1503,11 @@ function nbHighlightFor(t) {
   if (t.task_type === 'urgent') return 'pink';
   if (t.task_status === 'waiting-on-client') return 'blue';
   if (t.task_status === 'waiting-on-me') return 'orange';
+  if (t.task_status === 'review') return 'purple';
   if (t.task_band === 'today') return 'green';
-  if (t.assignee && currentUser && t.assignee !== currentUser.display_name) return 'yellow';
+  // Yellow = "I delegated this" — only the owner's mental model; for staff,
+  // colleagues' tasks are just plain ink, not a wall of yellow.
+  if (currentUser?.role === 'owner' && t.assignee && t.assignee !== currentUser.display_name) return 'yellow';
   if (t.deadline && t.deadline < today) return 'pink';
   if ((t.planned_date || t.deadline) === today) return 'green';
   return null;
@@ -1485,6 +1537,7 @@ function nbOpenPalette(taskId, ev) {
     <button class="nb-menu-item" onclick="nbPaint('green')"><span class="nb-leg-chip nb-chip-green"></span> Due today</button>
     <button class="nb-menu-item" onclick="nbPaint('blue')"><span class="nb-leg-chip nb-chip-blue"></span> Awaiting client</button>
     <button class="nb-menu-item" onclick="nbPaint('orange')"><span class="nb-leg-chip nb-chip-orange"></span> Waiting on me</button>
+    <button class="nb-menu-item" onclick="nbPaint('purple')"><span class="nb-leg-chip nb-chip-purple"></span> ${currentUser?.role === 'owner' ? 'For review' : 'Send for review'}</button>
     <button class="nb-menu-item" onclick="nbPaint('yellow')"><span class="nb-leg-chip nb-chip-yellow"></span> Delegate to&hellip;</button>
     <div class="nb-menu-sep"></div>
     <button class="nb-menu-item" onclick="nbPaint('')">&#9003; Rub it out (clear)</button>`;
@@ -1522,7 +1575,7 @@ async function nbPaint(colour) {
   const prev = { id, ...nbStateSnapshot(t) };
   nbClosePalette();
   const today = localDateStr(new Date());
-  const isWaiting = t.task_status === 'waiting-on-client' || t.task_status === 'waiting-on-me';
+  const isWaiting = t.task_status === 'waiting-on-client' || t.task_status === 'waiting-on-me' || t.task_status === 'review';
   const isDelegated = t.assignee && currentUser && t.assignee !== currentUser.display_name;
   const body = {};
   // Each colour also clears any state that outranks it, so the colour you
@@ -1533,6 +1586,9 @@ async function nbPaint(colour) {
     if (t.task_type === 'urgent') body.task_type = 'ad-hoc';
   } else if (colour === 'orange') {
     body.task_status = 'waiting-on-me';
+    if (t.task_type === 'urgent') body.task_type = 'ad-hoc';
+  } else if (colour === 'purple') {
+    body.task_status = 'review';
     if (t.task_type === 'urgent') body.task_type = 'ad-hoc';
   } else if (colour === 'green') {
     body.task_band = 'today';
@@ -1615,6 +1671,32 @@ async function nbDrop(targetId) {
     await loadClients();
   } catch (e) { toast('Order not saved — ' + e.message); loadClients(); }
 }
+// ─── Personal ink colours (colour-wheel per meaning; review purple locked) ──
+const NB_DEFAULT_COLOURS = { pink:'#ff9ecb', green:'#8ee27d', blue:'#8fd0ff', orange:'#ffb45e', yellow:'#ffe43a' };
+function nbColours() {
+  try { return { ...NB_DEFAULT_COLOURS, ...(JSON.parse(localStorage.getItem('nbm_nb_colours') || '{}')) }; }
+  catch { return { ...NB_DEFAULT_COLOURS }; }
+}
+function applyNbColours() {
+  const c = nbColours();
+  for (const [k, v] of Object.entries(c)) {
+    if (/^#[0-9a-fA-F]{6}$/.test(v)) document.documentElement.style.setProperty('--nb-c-' + k, v);
+  }
+  document.querySelectorAll('.nb-leg-pick').forEach(i => { if (c[i.dataset.c]) i.value = c[i.dataset.c]; });
+}
+function nbSetColour(key, value) {
+  if (!NB_DEFAULT_COLOURS[key] || !/^#[0-9a-fA-F]{6}$/.test(value)) return;
+  const c = { ...nbColours(), [key]: value };
+  setPref('nbm_nb_colours', JSON.stringify(c));
+  applyNbColours();
+}
+function nbResetColours() {
+  setPref('nbm_nb_colours', '');
+  localStorage.removeItem('nbm_nb_colours');
+  for (const k of Object.keys(NB_DEFAULT_COLOURS)) document.documentElement.style.setProperty('--nb-c-' + k, NB_DEFAULT_COLOURS[k]);
+  document.querySelectorAll('.nb-leg-pick').forEach(i => { i.value = NB_DEFAULT_COLOURS[i.dataset.c]; });
+}
+
 function nbSetFont(f) {
   nbFont = NB_PENS[f] ? f : 'Caveat';
   setPref('nbm_nb_font', nbFont);
@@ -1625,6 +1707,7 @@ function nbSetFont(f) {
 // structural and can't drift with font metrics. This just sets the ink vars;
 // each row's fixed height == --nb-lh keeps text welded to its line.
 function applyNbFont() {
+  applyNbColours();
   const wrap = document.querySelector('.nb-wrap');
   if (!wrap) return;
   const pen = NB_PENS[nbFont] || NB_PENS.Caveat;
@@ -1680,6 +1763,7 @@ const NB_PAGE_TITLES = {
   today: "Today's page",
   week: 'This week',
   waiting: 'Waiting on people',
+  review: 'Waiting for sign-off',
   done: 'Ticked off lately',
 };
 
@@ -1731,6 +1815,8 @@ function loadNotebookView() {
       (t.task_band === 'today' || t.task_band === 'this-week' || (eff(t) >= wsStr && eff(t) <= weStr) || (t.deadline && t.deadline < today)));
   } else if (nbTab === 'waiting') {
     items = items.filter(t => t.task_status === 'waiting-on-client' || t.task_status === 'waiting-on-me');
+  } else if (nbTab === 'review') {
+    items = items.filter(t => t.task_status === 'review');
   } else if (nbTab === 'done') {
     items = items.filter(t => t.task_status === 'done' && (t.completed_at || '') >= weekAgo);
   } else {
@@ -1852,6 +1938,7 @@ async function nbQuickAdd() {
   if (nbTab === 'today') body.task_band = 'today';
   else if (nbTab === 'week') { body.task_status = 'scheduled'; body.task_band = 'this-week'; }
   else if (nbTab === 'waiting') body.task_status = 'waiting-on-client';
+  else if (nbTab === 'review') body.task_status = 'review';
   try {
     await api('/api/tasks', { method: 'POST', body });
     inp.value = '';
@@ -1881,6 +1968,7 @@ function nbMenuEl() {
     <button class="nb-menu-item" onclick="nbMenuPush1()">Push both dates +1 day</button>
     <div class="nb-menu-sep"></div>
     <button class="nb-menu-item nb-menu-now" id="nbMenuNowBtn" onclick="nbMenuNow()">&#9654; I&rsquo;m on this NOW</button>
+    <button class="nb-menu-item nb-menu-review" id="nbMenuReviewBtn" onclick="nbMenuReview()"></button>
     <button class="nb-menu-item" id="nbMenuHl" onclick="nbMenuColour(event)">Colour-code&hellip;</button>
     <button class="nb-menu-item" onclick="nbMenuOpen()">Open full task</button>
     <div class="nb-menu-sep"></div>
@@ -1899,6 +1987,15 @@ function nbOpenMenu(taskId, x, y) {
   document.getElementById('nbMenuDate').value = t.deadline || '';
   document.getElementById('nbMenuNowBtn').innerHTML = nbIsNow(t)
     ? '&#10005; Not on this any more' : '&#9654; I&rsquo;m on this NOW';
+  // Review toggle: staff send work for sign-off; the owner approves or sends back.
+  const rvBtn = document.getElementById('nbMenuReviewBtn');
+  if (t.task_status === 'review') {
+    rvBtn.innerHTML = currentUser?.role === 'owner'
+      ? '&#10004; Approve &mdash; mark done' : '&#8617; Take back from review';
+  } else {
+    rvBtn.innerHTML = currentUser?.role === 'owner'
+      ? '&#9998; Mark for review' : '&#9998; Send for review';
+  }
   m.style.display = 'block';
   const mw = 240, mh = m.offsetHeight || 320;
   m.style.left = Math.min(x, window.innerWidth - mw - 12) + 'px';
@@ -1934,6 +2031,25 @@ function nbMenuNow() {
   const id = nbMenuTaskId; nbCloseMenu();
   if (id === null) return;
   nbIsNow(findTaskById(id)) ? nbNowOff(id) : nbNowClick(id);
+}
+
+// Review toggle from the right-click menu. Staff: send/take back. Owner on a
+// review task: approve (done). Undo restores the previous status.
+async function nbMenuReview() {
+  const id = nbMenuTaskId; nbCloseMenu();
+  const t = id !== null ? findTaskById(id) : null;
+  if (!t) return;
+  const prevStatus = t.task_status;
+  const inReview = t.task_status === 'review';
+  const next = inReview ? (currentUser?.role === 'owner' ? 'done' : 'scheduled') : 'review';
+  try {
+    await api(`/api/tasks/${id}`, { method: 'PUT', body: { task_status: next } });
+    nbPushUndo(next === 'done' ? 'approve' : next === 'review' ? 'send for review' : 'take back', async () => {
+      await api(`/api/tasks/${id}`, { method: 'PUT', body: { task_status: prevStatus } });
+    });
+    if (next === 'done') { try { celebrate(); } catch {} }
+    await loadClients();
+  } catch (e) { toast('Not saved — ' + e.message); }
 }
 
 function nbMenuPush1() {
@@ -2314,6 +2430,7 @@ const TASK_STATUS = {
   'in-progress':       { label: 'In Progress',       cls: 'st-in-progress' },
   'waiting-on-client': { label: 'Waiting on Client', cls: 'st-waiting-client' },
   'waiting-on-me':     { label: 'Waiting on Me',     cls: 'st-waiting-me' },
+  'review':            { label: 'For Review',        cls: 'st-review' },
   'done':              { label: 'Done',              cls: 'st-done' },
   'cancelled':         { label: 'Cancelled',         cls: 'st-cancelled' },
 };
@@ -2335,7 +2452,7 @@ const CONTROL_STATUS = {
   'blue':  { label: 'Waiting on client', cls: 'rag-blue' },
 };
 const RISK = { 'low': 'Low', 'medium': 'Medium', 'high': 'High' };
-const STATUS_ORDER = ['inbox','scheduled','in-progress','waiting-on-client','waiting-on-me','done','cancelled'];
+const STATUS_ORDER = ['inbox','scheduled','in-progress','waiting-on-client','waiting-on-me','review','done','cancelled'];
 const BAND_ORDER = ['today','this-week','scheduled','waiting','someday'];
 const BAND_RANK = { 'today':0,'this-week':1,'scheduled':2,'waiting':3,'someday':4 };
 const TYPE_ORDER = ['recurring','ad-hoc','urgent','sales','admin','waiting','idea'];
@@ -2689,6 +2806,7 @@ document.getElementById('addClientBtn').addEventListener('click',()=>{
   document.getElementById('clientLogo').value='';
   document.getElementById('clientPrivate').checked=false;
   document.getElementById('privateClientGroup').style.display=currentUser?.role==='owner'?'':'none';
+  document.querySelectorAll('.money-owner-only').forEach(el=>el.style.display=currentUser?.role==='owner'?'':'none');
   window._croppedLogo=null;
   openModal('clientModal');
 });
@@ -2715,6 +2833,7 @@ function editClient(id){
   document.getElementById('clientLogo').value='';
   document.getElementById('clientPrivate').checked=!!c.is_private;
   document.getElementById('privateClientGroup').style.display=currentUser?.role==='owner'?'':'none';
+  document.querySelectorAll('.money-owner-only').forEach(el=>el.style.display=currentUser?.role==='owner'?'':'none');
   openModal('clientModal');
 }
 document.getElementById('clientForm').addEventListener('submit',async e=>{
@@ -3559,7 +3678,7 @@ async function loadFocusView() {
   const now = mine.filter(t => t.task_status === 'in-progress');
   const blocked = mine.filter(t => t.task_status === 'waiting-on-client' || t.task_status === 'waiting-on-me');
   // Sign-off tasks (where I'm secondary and the task is waiting on me)
-  const signOff = myName ? allTasks.filter(t => t.secondary_assignee === myName && t.task_status === 'waiting-on-me' && t.assignee !== myName) : [];
+  const signOff = myName ? allTasks.filter(t => t.assignee !== myName && (t.task_status === 'review' || (t.secondary_assignee === myName && t.task_status === 'waiting-on-me'))) : [];
   const next = mine.filter(t => t.task_status === 'inbox' || t.task_status === 'scheduled')
     .sort((a, b) => (BAND_RANK[a.task_band] ?? 2) - (BAND_RANK[b.task_band] ?? 2)).slice(0, 8);
 

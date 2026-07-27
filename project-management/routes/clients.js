@@ -142,6 +142,12 @@ router.get('/', requireAuth, (req, res) => {
     client.resolved_status = client.control_status || control.status;
     client.resolved_risk = client.risk_level || control.risk;
     client.board = { outstanding, waiting, overdue, recurring, next_due_date: nextDue };
+
+    // Client financials are owner-only: staff see client health, not money.
+    if (!isOwner) {
+      client.monthly_value = 0;
+      client.agreement_summary = '';
+    }
   }
   res.json(clients);
 });
@@ -195,6 +201,9 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   last_contact_date = cleanDate(last_contact_date);
   next_scheduled_date = cleanDate(next_scheduled_date);
   monthly_value = cleanMoney(monthly_value);
+  // Financials are owner-only: staff never see these fields, so a staff save
+  // must never overwrite them (their form posts blanks).
+  if (req.user.role !== 'owner') { monthly_value = undefined; agreement_summary = undefined; }
 
   db.prepare('UPDATE clients SET name=COALESCE(?,name), code=COALESCE(?,code), agreement_type=COALESCE(?,agreement_type), notes=COALESCE(?,notes), logo_url=COALESCE(?,logo_url), gmail_link=COALESCE(?,gmail_link), drive_link=COALESCE(?,drive_link), is_private=COALESCE(?,is_private), client_type=COALESCE(?,client_type), monthly_value=COALESCE(?,monthly_value), agreement_summary=COALESCE(?,agreement_summary), recurring_deliverables=COALESCE(?,recurring_deliverables), last_contact_date=COALESCE(?,last_contact_date), next_scheduled_date=COALESCE(?,next_scheduled_date), control_status=COALESCE(?,control_status), risk_level=COALESCE(?,risk_level), important_contacts=COALESCE(?,important_contacts) WHERE id=?')
     .run(name, code, agreement_type, notes, logo_url, gmail_link, drive_link, is_private !== undefined ? (is_private ? 1 : 0) : null,

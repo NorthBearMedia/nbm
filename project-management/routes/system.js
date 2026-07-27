@@ -22,8 +22,15 @@ router.get('/api/health', (req, res) => {
 // ─── Per-user UI preferences (syncs notebook/format across devices) ──
 router.get('/api/prefs', requireAuth, (req, res) => {
   const row = db.prepare('SELECT prefs FROM users WHERE id = ?').get(req.user.id);
-  try { res.json(row?.prefs ? JSON.parse(row.prefs) : {}); }
-  catch { res.json({}); }
+  try {
+    const own = row?.prefs ? JSON.parse(row.prefs) : {};
+    if (Object.keys(own).length) return res.json(own);
+    // House style: a user with no saved prefs inherits the owner's format,
+    // so a new login looks like the console everyone knows — until they
+    // customise, at which point their own prefs take over.
+    const ownerRow = db.prepare("SELECT prefs FROM users WHERE role='owner' ORDER BY id LIMIT 1").get();
+    return res.json(ownerRow?.prefs ? JSON.parse(ownerRow.prefs) : {});
+  } catch { res.json({}); }
 });
 
 router.put('/api/prefs', requireAuth, (req, res) => {
@@ -40,6 +47,20 @@ router.put('/api/prefs', requireAuth, (req, res) => {
   const json = JSON.stringify(merged);
   if (json.length > 8192) return res.status(400).json({ error: 'Prefs too large' });
   db.prepare('UPDATE users SET prefs = ? WHERE id = ?').run(json, req.user.id);
+  res.json({ success: true });
+});
+
+// ─── Notifications (review requests / approvals) ──────
+router.get('/api/notifications', requireAuth, (req, res) => {
+  const rows = db.prepare('SELECT * FROM notifications WHERE user_id = ? ORDER BY id DESC LIMIT 30').all(req.user.id);
+  const unread = db.prepare('SELECT COUNT(*) c FROM notifications WHERE user_id = ? AND is_read = 0').get(req.user.id).c;
+  res.json({ notifications: rows, unread });
+});
+
+router.put('/api/notifications/read', requireAuth, (req, res) => {
+  const { id } = req.body || {};
+  if (id) db.prepare('UPDATE notifications SET is_read = 1 WHERE user_id = ? AND id = ?').run(req.user.id, +id);
+  else db.prepare('UPDATE notifications SET is_read = 1 WHERE user_id = ?').run(req.user.id);
   res.json({ success: true });
 });
 
@@ -183,7 +204,8 @@ router.get('/api/export/excel', requireAuth, (req, res) => {
     'Client': c.name,
     'Code': c.code || '',
     'Type': c.client_type || '',
-    'Monthly Value': c.monthly_value || 0,
+    // Financials are owner-only — staff exports omit the money column's values.
+    ...(isOwner ? { 'Monthly Value': c.monthly_value || 0 } : {}),
     'Status': c.control_status || '(auto)',
     'Risk': c.risk_level || '(auto)',
     'Next Scheduled': c.next_scheduled_date || '',
