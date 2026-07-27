@@ -758,7 +758,16 @@ export async function retrofitTags() {
     if (rec.want !== want) { state[domain] = { want, tries: 0, done: false }; }
     const cur = state[domain];
     if (cur.done) continue;
-    if (cur.tries >= 15) continue; // gave up — visible in Connections, not retried forever
+    // Exhausted sites get a fresh look once a day rather than being written
+    // off forever: the owner may have pasted the code by hand since (live:
+    // richfordvehiclesales was pasted manually but stayed flagged "missing
+    // Fathom" because the counter had already hit its limit).
+    if (cur.tries >= 15) {
+      if (Date.now() - (cur.at || 0) < 24 * 3600_000) continue;
+      cur.tries = 0;
+      console.log('[retrofit]', domain, 'daily re-check after previous attempts were exhausted');
+    }
+    cur.at = Date.now();
     checked++;
     const html = await fetchLivePage(domain);
     if (html == null) { continue; } // unreachable right now — try next pass, doesn't burn a retry
