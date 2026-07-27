@@ -22,8 +22,15 @@ router.get('/api/health', (req, res) => {
 // ─── Per-user UI preferences (syncs notebook/format across devices) ──
 router.get('/api/prefs', requireAuth, (req, res) => {
   const row = db.prepare('SELECT prefs FROM users WHERE id = ?').get(req.user.id);
-  try { res.json(row?.prefs ? JSON.parse(row.prefs) : {}); }
-  catch { res.json({}); }
+  try {
+    const own = row?.prefs ? JSON.parse(row.prefs) : {};
+    if (Object.keys(own).length) return res.json(own);
+    // House style: a user with no saved prefs inherits the owner's format,
+    // so a new login looks like the console everyone knows — until they
+    // customise, at which point their own prefs take over.
+    const ownerRow = db.prepare("SELECT prefs FROM users WHERE role='owner' ORDER BY id LIMIT 1").get();
+    return res.json(ownerRow?.prefs ? JSON.parse(ownerRow.prefs) : {});
+  } catch { res.json({}); }
 });
 
 router.put('/api/prefs', requireAuth, (req, res) => {
@@ -183,7 +190,8 @@ router.get('/api/export/excel', requireAuth, (req, res) => {
     'Client': c.name,
     'Code': c.code || '',
     'Type': c.client_type || '',
-    'Monthly Value': c.monthly_value || 0,
+    // Financials are owner-only — staff exports omit the money column's values.
+    ...(isOwner ? { 'Monthly Value': c.monthly_value || 0 } : {}),
     'Status': c.control_status || '(auto)',
     'Risk': c.risk_level || '(auto)',
     'Next Scheduled': c.next_scheduled_date || '',
