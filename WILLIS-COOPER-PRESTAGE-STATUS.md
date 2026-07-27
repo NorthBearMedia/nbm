@@ -92,6 +92,19 @@ renders nothing) found four real defects, all now fixed in
    checkbox-based and desktop dropdowns are CSS :hover — both work natively.
 6. **Mailto subject em-dash** swapped for a plain hyphen in the contact and
    taxcover form handlers ("Website enquiry - Willis Cooper").
+7. **Mobile performance pass (desktop untouched).** 47 images over 120KB got
+   480/800/1200-width variants (generated with sips, jpg quality 78; 99 new
+   files under assets/images, named `<base>-wNNN.<ext>`) and 92 `<img>` tags
+   gained `srcset` — the original file stays in `src` and as the largest
+   candidate, so desktop picks the same full-quality images and the design
+   is pixel-identical. Phones now pull e.g. 87KB instead of 543KB per team
+   photo (before the CDN's webp pass). Preconnect hints added for
+   googletagmanager/usefathom (all pages), sociablekit (home), jotform
+   (careers). `.variant-manifest.json` records what was generated and is
+   excluded from builds via make-staging SKIP. All variant URLs pre-warmed
+   through the CDN. Verified: mobile (375px, DPR 2) picks -w800 team photos
+   and -w480/-w800 elsewhere; desktop (1280px) picks originals for the hero
+   and full-size card photos, screenshots confirmed unchanged.
 
 ## Verification performed (2026-07-27, after repairs)
 

@@ -43,6 +43,7 @@ const OUT = positional[0] || join(SRC, '..', PRODUCTION ? 'williscooper-live-bui
 // Dev/tooling files that should never be published to the live-facing site.
 const SKIP = new Set([
   'make-staging.mjs', 'README.md', 'DEPLOY.md', 'DEPLOY-STAGING.md',
+  '.variant-manifest.json',
   'williscooper-staging.zip', 'williscooper-live.zip',
 ]);
 
