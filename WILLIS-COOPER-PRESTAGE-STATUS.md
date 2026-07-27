@@ -188,6 +188,32 @@ the wcpreview site), (3) IT team flips the two A records to 31.170.164.41,
 (with the builder-release ask to Willis Cooper in the same message) is
 drafted in Norton's Gmail.
 
+## Flip-first strategy adopted (2026-07-27 evening)
+
+Norton chose to have the IT team flip DNS immediately, without waiting for
+the domain release. Verified safe: an unmatched Host on 31.170.164.41
+returns a neutral Hostinger **403 page** (NOT another client's site), which
+is no worse than the currently broken builder pages. The simple two-record
+email is drafted in Norton's Gmail (recipients + phone to fill in).
+
+New cutover order:
+1. IT team flips both A records to 31.170.164.41 whenever they can
+   (visitors see a 403 until step 3; acceptable per Norton).
+2. Builder-account login is hunted via Willis Cooper (Norton calling), or
+   Hostinger support releases the domain from the dead builder site.
+3. The moment the domain is released: create the williscooper.com website
+   on order 1005262292 (`hosting_createWebsiteV1`), wait for its docroot,
+   deploy the current production build zip, and the site is instantly live
+   (DNS already points here, TTL 60). Re-run the verification suite.
+   Note: `www.` cannot be attached separately (API: "Domain cannot start
+   with www"); the apex website covers www automatically once created.
+4. SSL auto-issues after the domain resolves + attaches; Force HTTPS via
+   hPanel if not automatic.
+
+Attach attempts on 2026-07-27 (all blocked by the platform lock, retried
+multiple times): create-website jobs silently dropped; parking rejected
+with "Domain is already hosted"; ownership check `is_accessible:false`.
+
 ## What the cutover session still does (DEPLOY.md Steps 1, 3, 4)
 
 1. Send the TTL-drop email (template in DEPLOY.md) — consider adding the
