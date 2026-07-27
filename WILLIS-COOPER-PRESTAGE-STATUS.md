@@ -1,3 +1,22 @@
+# UPDATE 2026-07-27 evening: DOMAIN ATTACHED, SITE DEPLOYED, AWAITING DNS ONLY
+
+Norton released williscooper.com from the old builder (it now sits on a
+temporary hostingersite.com address in his other Hostinger account). Then:
+
+- `williscooper.com` created as an addon website on order 1005262292,
+  docroot `/home/u275789987/domains/williscooper.com/public_html`
+  (created 2026-07-27 18:26 UTC).
+- Production build deployed and verified via Host-header requests against
+  origin 31.170.164.41: apex 200 with correct title, www 200, /about-us 200
+  (.htaccess active), styles css 200, sitemap 200.
+- The ONLY remaining step is the IT team's two A records (34.120.137.41 ->
+  31.170.164.41, TTL already 60s). Email requesting this was sent by Norton
+  today. A background DNS watcher is polling the authoritative servers.
+- When DNS flips: HTTPS cert auto-issues (verify + Force HTTPS in hPanel if
+  needed), then run DEPLOY.md Step 4 verification on the live domain.
+- wcpreview.northbearmedia.co.uk stays up as the preview; clean up per the
+  section below after live is confirmed stable.
+
 # Willis Cooper — pre-stage status (Step 2 of DEPLOY.md complete, site repaired)
 
 Pre-staged, repaired and verified on 2026-07-27 (UK morning). The production
