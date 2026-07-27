@@ -1,0 +1,7 @@
+# Serve live-style extensionless URLs from the static .html files.
+# /about-us -> about-us.html (internal rewrite, URL bar keeps /about-us)
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{DOCUMENT_ROOT}/$1.html -f
+RewriteRule ^([^.]+?)/?$ /$1.html [L]
