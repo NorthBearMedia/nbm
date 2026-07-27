@@ -48,6 +48,55 @@ function toast(msg, ok) {
   toastTimer = setTimeout(() => el.classList.remove('show'), ok ? 1800 : 3500);
 }
 
+// ─── Notifications: review requests/approvals, bell + toast + 60s poll ───
+let notifState = { unread: 0, list: [], loadedOnce: false };
+async function fetchNotifications() {
+  try {
+    const r = await api('/api/notifications');
+    const prevUnread = notifState.unread;
+    notifState.list = r.notifications; notifState.unread = r.unread;
+    const badge = document.getElementById('notifCount');
+    if (badge) { badge.textContent = r.unread > 9 ? '9+' : r.unread; badge.style.display = r.unread ? '' : 'none'; }
+    // A ping (not a nag): toast only when something NEW arrives mid-session.
+    if (notifState.loadedOnce && r.unread > prevUnread && r.notifications[0]) {
+      toast(r.notifications[0].message, true);
+    }
+    notifState.loadedOnce = true;
+  } catch {}
+}
+function toggleNotifs(e) {
+  if (e) e.stopPropagation();
+  const d = document.getElementById('notifDropdown');
+  if (d.classList.toggle('open')) renderNotifs();
+}
+function renderNotifs() {
+  const d = document.getElementById('notifDropdown');
+  d.innerHTML = notifState.list.length
+    ? notifState.list.map(n =>
+        `<button class="nav-dropdown-item notif-item ${n.is_read ? '' : 'notif-unread'}" onclick="openNotif(${n.id}, ${n.task_id || 'null'})">
+          <span class="notif-msg">${esc(n.message)}</span>
+          <span class="notif-time">${timeAgo(n.created_at)}</span>
+        </button>`).join('')
+      + `<div class="nav-dropdown-sep"></div><button class="nav-dropdown-item" onclick="markAllNotifsRead()">Mark all read</button>`
+    : '<div class="nav-dropdown-item" style="color:var(--text-muted);cursor:default">Nothing yet — review requests and approvals land here.</div>';
+}
+async function openNotif(id, taskId) {
+  document.getElementById('notifDropdown').classList.remove('open');
+  try { await api('/api/notifications/read', { method: 'PUT', body: { id } }); } catch {}
+  fetchNotifications();
+  if (taskId && findTaskById(taskId)) editTask(taskId);
+}
+async function markAllNotifsRead() {
+  try { await api('/api/notifications/read', { method: 'PUT', body: {} }); } catch {}
+  document.getElementById('notifDropdown').classList.remove('open');
+  fetchNotifications();
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.notif-wrap')) document.getElementById('notifDropdown')?.classList.remove('open');
+});
+fetchNotifications();
+setInterval(fetchNotifications, 60000);
+
 // ─── Global quick capture — a task from ANY view, two keystrokes ─────────
 function toggleQuickTask(e) {
   if (e) e.stopPropagation();
@@ -1622,6 +1671,32 @@ async function nbDrop(targetId) {
     await loadClients();
   } catch (e) { toast('Order not saved — ' + e.message); loadClients(); }
 }
+// ─── Personal ink colours (colour-wheel per meaning; review purple locked) ──
+const NB_DEFAULT_COLOURS = { pink:'#ff9ecb', green:'#8ee27d', blue:'#8fd0ff', orange:'#ffb45e', yellow:'#ffe43a' };
+function nbColours() {
+  try { return { ...NB_DEFAULT_COLOURS, ...(JSON.parse(localStorage.getItem('nbm_nb_colours') || '{}')) }; }
+  catch { return { ...NB_DEFAULT_COLOURS }; }
+}
+function applyNbColours() {
+  const c = nbColours();
+  for (const [k, v] of Object.entries(c)) {
+    if (/^#[0-9a-fA-F]{6}$/.test(v)) document.documentElement.style.setProperty('--nb-c-' + k, v);
+  }
+  document.querySelectorAll('.nb-leg-pick').forEach(i => { if (c[i.dataset.c]) i.value = c[i.dataset.c]; });
+}
+function nbSetColour(key, value) {
+  if (!NB_DEFAULT_COLOURS[key] || !/^#[0-9a-fA-F]{6}$/.test(value)) return;
+  const c = { ...nbColours(), [key]: value };
+  setPref('nbm_nb_colours', JSON.stringify(c));
+  applyNbColours();
+}
+function nbResetColours() {
+  setPref('nbm_nb_colours', '');
+  localStorage.removeItem('nbm_nb_colours');
+  for (const k of Object.keys(NB_DEFAULT_COLOURS)) document.documentElement.style.setProperty('--nb-c-' + k, NB_DEFAULT_COLOURS[k]);
+  document.querySelectorAll('.nb-leg-pick').forEach(i => { i.value = NB_DEFAULT_COLOURS[i.dataset.c]; });
+}
+
 function nbSetFont(f) {
   nbFont = NB_PENS[f] ? f : 'Caveat';
   setPref('nbm_nb_font', nbFont);
@@ -1632,6 +1707,7 @@ function nbSetFont(f) {
 // structural and can't drift with font metrics. This just sets the ink vars;
 // each row's fixed height == --nb-lh keeps text welded to its line.
 function applyNbFont() {
+  applyNbColours();
   const wrap = document.querySelector('.nb-wrap');
   if (!wrap) return;
   const pen = NB_PENS[nbFont] || NB_PENS.Caveat;

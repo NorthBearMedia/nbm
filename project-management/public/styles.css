@@ -3011,7 +3011,7 @@ select { color-scheme:dark; }
 .nb-marker {
   flex-shrink:0; width:26px; height:13px; align-self:center; padding:0;
   border:1px solid rgba(28,28,28,.25); border-radius:3px;
-  background:linear-gradient(180deg,#ffe43a,#f6cf22);
+  background:linear-gradient(180deg, var(--nb-c-yellow), color-mix(in srgb, var(--nb-c-yellow) 82%, #000));
   cursor:pointer; opacity:0; transition:opacity .12s, transform .12s;
 }
 .nb-line:hover .nb-marker { opacity:.55; }
@@ -3161,6 +3161,13 @@ select { color-scheme:dark; }
    text can never drift from the line regardless of font/OS. The page keeps a
    faint background rule (same lh) for the empty area below the writing. */
 .nb-wrap { --nb-drop: 0.12em; }
+/* Personal ink colours — each login can repick these (review purple is locked
+   app-wide: it's a shared workflow signal, not decoration). On :root because
+   the palette + menus render outside .nb-wrap. */
+:root {
+  --nb-c-pink:#ff9ecb; --nb-c-green:#8ee27d; --nb-c-blue:#8fd0ff;
+  --nb-c-orange:#ffb45e; --nb-c-yellow:#ffe43a;
+}
 .nb-paper {
   background:
     repeating-linear-gradient(to bottom, transparent 0 calc(var(--nb-lh) - 1px), rgba(112,146,190,.42) calc(var(--nb-lh) - 1px) var(--nb-lh)),
@@ -3243,11 +3250,11 @@ select { color-scheme:dark; }
 }
 .nb-swatch:hover { transform: scale(1.15); }
 .nb-swatch-on { outline: 2px solid rgba(28,28,28,.65); outline-offset: 1px; }
-.nb-swatch[data-hl=yellow] { background: linear-gradient(180deg,#ffe43a,#f6cf22); }
-.nb-swatch[data-hl=green]  { background: linear-gradient(180deg,#8ee27d,#6fcf5e); }
-.nb-swatch[data-hl=pink]   { background: linear-gradient(180deg,#ff9ecb,#f77fb4); }
-.nb-swatch[data-hl=blue]   { background: linear-gradient(180deg,#8fd0ff,#6cb8f2); }
-.nb-swatch[data-hl=orange] { background: linear-gradient(180deg,#ffb45e,#f29b3f); }
+.nb-swatch[data-hl=yellow] { background: linear-gradient(180deg, var(--nb-c-yellow), color-mix(in srgb, var(--nb-c-yellow) 82%, #000)); }
+.nb-swatch[data-hl=green]  { background: linear-gradient(180deg, var(--nb-c-green), color-mix(in srgb, var(--nb-c-green) 82%, #000)); }
+.nb-swatch[data-hl=pink]   { background: linear-gradient(180deg, var(--nb-c-pink), color-mix(in srgb, var(--nb-c-pink) 82%, #000)); }
+.nb-swatch[data-hl=blue]   { background: linear-gradient(180deg, var(--nb-c-blue), color-mix(in srgb, var(--nb-c-blue) 82%, #000)); }
+.nb-swatch[data-hl=orange] { background: linear-gradient(180deg, var(--nb-c-orange), color-mix(in srgb, var(--nb-c-orange) 82%, #000)); }
 
 /* ─── MOBILE / iPHONE PASS ───────────────────────────── */
 /* Notch + home-bar safe areas (standalone PWA draws edge-to-edge) */
@@ -3302,30 +3309,30 @@ select { color-scheme:dark; }
 /* ─── NOTEBOOK v8: meaningful colours + drag & drop ──── */
 /* Colour language (pink=urgent/overdue, green=due today, blue=awaiting client,
    orange=waiting on me, yellow=delegated). Overrides the old single-pen rules. */
-.nb-text .nb-hl.nb-hl-pink   { background: linear-gradient(100deg, transparent .5%, rgba(255,158,203,.8) 3%, rgba(255,158,203,.8) 97%, transparent 99.5%) !important; }
-.nb-text .nb-hl.nb-hl-green  { background: linear-gradient(100deg, transparent .5%, rgba(142,226,125,.8) 3%, rgba(142,226,125,.8) 97%, transparent 99.5%) !important; }
-.nb-text .nb-hl.nb-hl-blue   { background: linear-gradient(100deg, transparent .5%, rgba(143,208,255,.8) 3%, rgba(143,208,255,.8) 97%, transparent 99.5%) !important; }
-.nb-text .nb-hl.nb-hl-orange { background: linear-gradient(100deg, transparent .5%, rgba(255,180,94,.8) 3%, rgba(255,180,94,.8) 97%, transparent 99.5%) !important; }
-.nb-text .nb-hl.nb-hl-yellow { background: linear-gradient(100deg, transparent .5%, rgba(255,228,58,.8) 3%, rgba(255,228,58,.8) 97%, transparent 99.5%) !important; }
+.nb-text .nb-hl.nb-hl-pink   { background: linear-gradient(100deg, transparent .5%, color-mix(in srgb, var(--nb-c-pink) 80%, transparent) 3%, color-mix(in srgb, var(--nb-c-pink) 80%, transparent) 97%, transparent 99.5%) !important; }
+.nb-text .nb-hl.nb-hl-green  { background: linear-gradient(100deg, transparent .5%, color-mix(in srgb, var(--nb-c-green) 80%, transparent) 3%, color-mix(in srgb, var(--nb-c-green) 80%, transparent) 97%, transparent 99.5%) !important; }
+.nb-text .nb-hl.nb-hl-blue   { background: linear-gradient(100deg, transparent .5%, color-mix(in srgb, var(--nb-c-blue) 80%, transparent) 3%, color-mix(in srgb, var(--nb-c-blue) 80%, transparent) 97%, transparent 99.5%) !important; }
+.nb-text .nb-hl.nb-hl-orange { background: linear-gradient(100deg, transparent .5%, color-mix(in srgb, var(--nb-c-orange) 80%, transparent) 3%, color-mix(in srgb, var(--nb-c-orange) 80%, transparent) 97%, transparent 99.5%) !important; }
+.nb-text .nb-hl.nb-hl-yellow { background: linear-gradient(100deg, transparent .5%, color-mix(in srgb, var(--nb-c-yellow) 80%, transparent) 3%, color-mix(in srgb, var(--nb-c-yellow) 80%, transparent) 97%, transparent 99.5%) !important; }
 .nb-text .nb-hl.nb-hl-purple { background: linear-gradient(100deg, transparent .5%, rgba(206,163,255,.8) 3%, rgba(206,163,255,.8) 97%, transparent 99.5%) !important; }
 
 /* Uncoloured lines get a faint empty marker; coloured lines show their colour */
 .nb-line .nb-marker { background: transparent !important; border: 1px dashed rgba(28,28,28,.3); box-shadow: none !important; }
-.nb-line .nb-marker.nb-marker-pink   { background: linear-gradient(180deg,#ff9ecb,#f77fb4) !important; border-style: solid; opacity: .95; }
-.nb-line .nb-marker.nb-marker-green  { background: linear-gradient(180deg,#8ee27d,#6fcf5e) !important; border-style: solid; opacity: .95; }
-.nb-line .nb-marker.nb-marker-blue   { background: linear-gradient(180deg,#8fd0ff,#6cb8f2) !important; border-style: solid; opacity: .95; }
-.nb-line .nb-marker.nb-marker-orange { background: linear-gradient(180deg,#ffb45e,#f29b3f) !important; border-style: solid; opacity: .95; }
-.nb-line .nb-marker.nb-marker-yellow { background: linear-gradient(180deg,#ffe43a,#f6cf22) !important; border-style: solid; opacity: .95; }
+.nb-line .nb-marker.nb-marker-pink   { background: linear-gradient(180deg, var(--nb-c-pink), color-mix(in srgb, var(--nb-c-pink) 82%, #000)) !important; border-style: solid; opacity: .95; }
+.nb-line .nb-marker.nb-marker-green  { background: linear-gradient(180deg, var(--nb-c-green), color-mix(in srgb, var(--nb-c-green) 82%, #000)) !important; border-style: solid; opacity: .95; }
+.nb-line .nb-marker.nb-marker-blue   { background: linear-gradient(180deg, var(--nb-c-blue), color-mix(in srgb, var(--nb-c-blue) 82%, #000)) !important; border-style: solid; opacity: .95; }
+.nb-line .nb-marker.nb-marker-orange { background: linear-gradient(180deg, var(--nb-c-orange), color-mix(in srgb, var(--nb-c-orange) 82%, #000)) !important; border-style: solid; opacity: .95; }
+.nb-line .nb-marker.nb-marker-yellow { background: linear-gradient(180deg, var(--nb-c-yellow), color-mix(in srgb, var(--nb-c-yellow) 82%, #000)) !important; border-style: solid; opacity: .95; }
 .nb-line .nb-marker.nb-marker-purple { background: linear-gradient(180deg,#cea3ff,#b07fe8) !important; border-style: solid; opacity: .95; }
 
 /* Legend chips (options panel + palette) */
 .nb-leg-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 17px; color: rgba(28,28,28,.7); }
 .nb-leg-chip { display: inline-block; width: 22px; height: 12px; border-radius: 3px; border: 1px solid rgba(28,28,28,.3); flex-shrink: 0; }
-.nb-chip-pink   { background: linear-gradient(180deg,#ff9ecb,#f77fb4); }
-.nb-chip-green  { background: linear-gradient(180deg,#8ee27d,#6fcf5e); }
-.nb-chip-blue   { background: linear-gradient(180deg,#8fd0ff,#6cb8f2); }
-.nb-chip-orange { background: linear-gradient(180deg,#ffb45e,#f29b3f); }
-.nb-chip-yellow { background: linear-gradient(180deg,#ffe43a,#f6cf22); }
+.nb-chip-pink   { background: linear-gradient(180deg, var(--nb-c-pink), color-mix(in srgb, var(--nb-c-pink) 82%, #000)); }
+.nb-chip-green  { background: linear-gradient(180deg, var(--nb-c-green), color-mix(in srgb, var(--nb-c-green) 82%, #000)); }
+.nb-chip-blue   { background: linear-gradient(180deg, var(--nb-c-blue), color-mix(in srgb, var(--nb-c-blue) 82%, #000)); }
+.nb-chip-orange { background: linear-gradient(180deg, var(--nb-c-orange), color-mix(in srgb, var(--nb-c-orange) 82%, #000)); }
+.nb-chip-yellow { background: linear-gradient(180deg, var(--nb-c-yellow), color-mix(in srgb, var(--nb-c-yellow) 82%, #000)); }
 .nb-chip-purple { background: linear-gradient(180deg,#cea3ff,#b07fe8); }
 .nb-leg-hint { font-size: 15px; color: rgba(28,28,28,.4); padding-top: 4px; }
 .nb-palette .nb-menu-item { display: flex; align-items: center; gap: 10px; }
@@ -3436,3 +3443,25 @@ select { color-scheme:dark; }
   border: 1px solid var(--border, rgba(255,255,255,.15)); border-radius: 6px;
   padding: 7px 8px; font-size: 13px; font-family: inherit; outline: none;
 }
+
+
+/* ─── Notifications bell ─────────────────────────────── */
+.notif-badge { position: absolute; top: -3px; right: -3px; margin: 0; }
+.notif-dropdown { width: 320px; max-height: 420px; overflow-y: auto; }
+.notif-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; white-space: normal; text-align: left; }
+.notif-item .notif-msg { font-size: 12.5px; line-height: 1.35; }
+.notif-item .notif-time { font-size: 10.5px; color: var(--text-muted); }
+.notif-unread { border-left: 3px solid var(--primary); background: rgba(62,175,132,.07); }
+
+
+/* Legend colour pickers: native colour-wheel inputs styled as marker chips */
+.nb-leg-pick {
+  width: 24px; height: 14px; padding: 0; border: 1px solid rgba(28,28,28,.35);
+  border-radius: 3px; cursor: pointer; background: none;
+  -webkit-appearance: none; appearance: none;
+}
+.nb-leg-pick::-webkit-color-swatch-wrapper { padding: 0; }
+.nb-leg-pick::-webkit-color-swatch { border: none; border-radius: 2px; }
+.nb-leg-lock { font-size: 12px; opacity: .55; margin-left: 4px; }
+.nb-leg-reset { background: none; border: none; font-family: inherit; font-size: 14px; color: rgba(28,28,28,.45); cursor: pointer; text-decoration: underline dashed; padding: 2px 0; }
+.nb-leg-reset:hover { color: #b3372f; }

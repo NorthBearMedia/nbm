@@ -50,6 +50,20 @@ router.put('/api/prefs', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
+// ─── Notifications (review requests / approvals) ──────
+router.get('/api/notifications', requireAuth, (req, res) => {
+  const rows = db.prepare('SELECT * FROM notifications WHERE user_id = ? ORDER BY id DESC LIMIT 30').all(req.user.id);
+  const unread = db.prepare('SELECT COUNT(*) c FROM notifications WHERE user_id = ? AND is_read = 0').get(req.user.id).c;
+  res.json({ notifications: rows, unread });
+});
+
+router.put('/api/notifications/read', requireAuth, (req, res) => {
+  const { id } = req.body || {};
+  if (id) db.prepare('UPDATE notifications SET is_read = 1 WHERE user_id = ? AND id = ?').run(req.user.id, +id);
+  else db.prepare('UPDATE notifications SET is_read = 1 WHERE user_id = ?').run(req.user.id);
+  res.json({ success: true });
+});
+
 // ─── Global History (owner only) ──────────────────────
 router.get('/api/history', requireAuth, (req, res) => {
   if (req.user.role !== 'owner') return res.status(403).json({ error: 'Owner only' });
