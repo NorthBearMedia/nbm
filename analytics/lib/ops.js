@@ -1012,6 +1012,42 @@ export async function fixDuplicateFathomIds() {
   return { duplicates: dupes.length, released };
 }
 
+// ── Make the tag on the page match the property reports are READ from.
+// The measurement IDs were seeded from a hand-built map; if one is stale
+// or belongs to a different property, the site tags itself with an ID
+// whose data lands somewhere Pulse never looks — the page looks correctly
+// tagged and the property stays empty forever. (Live: northbearmedia.co.uk
+// — corrected block confirmed on the page, Fathom in the SAME block
+// reporting 26 visits, yet GA property 526994009 reads 0.)
+// The property is authoritative because that is what reports query, so
+// ask GA for ITS web stream's measurement ID and correct the site.
+// Changing the ID also changes the retrofit's want-hash, so the page is
+// automatically re-tagged with the right one.
+export async function healGa4MeasurementIds() {
+  const subject = getGscReaderEmail() || 'norton@northbearmedia.co.uk';
+  const auth = { scopes: ['https://www.googleapis.com/auth/analytics.readonly'], subject };
+  const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND ga4_property_id != ''").all()
+    .filter(s => (s.domain || '') !== 'nbmdemosite2.co.uk');
+  let fixed = 0;
+  for (const site of sites) {
+    const d = (site.domain || '').toLowerCase().replace(/^www\./, '');
+    try {
+      const streams = (await gReq({ url: `https://analyticsadmin.googleapis.com/v1beta/properties/${site.ga4_property_id}/dataStreams`, method: 'GET' }, auth)).dataStreams || [];
+      const web = streams.filter(s => s.type === 'WEB_DATA_STREAM' && s.webStreamData?.measurementId);
+      if (!web.length) { console.log('[ga-mid]', d, 'property', site.ga4_property_id, 'has no web stream'); continue; }
+      // Prefer the stream whose configured URL matches this domain.
+      const best = web.find(s => (s.webStreamData.defaultUri || '').toLowerCase().includes(d)) || web[0];
+      const real = best.webStreamData.measurementId;
+      if (real && real !== site.ga4_measurement_id) {
+        db.prepare('UPDATE sites SET ga4_measurement_id = ? WHERE id = ?').run(real, site.id);
+        fixed++;
+        console.log('[ga-mid]', d, `tag was ${site.ga4_measurement_id || '(none)'} but property ${site.ga4_property_id} uses ${real} — corrected; page will be re-tagged`);
+      }
+    } catch (e) { console.log('[ga-mid]', d, 'lookup failed:', String(e.message || e).slice(0, 80)); }
+  }
+  return { fixed };
+}
+
 // ── The tag is on the page, but the property reports nothing.
 // That combination means the stored ga4_property_id does NOT own the
 // measurement ID the site is actually sending to — data is pouring into a
@@ -1756,10 +1792,11 @@ export function scheduleOpsSweep() {
   // Repair shared Fathom IDs (one client seeing another's numbers) and GA
   // properties that report nothing because the tag feeds a different one.
   try {
-    cron.schedule('47 * * * *', () => { fixDuplicateFathomIds().catch(e => console.error('[fathom-dupe]', e.message)); healGa4Properties().catch(e => console.error('[ga-heal]', e.message)); }, { timezone: config.timezone });
+    cron.schedule('47 * * * *', () => { fixDuplicateFathomIds().catch(e => console.error('[fathom-dupe]', e.message)); healGa4MeasurementIds().catch(e => console.error('[ga-mid]', e.message)).then(() => healGa4Properties().catch(e => console.error('[ga-heal]', e.message))); }, { timezone: config.timezone });
   } catch (e) { console.error('[heal] schedule failed:', e.message); }
   setTimeout(() => fixDuplicateFathomIds().catch(e => console.error('[fathom-dupe]', e.message)), 90_000);
-  setTimeout(() => healGa4Properties().catch(e => console.error('[ga-heal]', e.message)), 200_000);
+  setTimeout(() => healGa4MeasurementIds().catch(e => console.error('[ga-mid]', e.message))
+    .then(() => healGa4Properties().catch(e => console.error('[ga-heal]', e.message))), 200_000);
   // Learn each site's real target keywords from its own Search Console
   // queries — daily (the data moves slowly) plus once after boot.
   try {
