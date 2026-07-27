@@ -38,6 +38,8 @@
     <meta name="twitter:description" content="<?php echo isset($pageDescription) ? $pageDescription : 'With a legacy in mechanical process engineering, Musk Engineering provides high-quality, precision-driven solutions for complex industrial projects.'; ?>">
     <meta name="twitter:image" content="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=1200,h=630,fit=crop/Yanqkw6EPbi7qy6G/musk-engineering-UkIrDbzowfyWOjjS.png">
 
+    <!-- NBM-GA-TAG --><script>(function(d,w){if(d.querySelector('script[src*="gtag/js?id=G-ZFNRCD6V17"]'))return;var g=d.createElement('script');g.async=true;g.src='https://www.googletagmanager.com/gtag/js?id=G-ZFNRCD6V17';d.head.appendChild(g);w.dataLayer=w.dataLayer||[];function gtag(){w.dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-ZFNRCD6V17');})(document,window);(function(d,w){if(d.querySelector('script[src*="clarity.ms/tag/xg3udlsbmh"]'))return;(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(w,d,"clarity","script","xg3udlsbmh");})(document,window);(function(d){if(d.querySelector('script[data-site="TPVLKMAX"]'))return;var f=d.createElement('script');f.src='https://cdn.usefathom.com/script.js';f.setAttribute('data-site','TPVLKMAX');f.defer=true;d.head.appendChild(f);})(document);</script><!-- /NBM-GA-TAG -->
+
     <!-- Fonts & CSS -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

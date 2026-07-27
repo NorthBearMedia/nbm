@@ -76,16 +76,6 @@ include 'includes/header.php';
         </div>
     </section>
 
-    <!-- Testimonial -->
-    <section class="testimonial-section">
-        <div class="testimonial-bg" style="background-image: url('https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=1920,fit=crop/Yanqkw6EPbi7qy6G/fdrqm3hq-m5KMgbKvPRfwLlwz.jpeg');"></div>
-        <div class="testimonial-overlay"></div>
-        <div class="container testimonial-content">
-            <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
-            <blockquote class="testimonial-quote">I've used Musk engineering for a number of years and always had a great level of service at a reasonable price. As a result I've taken this company with me to numerous other businesses to undertake works as a trusted contractor.<br><br>Health and Safety is never a concern with quality of workmanship also top notch&hellip; Installations, Pipework, Fabrications and also Design and some small scale R&amp;D works. Would definitely recommend Steve Musk Engineering</blockquote>
-            <p class="testimonial-author"><strong>James Hardy - Celanese</strong></p>
-            <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=375,h=74,fit=crop/Yanqkw6EPbi7qy6G/celogo4x-1-YNqBOEJO3rHpeQP2.png" alt="Celanese" class="testimonial-logo">
-        </div>
-    </section>
+    <!-- Testimonial removed -->
 
 <?php include 'includes/footer.php'; ?>
