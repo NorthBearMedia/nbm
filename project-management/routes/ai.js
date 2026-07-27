@@ -4,6 +4,7 @@ import { google } from 'googleapis';
 import db from '../database.js';
 import { requireAuth, requireWrite, aiMediaUpload } from '../middleware.js';
 import { logActivity } from '../lib/activity.js';
+import { notifyReview } from '../lib/notify.js';
 import { statusToProgress, bandToPriority, isValidStatus, isValidBand, isValidType } from '../lib/taskmap.js';
 import { gmailClientForUser } from './gmail.js';
 
@@ -282,6 +283,14 @@ export async function executeTool(name, input, user) {
           logActivity('task', nt.lastInsertRowid, 'created', 'System', `Auto-created recurring task "${old.title}" (next: ${nextDate})`);
         }
 
+        if (status !== null && status !== old.task_status) {
+          const nt = { id: +input.task_id, title: input.title || old.title, assignee: input.assignee !== undefined ? input.assignee : old.assignee };
+          try {
+            if (status === 'review') notifyReview(db, user, nt, 'requested');
+            else if (old.task_status === 'review' && status === 'done') notifyReview(db, user, nt, 'approved');
+            else if (old.task_status === 'review') notifyReview(db, user, nt, 'returned');
+          } catch (e) { console.error('[Notify]', e.message); }
+        }
         logActivity('task', input.task_id, 'updated', user.display_name, `Updated via AI assistant`);
         return { success: true, task_id: input.task_id };
       }
