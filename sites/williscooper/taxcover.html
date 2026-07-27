@@ -35,11 +35,35 @@ document.querySelectorAll('form').forEach(function (form) {
       var val = (el.value || '').trim();
       if (val) lines.push(label + ': ' + val);
     });
-    var subject = 'Website enquiry — Willis Cooper';
+    var subject = 'Website enquiry - Willis Cooper';
     var body = lines.join('\n') + '\n\n(Sent from the Willis Cooper website contact form)';
     window.location.href = 'mailto:info@williscooper.com?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
   });
 });
 </script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"AccountingService","@id":"https://williscooper.com/#organization","name":"Willis Cooper Chartered Accountants","legalName":"Willis Cooper Ltd","description":"ICAEW Chartered Accountants in Belper, Derbyshire providing accounts, tax, payroll, VAT, bookkeeping, auditing, business advice, R&D tax relief and Xero cloud accounting for businesses and individuals across Derbyshire and the East Midlands since 2000.","slogan":"Trusted advisors in Derbyshire since 2000","foundingDate":"2000","image":"https://williscooper.com/assets/images/willis-cooper-original-Y4LPby6rKBslLX1b.png","logo":"https://williscooper.com/assets/images/willis-cooper-original-Y4LPby6rKBslLX1b.png","url":"https://williscooper.com/","telephone":"+44 1773 881045","email":"info@williscooper.com","address":{"@type":"PostalAddress","streetAddress":"Unit 5 & 6, Heritage Business Centre, Derby Road","addressLocality":"Belper","addressRegion":"Derbyshire","postalCode":"DE56 1SW","addressCountry":"GB"},"areaServed":[{"@type":"Place","name":"Belper"},{"@type":"Place","name":"Duffield"},{"@type":"Place","name":"Ripley"},{"@type":"Place","name":"Heanor"},{"@type":"Place","name":"Alfreton"},{"@type":"Place","name":"Ambergate"},{"@type":"Place","name":"Milford"},{"@type":"Place","name":"Derby"},{"@type":"Place","name":"Amber Valley"},{"@type":"Place","name":"Derbyshire"},{"@type":"Place","name":"East Midlands"}],"knowsAbout":["Accounting","Bookkeeping","Payroll","VAT","Self Assessment tax returns","Corporation Tax","Auditing","R&D tax relief","Xero","Making Tax Digital","Business advice","Company accounts"],"hasMap":"https://www.google.com/maps/search/?api=1&query=Willis%20Cooper%20Chartered%20Accountants%20Heritage%20Business%20Centre%20Belper%20DE56%201SW","sameAs":["https://www.facebook.com/williscooperbelper/","https://www.instagram.com/williscooperaccountants","https://www.linkedin.com/company/williscooper/","https://x.com/willis_cooper"]}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://williscooper.com/"},{"@type":"ListItem","position":2,"name":"Tax Investigation Cover","item":"https://williscooper.com/taxcover"}]}</script></body></html>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://williscooper.com/"},{"@type":"ListItem","position":2,"name":"Tax Investigation Cover","item":"https://williscooper.com/taxcover"}]}</script><script>
+/* North Bear: static build - mobile hamburger toggle (builder runtime removed) */
+(function () {
+  var burger = document.querySelector('.block-header__hamburger-menu');
+  var dropdown = document.querySelector('[class*="block-header-layout-mobile__dropdown"]');
+  if (!burger || !dropdown) return;
+  function setOpen(open) {
+    burger.classList.toggle('burger--open', open);
+    dropdown.classList.toggle('block-header-layout-mobile__dropdown--open', open);
+    burger.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  burger.setAttribute('aria-expanded', 'false');
+  burger.addEventListener('click', function () {
+    setOpen(!burger.classList.contains('burger--open'));
+  });
+  dropdown.addEventListener('click', function (e) {
+    var t = e.target;
+    while (t && t !== dropdown && t.tagName !== 'A') t = t.parentElement;
+    if (t && t.tagName === 'A') setOpen(false);
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') setOpen(false);
+  });
+})();
+</script></body></html>

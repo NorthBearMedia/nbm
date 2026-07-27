@@ -83,6 +83,15 @@ renders nothing) found four real defects, all now fixed in
    internal hrefs to extensionless and added `.htaccess` (in the site source,
    deploys with the build) that maps `/about-us` -> `about-us.html`. Both URL
    forms serve; the visible scheme now matches live exactly.
+5. **Mobile hamburger menu was dead.** The burger button relied on the
+   builder runtime; on the static site it did nothing, leaving mobile
+   visitors with no navigation. Added a small toggle script to all 24 pages
+   that drives the builder's own state classes (`burger--open`,
+   `block-header-layout-mobile__dropdown--open`), closes on link tap and
+   Escape, and sets aria-expanded. Submenu carets (mobile) are CSS
+   checkbox-based and desktop dropdowns are CSS :hover — both work natively.
+6. **Mailto subject em-dash** swapped for a plain hyphen in the contact and
+   taxcover form handlers ("Website enquiry - Willis Cooper").
 
 ## Verification performed (2026-07-27, after repairs)
 
@@ -101,6 +110,21 @@ renders nothing) found four real defects, all now fixed in
   live's swapped Careers/Contact titles — and (b) content live cannot render
   because its JS is dead (blog list, team grid, privacy text, FB section),
   all of which the preview renders correctly.
+- Full crawl audit (second pass): all 24 pages 200 on both sites; all 23
+  unique internal link targets 200; all 144 fragment links have their anchor
+  ids; all 85 referenced local assets (incl. font files from fonts.css) 200;
+  robots.txt/sitemap.xml/llms.txt 200; trailing-slash URLs work; unknown
+  paths 404 correctly; /favicon.ico 404s on BOTH sites (both use the
+  <link rel=icon> PNGs, which serve fine). Client Login points at
+  https://www.irisopenspace.co.uk/ on both. External link sets are identical
+  (the taxcover PDF is intentionally localised instead of the builder's
+  assets.zyrosite.com copy, which dies post-cutover). Mobile: hamburger menu
+  opens/navigates/closes, submenu expands, contact form renders and its
+  submit dry-run executes cleanly (4 fields -> pre-filled mailto).
+- Note on analytics parity: live's raw HTML carries GA/Fathom on only 10 of
+  24 pages — the rest were injected at runtime by the (now dead) builder JS.
+  The preview carries both tags baked into all 24 pages, matching the
+  working site's effective behaviour.
 
 ## Known gaps / decisions for Norton or the cutover session
 
