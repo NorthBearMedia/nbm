@@ -1,7 +1,7 @@
 // Per-site connections health — live-checked on demand from the admin
 // console ("Connections" button). Replaces diagnostic emails: the owner
 // looks when he wants, nothing lands in his inbox.
-import db, { getSetting } from '../database.js';
+import db, { getSetting, setSetting } from '../database.js';
 import * as ga4 from './ga4.js';
 import * as gsc from './gsc.js';
 import { syncSite } from './clarity.js';
