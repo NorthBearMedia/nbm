@@ -83,6 +83,17 @@ async function siteHealth(site, start, end) {
           return noData();
         })
         .catch(e => bad(e.message.slice(0, 90)));
+  // Independent evidence that the site genuinely has visitors, gathered
+  // from the tools already checked above — used to tell "quiet week" apart
+  // from "tag blocked from firing".
+  // (Clarity's own verdict is built further down, so read its stored
+  // snapshots directly rather than a value that doesn't exist yet.)
+  const fathomVisits = Number((out.fathom?.detail || '').match(/^(\d+) visits/)?.[1] || 0);
+  const clarityDays = db.prepare('SELECT COUNT(*) AS n FROM clarity_snapshots WHERE site_id = ? AND snapshot_date >= ?')
+    .get(site.id, start).n;
+  const otherToolsSeeTraffic = fathomVisits > 0 ? `Fathom (${fathomVisits} visits)`
+    : clarityDays >= 3 ? `Microsoft Clarity (${clarityDays} days of sessions)` : '';
+
   out.ga = integ.ga?.status === 'mismatch'
     ? bad(`WRONG PROPERTY — its traffic is from ${(integ.ga.hosts || []).join(', ')}, not this site. North Bear is on it; don't paste anything.`)
     : !site.ga4_property_id ? bad('no property ID')
@@ -99,6 +110,17 @@ async function siteHealth(site, start, end) {
           // A stuck auto-installer outranks a reassuring visit count: it
           // means the tag genuinely isn't reaching visitors.
           if (installerStuck && !gaTagFound) return bad(`${Math.round(o.sessions)} visits (7d)${stuckNote}`);
+          // GA silent while OTHER tools on the same page see real traffic
+          // is never "a quiet week" — the tag is present but prevented from
+          // firing. Overwhelmingly this is a speed-optimisation plugin
+          // delaying scripts until interaction, or a consent tool blocking
+          // until accept. GA's pageview is a one-shot event at load, so a
+          // delayed library simply never sends it, while cookieless or
+          // late-attaching tools (Fathom, Clarity) still record normally.
+          // Found live on northbearmedia.co.uk. Naming it saves hours.
+          if (o.sessions === 0 && otherToolsSeeTraffic) {
+            return bad(`recording nothing while ${otherToolsSeeTraffic} sees real traffic on the same pages — the tag is on the site but being stopped from firing. Usual cause: a speed/"delay JavaScript" plugin holding scripts until interaction, or a cookie-consent tool. Exclude googletagmanager.com from that delay list so Analytics loads immediately.`);
+          }
           return ok(`${Math.round(o.sessions)} visits (7d)${note}`);
         })
         .catch(e => bad(e.message.slice(0, 90)));
