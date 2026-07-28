@@ -1292,6 +1292,19 @@ export async function healGscProperties({ reads: readsFn = null } = {}) {
   const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND gsc_site_url != '' AND gsc_site_url IS NOT NULL").all();
   if (!sites.length) return { checked: 0 };
   const reads = readsFn || await defaultGscReader();
+  // SAFETY: clearing a property is only valid when Google is definitely
+  // reachable and our credentials work. Without this, one transient outage,
+  // quota block or auth hiccup makes every read fail and the deadlock
+  // breaker below wipes the Search Console link off the ENTIRE fleet.
+  // A single successful read anywhere proves the pipe is healthy.
+  let googleHealthy = false;
+  for (const site of sites) {
+    if (await reads(site.gsc_site_url)) { googleHealthy = true; break; }
+  }
+  if (!googleHealthy) {
+    console.log('[gsc-heal] no property read successfully — treating as a Google/auth problem, changing nothing');
+    return { checked: sites.length, fixed: 0, skipped: 'google unreachable' };
+  }
   let fixed = 0;
   for (const site of sites) {
     if (await reads(site.gsc_site_url)) continue; // current property is fine
