@@ -172,3 +172,33 @@ alone does nothing). Cards stay whole. Live height is now 888px, 3 posts shown.
   stylesheet can override. It was deliberately left alone rather than scripted
   around, since attribution is a licence condition on SociableKIT's free tier;
   it can be switched off properly in their dashboard on a paid plan.
+
+---
+
+# Hero + feed follow-up — 2026-07-29 (fifth/sixth deploy)
+
+**Hero, properly diagnosed this time.** The tinted panels behind the hero text
+are two fixed decorative rectangles (builder GridShapes `zg2wvz` and
+`z3fiqe`). The subtitle's panel is **812 x 112px** — sized for the two-line
+strapline the design was built around. The longer SEO subtitle added earlier
+needed **five lines** once held clear of the dogs, so it overflowed the panel
+and spilled onto the photograph. No font size fixed that: measured at 26px it
+still overflowed by 65px.
+
+Resolution: restored the subtitle to the strapline the panel fits —
+"Specialists in accounts, tax, payroll, VAT and business support." — which
+renders as 2 lines wholly inside the panel with 36px/7px clearance from the
+dogs. Dogs stay capped at 196px; type scales with `clamp(20px, 2.1vw, 32px)`
+so the fit holds as the viewport changes. The "Chartered Accountants in
+Belper, Derbyshire" wording is dropped from the hero only; it remains in the
+page title, meta description, H1 (Derbyshire), schema and footer, so the SEO
+value is retained.
+
+Known and out of scope: around 1000px wide the builder's fixed panels are too
+small for their text and the **H1 overflows its own panel too** — pre-existing
+behaviour of the export at tablet widths, not introduced here.
+
+**Feed.** Norton re-synced SociableKIT: posts are current again (newest 27 July
+2026) and images now load. Post photos came through at full height, making each
+card very tall, so they are capped at 170px with `object-fit: cover`. Section
+height is now **1,198px, three posts** (from 2,205px showing twelve stale ones).
