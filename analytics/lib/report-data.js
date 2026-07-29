@@ -48,10 +48,28 @@ export async function gatherReportData(site, start, end, opts = {}) {
     integrity = JSON.parse(getSetting('source_integrity') || '{}')[(site.domain || '').toLowerCase().replace(/^www\./, '')] || {};
   } catch { /* no verdicts yet — trust the sources */ }
   const useFathom = Boolean(getFathomToken() && site.fathom_site_id) && integrity.fathom?.status !== 'mismatch';
+  // How much of the reporting period does a source's history actually
+  // cover? A source connected mid-period reports a fraction of the real
+  // traffic — true for its own data, but wrong as the headline figure for
+  // the whole period, and it makes healthy sites look broken.
+  const periodDays = Math.max(1, Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1);
+  const coversPeriod = (block) => {
+    const first = (block?.timeseries || []).map(t => t.date).filter(Boolean).sort()[0];
+    if (!first) return false;
+    const missedDays = Math.round((Date.parse(first) - Date.parse(start)) / 86400000);
+    return missedDays <= Math.max(2, periodDays * 0.15);
+  };
+
   jobs.push((async () => {
+    let fathomBlock = null;
     if (useFathom) {
-      const block = await attempt('Fathom analytics', warnings, () => gatherFathom(site.fathom_site_id, start, end));
-      if (block) { data.ga4 = block; return; }
+      fathomBlock = await attempt('Fathom analytics', warnings, () => gatherFathom(site.fathom_site_id, start, end));
+      // Only lead with Fathom when its history spans the period. A site
+      // whose Fathom was connected days ago would otherwise headline a
+      // month's report with a couple of days of visits — which is exactly
+      // what made EVC Citysprint's report claim its tracking was broken.
+      if (fathomBlock && coversPeriod(fathomBlock)) { data.ga4 = fathomBlock; return; }
+      if (fathomBlock) warnings.push('Fathom history starts mid-period — using Google Analytics for this report so the totals cover the whole period.');
     }
     if (site.ga4_property_id) {
       const pid = site.ga4_property_id;
@@ -74,6 +92,9 @@ export async function gatherReportData(site, start, end, opts = {}) {
       if (wrongProperty) warnings.push(`Analytics: property carries traffic for ${(integrity.ga.hosts || []).join(', ')}, not this site — excluded from the report.`);
       if (overview && !dead && !wrongProperty) data.ga4 = { sourceLabel: 'Google Analytics', overview, prevOverview, timeseries: timeseries || [], topPages: topPages || [], channels: channels || [], devices: devices || [] };
     }
+    // GA unusable after all (no property, silent, or wrong property)?
+    // Fathom's partial history still beats reporting nothing.
+    if (!data.ga4 && fathomBlock) data.ga4 = fathomBlock;
   })());
 
   if (site.gsc_site_url) {
@@ -173,7 +194,11 @@ export async function gatherReportData(site, start, end, opts = {}) {
   if (data.ga4?.overview) {
     const sessions = Number(data.ga4.overview.sessions || 0);
     const gscClicks = Number(data.search?.summary?.clicks || 0);
-    if (gscClicks >= 10 && sessions < gscClicks * 0.5) {
+    // A source whose history genuinely begins mid-period reports less than
+    // the period's real traffic and must not be called broken for it — the
+    // report already carries a "tracking installed on <date>" caveat.
+    const partialHistory = !coversPeriod(data.ga4);
+    if (!partialHistory && gscClicks >= 10 && sessions < gscClicks * 0.5) {
       data.ga4.unreliable = true;
       data.ga4.independentTraffic = gscClicks;
       warnings.push(`Traffic source under-counting: ${data.ga4.sourceLabel} shows ${sessions} sessions but Search Console recorded ${gscClicks} clicks from Google alone — the tracking tag likely isn't firing on the live site.`);
