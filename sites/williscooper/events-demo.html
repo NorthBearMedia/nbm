@@ -25,6 +25,10 @@
 .wc-ev-section{--wc-navy:#022733;--wc-plum:#6b3a5e;--wc-blue:#5fb8d9;--wc-teal:#1a9b8f;--wc-gold:#f0b042;--wc-rose:#c23360;
   background:#f6f8f9;padding:56px 0 72px;font-family:'Montserrat',system-ui,sans-serif;color:#2f3337;}
 .wc-ev-wrap{max-width:1224px;margin:0 auto;padding:0 16px;}
+/* Any explicit display rule below (cards are flex, headings are flex) would
+   otherwise beat the browser's built-in [hidden] behaviour and leave filtered
+   -out cards on screen. This keeps hidden meaning hidden, section-wide. */
+.wc-ev-section [hidden]{display:none!important;}
 .wc-ev-demo{margin:0 0 24px;padding:10px 16px;border-radius:8px;background:var(--wc-gold);color:#3b2a06;font-size:14px;font-weight:700;text-align:center;}
 .wc-ev-head{text-align:center;max-width:760px;margin:0 auto 34px;}
 .wc-ev-accent{display:flex;gap:8px;max-width:240px;margin:0 auto 18px;height:4px;}

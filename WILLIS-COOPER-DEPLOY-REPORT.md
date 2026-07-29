@@ -128,3 +128,47 @@ September; Payroll and Benefits, November) and the Autumn Xero Drop-In shows
 10:00–12:00 or 14:00–16:00 — that was deliberately not published; swap
 `timeLabel` once Emma confirms. Same for the two September/November dates:
 replace `precision`/`dateNote` with the real date when known.
+
+---
+
+# Fixes — 2026-07-29 (fourth deploy)
+
+**1. Events filters did nothing (reported by Norton).** The script set
+`hidden` on filtered-out cards correctly, but `.wc-ev-card{display:flex}` in my
+own CSS beat the browser's built-in `[hidden]{display:none}`, so every card
+stayed on screen. My earlier check read the DOM attribute rather than what was
+rendered, which is why it passed. Fixed section-wide with
+`.wc-ev-section [hidden]{display:none!important}` so this cannot recur for any
+element in the section. Verified on the live site by computed visibility, not
+attributes: filtering to Workshop leaves 4 visible and 3 genuinely hidden.
+
+**2. Homepage hero text ran underneath the dogs.** The two dog illustrations
+sit in grid columns that overlap the subtitle's (2/5 and 6/9 vs 3/7) and their
+widths are set in `vw`, so they grew into the text as the viewport widened —
+worse on large screens. Capped both at 196px and held the subtitle to the clear
+space between them (max-width 552px, centred, from 921px up; mobile stacks and
+was unaffected). Measured live: 35px clearance left, 7px right.
+Also removed the em-dash from the subtitle per Norton's house style — it now
+reads as two sentences: "Chartered Accountants in Belper, Derbyshire.
+Specialists in accounts, tax, payroll, VAT and business support."
+
+**3. Facebook feed was 2,205px tall.** An earlier fix removed the height cap to
+stop cards being sliced mid-sentence, which left all 12 posts stacked down the
+page. Now trimmed to the first row only: a script inside the iframe measures the
+first row, hides the rest and sets the masonry container height to match (the
+widget positions posts absolutely inside a fixed inline height, so hiding cards
+alone does nothing). Cards stay whole. Live height is now 888px, 3 posts shown.
+
+## Needs Norton, cannot be fixed from the site
+
+- **The feed has not updated since 18 February 2026.** SociableKIT's cached
+  copy of the Facebook page stopped syncing five months ago; post images are
+  broken for the same reason. Fixing it means re-syncing or reconnecting the
+  page in the SociableKIT dashboard (embed id 25656041). Until then the
+  homepage shows five-month-old posts — worth either fixing or hiding the
+  section.
+- **"Facebook Feed Widget by SociableKIT" now shows** under the posts. The
+  widget writes `display:block !important` as an inline style, which no
+  stylesheet can override. It was deliberately left alone rather than scripted
+  around, since attribution is a licence condition on SociableKIT's free tier;
+  it can be switched off properly in their dashboard on a paid plan.
