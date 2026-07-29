@@ -1,0 +1,70 @@
+{
+  "_note": "Location landing pages. Each town needs genuinely distinct copy: thin, near-identical pages are treated as doorway pages and get filtered by Google. Only claims that are true of Willis Cooper (ICAEW, established 2000, the Belper office, the software they use) and plainly verifiable local geography are used here. Nothing asserts existing clients in a given town. Run: node sites/williscooper/build-locations.mjs",
+  "locations": [
+    {
+      "slug": "duffield",
+      "town": "Duffield",
+      "distance": "about 3 miles",
+      "direction": "south of Belper along the A6",
+      "intro": "Willis Cooper is a firm of ICAEW Chartered Accountants based just up the A6 in Belper, a few minutes from Duffield. We look after limited companies, sole traders, partnerships, landlords and individuals, handling everything from year-end accounts and tax returns to payroll, VAT and day-to-day bookkeeping.",
+      "localContext": "Duffield is a village of largely owner-managed and professional businesses, plus a good number of people who are employed elsewhere but have their own rental property, consultancy or side business to declare. That mix tends to mean self assessment, property income and small limited company work rather than heavy industry, and it is the sort of work we handle every day.",
+      "journey": "The office is on Derby Road in Belper, straight up the A6 from Duffield and usually a ten minute drive. Duffield also has a station on the Derby to Matlock line, one stop from Belper, if you would rather not drive.",
+      "faqExtra": {
+        "q": "I have a full-time job and one rental property. Is that too small for you?",
+        "a": "Not at all. A good share of our self assessment work is exactly that: employed people with rental income, dividends or a small side business who want the return done properly and on time."
+      }
+    },
+    {
+      "slug": "ripley",
+      "town": "Ripley",
+      "distance": "about 5 miles",
+      "direction": "north east of Belper",
+      "intro": "Willis Cooper is a firm of ICAEW Chartered Accountants in Belper, a short drive from Ripley. We work with limited companies, sole traders, partnerships and individuals across Amber Valley, covering accounts, corporation tax, self assessment, payroll, VAT, bookkeeping and business advice.",
+      "localContext": "Ripley is a working market town and the administrative centre of Amber Valley, with trading and industrial estates alongside the town centre trade. That brings a practical mix of contractors, trades, manufacturing and retail businesses, where the questions tend to be about payroll, CIS, VAT schemes and keeping on top of records without it eating the week.",
+      "journey": "We are on Derby Road in Belper, roughly fifteen minutes from Ripley by road. Plenty of our work is done by email, phone and Xero without anyone needing to travel, but you are very welcome at the office if you would rather sit down together.",
+      "faqExtra": {
+        "q": "Do you handle CIS and subcontractor payments?",
+        "a": "Yes. CIS returns and subcontractor verification sit within our payroll and compliance work, alongside RTI submissions and auto-enrolment."
+      }
+    },
+    {
+      "slug": "alfreton",
+      "town": "Alfreton",
+      "distance": "about 8 miles",
+      "direction": "north of Belper",
+      "intro": "Willis Cooper is a firm of ICAEW Chartered Accountants based in Belper, covering Alfreton and the surrounding villages. We handle year-end accounts, corporation tax and self assessment, payroll and VAT, audit where it is needed, and the ordinary week-to-week questions that come with running a business.",
+      "localContext": "Alfreton sits close to junction 28 of the M1, and that access has drawn in business parks, distribution and manufacturing alongside the town centre. Businesses of that shape often need more than a set of accounts once a year: management figures they can act on, payroll that runs without drama, and someone to talk to before a decision rather than after it.",
+      "journey": "The office is on Derby Road in Belper, around twenty minutes from Alfreton via the A38 or the A61. Much of what we do runs remotely through Xero, so the distance rarely matters day to day.",
+      "faqExtra": {
+        "q": "Do you carry out audits?",
+        "a": "Yes. We provide independent statutory and voluntary audits, and can advise on whether your company actually needs one before you commit to the cost."
+      }
+    },
+    {
+      "slug": "heanor",
+      "town": "Heanor",
+      "distance": "about 7 miles",
+      "direction": "east of Belper",
+      "intro": "Willis Cooper is a firm of ICAEW Chartered Accountants in Belper, working with businesses and individuals in Heanor and across eastern Amber Valley. We cover accounts, tax, payroll, VAT, bookkeeping, cloud accounting with Xero and practical business advice.",
+      "localContext": "Heanor and the villages around it have a strong base of small owner-managed businesses: trades, services, shops and family firms where the owner is doing the work and the paperwork. The most useful thing an accountant does there is take the compliance off the desk entirely and give a straight answer when a decision needs making.",
+      "journey": "We are on Derby Road in Belper, roughly twenty minutes from Heanor by road. If getting across is awkward, most things can be dealt with by phone, email or a share of your Xero file.",
+      "faqExtra": {
+        "q": "I am still on spreadsheets. Is moving to software a big job?",
+        "a": "It is usually more straightforward than people expect, and Making Tax Digital is steadily removing the choice. We set Xero up, move the history across and run free drop-in sessions at the Belper office to get you confident with it."
+      }
+    },
+    {
+      "slug": "derby",
+      "town": "Derby",
+      "distance": "about 8 miles",
+      "direction": "south of Belper",
+      "intro": "Willis Cooper is a firm of ICAEW Chartered Accountants based in Belper, a straight run up the A6 from Derby. We act for limited companies, sole traders, partnerships, landlords and individuals, covering accounts, corporation tax, self assessment, payroll, VAT, audit, R&D tax relief and cloud accounting.",
+      "localContext": "Derby has an engineering and manufacturing backbone, with a long tail of suppliers, contractors and professional services around it. Two things come up more often here than elsewhere: research and development tax relief, where genuine qualifying work frequently goes unclaimed, and contractor and consultancy arrangements that need structuring properly for tax.",
+      "journey": "The office is on Derby Road in Belper, about twenty minutes up the A6 from the city, and Belper station is on the line from Derby. In practice most Derby clients deal with us remotely and come in when there is something worth talking through face to face.",
+      "faqExtra": {
+        "q": "How do I know if our work qualifies for R&D tax relief?",
+        "a": "The test is whether you are resolving genuine technical uncertainty, not whether the work feels innovative. It is worth a conversation before you rule yourself out, and equally worth caution: claims now face far more scrutiny than they used to."
+      }
+    }
+  ]
+}

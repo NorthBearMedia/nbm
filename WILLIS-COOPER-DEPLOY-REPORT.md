@@ -255,3 +255,40 @@ failed deploy leaves the old site intact rather than a half-written docroot.
   but that is a writing job about a real business, not something to auto-fill.
 - **Google Business Profile** is the biggest remaining local-search lever and
   lives entirely outside the site.
+
+---
+
+# Location landing pages — 2026-07-29 (eighth deploy)
+
+Five pages covering the towns around Belper, at `/accountants-in-<town>`:
+Duffield, Ripley, Alfreton, Heanor and Derby. Generated from
+`locations.json` by `build-locations.mjs`; how-to in `LOCATIONS.md`.
+
+Each page reuses the real site shell (head, header nav, footer) lifted from an
+existing page, so navigation and branding cannot drift, with location content
+dropped in between. Per page: ~730 words, one H1, unique title (58-61 chars)
+and meta description (156-162), correct canonical, Open Graph and Twitter
+tags, and WebPage + BreadcrumbList + FAQPage + the shared AccountingService
+schema. FAQs are real questions with FAQPage markup, so they are eligible for
+rich results.
+
+Wired in rather than left as orphans: added to sitemap.xml, given an "Areas we
+cover" section in llms.txt, cross-linked between themselves, and linked from
+the homepage, contact-us and our-services via a new "Areas we cover" block.
+
+Caught before it stuck: the first generated FAQ said "the office is about 5
+miles north east of Belper" (the office *is* in Belper) and repeated "We are
+on Derby Road in Belper" twice in one answer. Reworded so the distance is
+stated from the town's perspective.
+
+## Honest limits, and what would make these much stronger
+
+- Roughly 200 of the ~730 words per page are genuinely town-specific; the rest
+  is shared scaffolding. That is defensible, but it is the number to watch.
+  **A real client quote per town is the single biggest improvement available**
+  and needs Willis Cooper to supply it.
+- Nothing claims existing clients in any town, and no case studies, client
+  counts or testimonials were invented. Local colour is limited to plainly
+  verifiable geography.
+- These pages support the map pack, they do not replace it. Google Business
+  Profile and review volume remain the larger levers for local search.

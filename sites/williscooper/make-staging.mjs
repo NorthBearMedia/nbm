@@ -45,6 +45,7 @@ const SKIP = new Set([
   'make-staging.mjs', 'README.md', 'DEPLOY.md', 'DEPLOY-STAGING.md',
   '.variant-manifest.json',
   'events.json', 'events.sample.json', 'build-events.mjs', 'events-demo.html',
+  'locations.json', 'build-locations.mjs',
   'williscooper-staging.zip', 'williscooper-live.zip',
 ]);
 
