@@ -85,8 +85,13 @@ router.get('/', requireAuth, (req, res) => {
   const allTasks = cids.length
     ? db.prepare(`SELECT * FROM tasks WHERE client_id IN (${ph}) ORDER BY sort_order, created_at`).all(...cids)
     : [];
+  // Staff visibility rule: non-owners get only tasks assigned to them (primary
+  // or secondary). Enforced here because this payload feeds every view.
+  const me = req.user.display_name;
+  const visibleTasks = isOwner ? allTasks
+    : allTasks.filter(t => t.assignee === me || t.secondary_assignee === me);
   const byClient = new Map(), byClientArchived = new Map();
-  for (const t of allTasks) {
+  for (const t of visibleTasks) {
     const m = t.archived ? byClientArchived : byClient;
     if (!m.has(t.client_id)) m.set(t.client_id, []);
     m.get(t.client_id).push(t);
