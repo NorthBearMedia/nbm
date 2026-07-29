@@ -56,3 +56,38 @@ the stale-file removal below.
   expect stragglers.
 - A transient self-deleting cleanup script (`nbm-tidy-*.php`) was used to
   confirm the stale CSS removal; verified deleted (404).
+
+
+---
+
+# Events page rebuilt — 2026-07-29 (second deploy)
+
+Replaced the single hard-coded event on /events with a data-driven listing:
+one uniform card per event, colour-coded by type, that greys itself out once
+the date has passed.
+
+**How it is built.** Events live in `sites/williscooper/events.json`;
+`sites/williscooper/build-events.mjs` regenerates the cards and the
+schema.org Event data inside events.html between marker comments. Full
+instructions in `sites/williscooper/EVENTS.md`.
+
+**Deliberately not JavaScript-dependent.** The cards are written into the page
+as static HTML and past/upcoming is baked in at build time, so the listing
+renders and is indexable with JS off — the failure mode that took the old
+builder site down. The script only enhances: it re-checks dates on each visit
+(so a card greys the morning after an event, with no redeploy) and powers the
+filter and sort controls.
+
+**Verified on the live site:** /events 200; H1 "Events & Workshops"; card
+present with baked `is-past`; struck-through date; COMPLETED badge; Event
+schema present; GA + Fathom intact; demo banner hidden. Filters, all four
+sort modes, hide-past, and the empty state were exercised against a six-event
+demo build locally (screenshots taken); no console errors on either build.
+Internal files (`events.json`, `events.sample.json`, `build-events.mjs`,
+`events-demo.html`) are excluded from `make-staging.mjs` and all 404 on the
+live site. Homepage, about-us, our-services, meet-the-team, privacy-policy and
+the 404 page all re-checked and unchanged.
+
+**For a human:** the page currently shows one past event and a "nothing in the
+diary" notice. That notice and the filter/sort bar appear and disappear on
+their own as events are added — nothing to switch on.

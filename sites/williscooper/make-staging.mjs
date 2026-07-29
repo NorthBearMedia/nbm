@@ -44,6 +44,7 @@ const OUT = positional[0] || join(SRC, '..', PRODUCTION ? 'williscooper-live-bui
 const SKIP = new Set([
   'make-staging.mjs', 'README.md', 'DEPLOY.md', 'DEPLOY-STAGING.md',
   '.variant-manifest.json',
+  'events.json', 'events.sample.json', 'build-events.mjs', 'events-demo.html',
   'williscooper-staging.zip', 'williscooper-live.zip',
 ]);
 

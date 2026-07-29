@@ -1,0 +1,51 @@
+{
+  "_warning": "DEMO DATA — invented events, for previewing the layout locally only. Never deploy a page built from this file. make-staging.mjs excludes it from every build, and pages generated from it show a 'Demo data' banner. Build with: node sites/williscooper/build-events.mjs events.sample.json --out events-demo.html",
+  "events": [
+    {
+      "id": "demo-1", "title": "Making Tax Digital: what changes for sole traders",
+      "type": "Workshop", "accent": "teal", "date": "2026-09-17", "timeLabel": "10am – 12pm", "startTime": "10:00",
+      "location": "Willis Cooper, Unit 6, Heritage Business Centre, Derby Rd, Belper, DE56 1SW",
+      "cost": "Free to attend",
+      "description": "A walk through the new quarterly reporting rules, what software you will need, and the deadlines that matter.",
+      "ctaLabel": "Book a place", "ctaUrl": "/contact-us"
+    },
+    {
+      "id": "demo-2", "title": "Year-end payroll clinic",
+      "type": "Drop-in clinic", "accent": "rose", "date": "2026-10-08", "timeLabel": "9am – 4pm, drop in any time",
+      "location": "Willis Cooper, Belper", "cost": "Free for clients",
+      "description": "Bring your payroll questions and we will work through them with you, one to one, for as long as you need.",
+      "ctaLabel": "Tell us you are coming", "ctaUrl": "/contact-us"
+    },
+    {
+      "id": "demo-3", "title": "Xero for beginners",
+      "type": "Webinar", "accent": "blue", "date": "2026-11-05", "timeLabel": "1pm – 2pm", "startTime": "13:00",
+      "location": "Online — joining link sent on booking", "cost": "Free to attend",
+      "description": "A live run-through of the basics: raising invoices, reconciling the bank, and the reports worth checking each month.",
+      "ctaLabel": "Reserve your spot", "ctaUrl": "/contact-us"
+    },
+    {
+      "id": "demo-4", "title": "Belper business breakfast",
+      "type": "Networking", "accent": "gold", "date": "2026-08-21", "timeLabel": "7:30am – 9am", "startTime": "07:30",
+      "location": "Heritage Business Centre, Belper", "cost": "£10 including breakfast",
+      "description": "An informal get-together for Amber Valley business owners. No pitching, just useful conversation.",
+      "ctaLabel": "Save me a seat", "ctaUrl": "/contact-us"
+    },
+    {
+      "id": "demo-5", "title": "Inheritance Tax and Pension workshop",
+      "type": "Workshop", "accent": "teal", "date": "2026-07-16", "timeLabel": "10am", "startTime": "10:00",
+      "location": "Willis Cooper, Unit 6, Heritage Business Centre, Derby Rd, Belper, DE56 1SW",
+      "cost": "Free to attend",
+      "description": "How Inheritance Tax and pensions work together, and the planning options open to you and your family.",
+      "pastNote": "This workshop has now taken place. Thank you to everyone who joined us — get in touch to be told about the next one.",
+      "ctaLabel": "Register your interest", "ctaUrl": "/contact-us", "pastCtaLabel": "Ask about the next one"
+    },
+    {
+      "id": "demo-6", "title": "R&D tax relief: is your project eligible?",
+      "type": "Seminar", "accent": "plum", "date": "2026-06-11", "timeLabel": "2pm – 4pm", "startTime": "14:00",
+      "location": "Willis Cooper, Belper", "cost": "Free to attend",
+      "description": "What counts as qualifying work under the merged scheme, and how to evidence a claim that stands up to scrutiny.",
+      "pastNote": "This seminar has finished. We run it roughly twice a year — get in touch to be told about the next date.",
+      "ctaLabel": "Register your interest", "ctaUrl": "/contact-us"
+    }
+  ]
+}
