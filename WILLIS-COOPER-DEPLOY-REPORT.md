@@ -202,3 +202,56 @@ behaviour of the export at tablet widths, not introduced here.
 2026) and images now load. Post photos came through at full height, making each
 card very tall, so they are capped at 170px with `object-fit: cover`. Section
 height is now **1,198px, three posts** (from 2,205px showing twelve stale ones).
+
+---
+
+# SEO pass — 2026-07-29 (seventh deploy)
+
+Audited all 25 pages first. The earlier SEO work holds up well: unique titles
+and descriptions within length, exactly one H1 per page, canonicals, Open
+Graph and Twitter cards everywhere, BreadcrumbList/Service/Article/FAQPage
+schema, every image carrying an alt attribute, a noindex 404, a sitemap
+covering all 24 indexable URLs, and a robots.txt that explicitly welcomes AI
+crawlers. Three real gaps remained.
+
+**1. llms.txt had drifted from the pages.** 8 of 24 entries still carried the
+old builder copy that the pages themselves had already moved past — including
+the swapped Careers/Contact descriptions fixed earlier in HTML but never in
+llms.txt (Careers was described as "Get in touch with Willis Cooper..."). All
+8 are now regenerated from each page's real meta description. This matters
+because robots.txt actively invites AI assistants and points them at llms.txt.
+
+**2. No service catalogue in the organisation schema.** Added
+`hasOfferCatalog` to the AccountingService block on all 25 pages, listing the
+eight real services with descriptions, URLs, provider @id and area served.
+Built from the actual service pages, so nothing is invented. All 85 JSON-LD
+blocks re-validated as parseable afterwards.
+
+**3. The five articles were near-orphans** with a single inbound link each
+(the blog index), which buries them for readers and crawlers alike. Added a
+styled "Related reading" block to 8 pages with contextual pairings only:
+payroll -> Staffology; business-advice -> Companies House fees, director
+verification, bank scams; accounting -> both Companies House pieces; tax ->
+fees; finance -> bank scams; cloud-accounting -> Staffology; careers and
+meet-the-team -> Jess's trainee-to-Chartered story. Re-audit shows no page
+below 2 inbound internal links.
+
+Verified live: all pages 200, 404 still 404, related-reading renders above the
+footer, hasOfferCatalog and the corrected llms.txt served.
+
+Note: the first deploy attempt returned a 500 from Hostinger's extract step.
+The live site was checked immediately and was untouched and healthy (the
+previous version still serving); a re-upload succeeded. Worth knowing that a
+failed deploy leaves the old site intact rather than a half-written docroot.
+
+## Left for Norton (need facts I should not invent)
+
+- **`geo` coordinates and `priceRange`** are the two remaining local-SEO
+  fields. Exact lat/long should come from the Google Business Profile rather
+  than a guess, since a wrong pin actively hurts. priceRange is a commercial
+  decision.
+- **Thin pages:** home (208 words), contact-us (180), taxcover (214),
+  meet-the-team (216), our-services (229). These would benefit from more copy,
+  but that is a writing job about a real business, not something to auto-fill.
+- **Google Business Profile** is the biggest remaining local-search lever and
+  lives entirely outside the site.
