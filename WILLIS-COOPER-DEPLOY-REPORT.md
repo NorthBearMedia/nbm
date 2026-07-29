@@ -292,3 +292,42 @@ stated from the town's perspective.
   verifiable geography.
 - These pages support the map pack, they do not replace it. Google Business
   Profile and review volume remain the larger levers for local search.
+
+---
+
+# North Bear Media credit patch — 2026-07-29 (ninth deploy)
+
+A woven clothing-tag credit below the footer on all 29 content pages, linking
+to northbearmedia.co.uk in a new tab.
+
+Built as CSS rather than an image so it stays crisp at any size: a dark panel
+with a woven cross-hatch texture, a dashed inner border for stitching, inner
+and outer shadows so it reads as raised, and a 0.75 degree tilt so it looks
+sewn on rather than placed. On hover or keyboard focus it straightens, lifts
+2px and a diagonal light sweep runs across it once (`nbm-shimmer`, 0.95s).
+Verified firing on the live DOM, not just assumed from the CSS.
+
+Logo: `assets/images/north-bear-media.png`, taken from the brand asset
+"NBM Logo No BG Light Lines.png" in Drive, alpha-trimmed from 3000x3000 to
+its bounding box and resized to 420x196 (30KB). The light-lines version is the
+one that reads on a dark patch; the standard dark-line logo would have
+disappeared.
+
+Accessibility and performance: `rel="noopener"`, a descriptive aria-label
+noting it opens in a new tab, a visible focus ring, the shimmer and tilt both
+dropped under `prefers-reduced-motion`, and the logo lazy-loaded since it sits
+below the fold.
+
+Two things caught while checking rather than after: the logo was illegible at
+30px because the brand mark is thin-stroked, so it went to 42px; and the 404
+page centres its content with flexbox, which squashed the strip to 750px. The
+404 has no footer, so the patch was removed from it entirely rather than
+bodged.
+
+Both generators preserve it: `build-events.mjs` only rewrites between markers,
+and `build-locations.mjs` takes its shell from taxcover.html, which now
+carries the patch.
+
+Note for Norton: the link is a normal followed link, which is standard for an
+agency credit. If Willis Cooper ever object to passing link equity, adding
+rel="nofollow" is a one-line change.
