@@ -74,6 +74,12 @@ Build and deploy as normal (`make-staging.mjs --production`, then upload).
 node sites/williscooper/build-events.mjs events.sample.json --out events-demo.html
 ```
 
+Then serve the folder and open the demo page in a browser:
+
+```bash
+python3 -m http.server 8778 -d sites/williscooper
+```
+
 `events.sample.json` holds six invented events covering every colour and a mix
 of past and upcoming, so you can see the filters, sorting and greying working.
 Pages built from it show a "Demo data" banner, and `events.json`,
