@@ -5,7 +5,7 @@ import db from '../database.js';
 import { requireAuth, requireWrite, aiMediaUpload } from '../middleware.js';
 import { logActivity } from '../lib/activity.js';
 import { notifyReview } from '../lib/notify.js';
-import { statusToProgress, bandToPriority, isValidStatus, isValidBand, isValidType } from '../lib/taskmap.js';
+import { statusToProgress, bandToPriority, isValidStatus, isValidBand, isValidType, nextRecurrence } from '../lib/taskmap.js';
 import { gmailClientForUser } from './gmail.js';
 
 const router = Router();
@@ -270,13 +270,8 @@ export async function executeTool(name, input, user) {
 
         // Recurring auto-create on the canonical "done" transition.
         if (nowDone && !wasDone && old.is_recurring && old.recur_interval > 0) {
-          const d = new Date((old.deadline || old.planned_date || new Date().toISOString().split('T')[0]) + 'T00:00:00');
-          const u = old.recur_unit, n = old.recur_interval;
-          if (u === 'days') d.setDate(d.getDate() + n);
-          else if (u === 'weeks') d.setDate(d.getDate() + n * 7);
-          else if (u === 'months') d.setMonth(d.getMonth() + n);
-          else if (u === 'years') d.setFullYear(d.getFullYear() + n);
-          const nextDate = d.toISOString().split('T')[0];
+          const todayUK = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date());
+          const nextDate = nextRecurrence(old.deadline || old.planned_date || todayUK, old.recur_interval, old.recur_unit, todayUK);
           const nt = db.prepare(
             "INSERT INTO tasks (project_id, client_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, task_status, task_band, task_type, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, 'not-started', ?, 'scheduled', ?, ?, ?, ?, 1, ?, ?)"
           ).run(old.project_id, old.client_id, old.title, old.assignee, nextDate, nextDate, old.estimated_hours, old.priority, old.task_band || '', old.task_type || 'recurring', old.references_text, old.notes, old.recur_interval, old.recur_unit);

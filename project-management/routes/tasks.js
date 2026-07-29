@@ -5,7 +5,7 @@ import { logActivity } from '../lib/activity.js';
 import { notifyReview } from '../lib/notify.js';
 import {
   statusToProgress, bandToPriority, progressToStatus, priorityToBand,
-  isValidStatus, isValidBand, isValidType,
+  isValidStatus, isValidBand, isValidType, nextRecurrence,
 } from '../lib/taskmap.js';
 
 const router = Router();
@@ -184,7 +184,8 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
 
   // Recurring auto-create fires on the canonical "done" transition.
   if (nowDone && !wasDone && old.is_recurring && old.recur_interval > 0) {
-    const nextDate = calculateNextDate(old.deadline || old.planned_date || new Date().toISOString().split('T')[0], old.recur_interval, old.recur_unit);
+    const todayUK = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date());
+    const nextDate = nextRecurrence(old.deadline || old.planned_date || todayUK, old.recur_interval, old.recur_unit, todayUK);
     const newTask = db.prepare(
       "INSERT INTO tasks (project_id, client_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, task_status, task_band, task_type, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, 'not-started', ?, 'scheduled', ?, ?, ?, ?, 1, ?, ?)"
     ).run(old.project_id, old.client_id, old.title, old.assignee, nextDate, nextDate, old.estimated_hours, old.priority, old.task_band || '', old.task_type || 'recurring', old.references_text, old.notes, old.recur_interval, old.recur_unit);
@@ -196,17 +197,6 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   task.attachments = db.prepare('SELECT * FROM task_attachments WHERE task_id = ? ORDER BY created_at DESC').all(task.id);
   res.json(task);
 });
-
-function calculateNextDate(fromDate, interval, unit) {
-  const d = new Date(fromDate + 'T00:00:00');
-  switch (unit) {
-    case 'days': d.setDate(d.getDate() + interval); break;
-    case 'weeks': d.setDate(d.getDate() + interval * 7); break;
-    case 'months': d.setMonth(d.getMonth() + interval); break;
-    case 'years': d.setFullYear(d.getFullYear() + interval); break;
-  }
-  return d.toISOString().split('T')[0];
-}
 
 // ─── Batch Move Tasks ────────────────────────────────
 router.post('/batch-move', requireAuth, requireWrite, (req, res) => {
