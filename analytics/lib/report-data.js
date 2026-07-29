@@ -154,26 +154,29 @@ export async function gatherReportData(site, start, end, opts = {}) {
     data.prevClarity = clarity.aggregate(site.id, prev.start, prev.end);
   }
 
-  // Cross-source truth check. A tag-based traffic source (GA especially)
-  // can massively under-count when its tag isn't firing on the real live
-  // site — but Search Console clicks and Clarity's human sessions are
-  // INDEPENDENT proof of real traffic. If the chosen source reports far
-  // fewer visits than those independent signals, it's broken for this
-  // period: flag it so the report leads with the true search + behaviour
-  // story instead of headlining a wrong "1 visit / coming soon" number.
-  // (This is exactly the North Bear Media case: GA=1, but GSC=33 clicks
-  // and Clarity=55 sessions on a fully-live site.)
+  // Cross-source truth check: is the traffic source so far below hard
+  // evidence that its number would be a lie?
+  //
+  // The ONLY safe yardstick is Search Console clicks. Each click is a
+  // person who landed on the site from Google, so the traffic tool must
+  // have seen at least most of them. Clarity was in this comparison
+  // originally and had to come out: Clarity counts sessions on completely
+  // different rules and routinely reports several times GA's figure, so a
+  // perfectly healthy site with rich Clarity history was branded broken —
+  // hit live on EVC Citysprint, whose GA, Fathom, Search Console and
+  // Clarity were all working while its report claimed tracking was being
+  // reconnected.
+  //
+  // Threshold is deliberately generous: GA legitimately runs below click
+  // counts (consent tools, ad-blockers, bounced redirects), so only a
+  // catastrophic shortfall — under half the clicks — counts as broken.
   if (data.ga4?.overview) {
     const sessions = Number(data.ga4.overview.sessions || 0);
     const gscClicks = Number(data.search?.summary?.clicks || 0);
-    const clarityHumans = Number(data.clarity?.humanSessions ?? data.clarity?.sessions ?? 0);
-    const independent = Math.max(gscClicks, clarityHumans);
-    // Only with solid independent evidence, and only when the source
-    // captured under a third of it — a genuine tag failure, not noise.
-    if (independent >= 10 && sessions < independent * 0.34) {
+    if (gscClicks >= 10 && sessions < gscClicks * 0.5) {
       data.ga4.unreliable = true;
-      data.ga4.independentTraffic = independent;
-      warnings.push(`Traffic source under-counting: ${data.ga4.sourceLabel} shows ${sessions} sessions but Search Console/Clarity independently show ~${independent} — the tracking tag likely isn't firing on the live site.`);
+      data.ga4.independentTraffic = gscClicks;
+      warnings.push(`Traffic source under-counting: ${data.ga4.sourceLabel} shows ${sessions} sessions but Search Console recorded ${gscClicks} clicks from Google alone — the tracking tag likely isn't firing on the live site.`);
     }
   }
 
