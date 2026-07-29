@@ -1,7 +1,69 @@
-# Serve live-style extensionless URLs from the static .html files.
-# /about-us -> about-us.html (internal rewrite, URL bar keeps /about-us)
+# Willis Cooper — Apache config for Hostinger shared hosting.
+
 RewriteEngine On
+RewriteBase /
+
+# ---------------------------------------------------------------------------
+# HTTPS + canonical host — COMMENTED OUT UNTIL THE SSL CERTIFICATE IS INSTALLED.
+# Enabling this before hPanel has issued the Let's Encrypt certificate sends
+# every visitor to an https:// URL that cannot be served — a full outage with
+# no way back. Uncomment ONLY after https://williscooper.com loads with a valid
+# padlock. Do the same for the HSTS header further down.
+#
+# RewriteCond %{HTTPS} off [OR]
+# RewriteCond %{HTTP_HOST} ^www\. [NC]
+# RewriteRule ^ https://williscooper.com%{REQUEST_URI} [L,R=301]
+# ---------------------------------------------------------------------------
+
+# Strip the trailing slash. Asset paths in the HTML are all relative, so
+# /about-us/ resolves them against /about-us/assets/... and 404s every image,
+# stylesheet and font — the page renders as unstyled text. Matches the literal
+# request only, so it cannot loop with the rewrite below.
+RewriteCond %{THE_REQUEST} \s/+([^?\s]+?)/(\?\S*)?\s [NC]
+RewriteRule ^ /%1 [L,R=301]
+
+# Live-style extensionless URLs: /about-us -> about-us.html (internal rewrite,
+# the address bar keeps /about-us). The substitution contains a dot, so the
+# pattern cannot re-match it.
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{DOCUMENT_ROOT}/$1.html -f
 RewriteRule ^([^.]+?)/?$ /$1.html [L]
+
+# Compression. The main stylesheet is 365KB raw but 38KB gzipped, and the HTML
+# compresses by ~85% — the single biggest performance win available here.
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css text/plain text/xml \
+    application/javascript application/json image/svg+xml
+</IfModule>
+
+# Cache immutable assets hard; never cache HTML, so content edits go live at once.
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css        "access plus 1 year"
+  ExpiresByType image/jpeg      "access plus 1 year"
+  ExpiresByType image/png       "access plus 1 year"
+  ExpiresByType image/webp      "access plus 1 year"
+  ExpiresByType image/svg+xml   "access plus 1 year"
+  ExpiresByType font/woff2      "access plus 1 year"
+  ExpiresByType application/pdf "access plus 1 month"
+  ExpiresByType text/html       "access plus 0 seconds"
+</IfModule>
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+  # Enable together with the HTTPS redirect above, not before.
+  # Header always set Strict-Transport-Security "max-age=31536000" env=HTTPS
+</IfModule>
+# X-Frame-Options / frame-ancestors is deliberately NOT set: the site frames its
+# own srcdoc content and a Google Map, and a careless policy would break them.
+
+Options -Indexes
+ErrorDocument 404 /404.html
+
+# Never serve repo/tooling files if one is ever uploaded by mistake.
+<FilesMatch "\.(zip|mjs|md|json|yml)$">
+  Require all denied
+</FilesMatch>
