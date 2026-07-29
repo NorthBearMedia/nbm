@@ -77,3 +77,26 @@ export function isValidRisk(r) { return r === '' || RISK_LEVELS.includes(r); }
 export function isOpenStatus(status) {
   return status !== 'done' && status !== 'cancelled';
 }
+
+// Next occurrence for a recurring task. Rolls forward from the task's own date
+// (keeping its anchor — e.g. always a Tuesday) until the result is AFTER
+// today. Without the roll, completing a long-overdue weekly task spawned a
+// next occurrence still in the past: an identical overdue line reappeared
+// instantly, and every "complete" minted another one. Pure UTC calendar math —
+// local-parse + toISOString shifts a day in BST.
+export function nextRecurrence(fromDate, interval, unit, todayStr) {
+  const [y, m, d] = String(fromDate).split('-').map(Number);
+  if (!y || !m || !d) return fromDate;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const step = () => {
+    if (unit === 'days') dt.setUTCDate(dt.getUTCDate() + interval);
+    else if (unit === 'weeks') dt.setUTCDate(dt.getUTCDate() + interval * 7);
+    else if (unit === 'months') dt.setUTCMonth(dt.getUTCMonth() + interval);
+    else if (unit === 'years') dt.setUTCFullYear(dt.getUTCFullYear() + interval);
+    else dt.setUTCDate(dt.getUTCDate() + 1);   // bad unit: still terminate
+  };
+  step();
+  let guard = 0;
+  while (todayStr && dt.toISOString().split('T')[0] <= todayStr && guard++ < 1000) step();
+  return dt.toISOString().split('T')[0];
+}

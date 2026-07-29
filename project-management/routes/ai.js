@@ -5,7 +5,7 @@ import db from '../database.js';
 import { requireAuth, requireWrite, aiMediaUpload } from '../middleware.js';
 import { logActivity } from '../lib/activity.js';
 import { notifyReview } from '../lib/notify.js';
-import { statusToProgress, bandToPriority, isValidStatus, isValidBand, isValidType } from '../lib/taskmap.js';
+import { statusToProgress, bandToPriority, isValidStatus, isValidBand, isValidType, nextRecurrence } from '../lib/taskmap.js';
 import { gmailClientForUser } from './gmail.js';
 
 const router = Router();
@@ -162,6 +162,8 @@ const normTitle = s => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(
 
 // Shared by create_task and create_tasks. Throws on bad client / permission.
 function createOneTask(input, user, isOwner) {
+  // Staff visibility rule: what a non-owner creates must stay visible to them.
+  if (!isOwner && !input.assignee) input = { ...input, assignee: user.display_name };
   const cl = db.prepare('SELECT is_private FROM clients WHERE id = ?').get(input.client_id);
   if (!cl) throw new Error(`Client ${input.client_id} not found`);
   if (cl.is_private && !isOwner) throw new Error('Access denied');
@@ -193,6 +195,9 @@ export async function executeTool(name, input, user) {
   const isOwner = user.role === 'owner';
   const canWrite = user.role === 'owner' || user.role === 'editor';
   const priv = isOwner ? '' : 'AND c.is_private = 0';
+  // Staff visibility rule: non-owners only see tasks assigned to them.
+  const meEsc = (user.display_name || '').replace(/'/g, "''");
+  const scope = isOwner ? '' : ` AND (t.assignee = '${meEsc}' OR t.secondary_assignee = '${meEsc}')`;
 
   try {
     switch (name) {
@@ -243,6 +248,9 @@ export async function executeTool(name, input, user) {
         const old = db.prepare('SELECT t.*, c.is_private FROM tasks t JOIN clients c ON t.client_id=c.id WHERE t.id=?').get(input.task_id);
         if (!old) return { error: 'Task not found' };
         if (old.is_private && !isOwner) return { error: 'Access denied' };
+        if (!isOwner && old.assignee !== user.display_name && old.secondary_assignee !== user.display_name) {
+          return { error: 'That task isn\'t assigned to you' };
+        }
 
         // Canonical status/band drive the legacy progress/priority shadows.
         let status = isValidStatus(input.status) ? input.status : null;
@@ -270,13 +278,8 @@ export async function executeTool(name, input, user) {
 
         // Recurring auto-create on the canonical "done" transition.
         if (nowDone && !wasDone && old.is_recurring && old.recur_interval > 0) {
-          const d = new Date((old.deadline || old.planned_date || new Date().toISOString().split('T')[0]) + 'T00:00:00');
-          const u = old.recur_unit, n = old.recur_interval;
-          if (u === 'days') d.setDate(d.getDate() + n);
-          else if (u === 'weeks') d.setDate(d.getDate() + n * 7);
-          else if (u === 'months') d.setMonth(d.getMonth() + n);
-          else if (u === 'years') d.setFullYear(d.getFullYear() + n);
-          const nextDate = d.toISOString().split('T')[0];
+          const todayUK = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date());
+          const nextDate = nextRecurrence(old.deadline || old.planned_date || todayUK, old.recur_interval, old.recur_unit, todayUK);
           const nt = db.prepare(
             "INSERT INTO tasks (project_id, client_id, title, assignee, deadline, planned_date, estimated_hours, progress, priority, task_status, task_band, task_type, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, 'not-started', ?, 'scheduled', ?, ?, ?, ?, 1, ?, ?)"
           ).run(old.project_id, old.client_id, old.title, old.assignee, nextDate, nextDate, old.estimated_hours, old.priority, old.task_band || '', old.task_type || 'recurring', old.references_text, old.notes, old.recur_interval, old.recur_unit);
@@ -300,9 +303,9 @@ export async function executeTool(name, input, user) {
         const refMatch = q.match(/^(?:NB)?(\d+)$/i);
         let rows;
         if (refMatch) {
-          rows = db.prepare(`SELECT t.id, t.title, t.assignee, t.deadline, t.planned_date, t.progress, t.priority, c.name as client_name FROM tasks t JOIN clients c ON t.client_id=c.id WHERE t.id=? ${priv}`).all(parseInt(refMatch[1]));
+          rows = db.prepare(`SELECT t.id, t.title, t.assignee, t.deadline, t.planned_date, t.progress, t.priority, c.name as client_name FROM tasks t JOIN clients c ON t.client_id=c.id WHERE t.id=? ${priv}${scope}`).all(parseInt(refMatch[1]));
         } else {
-          rows = db.prepare(`SELECT t.id, t.title, t.assignee, t.deadline, t.planned_date, t.progress, t.priority, c.name as client_name FROM tasks t JOIN clients c ON t.client_id=c.id WHERE t.archived=0 AND (t.title LIKE ? OR t.notes LIKE ? OR t.assignee LIKE ?) ${priv} ORDER BY t.created_at DESC LIMIT 20`).all(`%${q}%`, `%${q}%`, `%${q}%`);
+          rows = db.prepare(`SELECT t.id, t.title, t.assignee, t.deadline, t.planned_date, t.progress, t.priority, c.name as client_name FROM tasks t JOIN clients c ON t.client_id=c.id WHERE t.archived=0 AND (t.title LIKE ? OR t.notes LIKE ? OR t.assignee LIKE ?) ${priv}${scope} ORDER BY t.created_at DESC LIMIT 20`).all(`%${q}%`, `%${q}%`, `%${q}%`);
         }
         return { tasks: rows };
       }
@@ -311,7 +314,7 @@ export async function executeTool(name, input, user) {
         const tasks = db.prepare(`
           SELECT t.assignee, t.estimated_hours, t.planned_date, t.deadline
           FROM tasks t JOIN clients c ON t.client_id=c.id
-          WHERE t.archived=0 AND t.progress NOT IN ('completed','invoiced') ${priv}
+          WHERE t.archived=0 AND t.progress NOT IN ('completed','invoiced') ${priv}${scope}
         `).all();
         const today = new Date().toISOString().split('T')[0];
         const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
@@ -350,7 +353,7 @@ export async function executeTool(name, input, user) {
           JOIN tasks t ON t.id = a.entity_id AND a.entity_type = 'task'
           JOIN clients c ON c.id = t.client_id
           WHERE a.action = 'updated' AND (a.details LIKE '%deadline changed%' OR a.details LIKE '%planned date changed%')
-            AND t.archived = 0 AND t.task_status NOT IN ('done','cancelled') ${priv}
+            AND t.archived = 0 AND t.task_status NOT IN ('done','cancelled') ${priv}${scope}
           GROUP BY t.id HAVING times_moved >= 3
           ORDER BY times_moved DESC LIMIT 10
         `).all();
@@ -359,14 +362,14 @@ export async function executeTool(name, input, user) {
         const stale_inbox = db.prepare(`
           SELECT t.id, t.title, c.name AS client, t.created_at
           FROM tasks t JOIN clients c ON c.id = t.client_id
-          WHERE t.archived = 0 AND t.task_status = 'inbox' AND t.created_at < ? ${priv}
+          WHERE t.archived = 0 AND t.task_status = 'inbox' AND t.created_at < ? ${priv}${scope}
           ORDER BY t.created_at ASC LIMIT 15
         `).all(daysAgo(7));
 
         // Clients with open work but no activity in 14+ days
         const quiet_clients = db.prepare(`
           SELECT c.id, c.name, c.last_contact_date,
-            (SELECT COUNT(*) FROM tasks t WHERE t.client_id = c.id AND t.archived = 0 AND t.task_status NOT IN ('done','cancelled')) AS open_tasks,
+            (SELECT COUNT(*) FROM tasks t WHERE t.client_id = c.id AND t.archived = 0 AND t.task_status NOT IN ('done','cancelled')${scope}) AS open_tasks,
             (SELECT MAX(a.created_at) FROM activity_log a JOIN tasks t2 ON t2.id = a.entity_id AND a.entity_type='task' WHERE t2.client_id = c.id) AS last_activity
           FROM clients c
           WHERE c.archived = 0 AND c.is_system = 0 ${isOwner ? '' : 'AND c.is_private = 0'}
@@ -377,7 +380,7 @@ export async function executeTool(name, input, user) {
           SELECT c.name AS client, COUNT(*) AS overdue_count
           FROM tasks t JOIN clients c ON c.id = t.client_id
           WHERE t.archived = 0 AND t.task_status NOT IN ('done','cancelled')
-            AND t.deadline != '' AND t.deadline < ? ${priv}
+            AND t.deadline != '' AND t.deadline < ? ${priv}${scope}
           GROUP BY c.id HAVING overdue_count >= 3
           ORDER BY overdue_count DESC
         `).all(today);
@@ -387,7 +390,7 @@ export async function executeTool(name, input, user) {
           SELECT t.id, t.title, c.name AS client,
             (SELECT MAX(a.created_at) FROM activity_log a WHERE a.entity_type='task' AND a.entity_id = t.id) AS last_touched
           FROM tasks t JOIN clients c ON c.id = t.client_id
-          WHERE t.archived = 0 AND t.task_status = 'waiting-on-client' ${priv}
+          WHERE t.archived = 0 AND t.task_status = 'waiting-on-client' ${priv}${scope}
         `).all().filter(t => !t.last_touched || t.last_touched < daysAgo(14)).slice(0, 10);
 
         // Recurring tasks running late
@@ -396,7 +399,7 @@ export async function executeTool(name, input, user) {
           FROM tasks t JOIN clients c ON c.id = t.client_id
           WHERE t.archived = 0 AND t.task_status NOT IN ('done','cancelled')
             AND (t.is_recurring = 1 OR t.task_type = 'recurring')
-            AND ((t.deadline != '' AND t.deadline < ?) OR (t.deadline = '' AND t.planned_date != '' AND t.planned_date < ?)) ${priv}
+            AND ((t.deadline != '' AND t.deadline < ?) OR (t.deadline = '' AND t.planned_date != '' AND t.planned_date < ?)) ${priv}${scope}
           LIMIT 10
         `).all(today, today);
 
@@ -404,7 +407,7 @@ export async function executeTool(name, input, user) {
         const rhythm = {};
         for (const r of db.prepare(`
           SELECT t.completed_at FROM tasks t JOIN clients c ON c.id = t.client_id
-          WHERE t.completed_at != '' AND t.completed_at >= ? ${priv}
+          WHERE t.completed_at != '' AND t.completed_at >= ? ${priv}${scope}
         `).all(daysAgo(60))) {
           const d = new Date(r.completed_at + 'T12:00:00Z');
           const day = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getUTCDay()];
@@ -470,7 +473,7 @@ export async function executeTool(name, input, user) {
       }
 
       case 'list_tasks_for_user': {
-        const rows = db.prepare(`SELECT t.id, t.title, t.deadline, t.planned_date, t.estimated_hours, t.priority, t.progress, c.name as client_name FROM tasks t JOIN clients c ON t.client_id=c.id WHERE t.archived=0 AND t.progress NOT IN ('completed','invoiced') AND (t.assignee=? OR t.secondary_assignee=?) ${priv} ORDER BY COALESCE(NULLIF(t.planned_date,''), t.deadline), t.priority`).all(input.assignee, input.assignee);
+        const rows = db.prepare(`SELECT t.id, t.title, t.deadline, t.planned_date, t.estimated_hours, t.priority, t.progress, c.name as client_name FROM tasks t JOIN clients c ON t.client_id=c.id WHERE t.archived=0 AND t.progress NOT IN ('completed','invoiced') AND (t.assignee=? OR t.secondary_assignee=?) ${priv}${scope} ORDER BY COALESCE(NULLIF(t.planned_date,''), t.deadline), t.priority`).all(input.assignee, input.assignee);
         return { tasks: rows };
       }
 
