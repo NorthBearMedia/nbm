@@ -91,3 +91,40 @@ the 404 page all re-checked and unchanged.
 **For a human:** the page currently shows one past event and a "nothing in the
 diary" notice. That notice and the filter/sort bar appear and disappear on
 their own as events are added — nothing to switch on.
+
+
+---
+
+# Events: Upcoming / Past sections + full diary — 2026-07-29 (third deploy)
+
+Split the listing into **Upcoming events** and **Past events** sections, each
+with its own heading and count, and loaded the real diary: 4 upcoming, 3 past.
+
+New generator features (all optional, documented in EVENTS.md):
+- `precision: "month"` — for "September 2026, date TBC". Prints the month only,
+  and treats the **last day of that month** as the end date, so the event stays
+  in Upcoming for the whole month instead of dropping out on the 2nd.
+- `dateNote` — small italic note after the date ("date to be confirmed").
+- `logo` / `logoAlt` — logo on the card. The two Xero drop-ins and the past
+  Xero session use `assets/images/xero-logo.png`, resized to 128px from the
+  official brand asset in Google Drive (01_Brand/Graphics/xero-logo-hires-RGB.png).
+  Logos desaturate along with the rest of a past card.
+
+Fixed along the way: the logo was being stretched to full card width — the card
+body is a column flexbox, which stretches block children, so the logo now sets
+`align-self:flex-start`.
+
+**Verified on the live site:** /events 200; 4 upcoming + 3 past cards with the
+past ones baked grey; 2 group sections; 5 logo references; 3 TBC notes; 7
+schema.org Event entries; correct order (soonest upcoming first, most recent
+past first); xero-logo.png serves (6,273 bytes). Filters (All / Drop-in /
+Workshop), hide-past, all four sort modes and the section headings/counts
+exercised locally on desktop and mobile with no console errors. events.json,
+events.sample.json, build-events.mjs and events-demo.html all 404.
+
+**For a human:** two events show "date to be confirmed" (MTD for Income Tax,
+September; Payroll and Benefits, November) and the Autumn Xero Drop-In shows
+"Time to be confirmed". Norton's internal note said the Autumn slot is either
+10:00–12:00 or 14:00–16:00 — that was deliberately not published; swap
+`timeLabel` once Emma confirms. Same for the two September/November dates:
+replace `precision`/`dateNote` with the real date when known.

@@ -2,16 +2,17 @@
 // Regenerate the events listing inside events.html from events.json.
 //
 //   node sites/williscooper/build-events.mjs                  # real events
-//   node sites/williscooper/build-events.mjs events.sample.json --out demo.html
+//   node sites/williscooper/build-events.mjs events.sample.json --out events-demo.html
 //
 // Why a generator: the event cards are written into events.html as plain
-// static HTML, so they render (and are indexed) without JavaScript — the whole
-// reason this site was rebuilt was a JS-dependent page that went blank. JS on
-// the page only *enhances*: it re-checks which events have passed, and powers
-// the filter/sort controls.
+// static HTML, split into an Upcoming and a Past section, so they render (and
+// are indexed) without JavaScript — the whole reason this site was rebuilt was
+// a JS-dependent page that went blank. JS on the page only *enhances*: it
+// re-checks which events have passed, moves them into the Past section, and
+// powers the filter/sort controls.
 //
 // Past/upcoming is decided here at build time AND again in the browser on each
-// visit, so a card greys itself the day after its event without a redeploy.
+// visit, so an event moves itself to Past the day after without a redeploy.
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -45,8 +46,10 @@ const parseDay = iso => {
   return d;
 };
 
-const LONG = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-const fmtDate = d => d.toLocaleDateString('en-GB', LONG);
+const FULL = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+const MONTH = { month: 'long', year: 'numeric' };
+// "precision":"month" prints "June 2025" for events where only the month is known.
+const fmtDate = (d, precision) => d.toLocaleDateString('en-GB', precision === 'month' ? MONTH : FULL);
 
 const raw = JSON.parse(readFileSync(DATA_PATH, 'utf8'));
 const list = Array.isArray(raw) ? raw : raw.events;
@@ -58,18 +61,25 @@ const events = list.map((e, i) => {
   }
   const start = parseDay(e.date);
   if (!start) throw new Error(`Event "${e.title}": date must be YYYY-MM-DD, got "${e.date}"`);
-  const end = parseDay(e.endDate) || start;
+  // "September 2026, date TBC" is only definitely over once September is, so a
+  // month-precision event stays upcoming until the last day of its month.
+  const monthEnd = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+  monthEnd.setHours(0, 0, 0, 0);
+  const end = parseDay(e.endDate) || (e.precision === 'month' ? monthEnd : start);
   if (e.accent && !ACCENTS.has(e.accent)) {
     throw new Error(`Event "${e.title}": accent must be one of ${[...ACCENTS].join(', ')}`);
   }
-  return { ...e, start, end, isPast: end < today, accent: e.accent || 'blue' };
+  if (e.precision && e.precision !== 'month' && e.precision !== 'day') {
+    throw new Error(`Event "${e.title}": precision must be "month" or "day"`);
+  }
+  const pad = n => String(n).padStart(2, '0');
+  const endIso = `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`;
+  return { ...e, start, end, endIso, isPast: end < today, accent: e.accent || 'blue' };
 });
 
-// Upcoming first (soonest at the top), then past (most recent first). The
-// browser re-applies this same order, so it stays right as dates roll past.
-events.sort((a, b) =>
-  a.isPast !== b.isPast ? (a.isPast ? 1 : -1)
-    : a.isPast ? b.start - a.start : a.start - b.start);
+const byDateAsc = (a, b) => a.start - b.start;
+const upcoming = events.filter(e => !e.isPast).sort(byDateAsc);
+const past = events.filter(e => e.isPast).sort((a, b) => b.start - a.start);
 
 const icon = {
   date: '<path d="M7 2v3M17 2v3M3.5 9h17M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 19 20.5H5A1.5 1.5 0 0 1 3.5 19V6A1.5 1.5 0 0 1 5 4.5Z"/>',
@@ -84,42 +94,43 @@ const fact = (kind, label, valueHtml) => valueHtml
   : '';
 
 const card = e => {
-  const dateHtml = `<time datetime="${esc(e.date)}">${esc(fmtDate(e.start))}</time>`
-    + (e.endDate && e.endDate !== e.date ? ` – <time datetime="${esc(e.endDate)}">${esc(fmtDate(e.end))}</time>` : '');
+  const dateHtml = `<time datetime="${esc(e.date)}">${esc(fmtDate(e.start, e.precision))}</time>`
+    + (e.endDate && e.endDate !== e.date ? ` – <time datetime="${esc(e.endDate)}">${esc(fmtDate(e.end, e.precision))}</time>` : '')
+    + (e.dateNote ? ` <span class="wc-ev-tbc">${esc(e.dateNote)}</span>` : '');
   const ctaLabel = e.isPast ? (e.pastCtaLabel || 'Ask about the next one') : (e.ctaLabel || 'Register your interest');
 
-  return `        <article class="wc-ev-card${e.isPast ? ' is-past' : ''}" data-type="${esc(e.type)}" data-accent="${esc(e.accent)}" data-date="${esc(e.date)}" data-end="${esc(e.endDate || e.date)}"${e.id ? ` id="event-${esc(e.id)}"` : ''}>
+  return `        <article class="wc-ev-card${e.isPast ? ' is-past' : ''}" data-type="${esc(e.type)}" data-accent="${esc(e.accent)}" data-date="${esc(e.date)}" data-end="${esc(e.endIso)}"${e.id ? ` id="event-${esc(e.id)}"` : ''}>
           <p class="wc-ev-stripe" aria-hidden="true"></p>
           <div class="wc-ev-body">
             <div class="wc-ev-top">
               <span class="wc-ev-type">${esc(e.type)}</span>
               <span class="wc-ev-badge" data-upcoming="Upcoming" data-past="Completed">${e.isPast ? 'Completed' : 'Upcoming'}</span>
             </div>
-            <h2 class="wc-ev-title">${esc(e.title)}</h2>
+${e.logo ? `            <img class="wc-ev-logo" src="${esc(e.logo)}" alt="${esc(e.logoAlt || '')}" width="128" height="128" loading="lazy" decoding="async">\n` : ''}            <h3 class="wc-ev-title">${esc(e.title)}</h3>
             <div class="wc-ev-facts">
 ${[fact('date', 'Date', dateHtml),
     fact('time', 'Time', e.timeLabel ? esc(e.timeLabel) : ''),
     fact('place', 'Location', e.location ? esc(e.location) : ''),
     fact('cost', 'Cost', e.cost ? esc(e.cost) : '')].filter(Boolean).map(s => '              ' + s).join('\n')}
             </div>
-${e.description ? `            <p class="wc-ev-desc"${e.isPast && e.pastNote ? ' hidden' : ''}>${esc(e.description)}</p>\n` : ''}${e.pastNote ? `            <p class="wc-ev-note"${e.isPast ? '' : ' hidden'}>${esc(e.pastNote)}</p>\n` : ''}            <a class="wc-ev-cta" href="${esc(e.ctaUrl || '/contact-us')}" data-upcoming="${esc(e.ctaLabel || 'Register your interest')}" data-past="${esc(e.pastCtaLabel || 'Ask about the next one')}">${esc(ctaLabel)}</a>
+${e.description ? `            <p class="wc-ev-desc">${esc(e.description)}</p>\n` : ''}${e.pastNote ? `            <p class="wc-ev-note"${e.isPast ? '' : ' hidden'}>${esc(e.pastNote)}</p>\n` : ''}            <a class="wc-ev-cta" href="${esc(e.ctaUrl || '/contact-us')}" data-upcoming="${esc(e.ctaLabel || 'Register your interest')}" data-past="${esc(e.pastCtaLabel || 'Ask about the next one')}">${esc(ctaLabel)}</a>
           </div>
         </article>`;
 };
-
-const cardsHtml = events.map(card).join('\n');
 
 const ldJson = JSON.stringify({
   '@context': 'https://schema.org',
   '@type': 'ItemList',
   name: 'Events and workshops from Willis Cooper Chartered Accountants',
-  itemListElement: events.map((e, i) => ({
+  itemListElement: [...upcoming, ...past].map((e, i) => ({
     '@type': 'ListItem',
     position: i + 1,
     item: {
       '@type': 'Event',
       name: e.title,
-      startDate: e.startTime ? `${e.date}T${e.startTime}` : e.date,
+      // A month-precision event publishes as "2025-06" rather than inventing a day.
+      startDate: e.precision === 'month' ? e.date.slice(0, 7)
+        : e.startTime ? `${e.date}T${e.startTime}` : e.date,
       ...(e.endDate ? { endDate: e.endDate } : {}),
       eventStatus: 'https://schema.org/EventScheduled',
       eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
@@ -153,18 +164,29 @@ const between = (html, marker, body) => {
 };
 
 let page = readFileSync(PAGE_PATH, 'utf8');
-page = between(page, 'WC-EVENTS', cardsHtml);
+page = between(page, 'WC-EVENTS-UPCOMING', upcoming.map(card).join('\n'));
+page = between(page, 'WC-EVENTS-PAST', past.map(card).join('\n'));
 page = between(page, 'WC-EVENTS-LD', `<script type="application/ld+json">${ldJson}</script>`);
+
 page = page.replace(/<p class="wc-ev-demo"[^>]*>/,
   IS_DEMO ? '<p class="wc-ev-demo">' : '<p class="wc-ev-demo" hidden>');
 
-const upcoming = events.filter(e => !e.isPast).length;
-
-// Bake the "nothing in the diary" notice so it is right with JS off too.
+// Bake section visibility and counts so the page is correct with JS off too.
+page = page.replace(/<section class="wc-ev-group" data-group="past"[^>]*>/,
+  past.length ? '<section class="wc-ev-group" data-group="past">' : '<section class="wc-ev-group" data-group="past" hidden>');
+page = page.replace(/<h2 class="wc-ev-grouphead wc-ev-grouphead-upcoming"[^>]*>/,
+  upcoming.length ? '<h2 class="wc-ev-grouphead wc-ev-grouphead-upcoming">' : '<h2 class="wc-ev-grouphead wc-ev-grouphead-upcoming" hidden>');
+page = page.replace(/(<span class="wc-ev-groupcount wc-ev-groupcount-upcoming">)[^<]*(<\/span>)/,
+  `$1${upcoming.length > 1 ? `(${upcoming.length})` : ''}$2`);
+page = page.replace(/(<span class="wc-ev-groupcount wc-ev-groupcount-past">)[^<]*(<\/span>)/,
+  `$1${past.length > 1 ? `(${past.length})` : ''}$2`);
 page = page.replace(/<p class="wc-ev-noupcoming"[^>]*>/,
-  upcoming === 0 ? '<p class="wc-ev-noupcoming">' : '<p class="wc-ev-noupcoming" hidden>');
+  upcoming.length === 0 ? '<p class="wc-ev-noupcoming">' : '<p class="wc-ev-noupcoming" hidden>');
 
 writeFileSync(OUT_PATH, page);
+
 console.log(`${OUT_NAME} updated from ${DATA_NAME}${IS_DEMO ? '  [DEMO DATA — never deploy this]' : ''}`);
-console.log(`  events: ${events.length}  (${upcoming} upcoming, ${events.length - upcoming} past)`);
-for (const e of events) console.log(`   ${e.isPast ? 'past    ' : 'upcoming'}  ${e.date}  ${e.type.padEnd(12)} ${e.title}`);
+console.log(`  events: ${events.length}  (${upcoming.length} upcoming, ${past.length} past)`);
+for (const e of [...upcoming, ...past]) {
+  console.log(`   ${e.isPast ? 'past    ' : 'upcoming'}  ${fmtDate(e.start, e.precision).padEnd(26)} ${e.type.padEnd(10)} ${e.title}`);
+}

@@ -32,7 +32,10 @@ Open `events.json` and add an object to the `events` list:
 | `title`, `type`, `date` | **yes** | `date` must be `YYYY-MM-DD`. `type` is free text and becomes a filter button. |
 | `accent` | no | Colour stripe: `teal`, `blue`, `plum`, `gold` or `rose`. Defaults to blue. |
 | `endDate` | no | For multi-day events. The event greys out after this date. |
-| `timeLabel` | no | Shown as-is, e.g. `10am – 12pm`. |
+| `precision` | no | Set to `"month"` when only the month is known. Use the 1st of that month as `date`; it prints as "September 2026" and stays upcoming until the month is over. |
+| `dateNote` | no | Small italic note after the date, e.g. `"date to be confirmed"`. |
+| `logo` | no | Path to a logo shown on the card, e.g. `"assets/images/xero-logo.png"`. Pair with `logoAlt` for the alt text. |
+| `timeLabel` | no | Shown as-is, e.g. `10am – 12pm`, or `Time to be confirmed`. |
 | `startTime` | no | 24-hour `HH:MM`, used for Google's event listings. |
 | `location`, `cost`, `description` | no | Omit any and that line disappears. |
 | `ctaLabel` / `ctaUrl` | no | Button text and destination. Default: "Register your interest" → /contact-us. |
@@ -53,11 +56,24 @@ producing a broken page.
 
 Build and deploy as normal (`make-staging.mjs --production`, then upload).
 
+## Handling events that are not fully confirmed
+
+Everything can be filled in later — put in what you know:
+
+- **Month known, day not:** `"date": "2026-09-01"`, `"precision": "month"`,
+  `"dateNote": "date to be confirmed"`. It shows as *September 2026, date to
+  be confirmed* and stays in Upcoming until September is over.
+- **Time not settled:** `"timeLabel": "Time to be confirmed"`.
+- **Anything else unknown:** leave the field out and that line simply does not
+  appear on the card.
+
 ## How it behaves
 
-- **Order:** upcoming events first, soonest at the top; past events after,
-  most recent first.
-- **Greying out:** a past event turns grey, its date is struck through, the
+- **Two sections:** Upcoming events and Past events, each with its own heading
+  and a count. An event moves from one to the other on its own.
+- **Order:** upcoming events soonest first; past events most recent first.
+- **Greying out:** a past event moves into Past events, turns grey, its date
+  is struck through, any logo desaturates, the
   badge changes to "Completed", and the button becomes "Ask about the next
   one". This is re-checked in the visitor's browser on every visit, so an event
   greys itself the morning after **without a redeploy**.

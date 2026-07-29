@@ -71,6 +71,10 @@
 .wc-ev-card[data-accent="rose"] .wc-ev-type{color:#a52950;background:rgba(194,51,96,.12);}
 .wc-ev-badge{flex:none;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:5px 10px;border-radius:999px;
   color:#14776d;background:rgba(26,155,143,.13);}
+/* align-self stops the column flex container stretching the logo to full width. */
+.wc-ev-logo{display:block;align-self:flex-start;height:44px;width:auto;max-width:70%;object-fit:contain;margin:2px 0 14px;}
+.is-past .wc-ev-logo{filter:grayscale(1);opacity:.5;}
+.wc-ev-tbc{display:inline-block;margin-left:2px;font-size:12.5px;font-style:italic;color:#7b828a;}
 .wc-ev-title{margin:0 0 15px;font-size:20px;line-height:1.3;font-weight:700;color:var(--wc-navy);}
 .wc-ev-facts{display:grid;gap:9px;margin-bottom:15px;}
 .wc-ev-fact{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.55;color:#4b5563;}
@@ -101,6 +105,14 @@
 
 .wc-ev-noupcoming{margin:0 0 22px;padding:16px 18px;border-left:4px solid var(--wc-teal);border-radius:0 8px 8px 0;background:#eef6f5;color:#41474d;font-size:15px;line-height:1.6;}
 .wc-ev-noupcoming a{color:var(--wc-navy);font-weight:600;}
+.wc-ev-group{margin:0;}
+.wc-ev-group[hidden]{display:none;}
+.wc-ev-group[data-group="upcoming"]:not([hidden]) + .wc-ev-group[data-group="past"]{margin-top:36px;padding-top:32px;border-top:1px solid #e2e6e9;}
+.wc-ev-grouphead{display:flex;align-items:baseline;gap:9px;margin:0 0 18px;font-size:21px;line-height:1.3;font-weight:700;color:var(--wc-navy);}
+.wc-ev-grouphead[hidden]{display:none;}
+.wc-ev-groupcount{font-size:14px;font-weight:600;color:#6b7280;}
+.wc-ev-group[data-group="past"] .wc-ev-grouphead{color:#5f666d;}
+@media (max-width:760px){.wc-ev-grouphead{font-size:19px;}}
 .wc-ev-empty{margin:8px 0 0;padding:38px 20px;border:1px dashed #cfd6db;border-radius:12px;text-align:center;color:#6b7280;font-size:15px;}
 .wc-ev-empty a{color:var(--wc-navy);}
 .wc-ev-filter:focus-visible,.wc-ev-sort-select:focus-visible,.wc-ev-cta:focus-visible,.wc-ev-check input:focus-visible{outline:3px solid rgba(26,155,143,.55);outline-offset:2px;}
@@ -133,9 +145,9 @@
         <span class="wc-ev-sortwrap">
           <label class="wc-ev-sort-label" for="wc-ev-sort">Sort</label>
           <select id="wc-ev-sort" class="wc-ev-sort-select">
-            <option value="default">Upcoming first</option>
-            <option value="date-asc">Date: soonest first</option>
-            <option value="date-desc">Date: latest first</option>
+            <option value="default">Date (default)</option>
+            <option value="date-asc">Oldest first</option>
+            <option value="date-desc">Newest first</option>
             <option value="type">Event type</option>
           </select>
         </span>
@@ -143,37 +155,148 @@
     </div>
 
     <p class="wc-ev-count" role="status"></p>
-    <p class="wc-ev-noupcoming">There are no upcoming events in the diary at the moment. <a href="/contact-us">Get in touch</a> and we will let you know as soon as the next one is booked.</p>
 
-    <div class="wc-ev-grid">
-<!-- WC-EVENTS:START -->
-        <article class="wc-ev-card is-past" data-type="Workshop" data-accent="teal" data-date="2026-07-16" data-end="2026-07-16" id="event-inheritance-tax-and-pension-workshop-2026-07">
+    <section class="wc-ev-group" data-group="upcoming">
+      <h2 class="wc-ev-grouphead wc-ev-grouphead-upcoming">Upcoming events <span class="wc-ev-groupcount wc-ev-groupcount-upcoming">(4)</span></h2>
+      <p class="wc-ev-noupcoming" hidden>There are no upcoming events in the diary at the moment. <a href="/contact-us">Get in touch</a> and we will let you know as soon as the next one is booked.</p>
+      <div class="wc-ev-grid" data-grid="upcoming">
+<!-- WC-EVENTS-UPCOMING:START -->
+        <article class="wc-ev-card" data-type="Drop-in" data-accent="blue" data-date="2026-08-20" data-end="2026-08-20" id="event-summer-xero-drop-in-2026-08">
+          <p class="wc-ev-stripe" aria-hidden="true"></p>
+          <div class="wc-ev-body">
+            <div class="wc-ev-top">
+              <span class="wc-ev-type">Drop-in</span>
+              <span class="wc-ev-badge" data-upcoming="Upcoming" data-past="Completed">Upcoming</span>
+            </div>
+            <img class="wc-ev-logo" src="assets/images/xero-logo.png" alt="Xero" width="128" height="128" loading="lazy" decoding="async">
+            <h3 class="wc-ev-title">Summer Xero Drop-In</h3>
+            <div class="wc-ev-facts">
+              <div class="wc-ev-fact"><svg class="wc-ev-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 2v3M17 2v3M3.5 9h17M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 19 20.5H5A1.5 1.5 0 0 1 3.5 19V6A1.5 1.5 0 0 1 5 4.5Z"/></svg><span class="wc-ev-fact-label">Date</span><span class="wc-ev-fact-value"><time datetime="2026-08-20">Thursday, 20 August 2026</time></span></div>
+              <div class="wc-ev-fact"><svg class="wc-ev-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></svg><span class="wc-ev-fact-label">Time</span><span class="wc-ev-fact-value">2pm – 4pm</span></div>
+              <div class="wc-ev-fact"><svg class="wc-ev-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s6.5-5.6 6.5-10.4A6.5 6.5 0 0 0 5.5 10.6C5.5 15.4 12 21 12 21Z"/><circle cx="12" cy="10.5" r="2.4"/></svg><span class="wc-ev-fact-label">Location</span><span class="wc-ev-fact-value">Willis Cooper office, Unit 6 Heritage Business Centre, Derby Road, Belper, DE56 1SW</span></div>
+            </div>
+            <p class="wc-ev-desc">Pop in for relaxed, one-to-one help getting more confident with Xero. Bring your questions, grab a brew and a biscuit.</p>
+            <a class="wc-ev-cta" href="/contact-us" data-upcoming="Let us know you are coming" data-past="Ask about the next one">Let us know you are coming</a>
+          </div>
+        </article>
+        <article class="wc-ev-card" data-type="Workshop" data-accent="teal" data-date="2026-09-01" data-end="2026-09-30" id="event-mtd-income-tax-workshop-2026-09">
+          <p class="wc-ev-stripe" aria-hidden="true"></p>
+          <div class="wc-ev-body">
+            <div class="wc-ev-top">
+              <span class="wc-ev-type">Workshop</span>
+              <span class="wc-ev-badge" data-upcoming="Upcoming" data-past="Completed">Upcoming</span>
+            </div>
+            <h3 class="wc-ev-title">MTD for Income Tax Workshop</h3>
+            <div class="wc-ev-facts">
+              <div class="wc-ev-fact"><svg class="wc-ev-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 2v3M17 2v3M3.5 9h17M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 19 20.5H5A1.5 1.5 0 0 1 3.5 19V6A1.5 1.5 0 0 1 5 4.5Z"/></svg><span class="wc-ev-fact-label">Date</span><span class="wc-ev-fact-value"><time datetime="2026-09-01">September 2026</time> <span class="wc-ev-tbc">date to be confirmed</span></span></div>
+              <div class="wc-ev-fact"><svg class="wc-ev-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s6.5-5.6 6.5-10.4A6.5 6.5 0 0 0 5.5 10.6C5.5 15.4 12 21 12 21Z"/><circle cx="12" cy="10.5" r="2.4"/></svg><span class="wc-ev-fact-label">Location</span><span class="wc-ev-fact-value">Willis Cooper office, Belper</span></div>
+            </div>
+            <p class="wc-ev-desc">For clients earning over £30k from self-employment or rental income. What's changing with Making Tax Digital and how to get ready.</p>
+            <a class="wc-ev-cta" href="/contact-us" data-upcoming="Register your interest" data-past="Ask about the next one">Register your interest</a>
+          </div>
+        </article>
+        <article class="wc-ev-card" data-type="Drop-in" data-accent="blue" data-date="2026-10-22" data-end="2026-10-22" id="event-autumn-xero-drop-in-2026-10">
+          <p class="wc-ev-stripe" aria-hidden="true"></p>
+          <div class="wc-ev-body">
+            <div class="wc-ev-top">
+              <span class="wc-ev-type">Drop-in</span>
+              <span class="wc-ev-badge" data-upcoming="Upcoming" data-past="Completed">Upcoming</span>
+            </div>
+            <img class="wc-ev-logo" src="assets/images/xero-logo.png" alt="Xero" width="128" height="128" loading="lazy" decoding="async">
+            <h3 class="wc-ev-title">Autumn Xero Drop-In</h3>
+            <div class="wc-ev-facts">
+              <div class="wc-ev-fact"><svg class="wc-ev-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 2v3M17 2v3M3.5 9h17M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 19 20.5H5A1.5 1.5 0 0 1 3.5 19V6A1.5 1.5 0 0 1 5 4.5Z"/></svg><span class="wc-ev-fact-label">Date</span><span class="wc-ev-fact-value"><time datetime="2026-10-22">Thursday, 22 October 2026</time></span></div>
+              <div class="wc-ev-fact"><svg class="wc-ev-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></svg><span class="wc-ev-fact-label">Time</span><span class="wc-ev-fact-value">Time to be confirmed</span></div>
+              <div class="wc-ev-fact"><svg class="wc-ev-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s6.5-5.6 6.5-10.4A6.5 6.5 0 0 0 5.5 10.6C5.5 15.4 12 21 12 21Z"/><circle cx="12" cy="10.5" r="2.4"/></svg><span class="wc-ev-fact-label">Location</span><span class="wc-ev-fact-value">Willis Cooper office, Belper</span></div>
+            </div>
+            <p class="wc-ev-desc">Same informal format, with an autumn twist.</p>
+            <a class="wc-ev-cta" href="/contact-us" data-upcoming="Let us know you are coming" data-past="Ask about the next one">Let us know you are coming</a>
+          </div>
+        </article>
+        <article class="wc-ev-card" data-type="Workshop" data-accent="plum" data-date="2026-11-01" data-end="2026-11-30" id="event-payroll-and-benefits-workshop-2026-11">
+          <p class="wc-ev-stripe" aria-hidden="true"></p>
+          <div class="wc-ev-body">
+            <div class="wc-ev-top">
+              <span class="wc-ev-type">Workshop</span>
+              <span class="wc-ev-badge" data-upcoming="Upcoming" data-past="Completed">Upcoming</span>
+            </div>
+            <h3 class="wc-ev-title">Payroll and Benefits Workshop</h3>
+            <div class="wc-ev-facts">
+              <div class="wc-ev-fact"><svg class="wc-ev-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 2v3M17 2v3M3.5 9h17M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 19 20.5H5A1.5 1.5 0 0 1 3.5 19V6A1.5 1.5 0 0 1 5 4.5Z"/></svg><span class="wc-ev-fact-label">Date</span><span class="wc-ev-fact-value"><time datetime="2026-11-01">November 2026</time> <span class="wc-ev-tbc">date to be confirmed</span></span></div>
+              <div class="wc-ev-fact"><svg class="wc-ev-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s6.5-5.6 6.5-10.4A6.5 6.5 0 0 0 5.5 10.6C5.5 15.4 12 21 12 21Z"/><circle cx="12" cy="10.5" r="2.4"/></svg><span class="wc-ev-fact-label">Location</span><span class="wc-ev-fact-value">Willis Cooper office, Belper</span></div>
+            </div>
+            <p class="wc-ev-desc">An overview of payroll and employee benefits.</p>
+            <a class="wc-ev-cta" href="/contact-us" data-upcoming="Register your interest" data-past="Ask about the next one">Register your interest</a>
+          </div>
+        </article>
+<!-- WC-EVENTS-UPCOMING:END -->
+      </div>
+    </section>
+
+    <section class="wc-ev-group" data-group="past">
+      <h2 class="wc-ev-grouphead wc-ev-grouphead-past">Past events <span class="wc-ev-groupcount wc-ev-groupcount-past">(3)</span></h2>
+      <div class="wc-ev-grid" data-grid="past">
+<!-- WC-EVENTS-PAST:START -->
+        <article class="wc-ev-card is-past" data-type="Workshop" data-accent="teal" data-date="2026-07-16" data-end="2026-07-16" id="event-iht-and-pensions-workshop-2026-07">
           <p class="wc-ev-stripe" aria-hidden="true"></p>
           <div class="wc-ev-body">
             <div class="wc-ev-top">
               <span class="wc-ev-type">Workshop</span>
               <span class="wc-ev-badge" data-upcoming="Upcoming" data-past="Completed">Completed</span>
             </div>
-            <h2 class="wc-ev-title">Inheritance Tax and Pension workshop</h2>
+            <h3 class="wc-ev-title">IHT and Pensions Workshop</h3>
             <div class="wc-ev-facts">
               <div class="wc-ev-fact"><svg class="wc-ev-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 2v3M17 2v3M3.5 9h17M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 19 20.5H5A1.5 1.5 0 0 1 3.5 19V6A1.5 1.5 0 0 1 5 4.5Z"/></svg><span class="wc-ev-fact-label">Date</span><span class="wc-ev-fact-value"><time datetime="2026-07-16">Thursday, 16 July 2026</time></span></div>
               <div class="wc-ev-fact"><svg class="wc-ev-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></svg><span class="wc-ev-fact-label">Time</span><span class="wc-ev-fact-value">10am</span></div>
-              <div class="wc-ev-fact"><svg class="wc-ev-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s6.5-5.6 6.5-10.4A6.5 6.5 0 0 0 5.5 10.6C5.5 15.4 12 21 12 21Z"/><circle cx="12" cy="10.5" r="2.4"/></svg><span class="wc-ev-fact-label">Location</span><span class="wc-ev-fact-value">Willis Cooper, Unit 6, Heritage Business Centre, Derby Rd, Belper, DE56 1SW</span></div>
+              <div class="wc-ev-fact"><svg class="wc-ev-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s6.5-5.6 6.5-10.4A6.5 6.5 0 0 0 5.5 10.6C5.5 15.4 12 21 12 21Z"/><circle cx="12" cy="10.5" r="2.4"/></svg><span class="wc-ev-fact-label">Location</span><span class="wc-ev-fact-value">Willis Cooper office, Belper</span></div>
               <div class="wc-ev-fact"><svg class="wc-ev-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M14.6 9.3a3 3 0 0 0-5.1 2.1c0 2.6 5.2 2 5.2 4.3a3 3 0 0 1-5.2 1.4M12 6.6v10.8"/></svg><span class="wc-ev-fact-label">Cost</span><span class="wc-ev-fact-value">Free to attend</span></div>
             </div>
-            <p class="wc-ev-desc" hidden>A practical session on how Inheritance Tax and pensions work together, and the planning options open to you and your family.</p>
-            <p class="wc-ev-note">This workshop has now taken place. Thank you to everyone who joined us — get in touch to be told about the next one.</p>
+            <p class="wc-ev-desc">A look at proposed changes to inheritance tax and pensions, estate planning considerations, and how to spot potential risks. With guest speaker David Atack from B3 Wealth Management.</p>
             <a class="wc-ev-cta" href="/contact-us" data-upcoming="Register your interest" data-past="Ask about the next one">Ask about the next one</a>
           </div>
         </article>
-<!-- WC-EVENTS:END -->
-    </div>
+        <article class="wc-ev-card is-past" data-type="Workshop" data-accent="plum" data-date="2026-05-08" data-end="2026-05-08" id="event-renters-rights-and-landlord-workshop-2026-05">
+          <p class="wc-ev-stripe" aria-hidden="true"></p>
+          <div class="wc-ev-body">
+            <div class="wc-ev-top">
+              <span class="wc-ev-type">Workshop</span>
+              <span class="wc-ev-badge" data-upcoming="Upcoming" data-past="Completed">Completed</span>
+            </div>
+            <h3 class="wc-ev-title">Renters' Rights and Landlord Workshop</h3>
+            <div class="wc-ev-facts">
+              <div class="wc-ev-fact"><svg class="wc-ev-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 2v3M17 2v3M3.5 9h17M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 19 20.5H5A1.5 1.5 0 0 1 3.5 19V6A1.5 1.5 0 0 1 5 4.5Z"/></svg><span class="wc-ev-fact-label">Date</span><span class="wc-ev-fact-value"><time datetime="2026-05-08">Friday, 8 May 2026</time></span></div>
+              <div class="wc-ev-fact"><svg class="wc-ev-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s6.5-5.6 6.5-10.4A6.5 6.5 0 0 0 5.5 10.6C5.5 15.4 12 21 12 21Z"/><circle cx="12" cy="10.5" r="2.4"/></svg><span class="wc-ev-fact-label">Location</span><span class="wc-ev-fact-value">Willis Cooper office, Belper</span></div>
+            </div>
+            <p class="wc-ev-desc">A session for landlords on the Renters' Rights Act and what it means in practice, run in partnership with Nicola at Smartmove Homes. Attendees received a follow-up information pack.</p>
+            <a class="wc-ev-cta" href="/contact-us" data-upcoming="Register your interest" data-past="Ask about the next one">Ask about the next one</a>
+          </div>
+        </article>
+        <article class="wc-ev-card is-past" data-type="Drop-in" data-accent="blue" data-date="2025-06-01" data-end="2025-06-30" id="event-xero-drop-in-2025-06">
+          <p class="wc-ev-stripe" aria-hidden="true"></p>
+          <div class="wc-ev-body">
+            <div class="wc-ev-top">
+              <span class="wc-ev-type">Drop-in</span>
+              <span class="wc-ev-badge" data-upcoming="Upcoming" data-past="Completed">Completed</span>
+            </div>
+            <img class="wc-ev-logo" src="assets/images/xero-logo.png" alt="Xero" width="128" height="128" loading="lazy" decoding="async">
+            <h3 class="wc-ev-title">Xero Drop-In</h3>
+            <div class="wc-ev-facts">
+              <div class="wc-ev-fact"><svg class="wc-ev-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 2v3M17 2v3M3.5 9h17M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 19 20.5H5A1.5 1.5 0 0 1 3.5 19V6A1.5 1.5 0 0 1 5 4.5Z"/></svg><span class="wc-ev-fact-label">Date</span><span class="wc-ev-fact-value"><time datetime="2025-06-01">June 2025</time></span></div>
+              <div class="wc-ev-fact"><svg class="wc-ev-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s6.5-5.6 6.5-10.4A6.5 6.5 0 0 0 5.5 10.6C5.5 15.4 12 21 12 21Z"/><circle cx="12" cy="10.5" r="2.4"/></svg><span class="wc-ev-fact-label">Location</span><span class="wc-ev-fact-value">Willis Cooper office, Belper</span></div>
+            </div>
+            <p class="wc-ev-desc">Our first informal Xero help session, giving local businesses a chance to get more confident with their software, one biscuit at a time.</p>
+            <a class="wc-ev-cta" href="/contact-us" data-upcoming="Register your interest" data-past="Ask about the next one">Ask about the next one</a>
+          </div>
+        </article>
+<!-- WC-EVENTS-PAST:END -->
+      </div>
+    </section>
 
     <p class="wc-ev-empty" hidden>No events match that filter. <a href="/contact-us">Get in touch</a> and we will tell you what is coming up.</p>
   </div>
 </section>
 <!-- WC-EVENTS-LD:START -->
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"ItemList","name":"Events and workshops from Willis Cooper Chartered Accountants","itemListElement":[{"@type":"ListItem","position":1,"item":{"@type":"Event","name":"Inheritance Tax and Pension workshop","startDate":"2026-07-16T10:00","eventStatus":"https://schema.org/EventScheduled","eventAttendanceMode":"https://schema.org/OfflineEventAttendanceMode","description":"A practical session on how Inheritance Tax and pensions work together, and the planning options open to you and your family.","url":"https://williscooper.com/events#event-inheritance-tax-and-pension-workshop-2026-07","location":{"@type":"Place","name":"Willis Cooper Chartered Accountants","address":{"@type":"PostalAddress","streetAddress":"Unit 6, Heritage Business Centre, Derby Road","addressLocality":"Belper","addressRegion":"Derbyshire","postalCode":"DE56 1SW","addressCountry":"GB"}},"organizer":{"@type":"Organization","name":"Willis Cooper Chartered Accountants","url":"https://williscooper.com/"},"offers":{"@type":"Offer","price":"0","priceCurrency":"GBP","availability":"https://schema.org/InStock","url":"https://williscooper.com/events"}}}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"ItemList","name":"Events and workshops from Willis Cooper Chartered Accountants","itemListElement":[{"@type":"ListItem","position":1,"item":{"@type":"Event","name":"Summer Xero Drop-In","startDate":"2026-08-20T14:00","eventStatus":"https://schema.org/EventScheduled","eventAttendanceMode":"https://schema.org/OfflineEventAttendanceMode","description":"Pop in for relaxed, one-to-one help getting more confident with Xero. Bring your questions, grab a brew and a biscuit.","url":"https://williscooper.com/events#event-summer-xero-drop-in-2026-08","location":{"@type":"Place","name":"Willis Cooper Chartered Accountants","address":{"@type":"PostalAddress","streetAddress":"Unit 6, Heritage Business Centre, Derby Road","addressLocality":"Belper","addressRegion":"Derbyshire","postalCode":"DE56 1SW","addressCountry":"GB"}},"organizer":{"@type":"Organization","name":"Willis Cooper Chartered Accountants","url":"https://williscooper.com/"}}},{"@type":"ListItem","position":2,"item":{"@type":"Event","name":"MTD for Income Tax Workshop","startDate":"2026-09","eventStatus":"https://schema.org/EventScheduled","eventAttendanceMode":"https://schema.org/OfflineEventAttendanceMode","description":"For clients earning over £30k from self-employment or rental income. What's changing with Making Tax Digital and how to get ready.","url":"https://williscooper.com/events#event-mtd-income-tax-workshop-2026-09","location":{"@type":"Place","name":"Willis Cooper Chartered Accountants","address":{"@type":"PostalAddress","streetAddress":"Unit 6, Heritage Business Centre, Derby Road","addressLocality":"Belper","addressRegion":"Derbyshire","postalCode":"DE56 1SW","addressCountry":"GB"}},"organizer":{"@type":"Organization","name":"Willis Cooper Chartered Accountants","url":"https://williscooper.com/"}}},{"@type":"ListItem","position":3,"item":{"@type":"Event","name":"Autumn Xero Drop-In","startDate":"2026-10-22","eventStatus":"https://schema.org/EventScheduled","eventAttendanceMode":"https://schema.org/OfflineEventAttendanceMode","description":"Same informal format, with an autumn twist.","url":"https://williscooper.com/events#event-autumn-xero-drop-in-2026-10","location":{"@type":"Place","name":"Willis Cooper Chartered Accountants","address":{"@type":"PostalAddress","streetAddress":"Unit 6, Heritage Business Centre, Derby Road","addressLocality":"Belper","addressRegion":"Derbyshire","postalCode":"DE56 1SW","addressCountry":"GB"}},"organizer":{"@type":"Organization","name":"Willis Cooper Chartered Accountants","url":"https://williscooper.com/"}}},{"@type":"ListItem","position":4,"item":{"@type":"Event","name":"Payroll and Benefits Workshop","startDate":"2026-11","eventStatus":"https://schema.org/EventScheduled","eventAttendanceMode":"https://schema.org/OfflineEventAttendanceMode","description":"An overview of payroll and employee benefits.","url":"https://williscooper.com/events#event-payroll-and-benefits-workshop-2026-11","location":{"@type":"Place","name":"Willis Cooper Chartered Accountants","address":{"@type":"PostalAddress","streetAddress":"Unit 6, Heritage Business Centre, Derby Road","addressLocality":"Belper","addressRegion":"Derbyshire","postalCode":"DE56 1SW","addressCountry":"GB"}},"organizer":{"@type":"Organization","name":"Willis Cooper Chartered Accountants","url":"https://williscooper.com/"}}},{"@type":"ListItem","position":5,"item":{"@type":"Event","name":"IHT and Pensions Workshop","startDate":"2026-07-16T10:00","eventStatus":"https://schema.org/EventScheduled","eventAttendanceMode":"https://schema.org/OfflineEventAttendanceMode","description":"A look at proposed changes to inheritance tax and pensions, estate planning considerations, and how to spot potential risks. With guest speaker David Atack from B3 Wealth Management.","url":"https://williscooper.com/events#event-iht-and-pensions-workshop-2026-07","location":{"@type":"Place","name":"Willis Cooper Chartered Accountants","address":{"@type":"PostalAddress","streetAddress":"Unit 6, Heritage Business Centre, Derby Road","addressLocality":"Belper","addressRegion":"Derbyshire","postalCode":"DE56 1SW","addressCountry":"GB"}},"organizer":{"@type":"Organization","name":"Willis Cooper Chartered Accountants","url":"https://williscooper.com/"},"offers":{"@type":"Offer","price":"0","priceCurrency":"GBP","availability":"https://schema.org/InStock","url":"https://williscooper.com/events"}}},{"@type":"ListItem","position":6,"item":{"@type":"Event","name":"Renters' Rights and Landlord Workshop","startDate":"2026-05-08","eventStatus":"https://schema.org/EventScheduled","eventAttendanceMode":"https://schema.org/OfflineEventAttendanceMode","description":"A session for landlords on the Renters' Rights Act and what it means in practice, run in partnership with Nicola at Smartmove Homes. Attendees received a follow-up information pack.","url":"https://williscooper.com/events#event-renters-rights-and-landlord-workshop-2026-05","location":{"@type":"Place","name":"Willis Cooper Chartered Accountants","address":{"@type":"PostalAddress","streetAddress":"Unit 6, Heritage Business Centre, Derby Road","addressLocality":"Belper","addressRegion":"Derbyshire","postalCode":"DE56 1SW","addressCountry":"GB"}},"organizer":{"@type":"Organization","name":"Willis Cooper Chartered Accountants","url":"https://williscooper.com/"}}},{"@type":"ListItem","position":7,"item":{"@type":"Event","name":"Xero Drop-In","startDate":"2025-06","eventStatus":"https://schema.org/EventScheduled","eventAttendanceMode":"https://schema.org/OfflineEventAttendanceMode","description":"Our first informal Xero help session, giving local businesses a chance to get more confident with their software, one biscuit at a time.","url":"https://williscooper.com/events#event-xero-drop-in-2025-06","location":{"@type":"Place","name":"Willis Cooper Chartered Accountants","address":{"@type":"PostalAddress","streetAddress":"Unit 6, Heritage Business Centre, Derby Road","addressLocality":"Belper","addressRegion":"Derbyshire","postalCode":"DE56 1SW","addressCountry":"GB"}},"organizer":{"@type":"Organization","name":"Willis Cooper Chartered Accountants","url":"https://williscooper.com/"}}}]}</script>
 <!-- WC-EVENTS-LD:END -->
 <section id="zSiG-O" class="block" style="--cols:12;--rows:10;--width:1224px;--m-rows:1;--col-gap:24px;--row-gap:16px;--row-size:48px;--column-gap:24px;--block-padding-top:16px;--block-padding:16px 0 16px 0;--block-padding-right:0;--block-padding-bottom:16px;--block-padding-left:0;--m-block-padding:40px 16px 40px 16px;" data-v-3ffce944="" data-qa="block"><div class="block-background transition-with-bg" data-v-3ffce944="" style="--v4cfc8878:rgb(2, 39, 51);--v5abb0200:50%;--v5c6fda9f:0%;--v47c095f9:50%;--v000e51f2:center;--v79d8fbfe:calc(-20svh * 50 / 100);--v3f9ca25a:false;"><!----><!----><!----></div><div class="block-layout block-layout--layout" style="--m-grid-template-rows:11.11vw auto 5.28vw auto 6.11vw 40.28vw auto 11.11vw 9.44vw 3.06vw auto 0.83vw auto 4.44vw auto 4.44vw auto 4.44vw auto 4.44vw auto 4.44vw auto 4.44vw auto 4.44vw auto 3.06vw auto 2.22vw auto 0px;--t-grid-template-rows:minmax(40px, auto) minmax(21px, auto) minmax(19px, auto) minmax(30px, auto) minmax(22px, auto) minmax(145px, auto) minmax(27px, auto) minmax(40px, auto) minmax(34px, auto) minmax(11px, auto) minmax(13px, auto) minmax(3px, auto) minmax(24px, auto) minmax(16px, auto) minmax(24px, auto) minmax(16px, auto) minmax(24px, auto) minmax(16px, auto) minmax(24px, auto) minmax(16px, auto) minmax(24px, auto) minmax(16px, auto) minmax(24px, auto) minmax(16px, auto) minmax(24px, auto) minmax(16px, auto) minmax(24px, auto) minmax(11px, auto) minmax(144px, auto) minmax(8px, auto) minmax(32px, auto) 1fr;--small-desktop-grid-template-rows:minmax(3.51vw, auto) minmax(1.23vw, auto) minmax(0.41vw, auto) minmax(0.33vw, auto) minmax(1.96vw, auto) minmax(0.25vw, auto) minmax(0.33vw, auto) minmax(0.57vw, auto) minmax(0.82vw, auto) minmax(0.41vw, auto) minmax(1.23vw, auto) minmax(0.57vw, auto) minmax(0.16vw, auto) minmax(1.88vw, auto) minmax(0.08vw, auto) minmax(0.16vw, auto) minmax(0.98vw, auto) minmax(0.98vw, auto) minmax(0.16vw, auto) minmax(0.33vw, auto) minmax(1.96vw, auto) minmax(0.16vw, auto) minmax(1.96vw, auto) minmax(0.25vw, auto) minmax(1.72vw, auto) minmax(1.06vw, auto) minmax(3.35vw, auto) 0.00vw;--grid-template-rows:minmax(43px, auto) minmax(15px, auto) minmax(5px, auto) minmax(4px, auto) minmax(24px, auto) minmax(3px, auto) minmax(4px, auto) minmax(7px, auto) minmax(10px, auto) minmax(5px, auto) minmax(15px, auto) minmax(7px, auto) minmax(2px, auto) minmax(23px, auto) minmax(1px, auto) minmax(2px, auto) minmax(12px, auto) minmax(12px, auto) minmax(2px, auto) minmax(4px, auto) minmax(24px, auto) minmax(2px, auto) minmax(24px, auto) minmax(3px, auto) minmax(21px, auto) minmax(13px, auto) minmax(41px, auto) 1fr;--m-grid-template-columns:25.91% 13.72% 2.74% 15.24% 2.74% 13.72% 25.91%;--grid-template-columns:15.85% 0.98% 3.43% 9.31% 6.70% 27.45% 18.30% 2.70% 3.51% 2.37% 1.31% 0.65% 0.90% 6.54%;--m-block-min-height:auto;--t-block-min-height:376px;--small-desktop-block-min-height:auto;--block-min-height:328px;--v3f3138e2:1224px;--c27f45b8:360px;--v66d5c4a6:0 4.444444444444445vw;--v1984096a:0 16px;" data-v-3ffce944=""><!--[--><!--[--><div class="layout-element layout-element--layout layout-element transition transition--slide" style="--icon-size:30px;--icon-color:rgb(255, 255, 255);--icon-spacing:space-between;--icon-direction:row;--icon-color-hover:rgb(61, 171, 199);--m-element-margin:0 0 32px 0;--space-between-icons:32px;--z-index:1;--grid-row:9/12;--grid-column:1/2;--m-grid-row:4/5;--m-grid-column:2/7;--v970c3d1a:30px;--v1df5386b:30px;" data-v-12e029d5="" data-qa="layout-element-wrapper:ai-r_jdnq"><!--[--><!----><!----><!----><!----><!----><!----><!----><div class="social-icons social-icons--row layout-element__component layout-element__component--GridSocialIcons" style="--m-icon-direction:row;--icon-padding-vertical:0;--icon-padding-horizontal:var(--space-between-icons);height:100%;--space-between-icons:0px;" id="ai-R_jdNq" data-v-12e029d5="" data-v-7a627136="" data-qa="gridsocialicons:ai-r_jdnq"><!--[--><a href="https://www.facebook.com/williscooperbelper/?locale=en_GB" target="_blank" rel="noopener" title="Go to Facebook page" class="social-icons__link" data-v-7a627136=""><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M24 12.0726C24 5.44354 18.629 0.0725708 12 0.0725708C5.37097 0.0725708 0 5.44354 0 12.0726C0 18.0619 4.38823 23.0264 10.125 23.9274V15.5414H7.07661V12.0726H10.125V9.4287C10.125 6.42144 11.9153 4.76031 14.6574 4.76031C15.9706 4.76031 17.3439 4.99451 17.3439 4.99451V7.94612H15.8303C14.34 7.94612 13.875 8.87128 13.875 9.82015V12.0726H17.2031L16.6708 15.5414H13.875V23.9274C19.6118 23.0264 24 18.0619 24 12.0726Z" fill="currentColor"></path>
@@ -214,20 +337,36 @@
   });
 })();
 </script><script>
-/* North Bear: events listing enhancement. Without this the cards still show —
-   it re-checks which events have passed (so a card greys itself the day after
-   without a redeploy) and adds filtering and sorting. */
+/* North Bear: events listing enhancement. Without this the cards still show,
+   already split into Upcoming and Past — this re-checks the dates on each
+   visit (so an event moves itself into Past the day after, with no redeploy)
+   and adds filtering and sorting. */
 (function () {
   var section = document.querySelector('.wc-ev-section');
   if (!section) return;
-  var grid = section.querySelector('.wc-ev-grid');
+  var grids = {
+    upcoming: section.querySelector('.wc-ev-grid[data-grid="upcoming"]'),
+    past: section.querySelector('.wc-ev-grid[data-grid="past"]')
+  };
   var cards = [].slice.call(section.querySelectorAll('.wc-ev-card'));
-  if (!grid || !cards.length) return;
+  if (!grids.upcoming || !grids.past || !cards.length) return;
 
+  var groups = {
+    upcoming: section.querySelector('.wc-ev-group[data-group="upcoming"]'),
+    past: section.querySelector('.wc-ev-group[data-group="past"]')
+  };
+  var heads = {
+    upcoming: section.querySelector('.wc-ev-grouphead-upcoming'),
+    past: section.querySelector('.wc-ev-grouphead-past')
+  };
+  var groupCounts = {
+    upcoming: section.querySelector('.wc-ev-groupcount-upcoming'),
+    past: section.querySelector('.wc-ev-groupcount-past')
+  };
   var controls = section.querySelector('.wc-ev-controls');
   var filtersWrap = section.querySelector('.wc-ev-filters');
   var sortSel = section.querySelector('.wc-ev-sort-select');
-  var hidePast = section.querySelector('.wc-ev-hidepast');
+  var hidePastBox = section.querySelector('.wc-ev-hidepast');
   var countEl = section.querySelector('.wc-ev-count');
   var emptyEl = section.querySelector('.wc-ev-empty');
   var noUpcomingEl = section.querySelector('.wc-ev-noupcoming');
@@ -254,8 +393,7 @@
     var cta = card.querySelector('.wc-ev-cta');
     if (cta) cta.textContent = past ? cta.getAttribute('data-past') : cta.getAttribute('data-upcoming');
     var note = card.querySelector('.wc-ev-note');
-    var desc = card.querySelector('.wc-ev-desc');
-    if (note) { note.hidden = !past; if (desc) desc.hidden = past; }
+    if (note) note.hidden = !past;
 
     card.wcPast = past;
     card.wcTime = end ? end.getTime() : 0;
@@ -280,25 +418,23 @@
     filtersWrap.appendChild(makeFilter('All events', 'all'));
     types.forEach(function (t) { filtersWrap.appendChild(makeFilter(t, t)); });
   }
-  /* One lone event does not need filtering or sorting UI. */
   if (controls && cards.length > 1) controls.hidden = false;
 
-  function comparator(mode) {
+  function comparator(mode, isPastGroup) {
     if (mode === 'date-asc') return function (a, b) { return a.wcTime - b.wcTime; };
     if (mode === 'date-desc') return function (a, b) { return b.wcTime - a.wcTime; };
     if (mode === 'type') return function (a, b) {
       return a.wcType.localeCompare(b.wcType) || a.wcTime - b.wcTime;
     };
-    /* default: upcoming soonest-first, then past most-recent-first */
-    return function (a, b) {
-      if (a.wcPast !== b.wcPast) return a.wcPast ? 1 : -1;
-      return a.wcPast ? b.wcTime - a.wcTime : a.wcTime - b.wcTime;
-    };
+    /* default: upcoming soonest first, past most recent first */
+    return isPastGroup
+      ? function (a, b) { return b.wcTime - a.wcTime; }
+      : function (a, b) { return a.wcTime - b.wcTime; };
   }
 
   function update() {
     var mode = sortSel ? sortSel.value : 'default';
-    var hiding = !!(hidePast && hidePast.checked);
+    var hiding = !!(hidePastBox && hidePastBox.checked);
 
     if (filtersWrap) {
       [].slice.call(filtersWrap.children).forEach(function (b) {
@@ -311,28 +447,41 @@
       if (hiding && c.wcPast) return false;
       return true;
     });
-
     cards.forEach(function (c) { c.hidden = visible.indexOf(c) === -1; });
-    visible.slice().sort(comparator(mode)).forEach(function (c) { grid.appendChild(c); });
 
-    if (emptyEl) emptyEl.hidden = visible.length !== 0;
-    /* A note about the diary as a whole, so it does not flicker with filters. */
-    if (noUpcomingEl) noUpcomingEl.hidden = cards.some(function (c) { return !c.wcPast; });
-    if (countEl) {
-      if (!visible.length || cards.length < 2) {
-        countEl.textContent = '';
-      } else {
-        var upcoming = visible.filter(function (c) { return !c.wcPast; }).length;
-        var noun = visible.length === 1 ? 'event' : 'events';
-        var label = activeType === 'all' ? '' : ' in ' + activeType;
-        countEl.textContent = 'Showing ' + visible.length + ' ' + noun + label +
-          ' — ' + upcoming + ' upcoming, ' + (visible.length - upcoming) + ' past.';
+    /* Nothing upcoming in the diary at all is a different message from a
+       filter that happened to match nothing. */
+    var anyUpcoming = cards.some(function (c) { return !c.wcPast; });
+    if (noUpcomingEl) noUpcomingEl.hidden = anyUpcoming;
+
+    var shown = { upcoming: 0, past: 0 };
+    ['upcoming', 'past'].forEach(function (key) {
+      var isPastGroup = key === 'past';
+      var mine = cards.filter(function (c) { return c.wcPast === isPastGroup; });
+      mine.slice().sort(comparator(mode, isPastGroup)).forEach(function (c) { grids[key].appendChild(c); });
+
+      var count = mine.filter(function (c) { return !c.hidden; }).length;
+      shown[key] = count;
+      if (heads[key]) heads[key].hidden = count === 0;
+      if (groupCounts[key]) groupCounts[key].textContent = count > 1 ? '(' + count + ')' : '';
+      if (groups[key]) {
+        groups[key].hidden = key === 'upcoming'
+          ? (count === 0 && anyUpcoming)
+          : count === 0;
       }
+    });
+
+    if (emptyEl) emptyEl.hidden = !(visible.length === 0 && anyUpcoming);
+    if (countEl) {
+      countEl.textContent = (visible.length === 0 || cards.length < 2) ? '' :
+        'Showing ' + visible.length + ' ' + (visible.length === 1 ? 'event' : 'events') +
+        (activeType === 'all' ? '' : ' in ' + activeType) +
+        ' — ' + shown.upcoming + ' upcoming, ' + shown.past + ' past.';
     }
   }
 
   if (sortSel) sortSel.addEventListener('change', update);
-  if (hidePast) hidePast.addEventListener('change', update);
+  if (hidePastBox) hidePastBox.addEventListener('change', update);
   update();
 })();
 </script></body></html>

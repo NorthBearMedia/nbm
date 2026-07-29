@@ -1,21 +1,89 @@
 {
-  "_howToAddAnEvent": "Add an object to the list below, then run: node sites/williscooper/build-events.mjs — that regenerates the event cards and the search-engine data inside events.html. Required: title, type, date. accent picks the colour stripe (teal, blue, plum, gold, rose). Dates are YYYY-MM-DD. An event greys itself out automatically once its date has passed; you never need to mark it 'completed' by hand.",
+  "_howToAddAnEvent": "Add an object to the list below, then run: node sites/williscooper/build-events.mjs — that regenerates the event cards and the search-engine data inside events.html. Required: title, type, date. accent picks the colour stripe (teal, blue, plum, gold, rose). Dates are YYYY-MM-DD; when only the month is known use \"precision\": \"month\" with the 1st of that month, and the event stays upcoming until the month is over. Use dateNote for 'date to be confirmed' and timeLabel for 'Time to be confirmed'. An event moves itself into the Past events section and greys out automatically once its date has passed; you never mark it completed by hand. Full guide in EVENTS.md.",
   "events": [
     {
-      "id": "inheritance-tax-and-pension-workshop-2026-07",
-      "title": "Inheritance Tax and Pension workshop",
+      "id": "summer-xero-drop-in-2026-08",
+      "title": "Summer Xero Drop-In",
+      "type": "Drop-in",
+      "accent": "blue",
+      "logo": "assets/images/xero-logo.png",
+      "logoAlt": "Xero",
+      "date": "2026-08-20",
+      "timeLabel": "2pm – 4pm",
+      "startTime": "14:00",
+      "location": "Willis Cooper office, Unit 6 Heritage Business Centre, Derby Road, Belper, DE56 1SW",
+      "description": "Pop in for relaxed, one-to-one help getting more confident with Xero. Bring your questions, grab a brew and a biscuit.",
+      "ctaLabel": "Let us know you are coming"
+    },
+    {
+      "id": "mtd-income-tax-workshop-2026-09",
+      "title": "MTD for Income Tax Workshop",
+      "type": "Workshop",
+      "accent": "teal",
+      "date": "2026-09-01",
+      "precision": "month",
+      "dateNote": "date to be confirmed",
+      "location": "Willis Cooper office, Belper",
+      "description": "For clients earning over £30k from self-employment or rental income. What's changing with Making Tax Digital and how to get ready.",
+      "ctaLabel": "Register your interest"
+    },
+    {
+      "id": "autumn-xero-drop-in-2026-10",
+      "title": "Autumn Xero Drop-In",
+      "type": "Drop-in",
+      "accent": "blue",
+      "logo": "assets/images/xero-logo.png",
+      "logoAlt": "Xero",
+      "date": "2026-10-22",
+      "timeLabel": "Time to be confirmed",
+      "location": "Willis Cooper office, Belper",
+      "description": "Same informal format, with an autumn twist.",
+      "ctaLabel": "Let us know you are coming"
+    },
+    {
+      "id": "payroll-and-benefits-workshop-2026-11",
+      "title": "Payroll and Benefits Workshop",
+      "type": "Workshop",
+      "accent": "plum",
+      "date": "2026-11-01",
+      "precision": "month",
+      "dateNote": "date to be confirmed",
+      "location": "Willis Cooper office, Belper",
+      "description": "An overview of payroll and employee benefits.",
+      "ctaLabel": "Register your interest"
+    },
+    {
+      "id": "iht-and-pensions-workshop-2026-07",
+      "title": "IHT and Pensions Workshop",
       "type": "Workshop",
       "accent": "teal",
       "date": "2026-07-16",
       "timeLabel": "10am",
       "startTime": "10:00",
-      "location": "Willis Cooper, Unit 6, Heritage Business Centre, Derby Rd, Belper, DE56 1SW",
+      "location": "Willis Cooper office, Belper",
       "cost": "Free to attend",
-      "description": "A practical session on how Inheritance Tax and pensions work together, and the planning options open to you and your family.",
-      "ctaLabel": "Register your interest",
-      "ctaUrl": "/contact-us",
-      "pastNote": "This workshop has now taken place. Thank you to everyone who joined us — get in touch to be told about the next one.",
-      "pastCtaLabel": "Ask about the next one"
+      "description": "A look at proposed changes to inheritance tax and pensions, estate planning considerations, and how to spot potential risks. With guest speaker David Atack from B3 Wealth Management."
+    },
+    {
+      "id": "renters-rights-and-landlord-workshop-2026-05",
+      "title": "Renters' Rights and Landlord Workshop",
+      "type": "Workshop",
+      "accent": "plum",
+      "date": "2026-05-08",
+      "location": "Willis Cooper office, Belper",
+      "description": "A session for landlords on the Renters' Rights Act and what it means in practice, run in partnership with Nicola at Smartmove Homes. Attendees received a follow-up information pack."
+    },
+    {
+      "id": "xero-drop-in-2025-06",
+      "title": "Xero Drop-In",
+      "type": "Drop-in",
+      "accent": "blue",
+      "logo": "assets/images/xero-logo.png",
+      "logoAlt": "Xero",
+      "date": "2025-06-01",
+      "precision": "month",
+      "location": "Willis Cooper office, Belper",
+      "description": "Our first informal Xero help session, giving local businesses a chance to get more confident with their software, one biscuit at a time."
     }
   ]
 }
