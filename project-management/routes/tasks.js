@@ -12,6 +12,22 @@ const router = Router();
 
 // ─── Task CRUD ────────────────────────────────────────
 
+// Staff visibility rule: non-owners only see/touch tasks assigned to them
+// (primary or secondary). Owners see everything. Applied to every task-scoped
+// write and every task-listing query in this file.
+function canAccessTask(req, task) {
+  if (req.user.role === 'owner') return true;
+  const me = req.user.display_name;
+  return task.assignee === me || task.secondary_assignee === me;
+}
+// Combined non-owner listing filter: private clients hidden AND only tasks
+// assigned to them. display_name is server session data (not request input),
+// quoted-escaped for inlining. Requires t + c aliases in the query.
+function privScope(req) {
+  const me = req.user.display_name.replace(/'/g, "''");
+  return `AND c.is_private = 0 AND (t.assignee = '${me}' OR t.secondary_assignee = '${me}')`;
+}
+
 function checkPrivateClient(req, res, clientId) {
   const row = db.prepare('SELECT is_private FROM clients WHERE id = ?').get(clientId);
   if (row?.is_private && req.user.role !== 'owner') {
@@ -54,6 +70,8 @@ router.post('/', requireAuth, requireWrite, (req, res) => {
 
   // client_id is optional — clientless quick-captures land in the system "Unassigned" client
   if (!client_id) client_id = getUnassignedClientId();
+  // Staff visibility rule: what a non-owner creates must stay visible to them.
+  if (req.user.role !== 'owner' && !assignee) assignee = req.user.display_name;
   if (!checkPrivateClient(req, res, client_id)) return;
 
   deadline = cleanDate(deadline);
@@ -90,12 +108,13 @@ router.put('/reorder', requireAuth, requireWrite, (req, res) => {
   }
   const isOwner = req.user.role === 'owner';
   const upd = db.prepare('UPDATE tasks SET sort_order = ? WHERE id = ?');
-  const check = db.prepare('SELECT c.is_private FROM tasks t JOIN clients c ON t.client_id = c.id WHERE t.id = ?');
+  const check = db.prepare('SELECT c.is_private, t.assignee, t.secondary_assignee FROM tasks t JOIN clients c ON t.client_id = c.id WHERE t.id = ?');
   db.transaction(() => {
     order.forEach((id, i) => {
       const row = check.get(id);
       if (!row) return;
       if (row.is_private && !isOwner) return;   // can't reorder what you can't see
+      if (!isOwner && row.assignee !== req.user.display_name && row.secondary_assignee !== req.user.display_name) return;
       upd.run((i + 1) * 10, id);
     });
   })();
@@ -109,6 +128,7 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   const old = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!old) return res.status(404).json({ error: 'Task not found' });
   if (!checkPrivateClient(req, res, old.client_id)) return;
+  if (!canAccessTask(req, old)) return res.status(403).json({ error: 'This task isn\'t assigned to you' });
 
   deadline = cleanDate(deadline);
   planned_date = cleanDate(planned_date);
@@ -218,6 +238,7 @@ router.post('/batch-move', requireAuth, requireWrite, (req, res) => {
       const task = db.prepare('SELECT t.*, c.is_private FROM tasks t JOIN clients c ON t.client_id = c.id WHERE t.id = ?').get(id);
       if (!task) continue;
       if (task.is_private && !isOwner) continue;
+      if (!canAccessTask(req, task)) continue;
       update.run(target_client_id, id);
       moved.push(task.title);
       logActivity('task', id, 'updated', req.user.display_name, `Moved to "${targetClient.name}"`);
@@ -239,7 +260,7 @@ router.post('/bulk-shift', requireAuth, requireWrite, (req, res) => {
   }
   const onlyIds = Array.isArray(req.body?.taskIds) ? req.body.taskIds.map(Number).filter(Number.isInteger) : null;
   const isOwner = req.user.role === 'owner';
-  const priv = isOwner ? '' : 'AND c.is_private = 0';
+  const priv = isOwner ? '' : privScope(req);
   let rows;
   if (onlyIds && onlyIds.length) {
     rows = db.prepare(`SELECT t.id, t.deadline, t.planned_date FROM tasks t JOIN clients c ON c.id = t.client_id
@@ -281,6 +302,7 @@ router.put('/:id/archive', requireAuth, requireWrite, (req, res) => {
   const t = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!t) return res.status(404).json({ error: 'Task not found' });
   if (!checkPrivateClient(req, res, t.client_id)) return;
+  if (!canAccessTask(req, t)) return res.status(403).json({ error: 'This task isn\'t assigned to you' });
   const ns = t.archived ? 0 : 1;
   db.prepare('UPDATE tasks SET archived = ? WHERE id = ?').run(ns, req.params.id);
   logActivity('task', req.params.id, ns ? 'archived' : 'restored', req.user.display_name, `${ns ? 'Archived' : 'Restored'} "${t.title}"`);
@@ -290,9 +312,10 @@ router.put('/:id/archive', requireAuth, requireWrite, (req, res) => {
 // ─── Attachments ──────────────────────────────────────
 
 router.post('/:id/attachments', requireAuth, requireWrite, (req, res, next) => {
-  const t = db.prepare('SELECT client_id FROM tasks WHERE id = ?').get(req.params.id);
+  const t = db.prepare('SELECT client_id, assignee, secondary_assignee FROM tasks WHERE id = ?').get(req.params.id);
   if (!t) return res.status(404).json({ error: 'Task not found' });
   if (!checkPrivateClient(req, res, t.client_id)) return;
+  if (!canAccessTask(req, t)) return res.status(403).json({ error: 'This task isn\'t assigned to you' });
   next();
 }, attachUpload.array('files', 10), (req, res) => {
   if (!req.files || !req.files.length) return res.status(400).json({ error: 'No files' });
@@ -321,9 +344,10 @@ export function deleteAttachmentHandler(req, res) {
 router.post('/:id/comments', requireAuth, requireWrite, (req, res) => {
   const { content } = req.body;
   if (!content) return res.status(400).json({ error: 'Content required' });
-  const t = db.prepare('SELECT client_id FROM tasks WHERE id = ?').get(req.params.id);
+  const t = db.prepare('SELECT client_id, assignee, secondary_assignee FROM tasks WHERE id = ?').get(req.params.id);
   if (!t) return res.status(404).json({ error: 'Task not found' });
   if (!checkPrivateClient(req, res, t.client_id)) return;
+  if (!canAccessTask(req, t)) return res.status(403).json({ error: 'This task isn\'t assigned to you' });
   const author = req.user.display_name;
   const r = db.prepare('INSERT INTO comments (task_id, author, content) VALUES (?, ?, ?)').run(req.params.id, author, content);
   logActivity('task', req.params.id, 'commented', author, content.substring(0, 100));
@@ -333,18 +357,20 @@ router.post('/:id/comments', requireAuth, requireWrite, (req, res) => {
 // ─── Checklists ──────────────────────────────────────
 
 router.get('/:id/checklist', requireAuth, (req, res) => {
-  const t = db.prepare('SELECT client_id FROM tasks WHERE id = ?').get(req.params.id);
+  const t = db.prepare('SELECT client_id, assignee, secondary_assignee FROM tasks WHERE id = ?').get(req.params.id);
   if (!t) return res.status(404).json({ error: 'Task not found' });
   if (!checkPrivateClient(req, res, t.client_id)) return;
+  if (!canAccessTask(req, t)) return res.status(403).json({ error: 'This task isn\'t assigned to you' });
   res.json(db.prepare('SELECT * FROM checklist_items WHERE task_id = ? ORDER BY sort_order, id').all(req.params.id));
 });
 
 router.post('/:id/checklist', requireAuth, requireWrite, (req, res) => {
   const { label } = req.body;
   if (!label) return res.status(400).json({ error: 'Label required' });
-  const t = db.prepare('SELECT client_id FROM tasks WHERE id = ?').get(req.params.id);
+  const t = db.prepare('SELECT client_id, assignee, secondary_assignee FROM tasks WHERE id = ?').get(req.params.id);
   if (!t) return res.status(404).json({ error: 'Task not found' });
   if (!checkPrivateClient(req, res, t.client_id)) return;
+  if (!canAccessTask(req, t)) return res.status(403).json({ error: 'This task isn\'t assigned to you' });
   const maxOrder = db.prepare('SELECT MAX(sort_order) as m FROM checklist_items WHERE task_id = ?').get(req.params.id)?.m || 0;
   const r = db.prepare('INSERT INTO checklist_items (task_id, label, sort_order) VALUES (?, ?, ?)').run(req.params.id, label, maxOrder + 1);
   res.json(db.prepare('SELECT * FROM checklist_items WHERE id = ?').get(r.lastInsertRowid));
@@ -367,9 +393,10 @@ router.delete('/:id/checklist/:itemId', requireAuth, requireWrite, (req, res) =>
 // ─── Pin/Star ────────────────────────────────────────
 
 router.put('/:id/pin', requireAuth, (req, res) => {
-  const t = db.prepare('SELECT is_pinned, client_id FROM tasks WHERE id = ?').get(req.params.id);
+  const t = db.prepare('SELECT is_pinned, client_id, assignee, secondary_assignee FROM tasks WHERE id = ?').get(req.params.id);
   if (!t) return res.status(404).json({ error: 'Task not found' });
   if (!checkPrivateClient(req, res, t.client_id)) return;
+  if (!canAccessTask(req, t)) return res.status(403).json({ error: 'This task isn\'t assigned to you' });
   const newVal = t.is_pinned ? 0 : 1;
   db.prepare('UPDATE tasks SET is_pinned = ? WHERE id = ?').run(newVal, req.params.id);
   res.json({ is_pinned: newVal });
@@ -380,6 +407,7 @@ router.post('/:id/duplicate', requireAuth, requireWrite, (req, res) => {
   const old = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!old) return res.status(404).json({ error: 'Task not found' });
   if (!checkPrivateClient(req, res, old.client_id)) return;
+  if (!canAccessTask(req, old)) return res.status(403).json({ error: 'This task isn\'t assigned to you' });
 
   const r = db.prepare(
     'INSERT INTO tasks (project_id, client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, progress, priority, task_status, task_band, task_type, suggested_block, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
@@ -392,7 +420,7 @@ router.post('/:id/duplicate', requireAuth, requireWrite, (req, res) => {
 // ─── Workload Summary ───────────────────────────────
 router.get('/summary', requireAuth, (req, res) => {
   const isOwner = req.user.role === 'owner';
-  const priv = isOwner ? '' : 'AND c.is_private = 0';
+  const priv = isOwner ? '' : privScope(req);
   const tasks = db.prepare(`
     SELECT t.assignee, t.estimated_hours, t.planned_date, t.deadline, t.progress, t.priority
     FROM tasks t JOIN clients c ON t.client_id=c.id
@@ -468,7 +496,7 @@ router.get('/summary', requireAuth, (req, res) => {
 router.get('/workload-detail', requireAuth, (req, res) => {
   const { category, date } = req.query;
   const isOwner = req.user.role === 'owner';
-  const priv = isOwner ? '' : 'AND c.is_private = 0';
+  const priv = isOwner ? '' : privScope(req);
   const baseSelect = `SELECT t.*, c.name as client_name, c.code as client_code
     FROM tasks t JOIN clients c ON t.client_id=c.id
     WHERE t.archived=0 ${priv}`;
@@ -514,7 +542,7 @@ router.get('/by-date', requireAuth, (req, res) => {
   const { date, assignee } = req.query;
   const d = date || new Date().toISOString().split('T')[0];
   const isOwner = req.user.role === 'owner';
-  const priv = isOwner ? '' : 'AND c.is_private = 0';
+  const priv = isOwner ? '' : privScope(req);
   const q = assignee
     ? db.prepare(`SELECT t.*, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN clients c ON t.client_id=c.id WHERE t.planned_date=? AND t.assignee=? AND t.archived=0 ${priv} ORDER BY t.priority, t.sort_order`)
     : db.prepare(`SELECT t.*, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN clients c ON t.client_id=c.id WHERE t.planned_date=? AND t.archived=0 ${priv} ORDER BY t.assignee, t.priority, t.sort_order`);
@@ -525,7 +553,7 @@ router.get('/calendar', requireAuth, (req, res) => {
   const { start, end, assignee } = req.query;
   if (!start || !end) return res.status(400).json({ error: 'start and end required' });
   const isOwner = req.user.role === 'owner';
-  const priv = isOwner ? '' : 'AND c.is_private = 0';
+  const priv = isOwner ? '' : privScope(req);
   const q = assignee
     ? db.prepare(`SELECT t.*, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN clients c ON t.client_id=c.id WHERE t.archived=0 AND t.assignee=? AND (t.planned_date BETWEEN ? AND ? OR t.deadline BETWEEN ? AND ?) ${priv} ORDER BY t.planned_date, t.deadline`)
     : db.prepare(`SELECT t.*, c.name as client_name, c.code as client_code, c.logo_url as client_logo FROM tasks t JOIN clients c ON t.client_id=c.id WHERE t.archived=0 AND (t.planned_date BETWEEN ? AND ? OR t.deadline BETWEEN ? AND ?) ${priv} ORDER BY t.planned_date, t.deadline`);
@@ -539,7 +567,7 @@ router.get('/search', requireAuth, (req, res) => {
   if (!q || q.length < 1) return res.json([]);
 
   const isOwner = req.user.role === 'owner';
-  const priv = isOwner ? '' : 'AND c.is_private = 0';
+  const priv = isOwner ? '' : privScope(req);
   const refMatch = q.match(/^(?:NB)?(\d+)$/i);
   let tasks;
   if (refMatch) {

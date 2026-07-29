@@ -163,6 +163,7 @@ router.get('/api/export/excel', requireAuth, (req, res) => {
     JOIN clients c ON t.client_id = c.id
     WHERE t.archived = 0 AND t.task_status NOT IN ('done', 'cancelled') AND c.is_system = 0
     ${priv}
+    ${isOwner ? '' : `AND (t.assignee = '${req.user.display_name.replace(/'/g, "''")}' OR t.secondary_assignee = '${req.user.display_name.replace(/'/g, "''")}')`}
     ORDER BY c.name, t.deadline
   `).all();
 
