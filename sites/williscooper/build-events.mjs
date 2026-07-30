@@ -118,6 +118,30 @@ ${e.description ? `            <p class="wc-ev-desc">${esc(e.description)}</p>\n
         </article>`;
 };
 
+// Google's Event rich-result guidance treats these as recommended, and Search
+// Console reports them as improvements. Defaults are factual: the host is the
+// performer unless a guest speaker is named, and the fallback image is the
+// firm's own Belper photograph already used across the site.
+const DEFAULT_IMAGE = 'https://williscooper.com/assets/images/15217112968_8b24a1a4df_5k-A3Q7vM2KBrfr3vyp.jpg';
+const HOST = { '@type': 'Organization', name: 'Willis Cooper Chartered Accountants', url: 'https://williscooper.com/' };
+
+const performersFor = e => {
+  const extra = (e.performers || []).map(pf =>
+    pf.affiliation
+      ? { '@type': 'Person', name: pf.name, affiliation: { '@type': 'Organization', name: pf.affiliation } }
+      : { '@type': 'Person', name: pf.name });
+  return extra.length ? [HOST, ...extra] : HOST;
+};
+
+// endDate: an explicit end time when we have one, the month for month-precision
+// events, otherwise the event's own day.
+const endDateFor = e => {
+  if (e.endDate) return e.endDate;
+  if (e.endTime) return `${e.date}T${e.endTime}`;
+  if (e.precision === 'month') return e.date.slice(0, 7);
+  return e.date;
+};
+
 const ldJson = JSON.stringify({
   '@context': 'https://schema.org',
   '@type': 'ItemList',
@@ -131,7 +155,9 @@ const ldJson = JSON.stringify({
       // A month-precision event publishes as "2025-06" rather than inventing a day.
       startDate: e.precision === 'month' ? e.date.slice(0, 7)
         : e.startTime ? `${e.date}T${e.startTime}` : e.date,
-      ...(e.endDate ? { endDate: e.endDate } : {}),
+      endDate: endDateFor(e),
+      image: [e.image ? `https://williscooper.com/${String(e.image).replace(/^\//, '')}` : DEFAULT_IMAGE],
+      performer: performersFor(e),
       eventStatus: 'https://schema.org/EventScheduled',
       eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
       ...(e.description ? { description: e.description } : {}),
@@ -148,7 +174,13 @@ const ldJson = JSON.stringify({
       },
       organizer: { '@type': 'Organization', name: 'Willis Cooper Chartered Accountants', url: 'https://williscooper.com/' },
       ...(/free/i.test(e.cost || '')
-        ? { offers: { '@type': 'Offer', price: '0', priceCurrency: 'GBP', availability: 'https://schema.org/InStock', url: 'https://williscooper.com/events' } }
+        ? { offers: {
+              '@type': 'Offer', price: '0', priceCurrency: 'GBP',
+              availability: 'https://schema.org/InStock',
+              url: 'https://williscooper.com/events',
+              // when the event was published to the site; override with `announced`
+              validFrom: e.announced || '2026-07-29',
+            } }
         : {}),
     },
   })),

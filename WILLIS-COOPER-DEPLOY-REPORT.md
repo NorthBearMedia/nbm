@@ -331,3 +331,32 @@ carries the patch.
 Note for Norton: the link is a normal followed link, which is standard for an
 agency credit. If Willis Cooper ever object to passing link equity, adding
 rel="nofollow" is a one-line change.
+
+---
+
+# Event structured data — 2026-07-30 (tenth deploy)
+
+Search Console flagged 5 non-critical Event improvements. Also worth noting:
+this confirms **Search Console is verified and crawling the new site**, which
+had been an open question after the domain move.
+
+Fixed for all 7 events (verified live):
+- **endDate** - from `endTime` where known (Summer Xero Drop-In now ends
+  16:00, matching its published 2pm to 4pm), the month for month-precision
+  events, otherwise the event's own day.
+- **image** - defaults to the site's own Belper photograph; per-event override
+  via `image`.
+- **performer** - Willis Cooper as host Organization, plus named guest
+  speakers. The IHT workshop now credits David Atack of B3 Wealth Management,
+  which the page copy already stated.
+
+**offers / validFrom: fixed only where the price is documented.** Just one
+event (IHT and Pensions, "Free to attend") carries a cost, so only it gets an
+Offer. The other six were deliberately left rather than assumed free: a
+published price is a promise to whoever turns up, and Norton's source material
+did not state one. Evidence points to free (the past events say so, and the
+Facebook invite mentions no charge) but that needs confirming, after which it
+is `"cost": "Free to attend"` per event and a rebuild.
+
+Note: the scratchpad working copy was cleared mid-task. Everything had been
+committed and pushed, so the repo was re-cloned from 435ff41 with no loss.

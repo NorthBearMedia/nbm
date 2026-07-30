@@ -1,5 +1,5 @@
 {
-  "_howToAddAnEvent": "Add an object to the list below, then run: node sites/williscooper/build-events.mjs — that regenerates the event cards and the search-engine data inside events.html. Required: title, type, date. accent picks the colour stripe (teal, blue, plum, gold, rose). Dates are YYYY-MM-DD; when only the month is known use \"precision\": \"month\" with the 1st of that month, and the event stays upcoming until the month is over. Use dateNote for 'date to be confirmed' and timeLabel for 'Time to be confirmed'. An event moves itself into the Past events section and greys out automatically once its date has passed; you never mark it completed by hand. Full guide in EVENTS.md.",
+  "_howToAddAnEvent": "Add an object to the list below, then run: node sites/williscooper/build-events.mjs — that regenerates the event cards and the search-engine data inside events.html. Required: title, type, date. accent picks the colour stripe (teal, blue, plum, gold, rose). Dates are YYYY-MM-DD; when only the month is known use \"precision\": \"month\" with the 1st of that month, and the event stays upcoming until the month is over. Use dateNote for 'date to be confirmed' and timeLabel for 'Time to be confirmed'. An event moves itself into the Past events section and greys out automatically once its date has passed; you never mark it completed by hand. Full guide in EVENTS.md. Optional schema fields: endTime (HH:MM) gives Google an end time, performers [{name, affiliation}] adds a guest speaker, image overrides the default event photo, cost \"Free to attend\" publishes a price offer, and announced (YYYY-MM-DD) sets when that offer became valid.",
   "events": [
     {
       "id": "summer-xero-drop-in-2026-08",
@@ -13,7 +13,8 @@
       "startTime": "14:00",
       "location": "Willis Cooper office, Unit 6 Heritage Business Centre, Derby Road, Belper, DE56 1SW",
       "description": "Pop in for relaxed, one-to-one help getting more confident with Xero. Bring your questions, grab a brew and a biscuit.",
-      "ctaLabel": "Let us know you are coming"
+      "ctaLabel": "Let us know you are coming",
+      "endTime": "16:00"
     },
     {
       "id": "mtd-income-tax-workshop-2026-09",
@@ -62,7 +63,13 @@
       "startTime": "10:00",
       "location": "Willis Cooper office, Belper",
       "cost": "Free to attend",
-      "description": "A look at proposed changes to inheritance tax and pensions, estate planning considerations, and how to spot potential risks. With guest speaker David Atack from B3 Wealth Management."
+      "description": "A look at proposed changes to inheritance tax and pensions, estate planning considerations, and how to spot potential risks. With guest speaker David Atack from B3 Wealth Management.",
+      "performers": [
+        {
+          "name": "David Atack",
+          "affiliation": "B3 Wealth Management"
+        }
+      ]
     },
     {
       "id": "renters-rights-and-landlord-workshop-2026-05",

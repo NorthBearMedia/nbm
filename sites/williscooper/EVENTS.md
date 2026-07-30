@@ -102,3 +102,23 @@ Pages built from it show a "Demo data" banner, and `events.json`,
 `events.sample.json`, `build-events.mjs` and `events-demo.html` are all
 excluded from `make-staging.mjs` builds, so none of them can reach the live
 site.
+
+## Google Search Console: Event structured data
+
+Search Console reports Google's *recommended* Event fields as improvements.
+The generator now emits, for every event:
+
+- **endDate** - from `endTime` if set, the month for month-precision events,
+  otherwise the event's own day.
+- **image** - `image` on the event if set, otherwise the site's Belper
+  photograph. Supply a real event graphic where one exists; it is what shows
+  in a Google event listing.
+- **performer** - Willis Cooper as host, plus any named guest speaker added
+  through `performers: [{name, affiliation}]`.
+- **offers** with **validFrom** - only when the event has a `cost` containing
+  the word "free". This is deliberate: publishing a price for an event whose
+  price is unconfirmed could send someone to an event expecting the wrong
+  thing. Add `"cost": "Free to attend"` once confirmed and the offer appears.
+
+`announced` (YYYY-MM-DD) overrides the offer's validFrom date, which otherwise
+defaults to when the events system went live.
