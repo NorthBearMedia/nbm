@@ -360,3 +360,47 @@ is `"cost": "Free to attend"` per event and a rebuild.
 
 Note: the scratchpad working copy was cleared mid-task. Everything had been
 committed and pushed, so the repo was re-cloned from 435ff41 with no loss.
+
+---
+
+# Xero Gold Partner badges — 2026-07-30 (eleventh deploy)
+
+Norton supplied Xero Gold Partner badges in
+`Clients/Willis Cooper/01_Brand/Gold Xero/` (capsule, block, block-whiteout,
+block-secondary, all vector PDF). This is a credential, not decoration, so it
+replaces the plain Xero branding rather than sitting alongside it.
+
+Converted with `pdftocairo -png -transp` (ImageMagick could not read the PDFs;
+Ghostscript is not installed on this machine), trimmed and resized:
+- `assets/images/xero-gold-partner.png` — capsule, 900x244, 33KB
+- `assets/images/xero-gold-partner-block.png` — block, 600x600, 46KB
+
+Placed:
+- **Homepage partner strip** — the plain blue Xero circle is replaced by the
+  Gold Partner block. Square-for-square so the layout is undisturbed.
+- **Event cards** — the three Xero events now carry the capsule, which reads
+  far better than a small square on a wide card.
+
+Two bugs fixed in passing:
+- The old Xero circle's alt text read **"Willis Cooper Chartered Accountants
+  logo"**, which was wrong for both screen readers and image search. Now
+  "Xero Gold Partner".
+- The builder gives partner-logo slots `object-fit:cover` inside a 129x87 box,
+  which sliced the top off a 1:1 badge. A scoped `object-fit:contain` rule
+  letterboxes it instead. Caught by screenshotting rather than trusting the
+  markup.
+
+Verified live: 2 block refs on the homepage, 0 remaining references to the old
+circle, 3 capsule refs on /events, both assets serving, corrected alt text and
+the object-fit rule present.
+
+## Available but unused
+
+`Gold block - whiteout.pdf` (mono white, for dark backgrounds) and
+`Gold block - secondary.pdf` are converted in scratch but not deployed. The
+whiteout version would be the right choice if the badge is ever placed on the
+navy footer or a dark hero.
+
+Not done, worth considering: /cloud-accounting carries no Xero branding at
+all, and it is the page where Gold Partner status is most persuasive. That
+would be an addition rather than a swap, so it was left for a decision.
