@@ -404,3 +404,50 @@ navy footer or a dark hero.
 Not done, worth considering: /cloud-accounting carries no Xero branding at
 all, and it is the page where Gold Partner status is most persuasive. That
 would be an addition rather than a swap, so it was left for a decision.
+
+---
+
+# Homepage service cards restyled — 2026-07-30 (twelfth deploy)
+
+Rounded corners (16px), a soft drop shadow, and a whole-card lift-and-scale on
+hover for the five service cards.
+
+**Why it needed JS.** A "card" is not one element. The builder renders each as
+four or five separate grid items sharing a column range: the coloured panel,
+the heading, a rule, and the body text. Nothing wraps them, so there is no
+element to round, shadow or scale. The panel itself is an SVG `<path>` with
+`preserveAspectRatio="none"`, so rounding its geometry would give elliptical
+corners; instead the radius and `overflow:hidden` go on the panel's container,
+which clips the SVG to true circular corners.
+
+The hover applies a class to every member of the card via a listener delegated
+from `document`, and gives all members **one shared transform-origin** computed
+from the card's combined bounding box. Without that, scaling four independent
+boxes about their own centres makes the pieces drift apart instead of reading
+as one card growing.
+
+Gated behind `(hover:hover)` so touch devices do not get a stuck hover state,
+and the scale is dropped under `prefers-reduced-motion`.
+
+## Three traps found by testing rather than assuming
+
+1. **The builder re-renders the section on resize**, discarding any classes or
+   listeners bound to its elements. Hence delegation from `document` rather
+   than per-element listeners.
+2. **Inline styles change shape after hydration.** The shipped HTML has
+   `--grid-row:2/10`; the builder's JS re-serialises it as
+   `--grid-row: 2/10` with a space. The attribute selectors are doubled to
+   match both, and the JS regexes are whitespace-tolerant. The first attempt
+   silently styled nothing because of this.
+3. **`</body>` appears twice on the homepage** — the first belongs to the
+   Facebook iframe's `srcdoc` document. Inserting before the first occurrence
+   put the script inside the iframe, where it ran against a DOM that has no
+   cards and did nothing. It now goes before the last `</body>`.
+
+Also needed `!important` on the hover transform: the static-build animation
+fallback sets `transform:none !important` on `.transition` elements that never
+received an active animation state.
+
+Verified on the live page: 16px radius and shadow present, script in the main
+document, hover applies to all members of a card with `scale(1.035)` and clears
+on leave. All other pages still 200, 404 still 404.
