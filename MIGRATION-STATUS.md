@@ -1,6 +1,6 @@
 # Steadplan → Hostinger migration — session handoff status
 
-**Branch:** `claude/steadplan-wordpress-hostinger-mmoqtc` · **Last update:** 2026-07-31
+**Branch:** `claude/jolly-bohr-4ubh1r` (supersedes `claude/steadplan-wordpress-hostinger-mmoqtc`, merged in) · **Last update:** 2026-07-31 (session 3 prep)
 **Task:** Migrate WordPress site steadplan.co.uk (Steadplan Group) from old agency host to the
 North Bear Hostinger account. No destructive changes; NO DNS changes without explicit user OK.
 **Do not touch** other sites on the account: ensohr.com, ensohr.co.uk, maxus-evc.co.uk.
@@ -17,14 +17,28 @@ falls through). That env var is **not set in the Claude Code cloud environment**
 The claude.ai Hostinger connector that works in the user's normal chats is separate plumbing and
 does not reach these repo sessions.
 
-**Fix (user, one-time):** In the Claude Code environment settings for this repo (same screen as
-the network/domain allowlist) add environment variable/secret `HOSTINGER_API_TOKEN` = the
-Hostinger API token (hpanel.hostinger.com/profile/api). NEVER hardcode the token in `.mcp.json`
-(it's committed to git). Env vars inject at container start → needs a fresh session after saving.
+**RESOLVED PATH (no env var, no settings): token via chat + `scripts/steadplan-hostinger.sh`.**
+The user pastes the Hostinger API token into chat (from hpanel.hostinger.com/profile/api; minting
+a new token does not break their claude.ai connector). Then:
+`export HOSTINGER_API_TOKEN=<pasted>` and use `scripts/steadplan-hostinger.sh` (this branch) for
+ALL Hostinger calls — it replicates the exact endpoints + TUS upload protocol of
+hostinger-api-mcp@1.26.0 with curl. `preflight` / `api METHOD PATH [JSON]` / `import DOMAIN ZIP SQL`.
+Never write the token to any committed file; keep it in the shell env only.
 
-**On session start, re-run pre-flight:** `hosting_listWebsitesV1` + `hosting_listOrdersV1`.
-If "host not permitted" → STOP, tell user allowlist broken. If `Unauthenticated.` → env var
-still missing/misnamed, STOP, tell user.
+**Do NOT use the MCP `hosting_importWordpressWebsite` tool even if a token is present:** its
+upload layer (tus-js-client) ignores `HTTPS_PROXY`, so the 692MB upload would bypass the sandbox
+proxy and hang/fail. The script's curl upload honours the proxy. Read-only MCP tools are fine if
+the env var exists; the script works either way.
+
+**Known network risk:** the upload URL returned by `/api/hosting/v1/files/upload-urls` lives on a
+Hostinger host that is NOT `developers.hostinger.com` (exact host unknown until runtime; the script
+prints it). If the upload dies with `CONNECT tunnel failed, response 403`, report the printed host
+to the user for the allowlist. Pre-emptively allowlisting `*.hostinger.com`, `*.hstgr.io`,
+`*.hostingerapps.com` avoids this and is also needed to curl-test the temporary/preview URL later.
+
+**On session start:** ask the user to paste the API token FIRST, then run
+`scripts/steadplan-hostinger.sh preflight`. If "host not permitted" → allowlist regression, STOP.
+If 401 → token wrong, STOP and say so.
 
 ## Step 2 — backups: verified good (2026-07-31)
 
@@ -66,11 +80,15 @@ Zip passes full `unzip -t` CRC (14,409 entries, ~882 MB uncompressed).
 
 1. **Step 1:** From orders/websites lists confirm plan capacity + whether steadplan.co.uk can be
    added via API. If purchase/hPanel needed → tell user exactly what, and wait.
-2. **Step 4:** Add website (`hosting_createWebsiteV1`, needs `order_id`; domain ownership TXT may
-   be demanded — that is a DNS change ⇒ present to user and WAIT). Import via
-   `hosting_importWordpressWebsite` (takes local `archivePath` + `databaseDump` paths). Then: PHP
+2. **Step 4:** Add website (`api POST /api/hosting/v1/websites {"domain":...,"order_id":...}`;
+   `datacenter_code` needed if first site on a plan — `GET /api/hosting/v1/datacenters?order_id=`;
+   domain ownership TXT may be demanded — that is a DNS change ⇒ present to user and WAIT). Then
+   `scripts/steadplan-hostinger.sh import steadplan.co.uk <zip> <sql>`. Caveat: import requires the
+   site to be EMPTY — if website creation auto-installs WordPress, is-empty fails; files must then
+   be cleared (API file ops or one hPanel action by user — report, don't improvise). Then: PHP
    → **8.4**, verify `.htaccess` SetEnv on server, wp-config → new DB creds, prefix stays `sc_`.
-3. **Step 5:** Test preview URL + `curl -sk --resolve steadplan.co.uk:443:<NEW_IP> https://steadplan.co.uk/`
+3. **Step 5:** Test via the Hostinger temporary/preview URL. NOTE: `curl --resolve`/`--connect-to`
+   do NOT work through the sandbox HTTPS proxy (the proxy does its own DNS) — do not rely on them
    (homepage, pages, vehicle showroom, enquiry forms, wp-admin). Then hand to user: wp-admin login,
    "Update Vehicles" button (theme functions.php logic), licences (ACF Pro NEW licence; Filter
    Everything Pro OK unlicensed; Wordfence re-register to info@northbearmedia.co.uk).
