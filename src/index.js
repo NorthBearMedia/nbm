@@ -15,12 +15,34 @@ import {
 import { startPolling, getHealth, getClients, beginShutdown, isBusy } from "./services/poller.js";
 import { isSubmissionPosted } from "./db/database.js";
 import { initEmail, sendAlert } from "./services/notifier.js";
+import {
+  initPostLog,
+  postLogExists,
+  logPostEvent,
+  readPostLog,
+  postLogToCsv,
+  getCategoryStats,
+} from "./services/postlog.js";
+import { getAllPostedSubmissions } from "./db/database.js";
 import { postApprovedMessage } from "./facebook/poster.js";
 import { verifyAction } from "./utils/sign.js";
 import { escapeHtml } from "./utils/text.js";
 
 // Initialise database (use DATA_DIR for persistent volume on Railway)
 initDatabase(config.storage.dataDir);
+
+// Initialise the append-only post log; on first run, seed it from the ledger
+// so the analysis history doesn't start from zero.
+initPostLog(config.storage.dataDir);
+if (!postLogExists() || readPostLog().length === 0) {
+  const seed = getAllPostedSubmissions();
+  for (const post of seed) {
+    logPostEvent({ ...post, type: "published", imageCount: null, source: "backfill" });
+  }
+  if (seed.length > 0) {
+    console.log(`[POSTLOG] Seeded post log with ${seed.length} post(s) from the ledger`);
+  }
+}
 
 // Start the HTTP server FIRST so Railway sees the port open
 const app = express();
@@ -81,6 +103,19 @@ app.get("/messages", requireAdmin, (req, res) => {
 
 app.get("/flagged", requireAdmin, (req, res) => {
   res.json(getFlaggedMessages());
+});
+
+// The analysis dataset: every published post with its category. JSON for a
+// quick look, CSV for Excel/Sheets when working out ad volume and pricing.
+app.get("/postlog", requireAdmin, (req, res) => {
+  const limit = parseInt(req.query.limit || "100", 10);
+  res.json(readPostLog().slice(0, limit));
+});
+
+app.get("/postlog.csv", requireAdmin, (req, res) => {
+  res.set("Content-Type", "text/csv; charset=utf-8");
+  res.set("Content-Disposition", 'attachment; filename="spotted-post-log.csv"');
+  res.send(postLogToCsv());
 });
 
 app.post("/retry-flagged", requireAdmin, (req, res) => {
@@ -181,6 +216,19 @@ app.post("/action", async (req, res) => {
         client
       );
       updateConversationAction(cid, "POST", result.id);
+      logPostEvent({
+        type: "published",
+        postId: result.id,
+        pageId: row.page_id,
+        pageName: row.page_name,
+        conversationId: cid,
+        senderId: row.sender_id,
+        senderName: row.sender_name,
+        category: row.category || "unknown",
+        text: row.submission_text || "",
+        imageCount: (row.images || []).length,
+        source: "manual-approve",
+      });
       console.log(`[ADMIN] Approved ${cid} via email link → post ${result.id}`);
       return res.send(actionPage("✅ Posted", `<p>The submission is now live on <strong>${escapeHtml(row.page_name || "the page")}</strong>.</p>`));
     }
@@ -219,6 +267,17 @@ app.get("/admin", requireAdmin, (req, res) => {
   const flagged = getFlaggedMessages();
   const recent = getRecentConversations(30);
   const weekly = getWeeklyStats();
+
+  // Post types over the last 30 days (from the append-only post log) — the
+  // "how many business ads do we actually run?" number for monetisation.
+  const categoryCounts = getCategoryStats(30);
+  const categoryRows = Object.entries(categoryCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([key, count]) => {
+      const [pageName, category] = key.split("|");
+      return `<tr><td>${escapeHtml(pageName)}</td><td>${escapeHtml(category)}</td><td>${count}</td></tr>`;
+    })
+    .join("");
   const key = encodeURIComponent(String(req.query.key || ""));
 
   const fmtTime = (ts) =>
@@ -302,6 +361,10 @@ app.get("/admin", requireAdmin, (req, res) => {
   ${flaggedCards}
   <form method="post" action="/retry-flagged?key=${key}"><button>Re-run AI on all flagged</button></form>
   <p class="muted">Approve/Reject buttons arrive in the email for each flagged item.</p>
+
+  <h2>Post types (last 30 days)</h2>
+  <table><tr><th>Page</th><th>Type</th><th>Posts</th></tr>${categoryRows || "<tr><td colspan=3>No posts logged yet</td></tr>"}</table>
+  <p class="muted"><a href="/postlog.csv?key=${key}">Download the full post log as CSV</a> for analysis.</p>
 
   <h2>This week</h2>
   <table><tr><th>Page</th><th>Posts</th><th>Flagged</th><th>Rejected</th></tr>${weeklyRows || "<tr><td colspan=4>No activity yet</td></tr>"}</table>

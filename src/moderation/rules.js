@@ -48,6 +48,17 @@ export function validateModerationResult(result, threadIds) {
 /**
  * Determine the final action from a moderation result and confidence threshold.
  */
+export const CATEGORIES = ["business", "selling", "event", "community", "none"];
+
+/**
+ * Normalize the AI's post category to a known value. Falls back to "unknown"
+ * so an odd value can never break the post log the ad-billing data comes from.
+ */
+export function normalizeCategory(category) {
+  const value = typeof category === "string" ? category.toLowerCase().trim() : "";
+  return CATEGORIES.includes(value) ? value : "unknown";
+}
+
 export function resolveAction(moderationResult, threshold) {
   const { decision, confidence } = moderationResult;
 

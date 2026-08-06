@@ -14,6 +14,7 @@ import {
   getWatermark,
 } from "../db/database.js";
 import { sendNotification, sendEnquiryNotification } from "./notifier.js";
+import { logPostEvent } from "./postlog.js";
 import { textsMatch } from "../utils/text.js";
 
 /**
@@ -266,6 +267,8 @@ export async function processNewMessages(client) {
     }
 
     let postId = null;
+    let correctionOf = null;
+    let deletedPostId = null;
 
     if (action === "POST") {
       // Ledger check: this exact message must never be published twice, no
@@ -324,6 +327,7 @@ export async function processNewMessages(client) {
         try {
           const result = await correctPost(oldPostId, submission, moderation.reply, client);
           postId = result.id;
+          correctionOf = oldPostId;
         } catch (err) {
           console.error(
             `${tag} [ERROR] Failed to correct post for conversation ${convo.conversationId}: ${err.message}`
@@ -350,6 +354,7 @@ export async function processNewMessages(client) {
       } else {
         try {
           await removePost(oldPostId, submission, moderation.reply, client);
+          deletedPostId = oldPostId;
         } catch (err) {
           console.error(
             `${tag} [ERROR] Failed to delete post for conversation ${convo.conversationId}: ${err.message}`
@@ -368,6 +373,34 @@ export async function processNewMessages(client) {
       );
       await flagAndNotify(submission, moderation, "ai-flagged");
       continue;
+    }
+
+    // Append to the analysis post log (the monetisation dataset): every
+    // publish and takedown, with the AI's category (business/selling/event/
+    // community) so ad volume can be measured later.
+    if (postId) {
+      logPostEvent({
+        type: "published",
+        postId,
+        pageId: client.pageId,
+        pageName: client.pageName,
+        conversationId: convo.conversationId,
+        senderId: convo.senderId,
+        senderName: convo.senderName,
+        category: moderation.category || "unknown",
+        text: submissionText,
+        imageCount: images.length,
+        ...(correctionOf ? { correctionOf } : {}),
+        source: "auto",
+      });
+    } else if (deletedPostId) {
+      logPostEvent({
+        type: "deleted",
+        postId: deletedPostId,
+        pageId: client.pageId,
+        pageName: client.pageName,
+        conversationId: convo.conversationId,
+      });
     }
 
     // Save to database (records the submission in the ledger when posted)

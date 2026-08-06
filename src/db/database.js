@@ -171,6 +171,7 @@ export function saveConversation(convo, moderation, action, postId = null, extra
     user_message_count: userMessages.length,
     updated_at: now,
     decision: moderation.decision,
+    category: moderation.category || existing?.category || null,
     reason: moderation.reason,
     confidence: moderation.confidence,
     action,
@@ -343,6 +344,31 @@ export function getStats() {
 /**
  * Posts per page over the last N days — the number the owner actually wants.
  */
+/**
+ * Every posted submission across all conversations — used once to seed the
+ * append-only post log from the ledger, so analysis doesn't start from zero.
+ */
+export function getAllPostedSubmissions() {
+  const posts = [];
+  for (const row of data.conversations) {
+    for (const sub of row.submissions || []) {
+      if (!sub.post_id) continue;
+      posts.push({
+        at: sub.at || row.processed_at || 0,
+        postId: sub.post_id,
+        pageId: row.page_id || null,
+        pageName: row.page_name || null,
+        conversationId: row.conversation_id,
+        senderId: row.sender_id || null,
+        senderName: row.sender_name || null,
+        category: row.category || "unknown",
+        text: sub.text || "",
+      });
+    }
+  }
+  return posts.sort((a, b) => a.at - b.at);
+}
+
 export function getWeeklyStats(days = 7) {
   const cutoff = Date.now() - days * 24 * 3600_000;
   const perPage = {};

@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { config } from "../config.js";
 import { collapseLine } from "../utils/text.js";
-import { validateModerationResult } from "./rules.js";
+import { validateModerationResult, normalizeCategory } from "./rules.js";
 
 const client = new Anthropic({ apiKey: config.anthropic.apiKey });
 
@@ -162,6 +162,20 @@ FLAG if the message is borderline or you are not fully confident about moderatio
 Submit your decision by calling the submit_moderation_decision tool. Always call the tool —
 never reply with plain text.
 
+CATEGORY — classify every submission (the page owners use this for records):
+- "business": a business, tradesperson, or professional promoting themselves, their services,
+  their products, offers, or a commercial/ticketed event they run. Examples: a takeaway's menu,
+  a hairdresser's opening offer, a window cleaner looking for customers, a paid fitness class.
+- "selling": a private individual selling or giving away their own items (secondhand sofa,
+  outgrown kids' clothes, old phone). Not a business.
+- "event": a community, charity, school, church or club event that isn't a commercial promotion
+  (village fete, charity fun run, coffee morning, litter pick).
+- "community": everything else people share — lost & found, missing pets, shoutouts, thank-yous,
+  appeals, questions, warnings, road closures, general notices.
+- "none": there is no submission (ASK/SKIP/ENQUIRY).
+If a post could be two of these, pick the one that best matches WHO benefits: a business
+promoting itself is "business" even if it's framed as an event or a giveaway.
+
 CONFIDENCE GUIDE:
 - 0.9 to 1.0: Clear-cut cases. Event flyers, community messages, selling items, recommendations,
   shoutouts, lost/found posts — obvious submissions with no moderation concerns. USE THIS MOST OF THE TIME.
@@ -214,6 +228,12 @@ const DECISION_TOOL = {
         type: "string",
         description: "Brief one-sentence explanation of your decision.",
       },
+      category: {
+        type: "string",
+        enum: ["business", "selling", "event", "community", "none"],
+        description:
+          "What kind of post this is (see CATEGORY guide). Use \"none\" for ASK/SKIP/ENQUIRY or when there is no submission.",
+      },
       confidence: { type: "number", description: "0.0 to 1.0 (see CONFIDENCE GUIDE)." },
       reply: {
         type: "string",
@@ -221,7 +241,7 @@ const DECISION_TOOL = {
           "Your conversational reply to send back to the person. ALWAYS provide this — even for ASK. Be friendly and natural, like a real person running the page.",
       },
     },
-    required: ["decision", "hasImages", "reason", "confidence", "reply"],
+    required: ["decision", "hasImages", "category", "reason", "confidence", "reply"],
   },
 };
 
@@ -380,6 +400,7 @@ export async function moderateConversation(thread, pageState = {}) {
   result.submissionMessageId = result.submissionMessageId ?? null;
   result.submissionText = result.submissionText ?? null;
   result.useImagesFromMessageId = result.useImagesFromMessageId ?? null;
+  result.category = normalizeCategory(result.category);
 
   return result;
 }
