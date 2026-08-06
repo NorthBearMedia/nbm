@@ -3,7 +3,7 @@
  * logic is unit-testable without credentials.
  */
 
-const DECISIONS = ["APPROVE", "REJECT", "FLAG", "SKIP", "ASK", "CORRECTION", "DELETE"];
+const DECISIONS = ["APPROVE", "REJECT", "FLAG", "SKIP", "ASK", "CORRECTION", "DELETE", "ENQUIRY"];
 
 /**
  * Validate and repair a moderation result against the actual thread.
@@ -53,6 +53,10 @@ export function resolveAction(moderationResult, threshold) {
 
   if (decision === "SKIP") return "SKIP";
   if (decision === "ASK") return "ASK";
+  // A private page-buying enquiry: email the owners, never publish it.
+  // Deliberately NOT gated on the confidence threshold — a low-confidence
+  // enquiry must still never fall through to a posting path.
+  if (decision === "ENQUIRY") return "ENQUIRY";
   if (decision === "APPROVE" && confidence >= threshold) return "POST";
   if (decision === "REJECT" && confidence >= threshold) return "REJECT";
   if (decision === "CORRECTION" && confidence >= threshold) return "CORRECTION";

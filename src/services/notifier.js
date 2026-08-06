@@ -82,6 +82,57 @@ export async function sendStartupReport(pageResults) {
   );
 }
 
+/**
+ * Email a page-buying enquiry to the owners.
+ * These are private business enquiries (someone answering the "we buy dormant
+ * Spotted pages" post). They are never published, and the bot does not reply
+ * to the sender, so the owners can open the conversation themselves.
+ */
+export async function sendEnquiryNotification(enquiry, moderation) {
+  if (!resend) {
+    console.warn(
+      `[EMAIL] Page enquiry from ${enquiry.senderName} could NOT be emailed (email not configured) — check the Facebook inbox.`
+    );
+    return;
+  }
+
+  const preview = (enquiry.latestText || "").substring(0, 60);
+  const subject = `💼 PAGE ENQUIRY: ${enquiry.senderName} — "${preview}..."`;
+
+  // Include the whole conversation so far — context matters for a negotiation
+  const transcript = (enquiry.thread || [])
+    .map(
+      (m) =>
+        `<p style="margin:4px 0;"><strong>${escapeHtml(enquiry.senderName)}:</strong> ${
+          escapeHtml(m.text) || "<em>(no text)</em>"
+        }</p>`
+    )
+    .join("");
+
+  await send(
+    subject,
+    `
+    <h2>💼 Someone wants to talk about their page</h2>
+    <p>This looks like a reply to the "we're interested in buying dormant Spotted pages" post.
+       <strong>It has NOT been posted publicly</strong>, and the bot has not replied, so you can
+       message them yourself.</p>
+    <hr>
+    <p><strong>From:</strong> ${escapeHtml(enquiry.senderName)}</p>
+    <p><strong>Came in via:</strong> ${escapeHtml(enquiry.pageName || "Unknown page")}</p>
+    <p><strong>What they said:</strong></p>
+    <blockquote style="background:#f6f8fa;padding:10px 14px;border-left:3px solid #3eaf84;">
+      ${transcript || escapeHtml(enquiry.latestText)}
+    </blockquote>
+    <p><strong>Reply to them here:</strong>
+      <a href="https://business.facebook.com/latest/inbox/all">Open the Facebook inbox</a>
+    </p>
+    <hr>
+    <p style="color:#666;font-size:12px;">AI reason: ${escapeHtml(moderation.reason)}
+      (confidence ${(moderation.confidence * 100).toFixed(0)}%)</p>
+  `
+  );
+}
+
 const KIND_LABELS = {
   "ai-flagged": "The AI flagged this content for review",
   "posting-failed": "Posting to Facebook FAILED — the submission is stuck",

@@ -177,7 +177,7 @@ app.post("/action", async (req, res) => {
       };
       const result = await postApprovedMessage(
         submission,
-        "Good news — your message has been approved and posted!",
+        "Nice one, that's gone up on the page now. Cheers!",
         client
       );
       updateConversationAction(cid, "POST", result.id);
@@ -190,7 +190,7 @@ app.post("/action", async (req, res) => {
       try {
         await client.sendReply(
           row.sender_id,
-          "Thanks for your message — unfortunately it wasn't approved for posting this time."
+          "Sorry, we can't put that one up on the page."
         );
       } catch (err) {
         console.warn(`[ADMIN] Could not DM rejection: ${err.message}`);

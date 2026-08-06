@@ -87,11 +87,9 @@ export async function postApprovedMessage(submission, replyText, client) {
       (scheduledAt ? ` (scheduled for ${scheduledAt.toISOString()})` : "")
   );
 
-  let reply = replyText || "Your message has been approved and posted to the page!";
+  let reply = replyText || "Nice one, that's gone up on the page now. Cheers!";
   if (scheduledAt) {
-    reply += `\n\nIt will go live at ${formatLocalTime(scheduledAt)}.`;
-  } else if (permalink) {
-    reply += `\n\nHere's your post: ${permalink}`;
+    reply += `\n\nIt'll go up at ${formatLocalTime(scheduledAt)}.`;
   }
 
   try {
@@ -113,7 +111,7 @@ export async function notifyRejection(submission, replyText, client) {
   try {
     await client.sendReply(
       submission.senderId,
-      replyText || "Sorry, your message wasn't approved for posting."
+      replyText || "Sorry, we can't put that one up on the page."
     );
     console.log(`[REPLY] Sent rejection reply to ${submission.senderName}`);
   } catch (err) {
@@ -143,11 +141,9 @@ export async function correctPost(oldPostId, submission, replyText, client) {
 
   // Step 3: Notify the user
   let reply =
-    replyText || "No worries! The old post has been removed and the corrected version is now live.";
+    replyText || "All sorted, the old one's gone and the new one's up.";
   if (scheduledAt) {
-    reply += `\n\nThe corrected post will go live at ${formatLocalTime(scheduledAt)}.`;
-  } else if (permalink) {
-    reply += `\n\nHere's the updated post: ${permalink}`;
+    reply += `\n\nThe new one'll go up at ${formatLocalTime(scheduledAt)}.`;
   }
 
   try {
@@ -175,7 +171,7 @@ export async function removePost(oldPostId, submission, replyText, client) {
   try {
     await client.sendReply(
       submission.senderId,
-      replyText || "Done! The post has been taken down as requested."
+      replyText || "No worries, I've taken it down for you."
     );
     console.log(`[REPLY] Sent deletion confirmation to ${submission.senderName}`);
   } catch (err) {
@@ -190,7 +186,7 @@ export async function notifyFlagged(submission, replyText, client) {
   try {
     await client.sendReply(
       submission.senderId,
-      replyText || "Thanks for your message! It's been queued for review and will be posted shortly if approved."
+      replyText || "Cheers for that, I'll have a look and get it up shortly."
     );
     console.log(`[REPLY] Sent flagged reply to ${submission.senderName}`);
   } catch (err) {

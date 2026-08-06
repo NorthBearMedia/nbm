@@ -13,7 +13,7 @@ import {
   findRecentDuplicate,
   getWatermark,
 } from "../db/database.js";
-import { sendNotification } from "./notifier.js";
+import { sendNotification, sendEnquiryNotification } from "./notifier.js";
 import { textsMatch } from "../utils/text.js";
 
 /**
@@ -117,7 +117,7 @@ export async function processNewMessages(client) {
         useImagesFromMessageId: null,
         reason: "Moderation error — flagged for manual review",
         confidence: 0,
-        reply: "Thanks for your message! It's been queued for review.",
+        reply: "Cheers for that, I'll have a look shortly.",
       };
     }
 
@@ -154,6 +154,31 @@ export async function processNewMessages(client) {
       `${tag} [DECISION] ${action} (${moderation.decision} @ ${moderation.confidence}) — ${moderation.reason}`
     );
 
+    // ENQUIRY — someone answering our "we buy dormant Spotted pages" post.
+    // This is a private business enquiry: email it to the owners and NEVER
+    // publish it. No auto-reply is sent, so the owners can open the
+    // conversation themselves. Handled before any posting logic can run.
+    if (action === "ENQUIRY") {
+      const enquiryMessages = convo.thread.filter((m) => !m.isPage);
+      const latest = enquiryMessages[enquiryMessages.length - 1];
+      console.log(
+        `${tag} [ENQUIRY] Page-buying enquiry from ${convo.senderName} — emailing owners, not posting.`
+      );
+      await sendEnquiryNotification(
+        {
+          conversationId: convo.conversationId,
+          senderName: convo.senderName,
+          senderId: convo.senderId,
+          pageName: client.pageName,
+          latestText: latest?.text || "",
+          thread: enquiryMessages,
+        },
+        moderation
+      );
+      saveConversation(convo, moderation, "ENQUIRY", null, extras);
+      continue;
+    }
+
     // Build a submission object for the poster
     const submissionMsg = convo.thread.find(
       (m) => m.id === moderation.submissionMessageId
@@ -175,7 +200,7 @@ export async function processNewMessages(client) {
         try {
           await client.sendReply(
             convo.senderId,
-            "Could you resend the correct photo? I couldn't find it on my end."
+            "Can you send that photo again? It didn't come through my end."
           );
         } catch (err) {
           console.warn(`${tag} [WARN] Could not send CORRECTION resend request: ${err.message}`);
@@ -317,7 +342,7 @@ export async function processNewMessages(client) {
         try {
           await client.sendReply(
             convo.senderId,
-            moderation.reply || "We couldn't find the original post to remove — it may have already been taken down."
+            moderation.reply || "I can't find that post, it might already have been taken down."
           );
         } catch (err) {
           console.warn(`${tag} [WARN] Could not reply for delete: ${err.message}`);

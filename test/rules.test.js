@@ -72,3 +72,19 @@ test("validateModerationResult: ASK/SKIP need no submissionMessageId", () => {
   );
   assert.equal(result.decision, "ASK");
 });
+
+test("resolveAction: ENQUIRY never becomes a post, even at zero confidence", () => {
+  // A page-buying enquiry is private. It must never fall through to a posting
+  // path regardless of how unsure the model was.
+  assert.equal(resolveAction({ decision: "ENQUIRY", confidence: 0.99 }, THRESHOLD), "ENQUIRY");
+  assert.equal(resolveAction({ decision: "ENQUIRY", confidence: 0.2 }, THRESHOLD), "ENQUIRY");
+  assert.equal(resolveAction({ decision: "ENQUIRY", confidence: 0 }, THRESHOLD), "ENQUIRY");
+});
+
+test("validateModerationResult: ENQUIRY needs no submissionMessageId", () => {
+  const result = validateModerationResult(
+    { decision: "ENQUIRY", submissionMessageId: null, reason: "wants to sell a page", confidence: 0.9, hasImages: false },
+    new Set(["m_real"])
+  );
+  assert.equal(result.decision, "ENQUIRY");
+});
