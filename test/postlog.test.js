@@ -75,3 +75,13 @@ test("normalizeCategory accepts known values and falls back to unknown", () => {
   assert.equal(normalizeCategory(null), "unknown");
   assert.equal(normalizeCategory(undefined), "unknown");
 });
+
+test("CSV export neutralises spreadsheet formula injection", () => {
+  const dir = mkdtempSync(join(tmpdir(), "nbm-postlog-"));
+  initPostLog(dir);
+  logPostEvent({ type: "published", postId: "P1", pageName: "Derby", category: "community", text: "=HYPERLINK(\"http://evil\",\"click\")" });
+  const csv = postLogToCsv();
+  assert.ok(!csv.includes('\n=HYPERLINK'), "formula must not start a cell");
+  assert.ok(csv.includes("'=HYPERLINK"), "formula is prefixed inert");
+  rmSync(dir, { recursive: true, force: true });
+});

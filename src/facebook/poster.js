@@ -54,7 +54,7 @@ function formatLocalTime(date) {
 
 /**
  * Publish a submission to the page: template applied, all photos attached,
- * scheduled if outside posting hours. Returns { id, scheduledAt, permalink }.
+ * scheduled if outside posting hours. Returns { id, scheduledAt }.
  */
 export async function publishSubmission(submission, client) {
   const message = applyTemplate(client.template, submission.text || "");
@@ -66,21 +66,14 @@ export async function publishSubmission(submission, client) {
     scheduledAt,
   });
 
-  let permalink = null;
-  if (!scheduledAt) {
-    permalink = await client.getPermalink(result.id);
-  }
-
-  return { id: result.id, scheduledAt, permalink };
+  return { id: result.id, scheduledAt };
 }
 
 /**
- * Format and publish an approved message as a page post, then DM the sender —
- * including a link to their live post (people immediately like and share
- * their own post, and it stops the "did it go up?" resends).
+ * Format and publish an approved message as a page post, then DM the sender.
  */
 export async function postApprovedMessage(submission, replyText, client) {
-  const { id, scheduledAt, permalink } = await publishSubmission(submission, client);
+  const { id, scheduledAt } = await publishSubmission(submission, client);
 
   console.log(
     `[POSTED] Message ${submission.id} published as post ${id}` +
@@ -101,7 +94,7 @@ export async function postApprovedMessage(submission, replyText, client) {
     );
   }
 
-  return { id, scheduledAt, permalink };
+  return { id, scheduledAt };
 }
 
 /**
@@ -136,7 +129,7 @@ export async function correctPost(oldPostId, submission, replyText, client) {
   }
 
   // Step 2: Repost with corrected content
-  const { id, scheduledAt, permalink } = await publishSubmission(submission, client);
+  const { id, scheduledAt } = await publishSubmission(submission, client);
   console.log(`[CORRECTED] Reposted as ${id} (replaced ${oldPostId})`);
 
   // Step 3: Notify the user

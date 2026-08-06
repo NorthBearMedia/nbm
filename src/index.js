@@ -11,9 +11,10 @@ import {
   resetFlaggedForRetry,
   getConversation,
   updateConversationAction,
+  isSubmissionPosted,
+  getAllPostedSubmissions,
 } from "./db/database.js";
 import { startPolling, getHealth, getClients, beginShutdown, isBusy } from "./services/poller.js";
-import { isSubmissionPosted } from "./db/database.js";
 import { initEmail, sendAlert } from "./services/notifier.js";
 import {
   initPostLog,
@@ -23,7 +24,6 @@ import {
   postLogToCsv,
   getCategoryStats,
 } from "./services/postlog.js";
-import { getAllPostedSubmissions } from "./db/database.js";
 import { postApprovedMessage } from "./facebook/poster.js";
 import { verifyAction } from "./utils/sign.js";
 import { escapeHtml } from "./utils/text.js";

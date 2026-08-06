@@ -22,7 +22,10 @@ const required = (name) => {
  * Default is "{text}" (no change to the post body).
  */
 function parseFacebookPages() {
-  const defaultTemplate = process.env.POST_TEMPLATE || "{text}";
+  // Railway env vars can't hold real newlines — a typed "\n" arrives as two
+  // literal characters. Convert so multi-line post templates work.
+  const cleanTemplate = (t) => (t ? t.replaceAll("\\n", "\n") : t);
+  const defaultTemplate = cleanTemplate(process.env.POST_TEMPLATE) || "{text}";
 
   // Option A: JSON array
   if (process.env.FACEBOOK_PAGES) {
@@ -38,7 +41,7 @@ function parseFacebookPages() {
           );
         }
         p.name = p.name || `Page ${p.id}`;
-        p.template = p.template || defaultTemplate;
+        p.template = cleanTemplate(p.template) || defaultTemplate;
       }
       return pages;
     } catch (err) {
@@ -58,7 +61,7 @@ function parseFacebookPages() {
       id: process.env.FACEBOOK_PAGE_ID,
       token: process.env.FACEBOOK_PAGE_ACCESS_TOKEN,
       name: process.env.FACEBOOK_PAGE_NAME || "Spotted",
-      template: process.env.FACEBOOK_PAGE_TEMPLATE || defaultTemplate,
+      template: cleanTemplate(process.env.FACEBOOK_PAGE_TEMPLATE) || defaultTemplate,
     });
   }
 
@@ -71,7 +74,7 @@ function parseFacebookPages() {
         id,
         token,
         name: process.env[`FACEBOOK_PAGE_NAME_${i}`] || `Spotted ${i}`,
-        template: process.env[`FACEBOOK_PAGE_TEMPLATE_${i}`] || defaultTemplate,
+        template: cleanTemplate(process.env[`FACEBOOK_PAGE_TEMPLATE_${i}`]) || defaultTemplate,
       });
     }
   }

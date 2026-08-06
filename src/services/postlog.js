@@ -74,7 +74,12 @@ export function getCategoryStats(days = 30) {
 }
 
 function csvField(value) {
-  const s = String(value ?? "");
+  let s = String(value ?? "");
+  // Guard against spreadsheet formula injection: a post starting with = + - @
+  // would execute as a formula when the export is opened in Excel/Sheets.
+  if (/^[=+\-@\t\r]/.test(s)) {
+    s = `'${s}`;
+  }
   return /[",\n\r]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
 }
 

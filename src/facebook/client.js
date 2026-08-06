@@ -206,22 +206,6 @@ export function createPageClient(page) {
   }
 
   /**
-   * Fetch the public permalink for a post (sent to submitters so they can
-   * like/share their own post).
-   */
-  async function getPermalink(postId) {
-    try {
-      const data = await graphRequest(`/${postId}`, {
-        params: { fields: "permalink_url" },
-      });
-      return data.permalink_url || null;
-    } catch (err) {
-      console.warn(`[FB] [${page.name}] Could not fetch permalink for ${postId}: ${err.message}`);
-      return null;
-    }
-  }
-
-  /**
    * Delete a post from the Facebook page by its post ID.
    */
   async function deletePost(postId) {
@@ -356,7 +340,6 @@ export function createPageClient(page) {
     getConversations,
     getMessages,
     publishFeedPost,
-    getPermalink,
     deletePost,
     sendReply,
     markSeen,
