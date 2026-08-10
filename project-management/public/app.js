@@ -1224,6 +1224,17 @@ async function loadDashActivity() {
 }
 
 // ─── Task Inbox ─────────────────────────────────────────
+// Tiny per-client mark for the notebook: the uploaded logo, else a soft
+// auto-coloured initial (hue derived from the name, stable forever). Hidden
+// when the notebook is filtered to one client — the header already says it.
+function clientHue(name) { let h = 0; for (const ch of name || '') h = (h * 31 + ch.charCodeAt(0)) % 360; return h; }
+function nbClientChip(t) {
+  if (nbClient || !t.client_name || t.client_is_system) return '<span class="nb-cchip nb-cchip-empty"></span>';
+  if (t.client_logo) return `<img class="nb-cchip" src="${esc(t.client_logo)}" alt="" title="${esc(t.client_name)}" draggable="false">`;
+  const letter = esc((t.client_code || t.client_name).charAt(0).toUpperCase());
+  return `<span class="nb-cchip nb-cchip-f" style="background:hsl(${clientHue(t.client_name)} 52% 74%)" title="${esc(t.client_name)}">${letter}</span>`;
+}
+
 function allTasksFlat() {
   const out = [];
   for (const c of clients) for (const t of (c.tasks || [])) {
@@ -1877,6 +1888,7 @@ function loadNotebookView() {
     const titleTip = isNow ? 'Working on this NOW — click to bring up the timer' : 'Open task';
     return `<div class="nb-line ${done ? 'nb-done' : ''}" data-id="${t.id}" draggable="true">
       <button class="nb-bullet ${done ? 'nb-ticked' : ''}" onclick="nbTick(${t.id})" title="${done ? 'Untick' : 'Tick off'}">${done ? '&#10003;' : '&bull;'}</button>
+      ${nbClientChip(t)}
       <span class="nb-text">${nowTag}<span class="${titleCls}" onclick="${titleClick}" title="${titleTip}">${esc(t.title)}</span>${client}${due}</span>
       ${done ? '' : nbDatesHtml(t)}
       <button class="nb-marker ${hlc ? 'nb-marker-' + hlc : ''}" onclick="nbOpenPalette(${t.id}, event)" title="Colour-code this line"></button>
