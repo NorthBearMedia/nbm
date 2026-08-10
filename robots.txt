@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /generate-preview.php
+Disallow: /branding/
+
+Sitemap: https://muskengineering.co.uk/sitemap.xml

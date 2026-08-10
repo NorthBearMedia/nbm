@@ -1,3 +1,10 @@
+<?php
+// Build a clean, canonical URL for this page: https, apex host, no .php, no query.
+$canonPath = isset($_SERVER['REQUEST_URI']) ? strtok($_SERVER['REQUEST_URI'], '?') : '/';
+$canonPath = preg_replace('/\.php$/', '', $canonPath);
+if ($canonPath === '' || $canonPath === '/index') { $canonPath = '/'; }
+$canonicalUrl = 'https://muskengineering.co.uk' . $canonPath;
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,6 +12,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo isset($pageTitle) ? $pageTitle . ' | ' : ''; ?>Musk Engineering Ltd | Precision and Innovation in Engineering</title>
     <meta name="description" content="<?php echo isset($pageDescription) ? $pageDescription : 'With a legacy in mechanical process engineering, Musk Engineering provides high-quality, precision-driven solutions for complex industrial projects.'; ?>">
+    <link rel="canonical" href="<?php echo htmlspecialchars($canonicalUrl, ENT_QUOTES); ?>">
+    <meta property="og:url" content="<?php echo htmlspecialchars($canonicalUrl, ENT_QUOTES); ?>">
 
     <!-- Structured Data -->
     <script type="application/ld+json">
