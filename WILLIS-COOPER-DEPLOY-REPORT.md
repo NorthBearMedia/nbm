@@ -451,3 +451,52 @@ received an active animation state.
 Verified on the live page: 16px radius and shadow present, script in the main
 document, hover applies to all members of a card with `scale(1.035)` and clears
 on leave. All other pages still 200, 404 still 404.
+
+---
+
+# Search Console indexing report — 2026-08-10 (thirteenth deploy)
+
+Norton forwarded a Coverage export. Scale first, because the email overstates
+it: **5 URLs total** across three reasons, against 18 indexed pages and ~100
+impressions a day. None of it was urgent.
+
+The export is a summary and does not list URLs, so the affected addresses were
+worked out by testing rather than read off. All 29 sitemap URLs return a clean
+200 with zero redirects, so nothing submitted is broken; the flagged URLs were
+discovered elsewhere.
+
+**Not found (404) - 1 page. Fixed.** `/favicon.ico` was returning 404. Every
+crawler requests it whether or not the HTML declares icons, and this site only
+declared PNG icons. Generated a real multi-size `favicon.ico` (16/32/48/64,
+32KB) from the Willis Cooper logo. Now returns 200 as `image/x-icon`.
+
+**Page with redirect - 2 pages. No action needed.** These are the deliberate
+canonical redirects: `http` to `https`, `www` to non-www, and trailing slash to
+non-slash. All still verified working. Google reports redirected URLs as "not
+indexed" because it indexes the destination instead, which is the intended
+outcome.
+
+**Crawled - currently not indexed - 2 pages.** Normal for recently published
+pages. The location pages are days old and the site changed hosting a fortnight
+ago. No action beyond waiting.
+
+## Also tightened while in there
+
+`.html` URLs served 200 alongside their clean equivalents, so every page had
+two working addresses. Canonicals pointed at the clean one, but it wasted crawl
+budget and risked Google picking the wrong address. Added a 301 from
+`/page.html` to `/page` (and `/index.html` to `/`).
+
+The rule matches on `THE_REQUEST`, the original request line, so the internal
+extensionless-to-`.html` rewrite further down cannot re-trigger it and there is
+no loop. That mattered: a mistake here breaks every URL on the site.
+
+Intended to stage this on wcpreview first, but that site no longer exists in
+Hostinger (the vhost answers 403; the API reports no such website). Deployed to
+live with an immediate verification pass and a rollback ready instead.
+
+Verified after deploy: all 29 sitemap URLs 200 with **zero** redirect hops (no
+loops), `/about-us.html`, `/index.html`, `/taxcover.html` and `/events.html` all
+301 to their clean forms, the branded 404 still returns a real 404, favicon 200,
+and http/www/trailing-slash redirects all still correct. Assets, robots.txt,
+sitemap.xml and llms.txt unaffected.

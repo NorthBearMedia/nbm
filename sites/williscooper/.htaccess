@@ -19,6 +19,14 @@ RewriteRule ^ https://williscooper.com%{REQUEST_URI} [L,R=301]
 RewriteCond %{THE_REQUEST} \s/+([^?\s]+?)/(\?\S*)?\s [NC]
 RewriteRule ^ /%1 [L,R=301]
 
+# Send .html requests to the canonical extensionless URL, so each page has one
+# address rather than two. Matching on THE_REQUEST (the original request line)
+# means the internal rewrite further down never re-triggers this, so no loop.
+RewriteCond %{THE_REQUEST} \s/+index\.html[\s?] [NC]
+RewriteRule ^ / [L,R=301]
+RewriteCond %{THE_REQUEST} \s/+([^\s?]+)\.html[\s?] [NC]
+RewriteRule ^ /%1 [L,R=301]
+
 # Live-style extensionless URLs: /about-us -> about-us.html (internal rewrite,
 # the address bar keeps /about-us). The substitution contains a dot, so the
 # pattern cannot re-match it.
