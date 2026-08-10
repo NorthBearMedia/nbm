@@ -3465,3 +3465,18 @@ select { color-scheme:dark; }
 .nb-leg-lock { font-size: 12px; opacity: .55; margin-left: 4px; }
 .nb-leg-reset { background: none; border: none; font-family: inherit; font-size: 14px; color: rgba(28,28,28,.45); cursor: pointer; text-decoration: underline dashed; padding: 2px 0; }
 .nb-leg-reset:hover { color: #b3372f; }
+
+
+/* ─── Per-client mark: tiny logo / coloured initial by the bullet ── */
+.nb-cchip {
+  flex-shrink: 0; width: 15px; height: 15px; border-radius: 4px;
+  object-fit: cover; align-self: center; opacity: .92;
+  border: 1px solid rgba(28,28,28,.15);
+}
+.nb-cchip-f {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--nb-font,'Caveat'),cursive; font-size: 10px; font-weight: 700;
+  color: rgba(28,28,28,.72); line-height: 1;
+}
+.nb-cchip-empty { background: transparent; border-color: transparent; }
+.nb-done .nb-cchip { opacity: .3; }
