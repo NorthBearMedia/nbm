@@ -1,0 +1,36 @@
+name: Deploy to Hostinger
+
+on:
+  push:
+    branches:
+      - claude/musk-engineering-php-site-d5Kfw
+  workflow_dispatch:            # allows manual "Run workflow" from the Actions tab
+
+jobs:
+  ftp-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy site files via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server:   ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps          # Hostinger supports FTPS; use "ftp" if your account is plain FTP
+          local-dir: ./
+          server-dir: public_html/
+          # Only the live site ships. Everything below is skipped.
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            branding/**
+            *.md
+            preview.html
+            generate-preview.php
+            Website Update Text.docx
+            RMS Fire Blanket - Cover Photo.png
+            **/Redraw*.png
