@@ -2,6 +2,42 @@
 
 Status as of 2026-08-11 (second session). Branch: `claude/steadplan-hostinger-migration-f68vno`.
 
+## ✅ FINAL STATE 2026-08-11 ~09:55Z — site imported, awaiting Norton's media click + testing
+
+DONE via API this session: website recreated (empty) → slim-archive import
+(site minus uploads/logs) → DB `u275789987_VU5bA` created + SQL imported
+(122MB) → PHP set to **8.1.34** (verified) → server cache cleared → helper
+plugin `steadplan-media-restore` deployed to
+`wp-content/plugins/steadplan-media-restore-CcLshLb4/` (Norton approved
+deploy in-session). All three file fixes are in the imported tree. DNS
+untouched.
+
+NORTON'S CHECKLIST (in order):
+1. hPanel → Websites → steadplan.co.uk → **Admin Panel** (one-click
+   wp-admin login; no API tool mints auto-login links — this button is the
+   equivalent). Old wp-admin credentials from the previous site also work.
+2. Plugins → activate **"Steadplan Media Restore (one-off)"** → click
+   **"Restore media now"** in the orange notice. Takes a few minutes
+   (downloads the 692MB Drive backup on the server, extracts the 604MB /
+   2,882-file uploads folder). If it dies mid-way, click again — it
+   resumes. Success notice shows the restored count → **delete the
+   plugin**.
+3. hPanel → **Preview** button for steadplan.co.uk → test: pages, vehicle
+   showroom (media must show after step 2), enquiry forms, wp-admin.
+4. wp-admin → **Update Vehicles** button → wait for completion prompt
+   (stock API creds come from .htaccess SetEnv, preserved).
+5. Licences: ACF Pro new licence; Wordfence re-register to
+   info@northbearmedia.co.uk; Filter Everything Pro fine for now.
+6. Only when testing passes: DNS switch (section below) — A @ and
+   A www → 77.37.35.74 at Namecheap, nothing else. SSL auto-issues
+   ~15min–1h after.
+7. Afterwards: revoke the API token pasted into chat on 2026-08-10, mint a
+   fresh one into the env var. Optional cleanup: `wp-config copy.php`
+   variants + `new.php` are still in the imported tree (deliberately
+   untouched); `put_file.log`/`debug.log` were left OUT of the migration.
+8. For future sessions: add `MCP_TOOL_TIMEOUT=1800000` to the Hostinger
+   environment (would have avoided this session's whole upload saga).
+
 ## 2026-08-11 SECOND session: environment fix WORKED — blocked one step from the finish line
 
 The "Hostinger" Custom-allowlist environment is correct: MCP tools authenticated
