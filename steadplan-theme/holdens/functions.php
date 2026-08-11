@@ -1090,3 +1090,13 @@ add_action('after_switch_theme', function ($old_name, $old_theme = null) {
         if ($css) { wp_update_custom_css_post($css, ['stylesheet' => $new]); }
     }
 }, 10, 2);
+
+// NBM: expose ACF field groups via the REST API (raw/light format) so page
+// content can be managed programmatically with an application password.
+add_filter('acf/load_field_group', function ($group) {
+    $group['show_in_rest'] = 1;
+    return $group;
+});
+add_filter('acf/settings/rest_api_format', function () {
+    return 'light';
+});
