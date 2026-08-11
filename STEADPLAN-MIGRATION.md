@@ -1,6 +1,35 @@
 # Steadplan → Hostinger migration — working notes
 
-Status as of 2026-08-10 evening. Branch: `claude/steadplan-hostinger-migration-f68vno`.
+Status as of 2026-08-11. Branch: `claude/steadplan-hostinger-migration-f68vno`.
+
+## 2026-08-11 session: ABORTED at the auth gate — egress policy blocked everything
+
+New failure mode, distinct from "Unauthenticated": the Hostinger MCP servers
+connected and their tools ran, but every call returned
+**`"request rejected: host not permitted"`** — the session's outbound proxy
+refused the CONNECT to the Hostinger API host. Verified twice on
+`hosting_listWebsitesV1` and once on `billing_getSubscriptionListV1`
+(different MCP server, same rejection), so it is the egress policy, not one
+tool. `drive.usercontent.google.com` is blocked the same way (CONNECT 403 on
+a 1KB range probe). GitHub fetch/push works. Per proxy docs, 403-class
+denials are org/environment network policy — report, do not route around.
+No raw-API workarounds attempted (per Norton's standing instruction).
+
+**Nothing was changed anywhere**: nothing downloaded, no Hostinger call
+succeeded, website/DNS untouched.
+
+**Fix before next session** (in claude.ai/code → environment settings; both
+are boot-time, so a fresh session is required after changing them):
+
+1. `HOSTINGER_API_TOKEN` env var set (existing requirement, unchanged).
+2. Network policy must allow the hosts the migration needs:
+   - `developers.hostinger.com` (Hostinger API — what the MCP servers call)
+   - `*.hstgr.io` (TUS file upload, e.g. `srv1304-files.hstgr.io`)
+   - `drive.google.com` + `drive.usercontent.google.com` (backup downloads)
+
+The 2026-08-10 session could curl developers.hostinger.com and Drive, so it
+ran in a more permissive environment than this one — check which environment
+the session is started from, not just the env var.
 
 ## Hostinger account facts (verified via API 2026-08-10)
 
