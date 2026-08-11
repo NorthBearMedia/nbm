@@ -495,3 +495,16 @@ Styles are inline in footer.php (`.nbm-credit`), self-contained.
   accounts (Sam/olly/pete/lawrence → Subscriber). Demoting lawrence first
   kills API access. Then revoke lawrence's app password and put the new
   one in the claude.ai env as STEADPLAN_WP_USER/STEADPLAN_WP_APP_PASSWORD.
+
+### Users cleanup DONE (11 Aug, Norton)
+
+Norton kept the `lawrence` account (email changed to his own), added a new
+`norton@` Administrator, deleted all other users (4x Holdens + hjackson,
+slowe, moconnor). VERIFIED intact post-deletion via REST: 18 posts, 15
+pages, 2 users (both admins, both Norton's). The existing app password on
+`lawrence` remains valid and now belongs to a Norton-controlled account —
+the earlier sequencing warning is obsolete. Remaining hygiene: since the
+password was pasted in chat, revoke + reissue it into the claude.ai env
+(STEADPLAN_WP_USER=lawrence / STEADPLAN_WP_APP_PASSWORD) when convenient.
+Note: Hal's editor account was deleted too — recreate if he ever wants
+wp-admin access.
