@@ -66,12 +66,12 @@
             </div>
             <a class="nbm-credit" href="https://northbearmedia.co.uk/" title="North Bear Media" target="_blank">
                 <style>
-                .nbm-credit{display:inline-flex;flex-direction:column;align-items:center;gap:12px;
-                  padding:20px 34px;border-radius:12px;border:1px dashed rgba(255,255,255,.35);
+                .nbm-credit{display:inline-flex;flex-direction:column;align-items:center;gap:9px;
+                  padding:14px 24px;border-radius:10px;border:1px dashed rgba(255,255,255,.35);
                   background:#151b25 repeating-linear-gradient(135deg,rgba(255,255,255,.025) 0 2px,transparent 2px 7px);
                   text-decoration:none;line-height:1;}
-                .nbm-credit .nbm-credit-tag{color:#fff;font-size:11px;letter-spacing:3px;text-transform:uppercase;white-space:nowrap;}
-                .nbm-credit img{width:150px;height:auto;display:block;}
+                .nbm-credit .nbm-credit-tag{color:#fff;font-size:10px;letter-spacing:2.5px;text-transform:uppercase;white-space:nowrap;}
+                .nbm-credit img{width:130px;height:auto;display:block;}
                 </style>
                 <span class="nbm-credit-tag">Built &amp; Maintained By</span>
                 <img src="<?php echo get_template_directory_uri(); ?>/images/nbm-logo.png" alt="North Bear Media" loading="lazy">
