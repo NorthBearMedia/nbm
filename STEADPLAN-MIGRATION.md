@@ -458,3 +458,19 @@ Styles are inline in footer.php (`.nbm-credit`), self-contained.
    `wp-config-new.php`, `new.php` (File Manager).
 6. Wordfence + ACF licences; delete the two one-off plugins if not already.
 7. Staging site: GSC removal request + confirm it's dead (Norton has URL).
+
+## Sam Tucker's request tracker (28 Jul email)
+
+1. ✅ Meta Pixel 1072733728753651 — installed site-wide (theme v1.1.5),
+   live at DNS flip. Next: CF7 submission → pixel Lead/GA4 conversion events.
+2. ✅ EVC CitySprint YouTube link → https://youtu.be/OUVEY8lqgn0 — done by
+   Norton directly on the EVC site (11 Aug).
+3. ⏳ Mailchimp domain auth — add at Namecheap DURING the DNS-flip visit:
+   CNAME `k2._domainkey` → `dkim2.mcsv.net`, CNAME `k3._domainkey` →
+   `dkim3.mcsv.net` (confirm exact values against Sam's Mailchimp screen —
+   the draft reply to Sam requests a screenshot). While in there, check a
+   `_dmarc` TXT exists; if not, add `v=DMARC1; p=none;` (monitor-only,
+   safe alongside M365). Sam clicks Verify in Mailchimp after.
+4. ⏳ Conversions page: remove Ford Convertor + full gallery refresh —
+   blocked on Sam sending images (requested in the draft). Content edit
+   via wp-admin once received.
