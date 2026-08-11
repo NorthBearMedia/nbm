@@ -1,0 +1,332 @@
+@import "settings";
+
+$timing: cubic-bezier(.1,.6,.4,1);
+
+.revealTitle {
+    clip-path: polygon(0 0, 100% 0%, 100% 100%, 0% 100%);
+    .line {
+        overflow: hidden;
+    }
+}
+.char {
+    transform: translateY(115px);
+    transition-timing-function: $timing;
+    transition-property: all;
+    transition-duration: .75s;
+}
+
+.title {
+    padding-top: 8rem;
+    padding-bottom: 5rem;
+    @media only screen and (min-width: $tablet) {
+        padding-top: 9rem;
+    }
+    @media only screen and (min-width: $large) {
+        padding-top: 11rem;
+    }
+   
+
+    .wrapper {
+        > .titleWrapper {
+            
+            h1 {
+                margin-top: 0;
+                text-align: right;
+                @media only screen and (min-width: $tablet) {
+                    text-align: left;
+                }
+            }
+        }
+        .rightSide {
+            
+
+            .titleWrapper {
+                @media only screen and (min-width: $tablet) {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                }
+                @media only screen and (min-width: $large) {
+                    flex-direction: row-reverse;
+                }
+                .miniText {
+                    margin-bottom: 5rem;
+                    @media only screen and (min-width: $tablet) {
+                        flex: 0 1 25%;
+                        margin-top: 1rem;
+                        transform:translateY(50px);
+                    }
+
+                    @media only screen and (min-width: $large) {
+                        margin-top: 1.5rem;
+                        flex: 0 1 35%;
+                    }
+                    &:after {
+                        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38' height='38' viewBox='0 0 38 38'%3E%3Cg fill='none' stroke='%23101010' stroke-width='2'%3E%3Ccircle cx='19' cy='19' r='19' stroke='none'/%3E%3Ccircle cx='19' cy='19' r='18' fill='none'/%3E%3C/g%3E%3C/svg%3E");
+                    }
+                }
+                h2 {
+                    margin-top: 0;
+                    @media only screen and (min-width: $tablet) {
+                        flex: 0 1 75%;
+                    }
+                    @media only screen and (min-width: $large) {
+                        flex: 0 1 65%;
+                    }
+                }
+            }
+        }
+    }
+}
+
+@mixin twentySixText {
+    font-size: 1.125rem;
+
+    @media only screen and (min-width: $tablet) {
+        font-size: 1.2rem;
+    }
+    @media only screen and (min-width: $large) {
+        font-size: 1.5rem;
+    }
+    @media only screen and (min-width: $xlarge) {
+        font-size: 1.7rem;
+    }
+}
+
+
+// canvas {
+//     opacity: .6;
+// }
+.industries {
+    position: relative;
+    overflow: hidden;
+    padding-bottom: 3rem;
+    @media only screen and (min-width: $tablet) {
+        padding-bottom: 0;
+    }
+    &:after {
+        content:"";
+        top: -2px;
+        height: 500px;
+        right: -10px;
+        width: 30%;
+        position: absolute;
+        background-color: $white;
+        z-index: 2;
+    }
+    .faces {
+        position: absolute;
+        inset: 0;
+        margin: auto;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        z-index: 1;
+        canvas {
+            max-width: 100%;
+            position: absolute;
+            left: 0;
+            bottom: 0;
+        }
+    }
+    .wrapper {
+        position: relative;
+        z-index: 4;
+        .topWrapper {
+            @media only screen and (min-width: $tablet) {
+                display: flex;
+                align-items: center;
+                flex-wrap: wrap;
+                justify-content: space-between;
+            } 
+            .miniText {
+                &:after {
+                    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38' height='38' viewBox='0 0 38 38'%3E%3Cg fill='none' stroke='%23101010' stroke-width='2'%3E%3Ccircle cx='19' cy='19' r='19' stroke='none'/%3E%3Ccircle cx='19' cy='19' r='18' fill='none'/%3E%3C/g%3E%3C/svg%3E");
+                }
+            }
+        }
+        .innerWrapper {
+            position: relative;
+            padding: 0 0 100px; 
+            
+            .serviceLinks {
+                position: relative;
+                z-index: 2;
+                @media only screen and (min-width: $large) {
+                    display: flex;
+                    position: relative;
+                }
+                .industryLinksInner {
+                    a {
+                        &:nth-of-type(5), &:nth-of-type(7) {
+                            @media only screen and (min-width: $tablet) {
+                                margin-left: auto;
+                            } 
+                        }
+                        &:nth-of-type(6) {
+                            @media only screen and (min-width: $tablet) {
+                                margin-right: auto;
+                            } 
+                        }
+                        &:nth-of-type(10) {
+                            @media only screen and (min-width: $tablet) {
+                                margin-left: 7%;
+                            } 
+                            @media only screen and (min-width: $xxlarge) {
+                                margin-left: 12%;
+                            } 
+                        }
+                    }
+                    
+                }
+           }
+        }
+    }
+}
+
+.serviceLinks {
+    margin-top: 4rem;
+    @media only screen and (min-width: $tablet) {
+        margin-top: 2rem;
+    }
+    @media only screen and (min-width: $large) {
+        margin-top: 1rem;
+    }
+   
+    .serviceLinksInner {            
+        @media only screen and (min-width: $tablet) {
+            display: flex;
+            flex-wrap: wrap;
+        } 
+        .lineBreak {
+            flex-basis: 100%;
+            height: 0;
+        }
+        a {
+            display: inline-block;
+            @include twentySixText();
+            border-radius: 100px;
+            padding: 15px;
+            margin-bottom: 15px;
+            margin-right: 5px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            max-width: fit-content;
+            transition-timing-function: $timing;
+            transition-property: all;
+            transition-duration: .5s;
+            opacity: 0;
+            transform: translateY(50px);
+           
+            @media only screen and (max-width: 640px) {
+                font-size: 0.625rem;
+                padding: 8px 15px;
+                float: left;
+                margin-bottom: 5px;
+            }
+            &.active {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            @media only screen and (max-width: 1099px) {
+                background-image: none;
+            } 
+            .bg {
+                background-repeat: no-repeat;
+                background-size: contain;
+                background-position: center;
+                width: 109%;
+                height: 149%;
+                position: absolute;
+                margin: auto;
+                right: -10%;
+                top: -24%;
+                opacity: 0;
+                transition-timing-function: $timing;
+                transition-property: all;
+                filter: saturate(0);
+                transition-duration: 0s;
+                @media only screen and (min-width: $xlarge) {
+                    width: 115%;
+                    height: 160%;
+                    top: -28%;
+                }
+            }
+            span {
+                position: relative;
+                z-index: 3;
+                transition-timing-function: $timing;
+                transition-property: all;
+                transition-duration: .5s;
+
+                &:nth-of-type(1) {
+                    opacity: 0;
+                }
+                &:nth-of-type(2) {
+                    position: absolute;
+                    inset: 0;
+                    margin: auto;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transform-origin: center;
+                    transform: translateX(0) scale(1);
+                }
+            }
+            &:hover {
+                span {
+                    &:nth-of-type(2) {
+                        transform: translateX(0) scale(.65);
+                    }
+                }
+            }
+            // float: left;
+            &:nth-of-type(1), &:nth-of-type(3), &:nth-of-type(4), &:nth-of-type(7),
+            &:nth-of-type(9), &:nth-of-type(11) {
+                background-color: $orange;
+                color: $white;
+                &:hover {
+                    background-color: #DCDCDC;
+                    border-color: transparent;
+                    color: $orange;
+                    @media only screen and (min-width: $large) {
+                        .bg {
+                            opacity: 1;
+                            right: -30%;
+                            transition-delay: .7s;
+                            transition-duration: .5s;
+                        }
+                        
+                    } 
+                }
+            }
+            &:nth-of-type(2), &:nth-of-type(5), &:nth-of-type(6), &:nth-of-type(8),
+            &:nth-of-type(10), &:nth-of-type(12) {
+                background-color: $lightGrey;
+                color: $darkGrey;
+                &:hover {
+                    border-color: transparent;
+                    background-color: #DCDCDC;
+                    border-color: transparent;
+                    color: $orange;
+                }
+            }
+            @media only screen and (max-width: $medium) {
+                font-size: 12px;
+            }
+            @media only screen and (min-width: $medium) {
+                padding: 20px 25px;
+                
+            } 
+            @media only screen and (min-width: $large) {
+                padding: 40px 55px;
+            } 
+            @media only screen and (min-width: $xlarge) {
+                margin-right: 10px;
+                padding: 45px 65px;
+            } 
+            
+        }
+    }
+}

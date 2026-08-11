@@ -377,3 +377,37 @@ wp-admin -> patch applies with backup footer.php.pre-nbm.bak -> delete both
 one-off plugins (this + steadplan-media-restore). williscooper.com footer
 style could not be checked (egress-blocked); plain text link used, same CSS
 class so theme styling holds.
+
+## Theme deploy pipeline (2026-08-11, working — this is how site changes happen now)
+
+Norton gave standing approval for theme deploys. The flow that WORKS:
+
+1. Theme source of truth: `steadplan-theme/holdens/` in this repo (v1.1.1-nbm).
+   ⚠️ `functions.php` ~line 1006 has the AutoTrader webhook signing secret
+   REDACTED (GitHub push protection flags it as a Stripe key — same format).
+   The REAL value lives in: the live server's active theme, the original
+   `holdens` theme dir on the server, and the Drive backup's functions.php.
+   **Any future deploy of functions.php must restore that one line first**
+   (re-stage from Drive backup and copy the secret line back in the
+   scratchpad copy — never commit it).
+2. Deploy: `hosting_deployWordpressTheme` slug `holdens`, `activate: true`.
+   The 60s MCP timeout is NORMAL — the server-side handler finishes the
+   upload and activates (~2-4 min for the 14MB theme). The tool creates a
+   suffixed copy dir each time (`holdens-XXXX`); the theme's
+   `after_switch_theme` hook (added v1.1.x) migrates theme_mods (menus,
+   logo, customizer CSS) automatically, and `autotraderResults.php` now
+   uses `get_template_directory_uri()` so the vehicle filter follows the
+   active copy. Old copies accumulate — harmless; tidy occasionally via
+   File Manager. The 225 DB references to `/themes/holdens/` keep resolving
+   to the original dir, which must therefore NEVER be deleted.
+3. Verify on the preview URL via WebFetch: footer credit, nav menu intact,
+   /showroom/ renders ~30 vehicles, no PHP errors.
+
+Applied in v1.1.x and VERIFIED LIVE on preview: footer credit is now
+"Maintained by North Bear Media" -> https://northbearmedia.co.uk/.
+
+Cleanup for Norton whenever convenient (wp-admin -> Plugins): DELETE the two
+one-off plugins `steadplan-media-restore` (done its job) and
+`nbm-footer-patch` (made redundant by the theme deploy — if activated it
+safely reports "already patched"). Also `functions-old.php` was dropped from
+the repo copy (dead file, contained the same secret).
