@@ -2,7 +2,23 @@
 
 Status as of 2026-08-11 (second session). Branch: `claude/steadplan-hostinger-migration-f68vno`.
 
-## ✅ FINAL STATE 2026-08-11 ~09:55Z — site imported, awaiting Norton's media click + testing
+## ✅✅ VERIFIED LIVE 2026-08-11 ~10:3xZ — site AND media confirmed working on preview
+
+Preview URL (from Norton's screenshot): **https://darkcyan-dog-182593.hostingersite.com**
+(*.hostingersite.com is allowlisted, so sessions can verify it directly via WebFetch.)
+
+- Homepage renders fully: "Driving you further.", nav, testimonials, locations.
+- Norton's "Restore media now" click showed Hostinger's error page (server
+  drops slow connections — Hostinger serves a "scheduled maintenance"-styled
+  error page, NOT actual maintenance mode) BUT ignore_user_abort meant the
+  restore ran to completion server-side anyway: /wp-content/uploads/ images
+  verified serving real PNG data; showroom lists ~30 vehicles (photos via
+  m.atcdn.co.uk stock CDN — DB-driven integration working).
+- Remaining for Norton: green success notice in wp-admin → DELETE the
+  steadplan-media-restore plugin; spot-check pages/forms; Update Vehicles;
+  licences; then DNS (below).
+
+## Earlier same-day state (superseded)
 
 DONE via API this session: website recreated (empty) → slim-archive import
 (site minus uploads/logs) → DB `u275789987_VU5bA` created + SQL imported
