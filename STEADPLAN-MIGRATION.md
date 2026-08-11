@@ -366,3 +366,14 @@ die with the container — a fresh session must re-apply after re-downloading:
 4. DNS switch per above, only on Norton's confirmation.
 5. After everything: Norton should REVOKE the API token that was pasted into
    chat on 2026-08-10 and mint a fresh one into the env var.
+
+## Footer credit swap (2026-08-11, Norton request)
+
+Old "Website by Holdens" credit (theme holdens/footer.php) is replaced by
+"Maintained by North Bear Media" -> https://northbearmedia.co.uk/ via the
+one-off plugin `nbm-footer-patch/` (deployed to
+wp-content/plugins/nbm-footer-patch-sK8LmECz/). Norton activates it once in
+wp-admin -> patch applies with backup footer.php.pre-nbm.bak -> delete both
+one-off plugins (this + steadplan-media-restore). williscooper.com footer
+style could not be checked (egress-blocked); plain text link used, same CSS
+class so theme styling holds.
