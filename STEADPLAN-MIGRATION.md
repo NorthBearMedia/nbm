@@ -474,3 +474,24 @@ Styles are inline in footer.php (`.nbm-credit`), self-contained.
 4. ⏳ Conversions page: remove Ford Convertor + full gallery refresh —
    blocked on Sam sending images (requested in the draft). Content edit
    via wp-admin once received.
+
+## Content editing via WordPress REST API (working, 11 Aug)
+
+- Norton created an Application Password (on the `lawrence` account — the
+  login Holdens handed over). Auth verified; content edits now work via
+  `https://darkcyan-dog-182593.hostingersite.com/wp-json/` with Basic auth.
+- Theme v1.1.7 exposes ACF field groups to REST (light/raw format) via
+  filters in functions.php — pages built with ACF flexible content are
+  fully editable programmatically.
+- ✅ Ford converter section REMOVED from Conversions page (2 blocks cut
+  from acf.flexible_content, 12 → 10), verified at data level and on the
+  rendered page (MAN TGE section now leads; gallery + form intact).
+  Pre-change backup: `steadplan-audit/conversions-page-backup-pre-ford-removal.json`.
+- Helper: `scripts/steadplan-wp.sh` (pinned to the site's wp-json, GET/POST,
+  auth via STEADPLAN_WP_AUTH env or ~/.steadplan-wp-auth).
+- ⚠️ SEQUENCING: the app password lives on `lawrence` (a Holdens account).
+  Norton must create his own `norton` Administrator account + a NEW app
+  password on it, hand that over, and ONLY THEN demote the four Holdens
+  accounts (Sam/olly/pete/lawrence → Subscriber). Demoting lawrence first
+  kills API access. Then revoke lawrence's app password and put the new
+  one in the claude.ai env as STEADPLAN_WP_USER/STEADPLAN_WP_APP_PASSWORD.
