@@ -22,14 +22,22 @@ succeeded, website/DNS untouched.
 are boot-time, so a fresh session is required after changing them):
 
 1. `HOSTINGER_API_TOKEN` env var set (existing requirement, unchanged).
-2. Network policy must allow the hosts the migration needs:
+2. Network access: **Custom** (not Trusted), with this allowlist, AND the
+   "Also include default list of common package managers" box TICKED (the
+   MCP servers install via npx, so npm must stay reachable):
    - `developers.hostinger.com` (Hostinger API — what the MCP servers call)
    - `*.hstgr.io` (TUS file upload, e.g. `srv1304-files.hstgr.io`)
-   - `drive.google.com` + `drive.usercontent.google.com` (backup downloads)
+   - `drive.google.com` + `drive.usercontent.google.com` +
+     `*.googleusercontent.com` (backup downloads)
+   - `*.hostingersite.com` (Hostinger preview URL, for pre-DNS testing)
+   (**Full** access also works if Custom misbehaves.)
 
+Norton configured the "Hostinger" cloud environment this way on 2026-08-11.
 The 2026-08-10 session could curl developers.hostinger.com and Drive, so it
-ran in a more permissive environment than this one — check which environment
-the session is started from, not just the env var.
+ran in a more permissive environment than this one. **When starting the next
+session, check the environment selector above the message box says
+"Hostinger"** — today's session ran in the wrong (Default/Trusted)
+environment, which is exactly how it got blocked.
 
 ## Hostinger account facts (verified via API 2026-08-10)
 
