@@ -500,3 +500,37 @@ loops), `/about-us.html`, `/index.html`, `/taxcover.html` and `/events.html` all
 301 to their clean forms, the branded 404 still returns a real 404, favicon 200,
 and http/www/trailing-slash redirects all still correct. Assets, robots.txt,
 sitemap.xml and llms.txt unaffected.
+
+---
+
+# New article: Summer VAT reduction — 2026-08-11 (fourteenth deploy)
+
+Published Norton's copy at `/summer-vat-reduction-2026`. 1,193 words, one H1,
+8 H2s, 3 H3s, bullet and numbered lists, published 10 August 2026, 5 min read.
+
+Built from an existing article as the template so the blog header, byline and
+meta block match the other posts exactly, with the head, canonical, Open Graph,
+Twitter and Article/BreadcrumbList schema all rewritten for this piece. The
+builder styles paragraphs but leaves headings and lists unstyled, and this post
+leans on both, so it carries a scoped stylesheet for h2/h3/ul/ol in the site's
+existing type and colours.
+
+**Cover image.** The other posts each have their own, and there was no still
+for this one. Norton had already produced a social video for this exact article
+(`03_Video/Blog to video /VAT summer`), so a landscape band was cropped from a
+frame above the burned-in caption, brightened to lift the video's darkening
+overlay, and saved with 480/800 variants. Subject matter is a family walking
+into a theme park, which fits the piece. **Worth checking the stock licence
+covers still use as well as video**; easy to swap if not.
+
+Wired in: card at the top of /blog-list, sitemap, llms.txt, and related-reading
+links from tax, business-advice, cloud-accounting and accounting, so it has six
+inbound links rather than launching as an orphan.
+
+Copy is Norton's, reproduced faithfully. No em-dashes, per house style. No
+figures, dates or claims were added; the piece states a temporary 5% rate from
+25 June to 1 September 2026 and a return to normal treatment on 2 September.
+
+Verified live: page 200 with the right title and schema, cover image serving,
+`.html` form 301s to the clean URL, present in blog-list, sitemap and llms.txt,
+and the rest of the site still healthy.
