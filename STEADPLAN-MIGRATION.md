@@ -421,3 +421,40 @@ dashed border, diagonal texture, "BUILT & MAINTAINED BY" + NBM logo
 (`images/nbm-logo.png`, produced from `analytics/public/assets/`
 `nbm-logo-dark-bg.png` — black bg made transparent, trimmed, 520px).
 Styles are inline in footer.php (`.nbm-credit`), self-contained.
+
+## 2026-08-11 afternoon: pixel + audit + go-live checklist
+
+- Theme v1.1.5: **Meta Pixel installed** site-wide (ID 1072733728753651, Sam's
+  exact base code from 28 Jul email). v1.1.6: **duplicate <title> fixed**
+  (removed hardcoded `<title>Steadplan</title>` from header.php — Yoast's
+  title via wp_head is now the only one).
+- **SEO audit built**: `steadplan-audit/Steadplan_SEO_Audit_NorthBearMedia.docx`
+  (+ generator script). Grounded in a full preview crawl + DB/theme mining.
+  Norton to review in Word, then send to Hal + Sam (due w/c 10 Aug per his
+  5 Aug email). Key findings inside: duplicate titles (fixed), News page
+  noindexed + /blog/ duplicate, vehicle titles missing make/model,
+  /showroom/ page-vs-CPT-archive collision, no location pages
+  (Leeds/Rochdale/Burnley), no Vehicle/AutoDealer schema, blog stale since
+  26 Feb 2026, metadesc gaps (9/15 pages, 0 posts/vehicles), alt text 25%,
+  CSS/JS caching off, GSC 4xx alerts 18 Jul, staging site indexed (Norton
+  has URL in GSC).
+
+### GO-LIVE (DNS) CHECKLIST — Norton's manual part + post-flip fixes
+
+1. Namecheap (login `steadplansales`, Hal's shared Google login): BACK UP
+   current DNS records (screenshot), then change ONLY:
+   A @ → 77.37.35.74 · A www → 77.37.35.74. MX/TXT untouched.
+2. SSL auto-issues on Hostinger ~15min–1h after propagation.
+3. **Search-replace required after flip**: Hostinger's importer rewrote ALL
+   URLs to the preview domain — canonicals, og:url, sitemap URLs, and even
+   mailto: addresses (sales@darkcyan-dog-182593.hostingersite.com!). When
+   the domain connects, verify Hostinger auto-updates siteurl/home; then
+   reverse-replace `darkcyan-dog-182593.hostingersite.com` →
+   `steadplan.co.uk` across the DB (hPanel phpMyAdmin or a session task),
+   and spot-check: canonical on /, a mailto: on /contact/, sitemap URLs.
+4. Verify robots.txt on steadplan.co.uk is NOT the preview one (preview
+   blocks Googlebot only) and /sitemap_index.xml loads.
+5. Delete webroot junk: `wp-config copy.php`, `wp-config-2.php`,
+   `wp-config-new.php`, `new.php` (File Manager).
+6. Wordfence + ACF licences; delete the two one-off plugins if not already.
+7. Staging site: GSC removal request + confirm it's dead (Norton has URL).
