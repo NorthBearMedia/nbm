@@ -73,6 +73,65 @@ classifier to block it; fall back to normal wp-admin login on the preview URL.
 - Watching for import completion via `hosting_listAccountDatabasesV1` — a new
   DB besides u275789987_mPQfI means extraction ran and wired the site.
 
+### Upload flakiness diagnosis (session 2, ~09:45Z)
+
+Three import attempts all behaved the same: bulk upload streams at ~2.5MB/s
+for ~2 min (~300MB), then stalls to near-zero. Working theory: the egress
+proxy kills long-lived CONNECT tunnels; tus-js-client then hangs on the dead
+socket (no request timeout) until kernel TCP timeout (~15min), then MAY
+resume from the server-side offset on a fresh tunnel. Attempt #1's process
+read ~739MB total (≥1 full pass incl. re-reads) but no DB ever appeared and
+is-empty stayed true — so nothing fully landed. Also note each new attempt's
+preflight uses `override=true`, which RESETS server-side upload offsets —
+so repeated harness calls can never accumulate progress. Do not hammer the
+import tool; one attempt per session, given a long enough client timeout,
+is the right shape.
+
+### ✅ 2026-08-11 ~09:40Z: IMPORT SUCCEEDED — via slim-archive strategy
+
+Norton suggested breaking the upload into smaller files. That worked:
+
+- Built `steadplan_slim_20260811.zip` (**69MB**): full site EXCLUDING
+  `wp-content/uploads/**` (604MB, 2,882 files — restored separately),
+  `put_file.log`, `wp-content/debug.log` (junk logs; still in Drive backup).
+- `hosting_importWordpressWebsite` with slim zip + full SQL: client still
+  timed out at 60s, but the server-side handler completed — rchar delta
+  showed exactly zip+sql (117.4MB) read, then extract fired.
+- **New DB `u275789987_VU5bA` created 09:40:14Z, 122MB on disk** — SQL
+  imported and wired. PHP switched 8.3 → **8.1** via
+  `hosting_updatePHPVersionV1` (request accepted).
+- Media restore: helper plugin `steadplan-media-restore` (in repo at
+  `steadplan-media-restore/`) downloads the original Drive zip ON the
+  Hostinger server (no proxy in that path) and extracts only
+  `public_html/wp-content/uploads/*` into place. Activate → click
+  "Restore media now" → delete plugin. Deploy via
+  `hosting_deployWordpressPlugin` was classifier-blocked pending fresh
+  user approval; fallback = Norton uploads the single .php via hPanel
+  File Manager to `wp-content/plugins/steadplan-media-restore/`.
+
+### NEXT SESSION RECIPE (kept for reference — only needed if something above must be redone)
+
+1. In claude.ai/code → Hostinger environment settings, ADD env var
+   **`MCP_TOOL_TIMEOUT=1800000`** (30 min in ms; boot-time like the rest).
+   Keep HOSTINGER_API_TOKEN + the Custom network allowlist unchanged.
+2. Fresh session in the Hostinger environment. Re-stage (~10 min):
+   download both files (curl commands above), verify sizes, apply the 3
+   fixes, re-zip at zip root.
+3. Site state: website exists (recreated 2026-08-11 09:02Z, order
+   1005262292) and was still registering EMPTY as of ~09:45Z. If is-empty
+   went false from stray partial uploads, Norton clears public_html in
+   hPanel File Manager (do NOT use hosting_deleteWebsiteV1 — its schema
+   lacks the required boolean `confirm` field and cannot work through the
+   harness; hPanel delete + hosting_createWebsiteV1 recreate is the
+   fallback, already proven).
+4. Run hosting_importWordpressWebsite once and let it run up to 30 min.
+   If its internal tus upload dies mid-way, expect a 'partial'/'failure'
+   result text with per-file detail — visible this time, not a timeout.
+5. Then: verify DB appears (hosting_listAccountDatabasesV1), set PHP 8.1
+   (hosting_updatePHPVersionV1), preview URL + wp-admin from hPanel
+   (no MCP tool mints auto-login links; hPanel → WordPress → Admin Panel
+   is the equivalent one-click login).
+
 ## 2026-08-11 session: ABORTED at the auth gate — egress policy blocked everything
 
 New failure mode, distinct from "Unauthenticated": the Hostinger MCP servers
