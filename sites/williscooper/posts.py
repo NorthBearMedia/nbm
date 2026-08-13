@@ -69,14 +69,14 @@ MILEAGE_BODY = (
 # ---------------------------------------------------------------------------
 # 2. 25 years of Willis Cooper
 #    Source: 03_Video/Robert 25 year Questions/Robert 25 Year Article.docx
-#    Robert's section headings and pull quotes are kept. Four things are held
-#    back for Norton to decide on, since this one goes out under the client's
-#    name on a public page:
+#    Robert's section headings and pull quotes are kept. Four passages are cut
+#    (Norton's call, 13 Aug 2026, confirmed) because this publishes under the
+#    client's name:
 #      - the line about a former hire being "educated beyond his intelligence"
 #      - the joke that "most other accountants are such rubbish"
 #      - the tail of the indifference quote ("...because you ARE indifferent")
 #      - the "maybe I'd be bitter and twisted" paragraph
-#    Restoring any of them is a one-line edit here. Also fixed one transcription
+#    Restore any of them here if that ever changes. Also fixed one transcription
 #    typo: "you're still got to offer" -> "you've still got to offer".
 # ---------------------------------------------------------------------------
 Q = lambda t: f'<blockquote><p>{t}</p></blockquote>'

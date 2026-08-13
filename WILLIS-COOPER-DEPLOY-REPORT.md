@@ -561,17 +561,19 @@ journey, Staffology) as they predate our involvement.
 departures, all reversible in one edit in `sites/williscooper/posts.py`:
 
 1. The mileage doc's internal "Draft for approval" line is dropped.
-2. Four passages in the Robert interview are held back pending Norton's call,
-   since it publishes under the client's name: the "educated beyond his
+2. Four passages in the Robert interview are cut, since it publishes under the
+   client's name. Norton confirmed the cuts on 13 August 2026: the "educated beyond his
    intelligence" line about a former hire, the joke that most other accountants
    are "such rubbish", the sharper tail of the perceived-indifference quote, and
    the "bitter and twisted" paragraph. One transcription typo fixed
    ("you're still got" to "you've still got").
 3. The K2 piece is unheaded prose in the source. Lucie's words and their order
    are untouched; the section headings, photo captions and closing note are
-   ours, and it is attributed to Lucie MacArthur on the basis of the folder it
-   sits in ("Lucie Trip") plus her being an accountant on the team. **Worth
-   confirming with her before it circulates.**
+   ours. Attributed to Lucie MacArthur, confirmed by Norton on 13 August 2026;
+   she is happy for it to be public and it has already run on social.
+
+The mileage piece was signed off by the client despite the "DRAFT" filename,
+confirmed by Norton on 13 August 2026.
 
 **Images.** All from the client's own material. Robert and Julie outside the
 office, from the 2025 headshot set. Eight of Lucie's own trek photos, three used
