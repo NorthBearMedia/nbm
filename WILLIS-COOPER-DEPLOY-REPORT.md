@@ -534,3 +534,67 @@ figures, dates or claims were added; the piece states a temporary 5% rate from
 Verified live: page 200 with the right title and schema, cover image serving,
 `.html` form 301s to the clean URL, present in blog-list, sitemap and llms.txt,
 and the rest of the site still healthy.
+
+---
+
+# Drive blog backlog cleared — 2026-08-13 (fifteenth deploy)
+
+Audited every written document in the Willis Cooper Google Drive folder against
+what was actually published on the site, then published the three that were
+sitting there unused.
+
+**The audit.** Drive holds five pieces of written editorial. Two were already
+live (Bank Impersonation Scams, Summer VAT). Three were not:
+
+| Drive file | Now live at |
+|---|---|
+| `03_Video/Robert 25 year Questions/Robert 25 Year Article.docx` | `/25-years-of-willis-cooper` |
+| `06_Documents/Blog - Mileage Rate Increase - DRAFT.docx` | `/mileage-rate-increase-2026` |
+| `02_Photos/Lucie Trip/K2 Basecamp Trek.docx` | `/k2-basecamp-trek` |
+
+Cross-checked against Drive search for native Google Docs as well; there are
+none for this client, so the local mirror is the whole picture. Four published
+posts have no Drive source at all (the two Companies House pieces, Jess's
+journey, Staffology) as they predate our involvement.
+
+**Copy.** The client's words, carried over as written. Three deliberate
+departures, all reversible in one edit in `sites/williscooper/posts.py`:
+
+1. The mileage doc's internal "Draft for approval" line is dropped.
+2. Four passages in the Robert interview are held back pending Norton's call,
+   since it publishes under the client's name: the "educated beyond his
+   intelligence" line about a former hire, the joke that most other accountants
+   are "such rubbish", the sharper tail of the perceived-indifference quote, and
+   the "bitter and twisted" paragraph. One transcription typo fixed
+   ("you're still got" to "you've still got").
+3. The K2 piece is unheaded prose in the source. Lucie's words and their order
+   are untouched; the section headings, photo captions and closing note are
+   ours, and it is attributed to Lucie MacArthur on the basis of the folder it
+   sits in ("Lucie Trip") plus her being an accountant on the team. **Worth
+   confirming with her before it circulates.**
+
+**Images.** All from the client's own material. Robert and Julie outside the
+office, from the 2025 headshot set. Eight of Lucie's own trek photos, three used
+in the body plus a cover. For mileage there was no still, so a frame was lifted
+from the social video Norton had already produced for that article, cropped
+above the burned-in caption and brightened, the same approach as the VAT post.
+
+**Also fixed.** The Summer VAT post shipped on 11 August carried the wrong
+`og:description` and `twitter:description` (Companies House text inherited from
+the page it was built from). Corrected, and the generator now rewrites all three
+description fields so it cannot recur.
+
+**Tooling.** The post generator is now in the repo as
+`sites/williscooper/new-post.py` with the copy in `posts.py`, both excluded from
+the build. It clones an existing post so the builder markup stays identical,
+rewrites every meta field, and registers the post in blog-list, sitemap and
+llms.txt. Re-running is safe; it replaces rather than duplicates.
+
+Each post carries related-reading links from relevant service pages rather than
+launching as an orphan: mileage from tax, payroll, accounting and business
+advice; the interview from meet-the-team and business advice; the trek from
+meet-the-team and careers.
+
+Verified live: all three 200 with correct titles, headings and Article schema,
+all six new images serving, nine cards on /blog-list in date order, all three in
+sitemap and llms.txt, and the rest of the site healthy.
