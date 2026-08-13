@@ -638,3 +638,51 @@ word.
 
 `sites/williscooper/uk-dates.py` (excluded from the build) does the conversion
 and the re-sort, and is safe to re-run after adding any post.
+
+---
+
+# Robert re-dated to the anniversary, blog card hover — 2026-08-13 (seventeenth deploy)
+
+**25 years piece moved to 13 September 2025.** Norton confirmed the anniversary
+was September 2025, not 2026; the invite in `02_Photos/25th Anniversary`
+(`WC_Invite_1309.pdf`) puts the party at Saturday 13 September 2025 at Shottle
+Hall, and the event photos are stamped 14 September, so the post now carries
+that date.
+
+The closing credit had to move with it. It read "Willis Cooper celebrates 25
+years in 2026. Based on an interview with Robert Cooper, March 2026", and both
+of those dates sat in the future relative to a September 2025 post. It now
+reads "Willis Cooper celebrated 25 years in September 2025. Based on an
+interview with Robert Cooper." Robert's own "25, 26 years" phrasing inside the
+interview is left exactly as he said it.
+
+Sitemap `lastmod` is now derived from each post's displayed date rather than
+hard-coded, so it cannot drift again.
+
+**Bug found and fixed in the post generator.** The card-removal step in
+`new-post.py` used a regex that ran from the first card in the list to the
+target slug's href, which meant it deleted every card in between. Re-running the
+generator against a date-sorted list silently dropped the Summer VAT and Bank
+Impersonation cards, leaving seven where there should be nine. It now splits the
+list on the card boundary and discards by slug, and asserts that exactly one
+card was removed. Caught before deploy by the card count in the re-sort log.
+
+**Blog card hover.** The builder shipped the cards with a lone box-shadow
+transition, so the grid sat inert. Added: the cover image pushes in to 1.06 over
+0.8s, the card lifts 6px, its shadow deepens, and the title shifts to the brand
+teal. Cover images picked up a 12px radius to match the rest of the site.
+
+Scoped under the blog block's id because the builder's own rules are
+attribute-qualified and would otherwise win on specificity, and the lift carries
+`!important` because the entrance animation also writes `transform` on these
+elements. Gated on `(hover:hover)` so touch devices do not get a stuck hover
+state, and on `prefers-reduced-motion`, which disables the motion while keeping
+the shape. `:focus-within` mirrors it for keyboard users.
+
+Verified by cloning the built page with the media gate removed and the hover
+state forced on, then diffing the render against the resting state: lift, zoom,
+shadow and teal title all confirmed. The clone was never deployed;
+`/_hoverdemo.html` returns 404 on live.
+
+`sites/williscooper/blog-hover.py` (excluded from the build) applies the styles
+and is safe to re-run.

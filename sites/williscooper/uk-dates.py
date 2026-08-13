@@ -72,13 +72,19 @@ for (d, c), slug in zip(dated, order_after):
     print(f'  {d:%d %B %Y:>18}  {slug}')
 assert sorted(order_before) == sorted(order_after), 'lost a card while re-sorting'
 
-# --- 3. sitemap lastmod for the three re-dated posts -------------------------
+# --- 3. sitemap lastmod, derived from each post's own displayed date ---------
 sm_path = os.path.join(SRC, 'sitemap.xml')
 sm = open(sm_path, encoding='utf8').read()
-for slug, iso in [('25-years-of-willis-cooper', '2026-03-20'),
-                  ('mileage-rate-increase-2026', '2026-08-01'),
-                  ('k2-basecamp-trek', '2026-07-10')]:
+for path in sorted(glob.glob(os.path.join(SRC, '*.html'))):
+    slug = os.path.basename(path)[:-5]
+    if slug == 'blog-list':
+        continue
+    h = open(path, encoding='utf8').read()
+    m = DATE_SPAN.search(h)
+    if not m:
+        continue
+    iso = f'{sort_key(m.group(2)):%Y-%m-%d}'
     sm = re.sub(r'(<loc>https://williscooper\.com/' + re.escape(slug) + r'</loc><lastmod>)[^<]*(</lastmod>)',
-                lambda m: m.group(1) + iso + m.group(2), sm)
+                lambda mm: mm.group(1) + iso + mm.group(2), sm)
 open(sm_path, 'w', encoding='utf8').write(sm)
-print('\nsitemap lastmod updated for the three re-dated posts')
+print('\nsitemap lastmod synced to the displayed post dates')

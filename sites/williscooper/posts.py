@@ -69,15 +69,19 @@ MILEAGE_BODY = (
 # ---------------------------------------------------------------------------
 # 2. 25 years of Willis Cooper
 #    Source: 03_Video/Robert 25 year Questions/Robert 25 Year Article.docx
-#    Robert's section headings and pull quotes are kept. Four passages are cut
-#    (Norton's call, 13 Aug 2026, confirmed) because this publishes under the
-#    client's name:
+#    Robert's section headings and pull quotes are kept. Four things are held
+#    back for Norton to decide on, since this one goes out under the client's
+#    name on a public page:
 #      - the line about a former hire being "educated beyond his intelligence"
 #      - the joke that "most other accountants are such rubbish"
 #      - the tail of the indifference quote ("...because you ARE indifferent")
 #      - the "maybe I'd be bitter and twisted" paragraph
-#    Restore any of them here if that ever changes. Also fixed one transcription
+#    Restoring any of them is a one-line edit here. Also fixed one transcription
 #    typo: "you're still got to offer" -> "you've still got to offer".
+#    The closing credit read "celebrates 25 years in 2026 ... interview with
+#    Robert Cooper, March 2026". Dated to the 25th anniversary party
+#    (13 Sept 2025) per Norton, both of those now sat in the future relative
+#    to the post, so the credit points at the anniversary instead.
 # ---------------------------------------------------------------------------
 Q = lambda t: f'<blockquote><p>{t}</p></blockquote>'
 
@@ -242,7 +246,7 @@ ROBERT_BODY = (
     f'{P}Who knows. It’s one of those questions where you don’t know what the alternative would be.</p>'
 
     '<div class="wc-post-cta">'
-    f'{P}Willis Cooper celebrates 25 years in 2026. Based on an interview with Robert Cooper, March 2026.</p>'
+    f'{P}Willis Cooper celebrated 25 years in September 2025. Based on an interview with Robert Cooper.</p>'
     f'{P}You can <a href="/meet-the-team">meet the team</a>, read more '
     '<a href="/about-us">about the practice</a>, or <a href="/contact-us">get in touch</a> if you would '
     'like to talk to us about your own business.</p>'
@@ -328,7 +332,7 @@ POSTS = [
         seo_title='25 Years of Willis Cooper | Robert Cooper’s story',
         description='Robert Cooper started Willis Cooper in his living room with too many clients and no '
                     'business plan. Twenty-five years on, he looks back on the practice he built.',
-        date='8/13/2026', iso='2026-08-13T09:00:00.000Z',
+        date='13 September 2025', iso='2025-09-13T09:00:00.000Z',
         image='robert-cooper-25-years.jpg',
         image_alt='Robert and Julie Cooper outside the Willis Cooper office in Belper',
         body=ROBERT_BODY,
@@ -343,7 +347,7 @@ POSTS = [
         seo_title='Mileage rate rises to 55p per mile | Willis Cooper',
         description='The approved mileage rate has risen from 45p to 55p for the first 10,000 business '
                     'miles, the first increase since 2011. What counts and how to reclaim.',
-        date='8/13/2026', iso='2026-08-13T09:30:00.000Z',
+        date='1 August 2026', iso='2026-08-01T14:00:00.000Z',
         image='mileage-rate-increase.jpg',
         image_alt='Fuel prices displayed on a petrol station forecourt sign',
         body=MILEAGE_BODY,
@@ -358,7 +362,7 @@ POSTS = [
         seo_title='A trek towards K2 Basecamp | Willis Cooper',
         description='Our accountant Lucie MacArthur spent June trekking into the Karakoram. Deep snow '
                     'stopped the group short of basecamp, but not before K2 itself came into view.',
-        date='8/13/2026', iso='2026-08-13T10:00:00.000Z',
+        date='10 July 2026', iso='2026-07-10T08:22:00.000Z',
         image='k2-basecamp-trek.jpg',
         image_alt='Tents pitched on the moraine below snow-covered Karakoram peaks',
         body=K2_BODY,
