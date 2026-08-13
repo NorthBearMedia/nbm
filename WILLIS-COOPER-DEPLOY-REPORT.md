@@ -600,3 +600,41 @@ meet-the-team and careers.
 Verified live: all three 200 with correct titles, headings and Article schema,
 all six new images serving, nine cards on /blog-list in date order, all three in
 sitemap and llms.txt, and the rest of the site healthy.
+
+---
+
+# Blog dates: UK format and real authoring dates — 2026-08-13 (sixteenth deploy)
+
+Two problems with the blog dates, both fixed.
+
+**Format.** The builder emitted American `M/D/YYYY`, so "8/10/2026" read as
+8 October to a UK visitor when it meant 10 August. Every blog date is now UK
+long form ("10 August 2026"), matching the events page, which already formatted
+with `en-GB`. Nine article pages plus the nine blog-list cards. Machine-readable
+`datePublished` values were already correct ISO and were left alone; each one
+was checked against its displayed date and all nine agree.
+
+**Dates.** The three posts published earlier today were all stamped 13 August,
+the day they were uploaded rather than the day they were written. Re-dated from
+each document's own metadata:
+
+| Post | Was | Now | Evidence |
+|---|---|---|---|
+| 25 years of Willis Cooper | 13 Aug 2026 | **20 March 2026** | `dcterms:created` in the .docx, and the piece itself says "interview with Robert Cooper, March 2026" |
+| Mileage rate increase | 13 Aug 2026 | **1 August 2026** | zip entry timestamps and file mtime (no core.xml in this one) |
+| K2 Basecamp trek | 13 Aug 2026 | **10 July 2026** | zip entry timestamps; consistent with "In June I had the opportunity" |
+
+**Summer VAT deliberately left at 10 August.** Its .docx reports 9 June, but
+created and modified are the same second, which is the signature of a Google
+Docs export rather than an authoring date. 9 June also contradicts the article,
+which says "we're already well into the temporary period" for a period starting
+25 June. 10 August is consistent with the copy and with the social video for it
+(produced 3 August).
+
+The blog list was in insertion order, so it is now sorted by date, newest first.
+That moves the 25-years interview to fifth. If it should sit at the top as
+flagship content, that is a pinning rule rather than a date change, so say the
+word.
+
+`sites/williscooper/uk-dates.py` (excluded from the build) does the conversion
+and the re-sort, and is safe to re-run after adding any post.
