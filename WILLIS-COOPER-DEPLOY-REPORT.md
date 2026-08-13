@@ -686,3 +686,41 @@ shadow and teal title all confirmed. The clone was never deployed;
 
 `sites/williscooper/blog-hover.py` (excluded from the build) applies the styles
 and is safe to re-run.
+
+---
+
+# Blog list: one page, footer repaired — 2026-08-13 (eighteenth deploy)
+
+Norton reported two faults: the page selector did nothing so the 25 years post
+was unreachable, and the footer looked broken. Both were the same bug, and it
+was mine.
+
+**Cause.** The re-sort in `uk-dates.py` located the end of the last card with
+`rindex('</a></div>')` over everything following it. That string also occurs in
+the footer, so the last "card" swallowed the list's closing tag, the paginator
+and a chunk of the footer. When the cards were reordered, the closing tag moved
+with it and the oldest post was emitted *outside* `div.block-blog-list__list`,
+landing in the block's own 10-column grid. Measured live before the fix: that
+card rendered 42px wide and 1695px tall, a sliver of one-character-per-line text
+running down through the footer, which is exactly what "the footer looks broken"
+was. The same `rindex` mistake had already been fixed once in `new-post.py`; it
+survived in the sort path.
+
+**Fix.** Card-region boundaries now come from `sites/williscooper/bloglist.py`,
+which finds the list's closing tag by counting `div` depth from its opening tag
+and refuses to guess if the markup is unbalanced. Both `new-post.py` and
+`uk-dates.py` use it, and the sort asserts no card ends up outside the
+container. Verified idempotent: running the whole pipeline twice leaves the
+structure and the hover block identical.
+
+`blog-list.html` was rebuilt from commit `1daa60b`, the last structurally sound
+version, rather than patched in place.
+
+**Pagination removed.** The builder had paginated at eight posts per page and
+server-rendered the control, but the component is inert in the static build, so
+page 2 was genuinely unreachable rather than merely awkward. All nine posts are
+now on one page and the paginator markup is gone.
+
+Verified on live: nine cards, all children of the list, all 571px wide, none
+narrow, no paginator, footer section back to 358px from 2051px, and the North
+Bear patch intact at its usual size.

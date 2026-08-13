@@ -11,6 +11,7 @@ order rather than chronological order.
 """
 import re, os, glob
 from datetime import datetime
+import bloglist
 
 SRC = os.path.dirname(os.path.abspath(__file__))
 MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
@@ -49,28 +50,21 @@ for path in sorted(glob.glob(os.path.join(SRC, '*.html'))):
 print('dates converted in:', ', '.join(changed) or 'nothing')
 
 # --- 2. reorder the blog-list cards, newest first ----------------------------
+# The card region is bounded by div depth (see bloglist). Doing this by hand
+# with rindex previously walked into the footer and emitted a card outside the
+# list container, which broke both the grid and the footer.
 bl_path = os.path.join(SRC, 'blog-list.html')
 bl = open(bl_path, encoding='utf8').read()
-ANCHOR = '<div data-v-4b932081="" class="block-blog-list__list">'
-CARD = '<div data-v-b99b1992="" data-v-4b932081="" class="block-blog-list-item"'
-head, rest = bl.split(ANCHOR, 1)
-chunks = rest.split(CARD)
-lead, cards = chunks[0], [CARD + c for c in chunks[1:]]
-# the final card carries the markup that closes the list; split it off
-tail_at = cards[-1].rindex('</a></div>') + len('</a></div>')
-cards[-1], tail = cards[-1][:tail_at], cards[-1][tail_at:]
-
-dated = [(sort_key(DATE_SPAN.search(c).group(2)), c) for c in cards]
-order_before = [re.search(r'__content" href="/([a-z0-9-]+)"', c).group(1) for _, c in dated]
-dated.sort(key=lambda t: t[0], reverse=True)
-order_after = [re.search(r'__content" href="/([a-z0-9-]+)"', c).group(1) for _, c in dated]
-
-open(bl_path, 'w', encoding='utf8').write(
-    head + ANCHOR + lead + ''.join(c for _, c in dated) + tail)
+head, cards, tail = bloglist.split_cards(bl)
+before = sorted(bloglist.slug_of(c) for c in cards)
+cards.sort(key=lambda c: sort_key(bloglist.date_of(c)), reverse=True)
+assert sorted(bloglist.slug_of(c) for c in cards) == before, 'lost a card while re-sorting'
+bl = bloglist.join_cards(head, cards, tail)
+assert bloglist.CARD_START not in tail, 'a card ended up outside the list container'
+open(bl_path, 'w', encoding='utf8').write(bl)
 print(f'\nblog-list re-sorted ({len(cards)} cards)')
-for (d, c), slug in zip(dated, order_after):
-    print(f'  {d:%d %B %Y:>18}  {slug}')
-assert sorted(order_before) == sorted(order_after), 'lost a card while re-sorting'
+for c in cards:
+    print(f'  {bloglist.date_of(c):>18}  {bloglist.slug_of(c)}')
 
 # --- 3. sitemap lastmod, derived from each post's own displayed date ---------
 sm_path = os.path.join(SRC, 'sitemap.xml')

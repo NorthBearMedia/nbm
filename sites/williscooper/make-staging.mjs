@@ -46,7 +46,7 @@ const SKIP = new Set([
   '.variant-manifest.json',
   'events.json', 'events.sample.json', 'build-events.mjs', 'events-demo.html',
   'locations.json', 'build-locations.mjs',
-  'new-post.py', 'posts.py', 'uk-dates.py', 'blog-hover.py', '__pycache__',
+  'new-post.py', 'posts.py', 'uk-dates.py', 'blog-hover.py', 'bloglist.py', '__pycache__',
   'williscooper-staging.zip', 'williscooper-live.zip',
 ]);
 

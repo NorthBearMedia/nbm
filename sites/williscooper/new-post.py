@@ -10,15 +10,13 @@ Idempotent: re-running replaces an existing post of the same slug rather than
 duplicating its blog-list card or sitemap entry.
 """
 import re, sys, os
+import bloglist
 
 SRC = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE = 'summer-vat-reduction-2026.html'
 BASE = 'https://williscooper.com'
 AUTHOR = 'Willis Cooper Chartered Accountants'
 
-# Card boundaries in blog-list.html, used to add/remove/re-sort cards safely.
-CARD_LIST_ANCHOR = '<div data-v-4b932081="" class="block-blog-list__list">'
-CARD_START = '<div data-v-b99b1992="" data-v-4b932081="" class="block-blog-list-item"'
 
 # Shared article-body typography. The builder styles <p class="body"> but leaves
 # headings, lists, quotes and figures unstyled, and the posts rely on all four.
@@ -122,18 +120,12 @@ def register(post, read):
     bl_path = os.path.join(SRC, 'blog-list.html')
     bl = open(bl_path, encoding='utf8').read()
     if f'href="/{slug}"' in bl:
-        # Drop the existing card so a re-run replaces rather than duplicates.
-        # Split on the card boundary and discard by slug: a regex spanning from
-        # the first card to this slug's href would swallow every card between
-        # the two, which is exactly what it did.
-        head, rest = bl.split(CARD_LIST_ANCHOR, 1)
-        chunks = rest.split(CARD_START)
-        lead, cards = chunks[0], [CARD_START + c for c in chunks[1:]]
-        cut = cards[-1].rindex('</a></div>') + len('</a></div>')
-        cards[-1], tail = cards[-1][:cut], cards[-1][cut:]
-        kept = [c for c in cards if f'href="/{slug}"' not in c]
+        # Replace rather than duplicate on a re-run. bloglist bounds the card
+        # region by div depth, so this cannot reach past the list container.
+        head, cards, tail = bloglist.split_cards(bl)
+        kept = [c for c in cards if bloglist.slug_of(c) != slug]
         assert len(kept) == len(cards) - 1, f'expected to drop exactly one card for {slug}'
-        bl = head + CARD_LIST_ANCHOR + lead + ''.join(kept) + tail
+        bl = bloglist.join_cards(head, kept, tail)
     card = (
         '<div data-v-b99b1992="" data-v-4b932081="" class="block-blog-list-item" data-animation-role="block-element"'
         ' data-qa="blog-list-item" data-animation-state="active" style="--v525116cd: 24px;">'
@@ -154,7 +146,7 @@ def register(post, read):
         f'<span data-v-7baf6691="" data-qa="blog-list-item-date">{date}</span>'
         f'<span data-v-7baf6691="">{read} min read</span></p></div></div></a></div>'
     )
-    bl = bl.replace(CARD_LIST_ANCHOR, CARD_LIST_ANCHOR + card, 1)
+    bl = bl.replace(bloglist.ANCHOR, bloglist.ANCHOR + card, 1)
     open(bl_path, 'w', encoding='utf8').write(bl)
 
     sm_path = os.path.join(SRC, 'sitemap.xml')
