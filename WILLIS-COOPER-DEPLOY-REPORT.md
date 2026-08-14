@@ -724,3 +724,36 @@ now on one page and the paginator markup is gone.
 Verified on live: nine cards, all children of the list, all 571px wide, none
 narrow, no paginator, footer section back to 358px from 2051px, and the North
 Bear patch intact at its usual size.
+
+---
+
+# Morale Officers updated — 2026-08-14 (nineteenth deploy)
+
+Indie has died. The About us page still read "Meet Indie, Echo and Kilo... you
+will find them in the office most days", in the present tense, with her portrait
+and her name as a heading. Norton asked for it to become Echo, Kilo and Zeus,
+and it was urgent: a social post tonight will send people to that page.
+
+Zeus is Jess's dog and a permanent fixture, so he takes the third slot. The three
+cards were rotated rather than swapped in place, so the order reads Echo, Kilo,
+Zeus: image, srcset, alt text and name heading for each. Indie appears nowhere on
+the site now, verified on live.
+
+The rest of the paragraph is unchanged and still correct: three dogs, three
+wagging tails.
+
+**The photo is a stopgap and it looks like one.** Echo and Kilo are studio
+portraits on a blue backdrop with the Willis Cooper watermark. The only Zeus
+photos available are phone snaps in the office, so his card is a 2:3 crop of
+`02_Photos/WC_Zeus8.jpeg` at the same 1440x2160 with w480/w800 variants, and it
+reads as a different kind of picture: office background, no watermark, looking up
+and away rather than at camera. Getting him in front of the same backdrop and
+swapping the file is a five-minute job whenever that happens.
+
+The decorative dog illustration above the cards still works by luck: it shows two
+dark dogs and one tan, and Echo, Kilo and Zeus happen to keep that split.
+
+Indie's portrait (`assets/images/indie-AoP47lqLBkfkaOjw.jpg` and its variants) is
+still in the repo and still deployed, just unreferenced. Left deliberately: it is
+not costing anything, and deleting a dead dog's photo is not a call to make
+without asking.
