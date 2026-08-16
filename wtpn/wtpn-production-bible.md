@@ -74,3 +74,20 @@ Do not invent hypothesis #6. Report facts; optimise dread (user-confirmed driver
 
 ## EPISODE LEDGER — see channel-audit/ledger.tsv (reconstructed; live-titles.tsv is authoritative
 for what is published — 122 rows, both platforms, refreshed 15 Aug).
+
+## 16 AUG — DAY 2 BLOCKED ON CREDENTIALS; PONTEFRACT POSTS THE BEST DAY-1 OF THE ERA
+Analytics (yt-dlp; shares/1k first):
+  1.18d Pontefract    1 sh  750 views  1.3 sh/1k  2.9%  <- **BEST DAY-1 OF THE RECENT ERA**
+        (beats Hexham 729, South Shields 704). The scariest episode of the run now holds both
+        the best 4-hour open (415) AND the best day-1. Conversion low so far.
+  0.18d Hampton Court 0 sh  247 views  4.0%  (first fully-new-standards build; mid-band open)
+  3.18d Chislehurst   3 sh  262 views  11.5 sh/1k — winner band holds.
+  Followers 4,424. The old 230-283 day-1 band is now broken in BOTH directions (QM 329 low-mid,
+  Pontefract 750 high): day-1 variance is finally moving. No causal claim.
+CONTAINER NOTE: fresh box again — ffmpeg/pillow/yt-dlp had to be reinstalled (apt ffmpeg, pip
+pillow yt-dlp). Assume NOTHING is installed after a recycle.
+**END CARDS REBUILT** (endcards/ in repo now): Liberation Serif replaces the lost font —
+near-identical render, eyeballed against memory of the originals; endcard.mp4 5.0s decode-clean,
+now natively 48kHz MONO so the concat needs no aresample. STILL BLOCKED: Metricool/ElevenLabs/fal
+keys. 17-18 Aug armed and safe; **19 Aug is the first night that will be missed** if keys have
+not arrived by tomorrow morning's run.
