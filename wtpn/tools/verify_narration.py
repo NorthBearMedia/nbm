@@ -26,9 +26,9 @@ def norm(t):
 def verify(script_path,scribe_path):
     d=json.load(open(scribe_path))
     w,g=norm(open(script_path).read()),norm(d["text"])
-    ratio=difflib.SequenceMatcher(None,w,g).ratio()*100
+    ratio=difflib.SequenceMatcher(None,w.split(),g.split(),autojunk=False).ratio()*100
     lang,prob=d.get("language_code"),d.get("language_probability")
-    sm=difflib.SequenceMatcher(None,w.split(),g.split())
+    sm=difflib.SequenceMatcher(None,w.split(),g.split(),autojunk=False)
     ok = lang=="eng" and prob>=0.90 and ratio>=95
     print(f"lang={lang} p={prob:.3f} similarity={ratio:.1f}%  ->  {'PASS' if ok else 'FAIL'}")
     for t,i1,i2,j1,j2 in sm.get_opcodes():

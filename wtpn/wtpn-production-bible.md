@@ -91,3 +91,38 @@ near-identical render, eyeballed against memory of the originals; endcard.mp4 5.
 now natively 48kHz MONO so the concat needs no aresample. STILL BLOCKED: Metricool/ElevenLabs/fal
 keys. 17-18 Aug armed and safe; **19 Aug is the first night that will be missed** if keys have
 not arrived by tomorrow morning's run.
+
+## ★★★★★ 19 AUG — KEYS RESTORED (user re-provided all three; verified live). RECOVERY DAY. ★★★★★
+- ElevenLabs quota RESET on the new key: 0/177,776 chars.
+- Metricool + fal verified. **mc_upload.py's source is unrecoverable** — interim standard flow:
+  `fal_client.upload_file()` -> fal.media URL -> Metricool scheduler accepts it (this was the
+  original pre-S3 flow). Rebuild a Metricool-native uploader only if fal hosting misbehaves.
+- verify_narration.py had a REBUILD BUG: char-level SequenceMatcher autojunk junks spaces on
+  ~900-char strings (scored a clean take 20.4%). Fixed: word-level ratio, autojunk=False. Third
+  measurement-artifact bug of this class (positional zip 31 Jul, digits 10 Aug, autojunk 19 Aug).
+- **ONE NIGHT MISSED: 19 Aug** — the key outage's total cost (posts up to 18 Aug were pre-armed).
+  No backfill per standing rule. EP41 Cooneen armed for 20 Aug (post 363892259, fal-hosted,
+  isAigc, verified): 82.8s w/ cards, 4.8 dB (moor bed needed -36 — wind masks hard), 99.4%
+  ("Fermina"=Scribe on Cillian's accent), Cillian's first episode since 6 Aug. Thud/raps/ship-thud
+  /heartbeat effects; lit-farmhouse -> derelict-farmhouse bookend. EP42 Borley staged, HELD —
+  user asked for the analytics deep-dive before "building loads".
+
+## ★★★★★ 19 AUG — THE 10k DEEP DIVE (user-requested pivot checkpoint) ★★★★★
+FOLLOWERS: 4,426. Samples: ~4,340 (30 Jul) / 4,407 (10 Aug) / 4,412 (11) / 4,424 (16) / 4,426 (18-19).
+  Rates: 20-day +4.3/day; 9-day +2.1/day; last 3 days +0.7/day. **DECELERATING.**
+THE DECOUPLING (the central finding): the 700-club week (774/731/728/710 day-1s, views ~3x the
+old band) produced +2/day followers — conversion ~1 follow per 250 views vs ~1 per 100 lifetime.
+Views and follows have DECOUPLED. The affective metrics moved the OTHER way in the same window:
+new-era like-rates 1.5-2.9% vs 4-10% old register; shares 0-2 on every 700-club episode.
+92% of all channel likes (46.6k of 50.9k) sit on one video with a 14.2% like-rate AND 21.4 sh/1k —
+when this channel actually converts, all three metrics move together.
+ARITHMETIC: gap to 10k = 5,574. At current +2-4/day: 3.6-7.6 YEARS. At historical ~1 follow/100
+views: needs ~560k further views ≈ two Greyfriars-scale outlier events. Steady state cannot get
+there; only outliers + restored conversion can.
+EPWORTH is the one new-era episode where views (442), likes (7.3%) and shares (9.0/1k) all held —
+the existing proof the pipeline can produce all-three episodes.
+END CARDS: no measurable follows/day lift since 11 Aug deployment. Stated, not spun.
+PIVOT OPTIONS PUT TO USER (no standard changed): A keep pure dread course / B hybrid (dread
+cold-open + affective body-close, A/B for two weeks, judge on follows-per-day + sh/1k) /
+C narrow: clone Epworth's register. Follower count now scraped EVERY run — follows/day per
+episode is finally a measurable per-register outcome.
