@@ -126,3 +126,30 @@ PIVOT OPTIONS PUT TO USER (no standard changed): A keep pure dread course / B hy
 cold-open + affective body-close, A/B for two weeks, judge on follows-per-day + sh/1k) /
 C narrow: clone Epworth's register. Follower count now scraped EVERY run — follows/day per
 episode is finally a measurable per-register outcome.
+
+## ★★★★★ 19 AUG — THE TOP-20 RULES. USER-APPROVED ("so lets introduce those rules now"). ★★★★★
+Derived from the audit of the channel's 20 best-performing videos (15/20 present tense, 14/20
+named figure, 9/20 witness chain incl. 4-for-4 first-person, 13/20 place in the first line,
+19/20 from the 2025 catalogue). These COMPOSE WITH the horror rules — dread open ≤3s, pacing,
+placed effects all still govern. Principles, not a template.
+
+**T1. PRESENT TENSE — the haunting has not stopped.** The hook and the close carry "still"
+grammar: it still walks, they still see her, the reports have not stopped. A story that is over
+is a museum placard (rule 2 restated in time). Only claim "still" where the record supports
+continuing reports — attribute where soft.
+
+**T2. THE THING IS A WHO.** Named or titled, human-shaped where the record has one: the Black
+Nun, the White Lady, the watchman, the man buried in 1814. **RETIRED: the "naming it makes it
+smaller" note (11 Aug, mine) — the data says the audience shares entities with identities.**
+Never invent a name (rule 4); use the record's name or title, or the strongest human anchor.
+
+**T3. A WITNESS CHAIN YOU CAN STAND IN.** First person where the record contains first-hand
+accounts (quote them; never fabricate an "I"), else the chain: named witnesses, "locals still
+see", counts of independent observers. Every explicitly first-person video on the channel is
+in the top 20.
+
+**T4. PLACE IN THE FIRST LINE of the caption/title** (a titling practice, distinct from story
+selection). Country still anchored for the US audience.
+
+First episode built under these: EP42 Borley (below). EP41 Cooneen (armed 20 Aug) predates them —
+partially compliant by accident (named Bridget Murphy, "the house still stands"); left as armed.
