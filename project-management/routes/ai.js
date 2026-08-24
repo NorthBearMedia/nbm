@@ -17,6 +17,36 @@ function getClient() {
   return client;
 }
 
+// The API throws transient 529 'Overloaded' errors at busy times. The SDK's
+// built-in retries are quick and short; this adds patient spaced retries so a
+// busy minute doesn't surface as a failure — and if it still fails, the user
+// gets a sentence, never a raw error blob.
+async function callClaude(c, params) {
+  const delays = [1500, 4000, 8000];
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await c.messages.create(params);
+    } catch (err) {
+      const status = err?.status;
+      const retriable = status === 429 || (status >= 500 && status <= 599);
+      if (!retriable || attempt >= delays.length) throw err;
+      console.warn(`[AI] ${status} from API — retry ${attempt + 1}/${delays.length} in ${delays[attempt]}ms`);
+      await new Promise(r => setTimeout(r, delays[attempt]));
+    }
+  }
+}
+
+function friendlyAIError(err) {
+  const status = err?.status;
+  if (status === 529 || /overloaded/i.test(err?.message || '')) {
+    return 'The Bear\u2019s brain (the Claude API) is overloaded right now \u2014 nothing wrong on your end. Give it a minute and ask again.';
+  }
+  if (status === 429) return 'The Bear is being rate-limited \u2014 wait a minute and try again.';
+  if (status === 401) return 'The Bear\u2019s API key isn\u2019t working \u2014 check ANTHROPIC_API_KEY on Railway.';
+  if (status >= 500) return 'The Claude API had a hiccup \u2014 try again in a moment.';
+  return 'The Bear couldn\u2019t answer that one \u2014 try again, or rephrase.';
+}
+
 const TOOLS = [
   {
     name: 'list_clients',
@@ -559,7 +589,7 @@ router.post('/api/ai/chat', requireAuth, requireWrite, async (req, res) => {
     const maxIterations = 15;
 
     while (iteration++ < maxIterations) {
-      const response = await c.messages.create({
+      const response = await callClaude(c, {
         model: 'claude-opus-4-6',
         max_tokens: 8192,
         system: buildSystemPrompt(req.user),
@@ -599,8 +629,8 @@ router.post('/api/ai/chat', requireAuth, requireWrite, async (req, res) => {
       tool_calls: toolLog
     });
   } catch (err) {
-    console.error('[AI]', err);
-    return res.status(500).json({ error: err.message || 'AI request failed' });
+    console.error('[AI]', err?.status, err?.message);
+    return res.status(503).json({ error: friendlyAIError(err) });
   }
 });
 
@@ -651,7 +681,7 @@ router.post('/api/ai/chat-media', requireAuth, requireWrite, (req, res, next) =>
     const maxIterations = 15;
 
     while (iteration++ < maxIterations) {
-      const response = await c.messages.create({
+      const response = await callClaude(c, {
         model: 'claude-opus-4-6',
         max_tokens: 8192,
         system: buildSystemPrompt(req.user),
@@ -685,8 +715,8 @@ router.post('/api/ai/chat-media', requireAuth, requireWrite, (req, res, next) =>
 
     return res.json({ reply: 'Stopped after maximum tool iterations.', tool_calls: toolLog });
   } catch (err) {
-    console.error('[AI media]', err);
-    return res.status(500).json({ error: err.message || 'AI request failed' });
+    console.error('[AI media]', err?.status, err?.message);
+    return res.status(503).json({ error: friendlyAIError(err) });
   }
 });
 
