@@ -153,3 +153,38 @@ selection). Country still anchored for the US audience.
 
 First episode built under these: EP42 Borley (below). EP41 Cooneen (armed 20 Aug) predates them —
 partially compliant by accident (named Bridget Murphy, "the house still stands"); left as armed.
+
+
+## ★★★★★ 25 AUG — THE WITNESS FORMAT. USER-APPROVED ("Excellent. Publish it"). ★★★★★
+The channel's new flagship format, born from the user's craft verdict ("not even close")
+and their ask: first-person, interview, feels real.
+- **Form:** interview dramatisation. Typed question cards (mono font, black), the witness
+  ANSWERS in voice. On-screen disclosure card: "Dramatised from [witness]'s signed
+  statement / broadcast interviews / published account." isAigc:true always.
+- **Truth line (hard rule):** every FACT documented (facts.md per episode, sourced
+  verbatim where possible). Human texture (sensory detail, interiority) is dramatised —
+  never new facts, never a fabricated witness, never an invented name.
+- **Writing (the user's bar, met by Heeps v3/v4):** sensory anchors ("I remember her
+  hands"), the mundane beside the impossible ("waiting for furniture"), witness
+  characterisation of the event ("like it had done what it came to do"), cost/aftermath
+  ("that's the part I think about"), authority frame in the close ("sober, on duty, in
+  uniform"), refusal to plead ("make of it what you like"). AVOID abstractions like
+  "the air went wrong" — user vetoed; concrete experience only.
+- **Cold open:** witness voice at ~0.5s with the single scariest claim. Tape click first.
+- **Voice:** eleven_v3_conversational, stability 0.5, disfluencies WRITTEN into the text
+  (em-dashes, ellipses, restarts) + sparse tags [exhales]/[sighs]/[soft laugh].
+  Witness voices from the library per character (Heeps = Blondie exsUS4vynmxd379XN4yO).
+- **Processing (the "archive" sound):** highpass 240 / lowpass 3600 / aresample 8000->48000
+  / acompressor -24dB 4:1 / vibrato 0.4Hz d=0.015; per-segment measured normalize to -16.
+  Pink-noise hiss bed (amplitude 0.006, band 300-9000) runs until a tape-off click after
+  the last answer; drone bed at -36 under; scrape/click stings from the sfx library.
+- **Visuals:** black + typed cards + 2-3 existing stills degraded to near-mono
+  (saturation 0.07, contrast 1.22, brightness -0.06, heavy grain, slow zoompan).
+  Serif lowercase sentence captions, lower third. NO cinematic motion. ~ZERO generation cost.
+- **Length:** ~2:00-2:20 ratified (the 90s ceiling does NOT apply to witness episodes).
+- **Pipeline:** tools/mc_upload.py (REBUILT — Metricool S3 upload-transactions flow with
+  x-amz-checksum-sha256 headers) means publishing needs NO fal. fal only for new stills.
+- First episode: Enfield/WPC Heeps, armed 26 Aug 05:30, post 366475797.
+- Witness bench (documented first-person records): Sauchie (Miss Stewart), Borley
+  (Marianne Foyster), Pontefract, Battersea (Shirley Hitchings), Epworth letters,
+  Renvyle (Yeats/Gogarty published accounts), Glasgow/Gorbals BBC retrospectives.
