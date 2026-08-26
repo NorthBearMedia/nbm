@@ -184,6 +184,11 @@ and their ask: first-person, interview, feels real.
 - **Length:** ~2:00-2:20 ratified (the 90s ceiling does NOT apply to witness episodes).
 - **Pipeline:** tools/mc_upload.py (REBUILT — Metricool S3 upload-transactions flow with
   x-amz-checksum-sha256 headers) means publishing needs NO fal. fal only for new stills.
+  **CRITICAL (learned 26 Aug, cost a missed night):** create the scheduler post IMMEDIATELY
+  after mc_upload while the metricool-temp URL is fresh, then GET the post and CONFIRM its
+  media field was rewritten to static.metricool.com (= ingested to permanent storage).
+  If it still shows metricool-temp, delete and recreate the post — temp objects expire
+  before the 05:30 publish and all four networks fail with 'you need to add a video'.
 - First episode: Enfield/WPC Heeps, armed 26 Aug 05:30, post 366475797.
 - Witness bench (documented first-person records): Sauchie (Miss Stewart), Borley
   (Marianne Foyster), Pontefract, Battersea (Shirley Hitchings), Epworth letters,
