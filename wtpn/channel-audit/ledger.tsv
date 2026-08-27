@@ -34,3 +34,5 @@ STATS	25Aug-0844UTC	followers 4434 (+1) | Sauchie d1: 293v 1.7%lk 0sh (weak seed
 EP47	WITNESS 1: Enfield WPC Heeps interview (REARMED for 28 Aug, 366747007)	NEW FORMAT LAUNCH; 2:12; 26 Aug publish FAILED (temp-bucket media expired) = missed night #4; replaces the 292-view Enfield ep (user deletes old in-app)
 EP48	WITNESS 2: Cardiff/Pete, John Matthews + Fontana (rearmed for 27 Aug, 366746776, Rhys-Welsh)	2:27; SPR/broadcast-sourced
 NOTE	PUBLISH-PIPELINE	26 Aug: posts must be created while the mc_upload temp URL is FRESH; verify the post's media field shows static.metricool.com (ingested) after create - if it still shows metricool-temp, recreate. saveExternalMediaFiles is read-only via API.
+EP49	WITNESS 3: Willington Mill 1840, Dr Edward Drury letter (armed for 29 Aug, 367241031, Geordie-Andy)	2:35; ingestion verified static.metricool.com
+STATS	27Aug-0850UTC	followers 4438 (+4, best day since 19 Aug) | CARDIFF WITNESS 4h: 441v 5.0%lk 0sh - fastest start in weeks, best like-rate since old era | Enfield witness pub 28th

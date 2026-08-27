@@ -189,6 +189,9 @@ and their ask: first-person, interview, feels real.
   media field was rewritten to static.metricool.com (= ingested to permanent storage).
   If it still shows metricool-temp, delete and recreate the post — temp objects expire
   before the 05:30 publish and all four networks fail with 'you need to add a video'.
+  The ingestion TRIGGER is passing "saveExternalMediaFiles": true in the CREATE body
+  (the stored field always reads false afterwards — it's a trigger, not a setting;
+  confirmed 27 Aug when omitting it left the raw temp URL on the post).
 - First episode: Enfield/WPC Heeps, armed 26 Aug 05:30, post 366475797.
 - Witness bench (documented first-person records): Sauchie (Miss Stewart), Borley
   (Marianne Foyster), Pontefract, Battersea (Shirley Hitchings), Epworth letters,
