@@ -1208,9 +1208,25 @@ function pickKeywords(rows, domain, clientName) {
   // Established: already strong, worth showing as retained ground.
   const winning = clean.filter(r => r.position <= 3.5)
     .sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions);
+  // Near-duplicate collapse. Substring matching alone let "web design
+  // derby", "website design derby", "derby web design", "web designer
+  // derby" and "web designers derby" all through — eight rows of one
+  // keyword, useless in a client report. Compare the significant words
+  // instead: heavy overlap means the same search intent, so keep only the
+  // strongest and spend the remaining slots on the client's other
+  // services. (Validated against North Bear Media's own 705-query export.)
+  const STOP = new Set(['the', 'and', 'for', 'near', 'best', 'top', 'in', 'me', 'my', 'uk', 'a', 'of', 'to']);
+  const sig = q => new Set(q.split(/\s+/).map(w => w.replace(/s$/, '')).filter(w => w.length > 2 && !STOP.has(w)));
+  const sameIntent = (a, b) => {
+    const A = sig(a), B = sig(b);
+    if (!A.size || !B.size) return false;
+    let shared = 0;
+    for (const w of A) if (B.has(w)) shared++;
+    return shared / Math.min(A.size, B.size) >= 0.6;
+  };
   const out = [];
-  const push = q => { if (out.length < 8 && !out.some(x => x.includes(q) || q.includes(x))) out.push(q); };
-  striking.slice(0, 20).forEach(r => push(r.q));
+  const push = q => { if (out.length < 8 && !out.some(x => sameIntent(x, q))) out.push(q); };
+  striking.slice(0, 40).forEach(r => push(r.q));
   winning.slice(0, 4).forEach(r => push(r.q));
   return out;
 }
@@ -1228,9 +1244,15 @@ export async function deriveTargetKeywords() {
   for (const site of sites) {
     const d = (site.domain || '').toLowerCase().replace(/^www\./, '');
     const current = (site.target_keywords || '').trim();
-    // Owner-edited? Never touch it again.
-    if (current && auto[d] !== undefined && current !== auto[d]) continue;
-    if (current && auto[d] === undefined) continue; // pre-existing manual value
+    // Owner-edited? Never touch it again. But a value identical to the
+    // hardcoded starter list IS ours, even when it predates the auto
+    // register — otherwise every originally-seeded site was treated as
+    // hand-written and skipped forever. That is why northbearmedia.co.uk
+    // still carried guesses of mine that its Search Console data shows it
+    // has never once been searched for.
+    const isOurSeed = current && current === (TARGET_KEYWORDS[d] || '').trim();
+    if (current && !isOurSeed && auto[d] !== undefined && current !== auto[d]) continue;
+    if (current && !isOurSeed && auto[d] === undefined) continue; // genuinely hand-written
     let rows = [];
     try { rows = await fetchTopQueries(site.gsc_site_url, start, end, 500); }
     catch (e) { console.log('[keywords]', d, 'query fetch failed:', String(e.message || e).slice(0, 70)); continue; }
