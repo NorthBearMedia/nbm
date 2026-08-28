@@ -55,18 +55,43 @@ async function hg(path, method = 'GET', body) {
 // snippet only reached sites that happened to change an ID afterwards —
 // northbearmedia.co.uk sat on a block whose over-broad guard suppressed
 // its own Google tag, reporting 0 visits, with no path to ever update.
-export const SNIPPET_VERSION = 2;
+// v3 — STATIC script tags, because dynamically-injected ones do not
+// survive on React/SPA sites: hydration removes any script appended to
+// <head> outside React's tree, so createElement+appendChild loaders are
+// torn out moments after load. Proven in a browser on evccitysprint.co.uk,
+// where the site had been dark to all three tools for weeks while the
+// measurement ID still appeared in the page source — which is exactly the
+// "tag on site ✓ but zero data" signature seen on several sites.
+//
+// Static tags always load, so the previous per-ID runtime guards are gone.
+// Loading a library twice is harmless; only a duplicate gtag CONFIG
+// double-counts, so that one call stays behind a window flag. Our own
+// block can't duplicate anyway — the injector replaces it by marker.
+export const SNIPPET_VERSION = 3;
 
 export function buildSnippet(measurementId, clarityId, { consentBanner = false, fathomId = '' } = {}) {
+  const gaStatic = measurementId
+    ? `<script async src="https://www.googletagmanager.com/gtag/js?id=${measurementId}"></script>`
+      + `<script>window.dataLayer=window.dataLayer||[];function gtag(){window.dataLayer.push(arguments);}`
+      + `if(!window.__nbmGA){window.__nbmGA=1;gtag('js',new Date());gtag('config','${measurementId}');}</script>` : '';
+  // Clarity's tag URL loads directly as a script src, so it needs no
+  // inline injector of its own.
+  const clarityStatic = clarityId ? `<script async src="https://www.clarity.ms/tag/${clarityId}"></script>` : '';
+  const fathomStatic = fathomId ? `<script src="https://cdn.usefathom.com/script.js" data-site="${fathomId}" defer></script>` : '';
+  const staticTags = gaStatic + clarityStatic + fathomStatic;
+  if (!staticTags) return '<!-- NBM-GA-TAG --><!-- /NBM-GA-TAG -->';
+  if (!consentBanner) return `<!-- NBM-GA-TAG -->${staticTags}<!-- /NBM-GA-TAG -->`;
+
+  // Consent-gated variant must create its scripts after the visitor
+  // accepts, so it stays dynamic by nature. That is safe from hydration
+  // because it runs on a click, long after React has settled.
   const gaJs = measurementId
-    ? `(function(d,w){if(d.querySelector('script[src*="gtag/js?id=${measurementId}"]'))return;var g=d.createElement('script');g.async=true;g.src='https://www.googletagmanager.com/gtag/js?id=${measurementId}';d.head.appendChild(g);w.dataLayer=w.dataLayer||[];function gtag(){w.dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${measurementId}');})(document,window);` : '';
+    ? `var g=d.createElement('script');g.async=true;g.src='https://www.googletagmanager.com/gtag/js?id=${measurementId}';d.head.appendChild(g);w.dataLayer=w.dataLayer||[];function gtag(){w.dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${measurementId}');` : '';
   const clarityJs = clarityId
-    ? `(function(d,w){if(d.querySelector('script[src*="clarity.ms/tag/${clarityId}"]'))return;(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(w,d,"clarity","script","${clarityId}");})(document,window);` : '';
+    ? `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(w,d,"clarity","script","${clarityId}");` : '';
   const fathomJs = fathomId
-    ? `(function(d){if(d.querySelector('script[data-site="${fathomId}"]'))return;var f=d.createElement('script');f.src='https://cdn.usefathom.com/script.js';f.setAttribute('data-site','${fathomId}');f.defer=true;d.head.appendChild(f);})(document);` : '';
+    ? `var f=d.createElement('script');f.src='https://cdn.usefathom.com/script.js';f.setAttribute('data-site','${fathomId}');f.defer=true;d.head.appendChild(f);` : '';
   const load = gaJs + clarityJs + fathomJs;
-  if (!load) return '<!-- NBM-GA-TAG --><!-- /NBM-GA-TAG -->';
-  if (!consentBanner) return `<!-- NBM-GA-TAG --><script>${load}</script><!-- /NBM-GA-TAG -->`;
   // Consent-gated variant: nothing loads until the visitor accepts; the
   // choice is remembered. Stricter than Consent Mode, dead simple, and
   // compliant for UK PECR. (nbmConsent doubles as the retrofit's marker
