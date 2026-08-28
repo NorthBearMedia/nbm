@@ -78,7 +78,12 @@ async function siteHealth(site, start, end) {
     // Never offer the "just installed, be patient" grace to a source that
     // has previously delivered data — that is a regression, not a start-up.
     if (seenWorking.fathom) return regressed('fathom', fathomTagOn ? 'the script is on the page but Fathom has recorded nothing for 7 days.' : 'the Fathom script is no longer on the page.');
-    if (!fathomTagOn) return bad('script not on the page yet — file-hosted sites get it automatically within the hour; builder sites: paste the Tracking code');
+    // Don't assume every non-injectable site is a website-builder one.
+    // Musk Engineering is a PHP site whose tag lives in a header include:
+    // the code was correct in its repo for weeks while the deployed copy
+    // was stale, and this message kept sending the owner to a builder that
+    // doesn't exist. Name the real possibilities instead.
+    if (!fathomTagOn) return bad('not on the live page yet — sites Pulse can edit get it automatically within the hour. Otherwise add this site\'s Tracking code wherever its pages get their <head>: the site builder\'s custom-code box, the CMS theme header, or a header include/template — and if the code is already in a repo, check the deployed copy is up to date.');
     const since = pending[domain] || Date.now();
     if (pending[domain] !== since) { pending[domain] = since; setSetting('fathom_pending', JSON.stringify(pending)); }
     const waited = Date.now() - since;
