@@ -34,7 +34,8 @@ STATS	25Aug-0844UTC	followers 4434 (+1) | Sauchie d1: 293v 1.7%lk 0sh (weak seed
 EP47	WITNESS 1: Enfield WPC Heeps interview (REARMED for 28 Aug, 366747007)	NEW FORMAT LAUNCH; 2:12; 26 Aug publish FAILED (temp-bucket media expired) = missed night #4; replaces the 292-view Enfield ep (user deletes old in-app)
 EP48	WITNESS 2: Cardiff/Pete, John Matthews + Fontana (rearmed for 27 Aug, 366746776, Rhys-Welsh)	2:27; SPR/broadcast-sourced
 NOTE	PUBLISH-PIPELINE	26 Aug: posts must be created while the mc_upload temp URL is FRESH; verify the post's media field shows static.metricool.com (ingested) after create - if it still shows metricool-temp, recreate. saveExternalMediaFiles is read-only via API.
-EP49	WITNESS 3: Willington Mill 1840, Dr Edward Drury letter (armed for 29 Aug, 367241031, Geordie-Andy)	2:35; ingestion verified static.metricool.com
+EP49	WITNESS 3: Willington Mill 1840, Dr Edward Drury letter (REARMED v2 for 29 Aug, 367920388, Geordie-Andy)	2:35; v2 = hook open "They carried me out of that house. I am a doctor."; old 367241031 + malformed 367917999 deleted; ingestion verified
 STATS	27Aug-0850UTC	followers 4438 (+4, best day since 19 Aug) | CARDIFF WITNESS 4h: 441v 5.0%lk 0sh - fastest start in weeks, best like-rate since old era | Enfield witness pub 28th
-EP50	WITNESS 4: Renvyle/Gogarty (armed for 30 Aug, 367719751, JamesFitzgerald-Irish)	2:36; ingestion verified
+EP50	WITNESS 4: Renvyle/Gogarty (REARMED v2 for 30 Aug, 367920465, JamesFitzgerald-Irish)	2:36; v2 = new hook segment g_open2 "A dead boy asked me for flowers."; old 367719751 deleted; ingestion verified
 STATS	28Aug-0850UTC	followers 4440 (+2) | Cardiff d1: 688v 4.1%lk 0sh | ENFIELD 4h: 392v 5.6%lk 1sh (share in first 4h!) | witness era: like-rates 4-5.6% vs cinematic 1.4-3.0
+NOTE	HOOK-STANDARD	28 Aug user: "it doesnt grab attention at all to start with, needs the hook" -> every witness ep opens t=0 with big-type hook block (DejaVuSerif-Bold 88, most impossible claim) while voice speaks the same claim from 0.45s; title/disclosure AFTER. Builder: tools/hook_block.py. First applied: EP49/EP50 v2 rebuilds.

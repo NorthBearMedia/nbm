@@ -170,7 +170,15 @@ and their ask: first-person, interview, feels real.
   ("that's the part I think about"), authority frame in the close ("sober, on duty, in
   uniform"), refusal to plead ("make of it what you like"). AVOID abstractions like
   "the air went wrong" — user vetoed; concrete experience only.
-- **Cold open:** witness voice at ~0.5s with the single scariest claim. Tape click first.
+- **Open — THE HOOK (user 28 Aug: "it doesnt grab attention at all to start with, needs
+  the hook"; replaces the plain cold open):** t=0 is a big-type HOOK BLOCK — the witness's
+  single most impossible claim as 2-4 short lines, DejaVuSerif-Bold 88pt, off-white
+  (232,229,220) with black drop-shadow, centered upper-third, fade-in st=0.12 d=0.18 alpha,
+  over grain-black (noise=alls=9) — while the tape click fires and the witness VOICE speaks
+  that same claim from ~0.45s. Write a dedicated 1-2 sentence hook segment ("A dead boy
+  asked me for flowers." / "They carried me out of that house. I am a doctor."). Title +
+  disclosure card comes AFTER the hook, not before. First applied to Willington (29 Aug)
+  and Renvyle (30 Aug) v2 rebuilds; hook-block builder pattern in witness3/witness4 dirs.
 - **Voice:** eleven_v3_conversational, stability 0.5, disfluencies WRITTEN into the text
   (em-dashes, ellipses, restarts) + sparse tags [exhales]/[sighs]/[soft laugh].
   Witness voices from the library per character (Heeps = Blondie exsUS4vynmxd379XN4yO).
@@ -181,7 +189,7 @@ and their ask: first-person, interview, feels real.
 - **Visuals:** black + typed cards + 2-3 existing stills degraded to near-mono
   (saturation 0.07, contrast 1.22, brightness -0.06, heavy grain, slow zoompan).
   Serif lowercase sentence captions, lower third. NO cinematic motion. ~ZERO generation cost.
-- **Length:** ~2:00-2:20 ratified (the 90s ceiling does NOT apply to witness episodes).
+- **Length:** ~2:00-2:35 in practice (the 90s ceiling does NOT apply to witness episodes).
 - **Pipeline:** tools/mc_upload.py (REBUILT — Metricool S3 upload-transactions flow with
   x-amz-checksum-sha256 headers) means publishing needs NO fal. fal only for new stills.
   **CRITICAL (learned 26 Aug, cost a missed night):** create the scheduler post IMMEDIATELY
@@ -192,7 +200,10 @@ and their ask: first-person, interview, feels real.
   The ingestion TRIGGER is passing "saveExternalMediaFiles": true in the CREATE body
   (the stored field always reads false afterwards — it's a trigger, not a setting;
   confirmed 27 Aug when omitting it left the raw temp URL on the post).
-- First episode: Enfield/WPC Heeps, armed 26 Aug 05:30, post 366475797.
-- Witness bench (documented first-person records): Sauchie (Miss Stewart), Borley
-  (Marianne Foyster), Pontefract, Battersea (Shirley Hitchings), Epworth letters,
-  Renvyle (Yeats/Gogarty published accounts), Glasgow/Gorbals BBC retrospectives.
+- Episodes so far: Cardiff/Matthews (pub 27 Aug), Enfield/Heeps (pub 28 Aug),
+  Willington/Drury (armed 29 Aug, post 367920388, hook v2), Renvyle/Gogarty
+  (armed 30 Aug, post 367920465, hook v2). Never re-tell the same case as witness twice.
+- Witness bench remaining: Battersea (Shirley Hitchings — never covered, no gap needed),
+  Ballechin 1897 vigil diary; gap-constrained ~3wk from their cinematic run: Epworth
+  (~1 Sep), South Shields (~2 Sep), Pontefract (~5 Sep), Borley/Marianne (~11 Sep),
+  Sauchie/Miss Stewart (~14 Sep). Glasgow/Gorbals BBC retrospectives as backup.
