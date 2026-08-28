@@ -17,6 +17,36 @@ function getClient() {
   return client;
 }
 
+// The API throws transient 529 'Overloaded' errors at busy times. The SDK's
+// built-in retries are quick and short; this adds patient spaced retries so a
+// busy minute doesn't surface as a failure — and if it still fails, the user
+// gets a sentence, never a raw error blob.
+async function callClaude(c, params) {
+  const delays = [1500, 4000, 8000];
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await c.messages.create(params);
+    } catch (err) {
+      const status = err?.status;
+      const retriable = status === 429 || (status >= 500 && status <= 599);
+      if (!retriable || attempt >= delays.length) throw err;
+      console.warn(`[AI] ${status} from API — retry ${attempt + 1}/${delays.length} in ${delays[attempt]}ms`);
+      await new Promise(r => setTimeout(r, delays[attempt]));
+    }
+  }
+}
+
+function friendlyAIError(err) {
+  const status = err?.status;
+  if (status === 529 || /overloaded/i.test(err?.message || '')) {
+    return 'The Bear\u2019s brain (the Claude API) is overloaded right now \u2014 nothing wrong on your end. Give it a minute and ask again.';
+  }
+  if (status === 429) return 'The Bear is being rate-limited \u2014 wait a minute and try again.';
+  if (status === 401) return 'The Bear\u2019s API key isn\u2019t working \u2014 check ANTHROPIC_API_KEY on Railway.';
+  if (status >= 500) return 'The Claude API had a hiccup \u2014 try again in a moment.';
+  return 'The Bear couldn\u2019t answer that one \u2014 try again, or rephrase.';
+}
+
 const TOOLS = [
   {
     name: 'list_clients',
@@ -103,8 +133,22 @@ const TOOLS = [
     }
   },
   {
+    name: 'list_client_tasks',
+    description: 'List ALL tasks linked to one client — the reliable way to answer anything per-client, since most task titles do not mention the client name. Filter by status ("open", "done", "cancelled", or any specific task_status) and completed_since (YYYY-MM-DD, for "completed in the last N days" questions). Prefer this over search_tasks whenever the question is about a client.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        client: { type: 'string', description: 'Client name (or fragment of it), or a numeric client id' },
+        status: { type: 'string', description: '"open" (default: everything not done/cancelled), "done", "cancelled", "all", or a specific task_status' },
+        completed_since: { type: 'string', description: 'YYYY-MM-DD — with status "done", only tasks completed on/after this date' },
+        include_archived: { type: 'boolean', description: 'Include archived tasks (default false)' }
+      },
+      required: ['client']
+    }
+  },
+  {
     name: 'search_tasks',
-    description: 'Search tasks by a text query against title/notes/assignee. Returns up to 20 matches with ids, titles, and client context.',
+    description: 'Search tasks by a text query against title/notes/assignee. Returns up to 20 matches. NOTE: for anything per-client use list_client_tasks instead — titles usually do not contain the client name.',
     input_schema: {
       type: 'object',
       properties: {
@@ -296,6 +340,36 @@ export async function executeTool(name, input, user) {
         }
         logActivity('task', input.task_id, 'updated', user.display_name, `Updated via AI assistant`);
         return { success: true, task_id: input.task_id };
+      }
+
+      case 'list_client_tasks': {
+        const privC = isOwner ? '' : 'AND is_private = 0';
+        const ref = String(input.client || '').trim();
+        const cl = /^\d+$/.test(ref)
+          ? db.prepare(`SELECT id, name FROM clients WHERE id = ? AND is_system = 0 ${privC}`).get(+ref)
+          : db.prepare(`SELECT id, name FROM clients WHERE is_system = 0 ${privC} AND name LIKE ? ORDER BY archived, id LIMIT 1`).get(`%${ref}%`);
+        if (!cl) return { error: `No client matching "${ref}" — use list_clients to see them.` };
+        const conds = ['t.client_id = ?'];
+        const params = [cl.id];
+        if (!input.include_archived) conds.push('t.archived = 0');
+        const st = (input.status || 'open').toLowerCase();
+        if (st === 'open') conds.push("t.task_status NOT IN ('done','cancelled')");
+        else if (st !== 'all') {
+          if (!isValidStatus(st)) return { error: `Invalid status "${st}"` };
+          conds.push('t.task_status = ?'); params.push(st);
+        }
+        if (input.completed_since && /^\d{4}-\d{2}-\d{2}$/.test(input.completed_since)) {
+          conds.push('t.completed_at >= ?'); params.push(input.completed_since);
+        }
+        const rows = db.prepare(`
+          SELECT t.id, t.title, t.task_status, t.task_band, t.task_type, t.assignee,
+                 t.deadline, t.planned_date, t.completed_at
+          FROM tasks t JOIN clients c ON c.id = t.client_id
+          WHERE ${conds.join(' AND ')}${scope}
+          ORDER BY CASE WHEN t.completed_at != '' THEN t.completed_at ELSE t.deadline END DESC
+          LIMIT 100
+        `).all(...params);
+        return { client: cl.name, count: rows.length, tasks: rows.map(t => ({ ref: 'NB' + String(t.id).padStart(3, '0'), ...t })) };
       }
 
       case 'search_tasks': {
@@ -559,7 +633,7 @@ router.post('/api/ai/chat', requireAuth, requireWrite, async (req, res) => {
     const maxIterations = 15;
 
     while (iteration++ < maxIterations) {
-      const response = await c.messages.create({
+      const response = await callClaude(c, {
         model: 'claude-opus-4-6',
         max_tokens: 8192,
         system: buildSystemPrompt(req.user),
@@ -599,8 +673,8 @@ router.post('/api/ai/chat', requireAuth, requireWrite, async (req, res) => {
       tool_calls: toolLog
     });
   } catch (err) {
-    console.error('[AI]', err);
-    return res.status(500).json({ error: err.message || 'AI request failed' });
+    console.error('[AI]', err?.status, err?.message);
+    return res.status(503).json({ error: friendlyAIError(err) });
   }
 });
 
@@ -651,7 +725,7 @@ router.post('/api/ai/chat-media', requireAuth, requireWrite, (req, res, next) =>
     const maxIterations = 15;
 
     while (iteration++ < maxIterations) {
-      const response = await c.messages.create({
+      const response = await callClaude(c, {
         model: 'claude-opus-4-6',
         max_tokens: 8192,
         system: buildSystemPrompt(req.user),
@@ -685,8 +759,8 @@ router.post('/api/ai/chat-media', requireAuth, requireWrite, (req, res, next) =>
 
     return res.json({ reply: 'Stopped after maximum tool iterations.', tool_calls: toolLog });
   } catch (err) {
-    console.error('[AI media]', err);
-    return res.status(500).json({ error: err.message || 'AI request failed' });
+    console.error('[AI media]', err?.status, err?.message);
+    return res.status(503).json({ error: friendlyAIError(err) });
   }
 });
 
