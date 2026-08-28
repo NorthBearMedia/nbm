@@ -56,12 +56,28 @@ async function siteHealth(site, start, end) {
   // fleet read "8 of 20 connected" when 19 were fully tagged. It stays OK
   // for a grace period; if Fathom is still empty after that while the site
   // demonstrably has traffic, it becomes a real fault worth chasing.
+  // Regression memory. A source that USED to work and has stopped is a
+  // different, far more urgent problem than one never set up — and it was
+  // being disguised: when Fathom data stopped, the "waiting for the first
+  // visitor" grace period restarted from scratch, so a site whose tag had
+  // been stripped (a builder republish wipes custom code) showed a
+  // reassuring green. Live: Active Personnel and EVC Citysprint both lost
+  // tags they demonstrably had on 2 Aug — EVC while LIVE to its client.
+  let lastOk = {};
+  try { lastOk = JSON.parse(getSetting('source_last_ok') || '{}'); } catch { /* fresh */ }
+  const seenWorking = lastOk[domain] || {};
+  const regressed = (src, msg) =>
+    bad(`STOPPED WORKING — ${msg} This was recording normally on ${seenWorking[src]}, so the tag has since been removed from the page (republishing a builder site wipes its custom code). Re-paste this site's Tracking code.`);
+
   const fathomEnsureErr = getSetting('fathom_ensure_last') || '';
   const fathomTagOn = homepage != null && homepage.includes('usefathom.com');
   const GRACE_MS = 48 * 3600_000;
   let pending = {};
   try { pending = JSON.parse(getSetting('fathom_pending') || '{}'); } catch { /* fresh */ }
   const noData = () => {
+    // Never offer the "just installed, be patient" grace to a source that
+    // has previously delivered data — that is a regression, not a start-up.
+    if (seenWorking.fathom) return regressed('fathom', fathomTagOn ? 'the script is on the page but Fathom has recorded nothing for 7 days.' : 'the Fathom script is no longer on the page.');
     if (!fathomTagOn) return bad('script not on the page yet — file-hosted sites get it automatically within the hour; builder sites: paste the Tracking code');
     const since = pending[domain] || Date.now();
     if (pending[domain] !== since) { pending[domain] = since; setSetting('fathom_pending', JSON.stringify(pending)); }
@@ -94,6 +110,15 @@ async function siteHealth(site, start, end) {
   const otherToolsSeeTraffic = fathomVisits > 0 ? `Fathom (${fathomVisits} visits)`
     : clarityDays >= 3 ? `Microsoft Clarity (${clarityDays} days of sessions)` : '';
 
+  // Search Console is resolved BEFORE Analytics because its click count is
+  // the yardstick the Analytics check needs: every click is a real landing
+  // that Analytics must have seen.
+  out.search = !site.gsc_site_url ? bad('not linked')
+    : await gsc.fetchSummary(site.gsc_site_url, start, end)
+        .then(s => ok(`${Math.round(s.clicks)} clicks, pos ${s.position ? s.position.toFixed(1) : '—'} (7d)`))
+        .catch(e => bad(e.message.slice(0, 90)));
+  const gscClicks = Number((out.search?.detail || '').match(/^(\d+) clicks/)?.[1] || 0);
+
   out.ga = integ.ga?.status === 'mismatch'
     ? bad(`WRONG PROPERTY — its traffic is from ${(integ.ga.hosts || []).join(', ')}, not this site. North Bear is on it; don't paste anything.`)
     : !site.ga4_property_id ? bad('no property ID')
@@ -119,15 +144,22 @@ async function siteHealth(site, start, end) {
           // late-attaching tools (Fathom, Clarity) still record normally.
           // Found live on northbearmedia.co.uk. Naming it saves hours.
           if (o.sessions === 0 && otherToolsSeeTraffic) {
-            return bad(`recording nothing while ${otherToolsSeeTraffic} sees real traffic on the same pages — the tag is on the site but being stopped from firing. Usual cause: a speed/"delay JavaScript" plugin holding scripts until interaction, or a cookie-consent tool. Exclude googletagmanager.com from that delay list so Analytics loads immediately.`);
+            return seenWorking.ga
+              ? regressed('ga', `Analytics is recording nothing while ${otherToolsSeeTraffic} still sees real traffic.`)
+              : bad(`recording nothing while ${otherToolsSeeTraffic} sees real traffic on the same pages — the tag is on the site but being stopped from firing. Usual cause: a speed/"delay JavaScript" plugin holding scripts until interaction, or a cookie-consent tool. Exclude googletagmanager.com from that delay list so Analytics loads immediately.`);
+          }
+          // A collapse against Search Console clicks is the same failure as
+          // zero, just less obvious: every click is a real landing, so GA
+          // recording a small fraction of them means it stopped capturing.
+          // EVC Citysprint fell from 79 visits to 2 against 41 clicks and
+          // still read green, days before its next client report.
+          if (gscClicks >= 10 && o.sessions < gscClicks * 0.5) {
+            return seenWorking.ga
+              ? regressed('ga', `Analytics recorded only ${Math.round(o.sessions)} visits while Google sent ${gscClicks} clicks to the site.`)
+              : bad(`only ${Math.round(o.sessions)} visits recorded while Google sent ${gscClicks} clicks — the tag isn't capturing most visitors.`);
           }
           return ok(`${Math.round(o.sessions)} visits (7d)${note}`);
         })
-        .catch(e => bad(e.message.slice(0, 90)));
-
-  out.search = !site.gsc_site_url ? bad('not linked')
-    : await gsc.fetchSummary(site.gsc_site_url, start, end)
-        .then(s => ok(`${Math.round(s.clicks)} clicks, pos ${s.position ? s.position.toFixed(1) : '—'} (7d)`))
         .catch(e => bad(e.message.slice(0, 90)));
 
   // Clarity: two independent things must be true — the tracking TAG on the
@@ -159,6 +191,20 @@ async function siteHealth(site, start, end) {
   // Report delivery: the last report's fate, so a silently failing send is
   // visible here instead of nowhere.
   const last = db.prepare('SELECT status, period_label, error, created_at FROM reports WHERE site_id = ? ORDER BY id DESC LIMIT 1').get(site.id);
+  // Remember the last date each source genuinely delivered data, so a
+  // future failure can be reported as a regression with the date it broke.
+  // The Fathom grace message is provisional (installed, no data yet), so it
+  // must not count as proof the source ever worked.
+  const today = todayISO();
+  let recorded = false;
+  for (const key of ['ga', 'search', 'clarity', 'fathom']) {
+    const v = out[key];
+    if (!v?.ok) continue;
+    if (key === 'fathom' && /waiting on the first visitor/.test(v.detail || '')) continue;
+    if (seenWorking[key] !== today) { seenWorking[key] = today; recorded = true; }
+  }
+  if (recorded) { lastOk[domain] = seenWorking; setSetting('source_last_ok', JSON.stringify(lastOk)); }
+
   out.delivery = !last ? bad('no reports generated yet')
     : last.status === 'sent' ? ok(`last report sent ${String(last.created_at).slice(0, 10)} (${last.period_label})`)
     : bad(`LAST REPORT FAILED ${String(last.created_at).slice(0, 10)}: ${String(last.error || '').slice(0, 90)}`);
