@@ -1,0 +1,76 @@
+{
+ "case": "Battersea poltergeist 1956 — Shirley Hitchings",
+ "voice": {
+  "name": "WTPN Eleanor - elderly English",
+  "id": "2qQJWjw5QdG80GreshqG",
+  "note": "older British female; Shirley speaks in her eighties, as in the 2021 BBC interviews"
+ },
+ "hook_card": [
+  "I was six inches",
+  "above my bed."
+ ],
+ "segments": {
+  "b_open": "I was six inches above my bed. Rigid — like a board. [pause] My father stood in that room and watched it happen. I was fifteen.",
+  "b_s1": "It started small. A little silver key, just... sitting on my pillow. Dad tried it in every lock in the house. It fitted none of them. He left it on the kitchen table. [pause] Next morning it was back on my pillow. He thought I was playing a trick on him. I thought he was playing one on me.",
+  "b_s2": "Everyone heard it. So loud you could hear it from the street. The police came — surveyors, tapping the pipes. Grown men, in their good coats. [soft laugh] Nobody ever found anything.",
+  "b_s3": "The bedclothes went. Not — not slipping, the way a blanket slips. Pulled. From under me, hard, like something had hold of them. Mum and Dad grabbed the ends, and they could feel it pulling back. And then I was up. [pause] Rigid, about six inches off the bed — that's my father's word, to the papers. I remember the ceiling. I remember I couldn't turn my head. And then it set me down. Gently. Like it was being careful with me.",
+  "b_s4": "It knocked — counts for yes, counts for no — and then the letters started. Handwriting that wasn't mine — they checked. Signed... Donald. [sighs] He told us he was the King of France. It lied, is what I'm telling you — like a person lies. And it followed me to work. I lost the job. Then my friends.",
+  "b_s5": "I'm in my eighties now. People have had a lifetime to tell me what it really was. Nerves. A trick. A girl who wanted attention. [soft laugh] I promise you, I wanted anything but. My father was the steadiest man I ever knew. He watched his daughter rise off her bed, and he never took a word of it back. Neither will I. Make of that what you like."
+ },
+ "cards": {
+  "t1": {
+   "big": [
+    "Battersea, South London.",
+    "1956."
+   ],
+   "small": [
+    "The witness was fifteen years old.",
+    "Dramatised from Shirley Hitchings'",
+    "published memoir and BBC interviews."
+   ]
+  },
+  "q1": [
+   "How did it start?"
+  ],
+  "q2": [
+   "Who else heard it?"
+  ],
+  "q3": [
+   "What happened that night?"
+  ],
+  "q4": [
+   "What was Donald?"
+  ],
+  "t4": {
+   "big": [
+    "A reporter slept in Shirley's room.",
+    "",
+    "She watched her pulled from the bed."
+   ]
+  },
+  "t5": {
+   "big": [
+    "The disturbances lasted twelve years."
+   ]
+  },
+  "t6": {
+   "big": [
+    "She told her story to the BBC",
+    "in 2021, in her eighties.",
+    "",
+    "She never changed her account."
+   ]
+  }
+ },
+ "stills": {
+  "b_s1": "../ep41-cooneen/s1-bedroom.jpg",
+  "b_s4": "../ep45-sauchie/s3-parlour.jpg",
+  "b_s5": "../ep45-sauchie/s6-house-night.jpg"
+ },
+ "sting": {
+  "file": "door-t.mp3",
+  "at": "b_s3 'And then I was up'",
+  "vol": 0.3
+ },
+ "yt_title": "Battersea: Six Inches Above the Bed"
+}
