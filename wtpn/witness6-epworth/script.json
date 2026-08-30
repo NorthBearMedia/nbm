@@ -1,0 +1,75 @@
+{
+ "case": "Epworth Rectory 1716-17 — Emilia Wesley",
+ "voice": {
+  "name": "Fiamma",
+  "id": "50WEeAEwWXqIRk3eZGep",
+  "note": "clear warm English, neutral — rector's educated daughter, framed at her 1750 letter"
+ },
+ "hook_card": [
+  "It answered",
+  "my father.",
+  "Knock for knock."
+ ],
+ "segments": {
+  "e_open": "My father knocked on the nursery wall — his own pattern, one nobody else knew. [pause] It knocked back. The same pattern. Knock for knock.",
+  "e_s1": "The maid heard it first, at the dining-room door. Groans — like a person at the point of death. We laughed at her. [soft laugh] Then the knocking. Three, and a stop, and three again. It came to every one of us in turn.",
+  "e_s2": "Noises a house cannot make. Several people walking over our heads — running the stairs. All the bottles under the stairs dashed to a thousand pieces — my mother's words, in her letter. And nothing broken. Nothing moved. [pause] Our mastiff whimpered the first night. After that, it hid before the noises began. The dog knew before we did.",
+  "e_s3": "It interrupted prayers — always at the prayer for the King. Those words, and no others. So my father stood in the nursery and called it out — thou deaf and dumb devil, why dost thou fright these children? Come to me in my study, that am a man. [pause] The next evening, his study door was flung against him. Hard.",
+  "e_s4": "My sister Hetty trembled in her sleep before the knocks came — it followed her more than any of us. Something went down the stairs in the dark — like a man, in a loose gown, trailing behind him. And my sister Nancy... [pause] Nancy was lifted. Up. With the bed she sat upon.",
+  "e_s5": "It ended at the end of January — gone, like a guest that had said what it came to say. [pause] Thirty years on, my brother John gathered what we each remembered. I called it 'that wonderful thing called by us Jeffery'. I was four and twenty when it walked our stairs. Not my mother, not my father, not one of my sisters ever took back a word. Neither do I. Make of us what you will."
+ },
+ "cards": {
+  "t1": {
+   "big": [
+    "Epworth Rectory, Lincolnshire.",
+    "December, 1716."
+   ],
+   "small": [
+    "The witness is the rector's eldest daughter.",
+    "Dramatised from the Wesley family's",
+    "letters, journal and later accounts."
+   ]
+  },
+  "q1": [
+   "What did you hear first?"
+  ],
+  "q2": [
+   "What else came?"
+  ],
+  "q3": [
+   "Did your father confront it?"
+  ],
+  "q4": [
+   "Did anyone see it?"
+  ],
+  "t4": {
+   "big": [
+    "Her father kept a journal",
+    "as it was happening.",
+    "",
+    "Her mother's letters survive."
+   ]
+  },
+  "t5": {
+   "big": [
+    "The family that heard it",
+    "founded the Methodist church."
+   ]
+  },
+  "t6": {
+   "big": [
+    "None of them ever took it back."
+   ]
+  }
+ },
+ "stills": {
+  "e_s2": "../ep41-cooneen/s2-farmhouse.jpg",
+  "e_s3": "../ep46-renvyle/s3-corridor.jpg"
+ },
+ "sting": {
+  "file": "door-t.mp3",
+  "at": "e_s3 'his study door was flung'",
+  "vol": 0.3
+ },
+ "yt_title": "Epworth: It Answered Knock for Knock"
+}
