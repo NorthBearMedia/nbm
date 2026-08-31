@@ -1,0 +1,26 @@
+{
+ "case": "South Shields poltergeist 2006 — Darren Ritson (investigator)",
+ "voice": {"name": "George", "id": "j57KDF72L6gxbLk4sOo5", "note": "young male, Northern English — Ritson, North East investigator, recalling ~15 years on"},
+ "hook_card": ["I watched a knife", "throw itself", "across the kitchen."],
+ "segments": {
+  "s_open": "I watched a carving knife throw itself across the kitchen. It bounced off the television and hit the floor. Nobody was near it. [pause] I was there to take notes.",
+  "s_s1": "A young couple, and a little lad. An ordinary house in South Shields. They said things were moving. [soft laugh] Things are never moving — it's pipes, it's drafts, it's somebody wanting attention. I'd seen dozens of these. So we stayed. Two of us, month after month, cameras in every room. Five hundred photographs. Hours of tape.",
+  "s_s2": "A plastic nut off the boy's toy bench — it flew across the room. Not fell. Flew, with force, off a cupboard door. A rubber ball appeared on the bed from nowhere — I picked it up, and it was hot. Like it had been held. [pause] And the whole time, our eyes were on that couple. Their hands. Every minute of every night. It was not them. I can say that with one hundred percent certainty.",
+  "s_s3": "Then the knives. I found a kitchen knife lying in the middle of the boy's bedroom floor — it had not been there minutes before. Then the carving knife, in front of me, across the kitchen. [pause] And Marc's back... his back opened up. Long scratches, through his shirt, while we were in the house. Nobody within reach of him.",
+  "s_s4": "The little one had a doodle board — a child's toy, you write on it and wipe it clean. Words started appearing on it. 'Go now.' 'Stop it now.' In nobody's handwriting. [pause] Then her phone. Messages — going to die today, going to get you. I'll come for you when you're asleep. We checked the phones they came from. [exhales] They were switched off.",
+  "s_s5": "That's nearly twenty years ago now. I've been called gullible, and worse — I've heard it all. We were two grown men in a small house, watching everything, writing it down the day it happened. Every word of it stands. [pause] There is more to this world than we know at this moment. I can say that with total conviction. Make of it what you like."
+ },
+ "cards": {
+  "t1": {"big": ["South Shields, Tyneside.", "2006."], "small": ["The witness is a paranormal investigator.", "Dramatised from Darren Ritson's", "published case files and interviews."]},
+  "q1": ["Why were you there?"],
+  "q2": ["What did you see yourself?"],
+  "q3": ["When did it turn?"],
+  "q4": ["It communicated?"],
+  "t4": {"big": ["The investigator of the 1977", "Enfield case wrote the", "book's foreword."]},
+  "t5": {"big": ["The family's names", "were changed in print."]},
+  "t6": {"big": ["The investigators never", "withdrew a word."]}
+ },
+ "stills": {"s_s1": "../ep45-sauchie/s6-house-night.jpg", "s_s3": "../ep45-sauchie/s3-parlour.jpg"},
+ "sting": {"file": "door-t.mp3", "at": "s_s3 'the carving knife'", "vol": 0.3},
+ "yt_title": "South Shields: The Knife That Threw Itself"
+}
