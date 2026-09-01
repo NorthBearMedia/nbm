@@ -1,0 +1,76 @@
+{
+ "case": "Hinton Ampner 1765-71 — Mary Ricketts",
+ "voice": {
+  "name": "Lily",
+  "id": "pFZP5JQG7iQjIQuC4Bku",
+  "note": "velvety middle-aged British — an educated Georgian gentlewoman, measured and precise"
+ },
+ "hook_card": [
+  "Footsteps walked",
+  "to the foot",
+  "of my bed."
+ ],
+ "segments": {
+  "h_open": "I heard the footsteps of a man — a plodding step — walking towards the foot of my bed. [pause] There was no man in the house.",
+  "h_s1": "The servants saw him first — a gentleman, in drab-coloured clothes, walking into the yellow room. Which stood empty when they followed. [soft laugh] We dismissed it. One does. Then the doors began — slapping shut in the night, with vehemence. My husband searched, again and again. Nothing out of place.",
+  "h_s2": "I heard persons walking to and fro in the empty lobby, night after night. Then it grew. Explosions of sound, as loud as the bursting of a cannon. A shrill female voice would begin — and two others, deeper, man-like, joined the discourse. [pause] Even my cat knew. She would slink beneath my chair, rigid, staring at nothing.",
+  "h_s3": "The great hall door beneath my room slapped to with such violence it shook the floor. We found it locked, and bolted. Window shut. Chimney sealed. [pause] And in the yellow bedchamber — the footsteps. A man's tread, plodding, unhurried, to the very foot of my bed. I did not truly sleep again in that house.",
+  "h_s4": "My brother came — a captain in His Majesty's Navy. He sat up armed through the nights, with Captain Luttrell. Luttrell heard the footsteps cross the lobby. Something flitted past him at the door. My brother heard the groans. [pause] Their verdict: no house was fit to live in where such noises were heard, and no natural cause appeared. He would not let me stay.",
+  "h_s5": "My brother became Admiral of the Fleet — you may know the name he earned. Saint Vincent. He heard it too. [pause] I signed it: to the Almighty and Unerring Judgment of Heaven and Earth I dare appeal for the truth of what I here relate. [pause] Twenty years on, they pulled the house down. Under one of the floors, the workmen found a small skull. It was never examined. Make of that what you will."
+ },
+ "cards": {
+  "t1": {
+   "big": [
+    "Hinton Ampner, Hampshire.",
+    "1771."
+   ],
+   "small": [
+    "The witness is the lady of the house.",
+    "Dramatised from Mary Ricketts' signed",
+    "narrative, written for her children."
+   ]
+  },
+  "q1": [
+   "When did it begin?"
+  ],
+  "q2": [
+   "What did you hear?"
+  ],
+  "q3": [
+   "Could anyone have done it?"
+  ],
+  "q4": [
+   "Did anyone believe you?"
+  ],
+  "t4": {
+   "big": [
+    "The house could not",
+    "keep tenants.",
+    "",
+    "It was pulled down in 1793."
+   ]
+  },
+  "t5": {
+   "big": [
+    "The skull was never examined."
+   ]
+  },
+  "t6": {
+   "big": [
+    "Her signed narrative",
+    "is preserved."
+   ]
+  }
+ },
+ "stills": {
+  "h_s1": "../ep42-borley/fr_s2-rectory_5.jpg",
+  "h_s3": "../ep41-cooneen/s1-bedroom.jpg",
+  "h_s4": "../ep46-renvyle/s1-door.jpg"
+ },
+ "sting": {
+  "file": "door-t.mp3",
+  "at": "h_s3 'slapped to'",
+  "vol": 0.3
+ },
+ "yt_title": "Hinton Ampner: Footsteps at the Foot of the Bed"
+}
