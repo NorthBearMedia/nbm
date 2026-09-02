@@ -614,3 +614,12 @@ route). Deployed but only ever run in dry mode.
   focus kw "van dealer Leeds". To go live: set noindex meta to '2' and
   add to nav/footer + sitemap. Rochdale and Burnley to follow the same
   shape once Norton approves.
+- v1.2.3-nbm: FAQ accordion recoloured to brand (odd rows #2B2E34, even
+  #1F2125, white text, red #ED4233 hover/active/links) via overrides
+  appended to css/home.css + scss/home.scss. `$themeVersion` in
+  functions.php (the CSS cache-buster, separate from style.css Version)
+  bumped 2.8.2 → 2.8.3; bump it again whenever css/*.css changes.
+- Leeds page opening hours come from the site's own footer (Holdens
+  built): Office Mon–Fri 8–6 / Sat 8–12; Maintenance Mon–Fri 6AM–12AM /
+  Sat 6AM–12AM; Sales Mon–Fri 8:30–6. Not confirmed by Norton or Hal;
+  worth Hal checking before the page is indexed.
