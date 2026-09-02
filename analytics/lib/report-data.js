@@ -23,7 +23,12 @@ export async function gatherReportData(site, start, end, opts = {}) {
   const prev = previousPeriod(start, end);
   const warnings = [];
   const data = {
-    site: { id: site.id, clientName: site.client_name, domain: site.domain },
+    // The owner's own description of the business (the site's Notes field),
+    // so the writer can be specific about what they sell and who they serve
+    // instead of inferring it from URL slugs. Ops bookkeeping notes are not
+    // a business description and are filtered out.
+    site: { id: site.id, clientName: site.client_name, domain: site.domain,
+      about: /auto-onboarding|added by ops|managed site/i.test(site.notes || '') ? '' : String(site.notes || '').trim().slice(0, 400) },
     period: { start, end },
     previousPeriod: prev,
     warnings,

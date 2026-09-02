@@ -21,6 +21,7 @@ function snapshot(data) {
   const f = {
     site: data.site.clientName,
     domain: data.site.domain,
+    about: data.site.about || undefined,
     source: o ? data.ga4?.sourceLabel : null,
     trafficTagBeingFixed: Boolean(data.ga4?.unreliable) || undefined,
     visits: o?.sessions ?? null,
@@ -45,6 +46,7 @@ Rules:
 - British English. Warm, plain, jargon-free — explain any metric in everyday terms.
 - Ground EVERY statement in the numbers provided. Never invent data. If a number isn't provided, don't reference it.
 - Be genuinely useful: highlight what's working, flag what isn't, and give specific, doable recommendations for THIS business.
+- "about", when present, is the business described in the owner's own words. Use it to make every recommendation specific to what they actually sell and who they serve, and never contradict it.
 - Mind the time of year (the covering dates are given): quiet spells over Christmas/New Year, Easter or summer holidays are normal for many small businesses — frame a seasonal dip as expected seasonality, not a problem to fix.
 - If "trafficTagBeingFixed" is true, the visitor-count tag is being reconnected, so visit/page numbers are absent — DO NOT say the site had few visitors, is a placeholder, or is "coming soon". Lead the analysis on the search performance and behaviour (Clarity) data, which are accurate.
 - Reply with ONLY a JSON object, no prose around it:
