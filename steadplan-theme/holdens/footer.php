@@ -63,6 +63,9 @@
                 <a href="<?php echo esc_url( home_url( '/' ) ); ?>cookie-policy">Cookie Policy</a>
                 <a href="<?php echo esc_url( home_url( '/' ) ); ?>privacy-policy">Privacy Policy</a>
                 <a href="<?php echo esc_url( home_url( '/' ) ); ?>terms-conditions">Terms</a>
+                <a href="<?php echo esc_url( home_url( '/' ) ); ?>leeds">Leeds</a>
+                <a href="<?php echo esc_url( home_url( '/' ) ); ?>rochdale">Rochdale</a>
+                <a href="<?php echo esc_url( home_url( '/' ) ); ?>burnley">Burnley</a>
             </div>
         </div>
     </section>

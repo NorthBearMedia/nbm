@@ -3,7 +3,7 @@
  * Tom theme functions and definitions
  * */
 
-$themeVersion = "2.8.3";
+$themeVersion = "2.8.4";
 
 function theme_setup() {
 

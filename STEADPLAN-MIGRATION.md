@@ -623,3 +623,17 @@ route). Deployed but only ever run in dry mode.
   built): Office Mon–Fri 8–6 / Sat 8–12; Maintenance Mon–Fri 6AM–12AM /
   Sat 6AM–12AM; Sales Mon–Fri 8:30–6. Not confirmed by Norton or Hal;
   worth Hal checking before the page is indexed.
+
+## 2 Sep — Rochdale + Burnley location pages, all three indexed (theme v1.2.4-nbm)
+
+- Pages: Leeds **2651** `/leeds/`, Rochdale **2653** `/rochdale/`, Burnley
+  **2654** `/burnley/`. All published, Yoast noindex set to '2' (index).
+  Same 13-block ACF shape, location-specific copy, FAQ accordion, hours
+  from the site footer, Google Maps links from dealerships.php.
+- Theme v1.2.4-nbm: Dealership Locator (dealerships.php, included in the
+  footer on every page) gains a "Branch: Steadplan <town>" link per
+  dealership; footerLower gets Leeds / Rochdale / Burnley links.
+  `$themeVersion` 2.8.4.
+- Next for local SEO: link each page from its Google Business Profile,
+  submit sitemap in Search Console, add LocalBusiness schema per page
+  (AutoDealer graph currently only on front page + contact).

@@ -24,6 +24,10 @@
                             <span>Maintenance:</span>
                             <a href="tel:00441132797901">0113 279 7901</a>
                         </div>
+                        <div class="phone">
+                            <span>Branch:</span>
+                            <a href="<?php echo esc_url( home_url( '/leeds/' ) ); ?>">Steadplan Leeds</a>
+                        </div>
                     </div>
                 </div>
                 <div class="map">
@@ -57,6 +61,10 @@
                             <span>Maintenance:</span>
                             <a href="tel:00441706868668">01706 868 668</a>
                         </div>
+                        <div class="phone">
+                            <span>Branch:</span>
+                            <a href="<?php echo esc_url( home_url( '/rochdale/' ) ); ?>">Steadplan Rochdale</a>
+                        </div>
                     </div>
                 </div>
                 <div class="map">
@@ -89,6 +97,10 @@
                         <div class="phone">
                             <span>Maintenance:</span>
                             <a href="tel:00441282611616">01282 611 616</a>
+                        </div>
+                        <div class="phone">
+                            <span>Branch:</span>
+                            <a href="<?php echo esc_url( home_url( '/burnley/' ) ); ?>">Steadplan Burnley</a>
                         </div>
                     </div>
                 </div>
