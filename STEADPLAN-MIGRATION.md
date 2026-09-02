@@ -637,3 +637,9 @@ route). Deployed but only ever run in dry mode.
 - Next for local SEO: link each page from its Google Business Profile,
   submit sitemap in Search Console, add LocalBusiness schema per page
   (AutoDealer graph currently only on front page + contact).
+- Old Holdens staging site identified: **https://steadplan.andholdens.agency/**
+  (105 refs in the Nov-25 DB dump; still resolves to 109.169.82.58 and
+  still in Google's index on 2 Sep 2026, e.g. /careers/..., /vehicle/...).
+  Not in Norton's Search Console property (different domain), so GSC
+  Removals cannot touch it: Holdens must delete/noindex it, then use
+  Google's "Remove outdated content" tool per URL.
