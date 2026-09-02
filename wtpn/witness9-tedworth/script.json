@@ -1,0 +1,76 @@
+{
+ "case": "Drummer of Tedworth 1662-63 — John Mompesson",
+ "voice": {
+  "name": "James - Professional",
+  "id": "0c8J1N1i3sIcgiJsow0W",
+  "note": "West Country 50-year-old, slight accent — a Wiltshire magistrate, dry and exact"
+ },
+ "hook_card": [
+  "The drummer",
+  "was in prison.",
+  "The drumming",
+  "went on."
+ ],
+ "segments": {
+  "t_open": "The drummer was locked in a gaol cell, two counties away. His drum sat silent in my house. [pause] And still, every night — the drumming.",
+  "t_s1": "A vagrant drummer, begging with forged passes. I was the magistrate; I had the drum taken off him. A court matter. Paperwork. [soft laugh] The bailiff sent the drum to my house. And the first night, the banging began — on the doors, on the roof. Then drumming. From the air above my own chimneys.",
+  "t_s2": "It came indoors, to the children's room. Their bedframes beaten. Scratching under them — loud, like claws. My children were shaken, and lifted, in their beds. [pause] It would make chairs, tables, trunks — all moveables — walk up and down the rooms. Lights, moving with no hand to carry them. A panting, like a dog. And a smell of sulphur after.",
+  "t_s3": "Any man who doubted was welcome to a bed. The blacksmith took one — and a pair of pincers snapped at his nose the whole night through. [soft laugh] Then a clergyman came, a scholar, Glanvill, to test it. He stood in the children's chamber, their hands in plain view above the covers, and heard the scratching beneath them — as loud, he wrote, as long nails upon a bolster. He searched the room. Nothing.",
+  "t_s4": "The drummer sat in Gloucester gaol for theft. A Wiltshire man visited, and the drummer asked how I fared — and then he said it: it was because he took my drum from me. He shall never have his quiet again, till I have my drum, or satisfaction. [pause] They tried him under the Witchcraft Act. Over a drum. He was transported to the colonies.",
+  "t_s5": "Two years, it went on. And worse than the noise was the talk — that I had contrived it all, for profit or for attention. [exhales] I sent liars to the assizes for a living; now I was called one. I wrote it down while it was happening, and the letters were printed, and years later, when they whispered that I had confessed a trick — I set my denial in writing too. It was no imposture. Make of it what you will."
+ },
+ "cards": {
+  "t1": {
+   "big": [
+    "Tedworth, Wiltshire.",
+    "1662."
+   ],
+   "small": [
+    "The witness is the town's magistrate.",
+    "Dramatised from John Mompesson's letters,",
+    "printed almost verbatim in 1668."
+   ]
+  },
+  "q1": [
+   "How did it start?"
+  ],
+  "q2": [
+   "What happened inside?"
+  ],
+  "q3": [
+   "Did anyone else witness it?"
+  ],
+  "q4": [
+   "And the drummer?"
+  ],
+  "t4": {
+   "big": [
+    "Samuel Pepys read the account",
+    "on Christmas Day, 1667.",
+    "",
+    "\"Worth reading indeed.\""
+   ]
+  },
+  "t5": {
+   "big": [
+    "He denied the imposture",
+    "in writing, to his death."
+   ]
+  },
+  "t6": {
+   "big": [
+    "His letters survive in print."
+   ]
+  }
+ },
+ "stills": {
+  "t_s1": "../ep41-cooneen/s2-farmhouse.jpg",
+  "t_s3": "../ep46-renvyle/s3-corridor.jpg"
+ },
+ "sting": {
+  "file": "door-t.mp3",
+  "at": "t_s2 'It would make chairs'",
+  "vol": 0.3
+ },
+ "yt_title": "Tedworth: The Drummer Was in Prison"
+}
