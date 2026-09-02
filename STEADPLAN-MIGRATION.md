@@ -584,3 +584,19 @@ route). Deployed but only ever run in dry mode.
 5. Sam: Conversions gallery images still awaited (Ford section already
    removed). Confirm Meta Pixel firing on the live domain.
 6. Consider moving DNS to Hostinger so this access mess never recurs.
+
+## Final state confirmed (2026-09-02)
+
+- Footer credit now reads **"Maintained By"** + NBM logo (theme v1.1.8-nbm,
+  verified live). Wording changed from "Built & Maintained By" at Norton's
+  request: Holdens built the site, NBM maintains it.
+- All three one-off plugins removed (`steadplan-media-restore`,
+  `nbm-footer-patch`, `steadplan-url-fix`). Plugin list is back to the
+  original 9 production plugins, nothing of ours left behind.
+- WordPress admin email: info@northbearmedia.co.uk.
+- NOTE for future sessions: `hosting_deployWordpressTheme` silently
+  no-ops sometimes — the 60s MCP timeout is normal, but ALWAYS verify by
+  fetching `/wp-content/themes/holdens/style.css` and checking the Version
+  header before assuming a deploy landed. Watching the uploader process
+  for idle is NOT reliable (it reported success on a deploy that never
+  applied). Poll the version string instead.
