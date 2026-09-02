@@ -5,6 +5,33 @@
 
 $themeVersion = "2.8.4";
 
+// NBM: wheelbase_type archives are empty and 404, yet Yoast was listing them in the
+// sitemap (source of the Search Console 404 alerts). Keep the taxonomy out of the sitemap.
+add_filter('wpseo_sitemap_exclude_taxonomy', function ($exclude, $taxonomy) {
+    return $taxonomy === 'wheelbase_type' ? true : $exclude;
+}, 10, 2);
+
+// NBM: /showroom/ and /careers/ are served by the vehicle and careers post-type archives,
+// not by the pages of the same slug, so page-level Yoast titles/descriptions never apply.
+add_filter('wpseo_title', function ($title) {
+    if (is_post_type_archive('vehicle')) {
+        return 'Vans for Sale | New and Used MAN TGE Stock | Steadplan';
+    }
+    if (is_post_type_archive('careers')) {
+        return 'Careers at Steadplan | Commercial Vehicle Jobs in Leeds, Rochdale and Burnley';
+    }
+    return $title;
+}, 25);
+add_filter('wpseo_metadesc', function ($desc) {
+    if (is_post_type_archive('vehicle')) {
+        return 'Browse new and used MAN TGE vans and commercial vehicles in stock at Steadplan Leeds, Rochdale and Burnley. Filter by body type, wheelbase and fuel, or call to enquire.';
+    }
+    if (is_post_type_archive('careers')) {
+        return 'Careers at Steadplan. Join a growing MAN commercial vehicle dealer group with sites in Leeds, Rochdale and Burnley. See our current vacancies in sales, workshop and admin.';
+    }
+    return $desc;
+}, 25);
+
 function theme_setup() {
 
 	add_theme_support( 'post-thumbnails' );
