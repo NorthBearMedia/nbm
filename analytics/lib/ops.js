@@ -111,6 +111,14 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // explicit instruction ("send to the client, I don't want to have to do
 // anything else except confirm it is working", 2 Jul 2026). Only ever
 // fills BLANK contact fields — manual edits in the app always win.
+// What each business actually IS, in a line — fed to the report writer so
+// its recommendations are about what the client sells, not guessed from URL
+// slugs. Loaded into a BLANK "About this business" field only; anything the
+// owner types there is never overwritten. Facts only, from public sources.
+const BUSINESS_ABOUT = {
+  'steadplan.co.uk': 'Commercial vehicle dealership across the north of England: authorised MAN dealer (new and used truck and van sales, leasing, servicing and repairs with genuine parts) and official Ford van converter, including custom seating.',
+};
+
 const CLIENT_EMAILS = {
   'williscooper.com': 'emma@williscooper.com',
   'active-personnel.co.uk': 'Ashley@active-personnel.co.uk',
@@ -281,7 +289,7 @@ function ensureManagedSites() {
 
 // Runs on every boot: cheap, offline, idempotent.
 export function loadClientContacts() {
-  const sites = db.prepare('SELECT id, client_name, domain, contact_emails, clarity_project_id, ga4_measurement_id, ga4_property_id FROM sites WHERE active = 1').all();
+  const sites = db.prepare('SELECT id, client_name, domain, contact_emails, clarity_project_id, ga4_measurement_id, ga4_property_id, notes FROM sites WHERE active = 1').all();
   const loaded = [];
   for (const site of sites) {
     const d = (site.domain || '').toLowerCase().replace(/^www\./, '');
@@ -305,6 +313,11 @@ export function loadClientContacts() {
     if (pid && !site.ga4_property_id) {
       db.prepare('UPDATE sites SET ga4_property_id = ? WHERE id = ?').run(pid, site.id);
       console.log(`[ops] GA property ID loaded: ${site.client_name} → ${pid}`);
+    }
+    const about = BUSINESS_ABOUT[d];
+    if (about && !(site.notes || '').trim()) {
+      db.prepare('UPDATE sites SET notes = ? WHERE id = ?').run(about, site.id);
+      console.log(`[ops] business description loaded: ${site.client_name}`);
     }
   }
   // Target keywords: seed starter values into BLANK fields, re-running

@@ -578,8 +578,9 @@ function showSiteModal(site = null) {
         <div class="field full"><label>Clarity API token ${site?.has_clarity_token ? '(already saved — leave blank to keep)' : ''}</label>
           <input name="clarity_api_token" placeholder="${site?.has_clarity_token ? '••••••••••••' : 'Clarity → Settings → Data Export → Generate token'}">
           <div class="help">The one thing that can't be auto-fetched — Clarity → project → Settings → Data Export → Generate new API token</div></div>
-        <div class="field full"><label>Notes</label>
-          <textarea name="notes" rows="2">${esc(site?.notes)}</textarea></div>
+        <div class="field full"><label>About this business</label>
+          <textarea name="notes" rows="2" placeholder="e.g. MAN commercial vehicle dealership — sales, leasing, servicing and Ford van conversions, north of England">${esc(site?.notes)}</textarea>
+          <div class="help">One or two lines on what they do and who they serve. The report writer uses this to make its recommendations specific to the business.</div></div>
       </form>
       <div class="modal-actions">
         ${isNew ? '' : '<button class="btn danger left" id="deleteBtn">Delete site</button>'}
