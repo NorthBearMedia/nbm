@@ -600,3 +600,17 @@ route). Deployed but only ever run in dry mode.
   header before assuming a deploy landed. Watching the uploader process
   for idle is NOT reliable (it reported success on a deploy that never
   applied). Poll the version string instead.
+
+## 2 Sep — Leeds location page + Clarity (theme v1.2.2-nbm)
+
+- Theme v1.2.2-nbm deployed and verified (style.css Version poll): adds
+  Microsoft Clarity tag (`yc2blbp53t`) in header.php next to Fathom
+  (`ENQREIEU`). Both confirmed in live homepage HTML.
+- Leeds location page created via REST: page ID **2651**, slug `/leeds/`,
+  published with `_yoast_wpseo_meta-robots-noindex=1` for Norton's review.
+  Built from the theme's own ACF layouts (hero + 5 two_columns + straps +
+  accordion FAQ + contact_form + three_page_links). Yoast title
+  "Van Dealer Leeds | MAN TGE Sales, Leasing & Servicing | Steadplan",
+  focus kw "van dealer Leeds". To go live: set noindex meta to '2' and
+  add to nav/footer + sitemap. Rochdale and Burnley to follow the same
+  shape once Norton approves.

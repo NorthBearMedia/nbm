@@ -66,6 +66,15 @@
         <!-- Fathom - beautiful, simple website analytics -->
         <script src="https://cdn.usefathom.com/script.js" data-site="ENQREIEU" defer></script>
         <!-- / Fathom -->
+        <!-- Microsoft Clarity -->
+        <script type="text/javascript">
+            (function(c,l,a,r,i,t,y){
+                c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+                t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+                y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+            })(window, document, "clarity", "script", "yc2blbp53t");
+        </script>
+        <!-- / Microsoft Clarity -->
 	</head>
 	
 	<body data-breakpoint-mobile="(max-width: 639px)"
