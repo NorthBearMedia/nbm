@@ -280,7 +280,7 @@ function plainEnglishSummary(data) {
   }
   const sSum = data.search?.summary;
   if (sSum && sSum.impressions > 0) {
-    lines.push(`It appeared in Google search results ${fmtInt(sSum.impressions)} times, earning ${fmtInt(sSum.clicks)} visits, with an average ranking position of ${sSum.position.toFixed(1)}.`);
+    lines.push(`${lines.length ? 'It' : 'Your website'} appeared in Google search results ${fmtInt(sSum.impressions)} times, earning ${fmtInt(sSum.clicks)} visits, with an average ranking position of ${sSum.position.toFixed(1)}.`);
     const page1 = (data.search.topQueries || []).filter(q => q.position && q.position <= 10).length;
     if (page1 > 0) lines.push(`${page1} of your top search terms rank${page1 === 1 ? 's' : ''} on page 1 of Google.`);
   }
@@ -340,7 +340,9 @@ export async function generateReportPdf(data) {
       y += 6;
     }
   } else {
-    y = emptyNote(doc, y, 'Google Analytics is not connected for this site yet — once connected, visits, visitors and engagement will appear here.');
+    y = emptyNote(doc, y, data.trafficPending
+      ? 'Visitor tracking is installed on this site and is waiting for its first visitors — visits, visitors and engagement will appear here from your next report.'
+      : 'Google Analytics is not connected for this site yet — once connected, visits, visitors and engagement will appear here.');
   }
 
   // ── Daily traffic chart ── (suppressed when the source under-counted)
@@ -489,7 +491,9 @@ export async function generateReportPdf(data) {
         + (cl.quickBacks ? ` · ${fmtInt(cl.quickBacks)} quick-backs (visitors who left a page straight away)` : '') + '.', M, y - 6, { width: CW });
     y += 8;
   } else {
-    y = emptyNote(doc, y, 'Microsoft Clarity is not connected for this site yet — once connected, you’ll see how people actually use your pages (scrolling, clicks and frustration signals).');
+    y = emptyNote(doc, y, data.clarityConnected
+      ? `Microsoft Clarity was connected to this site${data.clarityFirstDate ? ' on ' + formatDate(data.clarityFirstDate) : ' recently'}, so there is no behaviour data for this period yet — how people scroll, click and where they get stuck will appear from your next report.`
+      : 'Microsoft Clarity is not connected for this site yet — once connected, you’ll see how people actually use your pages (scrolling, clicks and frustration signals).');
   }
 
   // ── Site health (Google PageSpeed) ──

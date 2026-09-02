@@ -42,9 +42,10 @@ async function siteHealth(site, start, end) {
   let retro = {};
   try { retro = JSON.parse(getSetting('retrofit_state') || '{}')[domain] || {}; } catch { /* none yet */ }
   const installerStuck = retro.tries >= 4 && !retro.done;
-  const stuckNote = installerStuck
-    ? ` · auto-installer has tried ${retro.tries}× without the tag appearing on the live page — the files it edits aren't what visitors see (site likely served by the builder). Paste this site's Tracking code into the builder to finish it.`
-    : '';
+  const stuckNote = !installerStuck ? ''
+    : retro.multiline
+      ? ' · the Tracking code on this site was pasted across several lines, which the auto-installer cannot update in place. Re-paste it as the single line the Tracking-code window gives you.'
+      : ` · auto-installer has tried ${retro.tries}× without the tag appearing on the live page — the files it edits aren't what visitors see (site likely served by the builder). Paste this site's Tracking code into the builder to finish it.`;
 
   // One homepage fetch feeds every tag check (Fathom, GA, Clarity).
   const homepage = await fetchHomepage(domain);
@@ -70,7 +71,10 @@ async function siteHealth(site, start, end) {
     bad(`STOPPED WORKING — ${msg} This was recording normally on ${seenWorking[src]}, so the tag has since been removed from the page (republishing a builder site wipes its custom code). Re-paste this site's Tracking code.`);
 
   const fathomEnsureErr = getSetting('fathom_ensure_last') || '';
-  const fathomTagOn = homepage != null && homepage.includes('usefathom.com');
+  // "A Fathom script" is not "THIS site's Fathom script": a hand-pasted or
+  // stale block carrying another ID read as installed for steadplan.co.uk.
+  const fathomAnyTag = homepage != null && homepage.includes('usefathom.com');
+  const fathomTagOn = fathomAnyTag && homepage.includes(site.fathom_site_id);
   const GRACE_MS = 48 * 3600_000;
   let pending = {};
   try { pending = JSON.parse(getSetting('fathom_pending') || '{}'); } catch { /* fresh */ }
@@ -83,9 +87,20 @@ async function siteHealth(site, start, end) {
     // the code was correct in its repo for weeks while the deployed copy
     // was stale, and this message kept sending the owner to a builder that
     // doesn't exist. Name the real possibilities instead.
-    if (!fathomTagOn) return bad('not on the live page yet — sites Pulse can edit get it automatically within the hour. Otherwise add this site\'s Tracking code wherever its pages get their <head>: the site builder\'s custom-code box, the CMS theme header, or a header include/template — and if the code is already in a repo, check the deployed copy is up to date.');
-    const since = pending[domain] || Date.now();
-    if (pending[domain] !== since) { pending[domain] = since; setSetting('fathom_pending', JSON.stringify(pending)); }
+    if (!fathomTagOn) {
+      // Tag absent: the grace clock must not keep running, or a re-paste
+      // days later would open straight onto "recorded nothing in 96h".
+      if (pending[domain]) { delete pending[domain]; setSetting('fathom_pending', JSON.stringify(pending)); }
+      if (fathomAnyTag) return bad(`a Fathom script is on the page but for a different site ID than ${site.fathom_site_id} — an older or hand-typed ID. Re-paste this site's Tracking code (sites Pulse can edit are corrected automatically within the hour).`);
+      return bad('not on the live page yet — sites Pulse can edit get it automatically within the hour. Otherwise add this site\'s Tracking code wherever its pages get their <head>: the site builder\'s custom-code box, the CMS theme header, or a header include/template — and if the code is already in a repo, check the deployed copy is up to date.');
+    }
+    // Grace clock keyed by THIS site ID, so a new ID starts a fresh clock.
+    const rec = pending[domain];
+    const since = rec && typeof rec === 'object' ? (rec.id === site.fathom_site_id ? rec.since : Date.now())
+      : (typeof rec === 'number' ? rec : Date.now());
+    if (!rec || typeof rec !== 'object' || rec.id !== site.fathom_site_id || rec.since !== since) {
+      pending[domain] = { id: site.fathom_site_id, since }; setSetting('fathom_pending', JSON.stringify(pending));
+    }
     const waited = Date.now() - since;
     return waited < GRACE_MS
       ? ok('script installed ✓ — waiting on the first visitor for data')
@@ -124,9 +139,17 @@ async function siteHealth(site, start, end) {
         .catch(e => bad(e.message.slice(0, 90)));
   const gscClicks = Number((out.search?.detail || '').match(/^(\d+) clicks/)?.[1] || 0);
 
+  // Why is there no property? The hourly onboarding job records its last
+  // outcome per domain; say so, rather than a bare "no property ID".
+  let ga4Setup = null;
+  try { ga4Setup = (JSON.parse(getSetting('onboard_state') || '{}')[domain] || {}).ga4 || null; } catch { /* fresh */ }
+  const noPropertyNote = ga4Setup?.error
+    ? `auto-setup blocked: ${ga4Setup.error} (last tried ${String(ga4Setup.at || '').slice(0, 16).replace('T', ' ')} — retries hourly)`
+    : 'no property yet — Pulse creates one automatically at 37 minutes past the hour';
+
   out.ga = integ.ga?.status === 'mismatch'
     ? bad(`WRONG PROPERTY — its traffic is from ${(integ.ga.hosts || []).join(', ')}, not this site. North Bear is on it; don't paste anything.`)
-    : !site.ga4_property_id ? bad('no property ID')
+    : !site.ga4_property_id ? bad(noPropertyNote)
     : await ga4.fetchOverview(site.ga4_property_id, start, end)
         .then(o => {
           // Real data flowing is the only proof that matters — if the tag

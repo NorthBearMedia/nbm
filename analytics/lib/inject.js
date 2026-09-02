@@ -150,6 +150,12 @@ export function buildInjectorScript(rootDir, snippet) {
     // replace pass.
     `  if grep -q 'NBM-GA-TAG' "$f"; then\n` +
     `    if grep -qF "$S" "$f"; then echo "already $f"\n` +
+    // A hand-pasted block that an editor has wrapped across lines cannot be
+    // replaced by the line-bound awk, which would report "replaced" having
+    // changed nothing. Name it, so the retrofit stops retrying and says so.
+    // (Anchored on the START marker: the end marker also contains the text
+    // "NBM-GA-TAG -->", which made the first version match the closing line.)
+    `    elif ! grep -qE '<!-- NBM-GA-TAG -->.*(<!-- /NBM-GA-TAG|</head>)' "$f"; then echo "NBM-MULTILINE-BLOCK $f"\n` +
     `    else\n` +
     `      [ -f "$f.nbmbak" ] || cp "$f" "$f.nbmbak"\n` +
     `      awk -v s="$S" '${awkRepl}' "$f" > "$f.nbmtmp" && mv "$f.nbmtmp" "$f" && echo "replaced $f"\n` +
@@ -297,7 +303,10 @@ export async function verifyTag(domain, measurementId) {
       const html = (await res.text()).slice(0, 2_000_000);
       const hasGa = measurementId ? html.includes(measurementId) : /gtag\/js\?id=/.test(html);
       const hasMarker = html.includes('NBM-GA-TAG');
-      if (hasGa || hasMarker) return { verified: true, url };
+      // The marker alone proves an install only when no GA ID is expected:
+      // a hand-pasted Clarity+Fathom block would otherwise "verify" the GA
+      // tag that is still missing, and the rollout would stop watching.
+      if (hasGa || (!measurementId && hasMarker)) return { verified: true, url };
     } catch { /* try next */ }
   }
   return { verified: false };

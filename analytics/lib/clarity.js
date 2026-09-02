@@ -84,6 +84,13 @@ export function aggregate(siteId, start, end) {
   };
 }
 
+// When did Pulse first capture this site's Clarity data? Lets a report say
+// "connected on <date>, behaviour data from next month" instead of "not
+// connected" for a site whose only snapshots fall after the period.
+export function firstSnapshotDate(siteId) {
+  return db.prepare('SELECT MIN(snapshot_date) AS d FROM clarity_snapshots WHERE site_id = ?').get(siteId)?.d || null;
+}
+
 export async function testConnection(apiToken) {
   await fetchLiveInsights(apiToken, 1);
   return true;

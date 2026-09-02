@@ -101,7 +101,10 @@ function render(d) {
     html += `<div class="panel"><h2>Visitor tracking is being reconnected</h2>
       <p class="hint">The visitor-count tag is being reinstalled on your site, so the visit total isn't complete yet — but your Google search performance and behaviour insights below are fully live and accurate${s && s.impressions > 0 ? `. Google showed your site <strong>${fmtInt(s.impressions)}</strong> times this period` : ''}.</p></div>`;
   } else {
-    html += `<div class="panel"><h2>Analytics warming up</h2>
+    html += d.trafficPending
+      ? `<div class="panel"><h2>Visitor tracking is installed</h2>
+      <p class="hint">Your visitor-count tag is in place and waiting for its first visitors — visits and visitors will appear here as they arrive.</p></div>`
+      : `<div class="panel"><h2>Analytics warming up</h2>
       <p class="hint">Google Analytics isn't connected for your site yet — North Bear Media is on it. Your visits and visitors will appear here soon.</p></div>`;
   }
 
@@ -216,7 +219,9 @@ function render(d) {
     <div class="hint" style="margin-top:6px">Based on ${cl.daysCovered} day${cl.daysCovered === 1 ? '' : 's'} of Clarity measurement in this period${cl.quickBacks ? ` · ${fmtInt(cl.quickBacks)} quick-backs (visitors who left a page straight away)` : ''}.</div>`;
   } else {
     html += section('How people use your site');
-    html += `<div class="panel"><p class="hint">Microsoft Clarity is being connected for your site — you'll soon see how visitors scroll, click and where they get stuck.</p></div>`;
+    html += d.clarityConnected
+      ? `<div class="panel"><p class="hint">Microsoft Clarity is connected and collecting — how visitors scroll, click and where they get stuck will appear here from next month.</p></div>`
+      : `<div class="panel"><p class="hint">Microsoft Clarity is being connected for your site — you'll soon see how visitors scroll, click and where they get stuck.</p></div>`;
   }
 
   if (d.siteHealth && (d.siteHealth.performance != null || d.siteHealth.seo != null)) {

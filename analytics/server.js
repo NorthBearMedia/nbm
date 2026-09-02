@@ -313,7 +313,21 @@ app.put('/api/sites/:id', requireAdmin, (req, res) => {
 });
 
 app.delete('/api/sites/:id', requireAdmin, (req, res) => {
+  // Forget the domain's operational memory too, or a site deleted and
+  // re-added inherits the old row's ghosts: a "STOPPED WORKING — was
+  // recording on <old date>" verdict on its first check, an expired Fathom
+  // grace clock, and a retrofit marked done for a block that may not exist.
+  const row = db.prepare('SELECT domain FROM sites WHERE id = ?').get(req.params.id);
   db.prepare('DELETE FROM sites WHERE id = ?').run(req.params.id);
+  const d = (row?.domain || '').toLowerCase().replace(/^www\./, '');
+  if (d) {
+    for (const key of ['source_last_ok', 'fathom_pending', 'retrofit_state', 'onboard_state', 'source_integrity', 'inject_state']) {
+      try {
+        const o = JSON.parse(getSetting(key) || '{}');
+        if (o && typeof o === 'object' && d in o) { delete o[d]; setSetting(key, JSON.stringify(o)); }
+      } catch { /* leave it */ }
+    }
+  }
   res.json({ ok: true });
 });
 
@@ -439,6 +453,11 @@ app.get('/api/diagnostic', requireAdmin, async (req, res) => {
     const full = health.sites.filter(r => !r.error && four.every(k => r[k]?.ok));
     L.push(`FLEET: ${full.length}/${health.sites.length} fully connected on all four sources`);
     L.push('');
+    // Per-domain state is printed inside each site's section. The previous
+    // single 900-character dump of each blob cut off whichever domain was
+    // added most recently — exactly the site being onboarded.
+    const blob = k => { try { return JSON.parse(getSetting(k) || '{}'); } catch { return {}; } };
+    const stateBlobs = { onboard: blob('onboard_state'), retrofit: blob('retrofit_state'), integrity: blob('source_integrity'), fathom_pending: blob('fathom_pending'), last_ok: blob('source_last_ok') };
     for (const r of health.sites) {
       const site = db.prepare("SELECT * FROM sites WHERE lower(replace(domain,'www.','')) = ?").get(r.domain) || {};
       L.push(`── ${r.client} (${r.domain})`);
@@ -449,6 +468,9 @@ app.get('/api/diagnostic', requireAdmin, async (req, res) => {
       else for (const k of four) L.push(`   ${(r[k]?.ok ? 'OK  ' : 'BAD ')}${label[k]}: ${r[k]?.detail || '—'}`);
       if (r.delivery) L.push(`   ${r.delivery.ok ? 'OK  ' : 'BAD '}Reports: ${r.delivery.detail}`);
       if (r.gscDiag?.findings?.length) r.gscDiag.findings.forEach(f => L.push(`   GSC-DIAG: ${f}`));
+      for (const [key, b] of Object.entries(stateBlobs)) {
+        if (b[r.domain] !== undefined) L.push(`   state.${key}: ${JSON.stringify(b[r.domain]).slice(0, 600)}`);
+      }
       L.push('');
     }
     const failed = db.prepare(`SELECT s.client_name, r.error, r.created_at FROM reports r JOIN sites s ON s.id = r.site_id
@@ -458,7 +480,7 @@ app.get('/api/diagnostic', requireAdmin, async (req, res) => {
       failed.forEach(f => L.push(`  ${f.created_at} ${f.client_name}: ${String(f.error || '').slice(0, 160)}`));
       L.push('');
     }
-    for (const key of ['last_crash', 'fathom_ensure_last', 'retrofit_state', 'source_integrity', 'onboard_state']) {
+    for (const key of ['last_crash', 'fathom_ensure_last']) {
       const v = getSetting(key);
       if (v) L.push(`${key}: ${String(v).slice(0, 900)}`);
     }
@@ -690,10 +712,12 @@ app.get('/ix/:token/:domain', (req, res) => {
       // IDENTIFIER, so the double-quoted form threw "no such column",
       // 500'd this endpoint, and every client injector download failed.
       const site = db.prepare("SELECT * FROM sites WHERE lower(replace(domain,'www.','')) = ? AND active = 1").get(domain);
-      if (!site || !site.ga4_measurement_id) {
-        return res.status(200).type('text/x-shellscript').send(`echo "NBM: no measurement id for ${domain}"\n`);
+      // Clarity and Fathom install without waiting for a GA ID; GA joins
+      // the block automatically once onboarding creates its property.
+      if (!site || (!site.ga4_measurement_id && !site.clarity_project_id && !site.fathom_site_id)) {
+        return res.status(200).type('text/x-shellscript').send(`echo "NBM: nothing to install for ${domain}"\n`);
       }
-      measurementId = site.ga4_measurement_id;
+      measurementId = site.ga4_measurement_id || '';
       clarityId = site.clarity_project_id || null;
       fathomId = site.fathom_site_id || '';
     }

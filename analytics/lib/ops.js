@@ -671,6 +671,13 @@ const AUTO_TAGGABLE = new Set([
 // them from the Hostinger website inventory (builder = no files to edit)
 // and records file-hosted ones here. The injector is harmless on a false
 // positive (NBM-NO-DOCROOT diagnostic, exit 0), so this errs inclusive.
+// Exact host of a GA4 web stream's default URI. Substring matching adopted
+// the wrong property: "steadplan.co.uk" is inside "dev.steadplan.co.uk" and
+// "personnel.co.uk" inside "active-personnel.co.uk".
+function streamHost(uri) {
+  try { return new URL(uri || '').hostname.toLowerCase().replace(/^www\./, ''); } catch { return ''; }
+}
+
 function isAutoTaggable(domain) {
   if (AUTO_TAGGABLE.has(domain)) return true;
   try { return JSON.parse(getSetting('file_hosted_extra') || '[]').includes(domain); }
@@ -696,7 +703,10 @@ export async function reconcileRolloutCrons() {
     if (domain === 'nbmdemosite2.co.uk') continue;
     const rec = state[domain];
     if (rec && (rec.status === 'verified' || rec.status === 'pending')) continue;
-    if (!site.ga4_measurement_id) { noId.push(domain); continue; }
+    // Nothing at all to install? Skip. But a site with Clarity/Fathom and no
+    // GA yet gets those two now — GA follows automatically when its ID
+    // arrives (the want-hash changes and the block is replaced).
+    if (!site.ga4_measurement_id && !site.clarity_project_id && !site.fathom_site_id) { noId.push(domain); continue; }
     if (isAutoTaggable(domain)) {
       try {
         await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
@@ -759,7 +769,7 @@ export async function retrofitTags() {
     setSetting('retrofit_criteria_v2', 'true');
     console.log('[retrofit] criteria updated — stuck sites reset for reassessment');
   }
-  const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND domain != '' AND ga4_measurement_id != ''").all();
+  const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND domain != '' AND (ga4_measurement_id != '' OR clarity_project_id != '' OR fathom_site_id != '')").all();
   let checked = 0, placed = 0;
   for (const site of sites) {
     const domain = (site.domain || '').toLowerCase().replace(/^www\./, '');
@@ -794,7 +804,7 @@ export async function retrofitTags() {
     const clarityWorking = site.clarity_project_id
       ? db.prepare("SELECT COUNT(*) AS n FROM clarity_snapshots WHERE site_id = ? AND snapshot_date >= ?").get(site.id, addDays(todayISO(), -10)).n > 0
       : true;
-    const gaOk = html.includes(site.ga4_measurement_id);
+    const gaOk = !site.ga4_measurement_id || html.includes(site.ga4_measurement_id);
     const clarityOk = !site.clarity_project_id || html.includes(site.clarity_project_id) || clarityWorking;
     const fathomOk = !site.fathom_site_id || html.includes(site.fathom_site_id);
     const ok = gaOk && clarityOk && fathomOk && (banner === html.includes('nbmConsent'));
@@ -814,6 +824,19 @@ export async function retrofitTags() {
         !clarityOk ? 'Clarity' : null,
         !fathomOk ? 'Fathom' : null,
       ].filter(Boolean);
+      // The injector reports a hand-pasted block wrapped across lines as
+      // NBM-MULTILINE-BLOCK: its line-bound replace cannot touch it, so
+      // retrying is pointless. Stop, and let Connections say what to do.
+      if (cur.tries > 0) {
+        const lastOut = await injectCronOutput(HOSTINGER_USER, domain).catch(() => '');
+        if (String(lastOut).includes('NBM-MULTILINE-BLOCK')) {
+          cur.multiline = true; cur.tries = 15;
+          await deleteInjectCrons(HOSTINGER_USER, domain).catch(() => {});
+          console.log('[retrofit]', domain, 'hand-pasted block spans several lines — installer cannot replace it; stopped');
+          continue;
+        }
+      }
+      cur.multiline = undefined;
       try {
         await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
         cur.tries++;
@@ -841,15 +864,17 @@ async function onboardNewSites() {
     .filter(s => s.d !== 'nbmdemosite2.co.uk')
     .filter(s => !MANAGED_SITES.some(m => m.domain === s.d) || s.ga4_property_id === '');
   const needy = sites.filter(s => !s.ga4_property_id || !s.ga4_measurement_id || !s.gsc_site_url);
-  if (!needy.length) return { done: true };
   const subject = getGscReaderEmail() || 'norton@northbearmedia.co.uk';
   let state = {};
   try { state = JSON.parse(getSetting('onboard_state') || '{}'); } catch { /* fresh */ }
   const save = () => setSetting('onboard_state', JSON.stringify(state));
 
-  // Platform classification (once per unknown domain): builder sites can't
-  // take the file injector; everything else can try (harmless if wrong).
-  const unknown = needy.filter(s => !isAutoTaggable(s.d) && !(state[s.d] || {}).classified);
+  // Platform classification, retried hourly until the inventory answers, for
+  // EVERY unclassified site — not just the "needy" ones. Tying it to needy
+  // meant one failed inventory call during a site's first pass left it
+  // unclassified for good once its IDs were filled in, so the injector
+  // never touched it.
+  const unknown = sites.filter(s => !isAutoTaggable(s.d) && !(state[s.d] || {}).classified);
   if (unknown.length && getHostingerToken()) {
     try {
       const inv = await hostingerWebsiteInventory();
@@ -865,22 +890,56 @@ async function onboardNewSites() {
       save();
     } catch (e) { console.log('[onboard] inventory failed:', e.message.slice(0, 80)); }
   }
+  if (!needy.length) return { done: true };
 
-  // GA4 — adopt or create.
+  // GA4 — adopt or create. Every outcome is recorded per domain in
+  // onboard_state.ga4 so Connections and the diagnostic can say WHY a site
+  // still has no property, instead of a bare "no property ID" (live:
+  // steadplan.co.uk sat on that message with no way to tell whether the
+  // hourly job was failing or simply hadn't run yet).
   for (const s of needy.filter(x => !x.ga4_property_id || !x.ga4_measurement_id)) {
+    const st = state[s.d] = state[s.d] || {};
+    const note = patch => { st.ga4 = { ...(st.ga4 || {}), ...patch, at: new Date().toISOString() }; save(); };
+    const auth = { scopes: ['https://www.googleapis.com/auth/analytics.edit'], subject };
     try {
-      const summaries = (await gReq({ url: 'https://analyticsadmin.googleapis.com/v1beta/accountSummaries?pageSize=200', method: 'GET' },
-        { scopes: ['https://www.googleapis.com/auth/analytics.edit'], subject })).accountSummaries || [];
-      // Adopt: an existing property whose web stream URI matches the domain.
+      // A property that exists but has no measurement ID yet — Pulse created
+      // it and the follow-up stream call failed, or the stream was removed.
+      // Finish THAT property. Before this, a failed stream call left the
+      // property ID unsaved, so every hour created another orphan property.
+      if (s.ga4_property_id && !s.ga4_measurement_id) {
+        const streams = (await gReq({ url: `https://analyticsadmin.googleapis.com/v1beta/properties/${s.ga4_property_id}/dataStreams`, method: 'GET' }, auth).catch(() => ({}))).dataStreams || [];
+        let web = streams.find(x => x.type === 'WEB_DATA_STREAM' && streamHost(x.webStreamData?.defaultUri) === s.d)
+          || streams.find(x => x.type === 'WEB_DATA_STREAM');
+        if (!web) {
+          web = await gReq({
+            url: `https://analyticsadmin.googleapis.com/v1beta/properties/${s.ga4_property_id}/dataStreams`, method: 'POST',
+            data: { type: 'WEB_DATA_STREAM', displayName: s.client_name || s.d, webStreamData: { defaultUri: 'https://' + s.d } },
+          }, auth);
+        }
+        const mid = web.webStreamData?.measurementId || '';
+        if (!mid) throw new Error('web stream has no measurement ID yet');
+        db.prepare('UPDATE sites SET ga4_measurement_id = ? WHERE id = ?').run(mid, s.id);
+        note({ ok: st.ga4?.ok || 'created', property: String(s.ga4_property_id), error: '' });
+        console.log('[onboard]', s.d, 'completed property', s.ga4_property_id, 'stream', mid);
+        continue;
+      }
+
+      const summaries = (await gReq({ url: 'https://analyticsadmin.googleapis.com/v1beta/accountSummaries?pageSize=200', method: 'GET' }, auth)).accountSummaries || [];
+      // Adopt: an existing property whose web stream is for EXACTLY this
+      // host. A property previously released for carrying another site's
+      // traffic is never adopted again.
+      const rejected = new Set((st.ga4?.rejected || []).map(String));
       let adopted = false;
       outer: for (const acc of summaries) {
         for (const p of (acc.propertySummaries || [])) {
-          const streams = (await gReq({ url: `https://analyticsadmin.googleapis.com/v1beta/${p.property}/dataStreams`, method: 'GET' },
-            { scopes: ['https://www.googleapis.com/auth/analytics.edit'], subject }).catch(() => ({}))).dataStreams || [];
-          const web = streams.find(st => st.type === 'WEB_DATA_STREAM' && (st.webStreamData?.defaultUri || '').toLowerCase().includes(s.d));
+          const pid = p.property.replace('properties/', '');
+          if (rejected.has(pid)) continue;
+          const streams = (await gReq({ url: `https://analyticsadmin.googleapis.com/v1beta/${p.property}/dataStreams`, method: 'GET' }, auth).catch(() => ({}))).dataStreams || [];
+          const web = streams.find(x => x.type === 'WEB_DATA_STREAM' && streamHost(x.webStreamData?.defaultUri) === s.d);
           if (web) {
             db.prepare('UPDATE sites SET ga4_property_id = ?, ga4_measurement_id = ? WHERE id = ?')
-              .run(p.property.replace('properties/', ''), web.webStreamData.measurementId || '', s.id);
+              .run(pid, web.webStreamData.measurementId || '', s.id);
+            note({ ok: 'adopted', property: pid, error: '' });
             console.log('[onboard]', s.d, 'adopted existing GA4 property', p.property);
             adopted = true; break outer;
           }
@@ -889,19 +948,27 @@ async function onboardNewSites() {
       if (adopted) continue;
       // Create: in the account that owns the agency's own property.
       const home = summaries.find(a => (a.propertySummaries || []).some(p => p.property === 'properties/526994009')) || summaries[0];
-      if (!home) { console.log('[onboard]', s.d, 'no GA account visible — cannot create property'); continue; }
+      if (!home) { note({ error: `no Google Analytics account is visible to ${subject} — cannot create a property` }); console.log('[onboard]', s.d, 'no GA account visible — cannot create property'); continue; }
       const prop = await gReq({
         url: 'https://analyticsadmin.googleapis.com/v1beta/properties', method: 'POST',
         data: { parent: home.account, displayName: s.client_name || s.d, timeZone: 'Europe/London', currencyCode: 'GBP' },
-      }, { scopes: ['https://www.googleapis.com/auth/analytics.edit'], subject });
+      }, auth);
+      const pid = prop.name.replace('properties/', '');
+      // Persist the property the moment it exists, so a failure in the next
+      // call resumes on this property next hour instead of creating another.
+      db.prepare('UPDATE sites SET ga4_property_id = ? WHERE id = ?').run(pid, s.id);
+      note({ ok: 'created', property: pid, error: '' });
       const stream = await gReq({
         url: `https://analyticsadmin.googleapis.com/v1beta/${prop.name}/dataStreams`, method: 'POST',
         data: { type: 'WEB_DATA_STREAM', displayName: s.client_name || s.d, webStreamData: { defaultUri: 'https://' + s.d } },
-      }, { scopes: ['https://www.googleapis.com/auth/analytics.edit'], subject });
-      db.prepare('UPDATE sites SET ga4_property_id = ?, ga4_measurement_id = ? WHERE id = ?')
-        .run(prop.name.replace('properties/', ''), stream.webStreamData?.measurementId || '', s.id);
-      console.log('[onboard]', s.d, 'created GA4 property', prop.name, 'stream', stream.webStreamData?.measurementId);
-    } catch (e) { console.log('[onboard] GA4 failed for', s.d, ':', String(e.message || e).slice(0, 100)); }
+      }, auth);
+      const mid = stream.webStreamData?.measurementId || '';
+      db.prepare('UPDATE sites SET ga4_measurement_id = ? WHERE id = ?').run(mid, s.id);
+      console.log('[onboard]', s.d, 'created GA4 property', prop.name, 'stream', mid);
+    } catch (e) {
+      note({ error: String(e.message || e).slice(0, 140) });
+      console.log('[onboard] GA4 failed for', s.d, ':', String(e.message || e).slice(0, 100));
+    }
   }
 
   // Search Console — sc-domain register → DNS TXT → tag-route fallback.
@@ -1058,7 +1125,7 @@ export async function healGa4MeasurementIds() {
       const web = streams.filter(s => s.type === 'WEB_DATA_STREAM' && s.webStreamData?.measurementId);
       if (!web.length) { console.log('[ga-mid]', d, 'property', site.ga4_property_id, 'has no web stream'); continue; }
       // Prefer the stream whose configured URL matches this domain.
-      const best = web.find(s => (s.webStreamData.defaultUri || '').toLowerCase().includes(d)) || web[0];
+      const best = web.find(s => streamHost(s.webStreamData.defaultUri) === d) || web[0];
       const real = best.webStreamData.measurementId;
       if (real && real !== site.ga4_measurement_id) {
         db.prepare('UPDATE sites SET ga4_measurement_id = ? WHERE id = ?').run(real, site.id);
@@ -1154,7 +1221,26 @@ async function verifySourceIntegrity() {
         v.ga = !total ? { status: 'no-data' }
           : own(rows) / total >= 0.5 ? { status: 'verified' }
           : { status: 'mismatch', hosts: rows.slice(0, 3).map(r => r.host) };
-        if (v.ga.status === 'mismatch') console.log('[integrity]', d, 'GA property carries traffic for', v.ga.hosts.join(','));
+        if (v.ga.status === 'mismatch') {
+          console.log('[integrity]', d, 'GA property carries traffic for', v.ga.hosts.join(','));
+          // A property Pulse ADOPTED (never one the owner typed, never one
+          // Pulse created) that carries another site's traffic is released
+          // so the next onboarding pass creates a clean one — and remembered
+          // so it is never adopted again. Before this the flag was raised
+          // and nothing ever acted on it.
+          try {
+            const ob = JSON.parse(getSetting('onboard_state') || '{}');
+            const g = ob[d]?.ga4;
+            if (g && g.ok === 'adopted' && String(g.property) === String(site.ga4_property_id)) {
+              db.prepare("UPDATE sites SET ga4_property_id = '', ga4_measurement_id = '' WHERE id = ?").run(site.id);
+              ob[d].ga4 = { ...g, ok: '', rejected: [...new Set([...(g.rejected || []), String(g.property)])],
+                error: `released property ${g.property} — its traffic is from ${v.ga.hosts.join(', ')}; a fresh one is created on the next pass`, at: new Date().toISOString() };
+              setSetting('onboard_state', JSON.stringify(ob));
+              v.ga = { status: 'released' };
+              console.log('[integrity]', d, 'released wrongly adopted property', g.property);
+            }
+          } catch { /* non-fatal */ }
+        }
       } catch (e) { v.ga = { status: 'error', err: String(e.message || e).slice(0, 60) }; }
     } else v.ga = undefined;
     if (site.fathom_site_id && getFathomToken()) {

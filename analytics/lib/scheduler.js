@@ -35,7 +35,17 @@ export function initialiseSchedules() {
   }
 }
 
+// One batch at a time. A monthly batch of ~20 sites can run past the next
+// hourly tick (PageSpeed alone can take 90s per site), and a second tick
+// would load the same due list and send the tail of it twice.
+let sending = false;
 export async function sendDueReports() {
+  if (sending) return 0;
+  sending = true;
+  try { return await sendDueReportsInner(); } finally { sending = false; }
+}
+
+async function sendDueReportsInner() {
   const now = nowStamp();
   // Sites without a contact email can't receive anything — skip rather
   // than logging a failure every cycle (covers bulk-imported sites that

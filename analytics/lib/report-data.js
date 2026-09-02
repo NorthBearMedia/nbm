@@ -109,7 +109,9 @@ export async function gatherReportData(site, start, end, opts = {}) {
         attempt('Search summary', warnings, () => gsc.fetchSummary(url, start, end)),
         attempt('Search comparison', warnings, () => gsc.fetchSummary(url, prev.start, prev.end)),
         attempt('Search top queries', warnings, () => gsc.fetchTopQueries(url, start, end)),
-        attempt('Search previous queries', warnings, () => gsc.fetchTopQueries(url, prev.start, prev.end, 50)),
+        // Previous period fetched deep: with only its top 50, a query that
+        // was position 22 last month reads as "new" on a busy site.
+        attempt('Search previous queries', warnings, () => gsc.fetchTopQueries(url, prev.start, prev.end, 1000)),
       ]);
       if (summary) {
         // Per-query ranking movement: previous position by query (lower
@@ -136,8 +138,11 @@ export async function gatherReportData(site, start, end, opts = {}) {
         const kws = String(site.target_keywords || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean).slice(0, 12);
         if (kws.length && !empty) {
           const [deep, prevDeep] = await Promise.all([
-            attempt('Search target keywords', warnings, () => gsc.fetchTopQueries(url, start, end, 1000)),
-            attempt('Search target keywords (prev)', warnings, () => gsc.fetchTopQueries(url, prev.start, prev.end, 1000)),
+            // The API maximum, because a target keyword that earns NO clicks
+            // sits at the bottom of a click-sorted list — on a busy site, far
+            // beyond row 1,000 — and the table would call it "not appearing".
+            attempt('Search target keywords', warnings, () => gsc.fetchTopQueries(url, start, end, 25000)),
+            attempt('Search target keywords (prev)', warnings, () => gsc.fetchTopQueries(url, prev.start, prev.end, 25000)),
           ]);
           if (deep == null) return; // fetch failed — skip the table rather than lie
           const match = (rows, kw) => (rows || []).filter(r => {
@@ -173,7 +178,15 @@ export async function gatherReportData(site, start, end, opts = {}) {
 
   await Promise.all(jobs);
 
+  // A traffic tool is installed but has recorded nothing for this period
+  // (brand-new site): different from "not connected", and the renderers
+  // and the writer must say so.
+  data.trafficPending = !data.ga4 && Boolean(site.fathom_site_id || site.ga4_measurement_id || site.ga4_property_id);
+
   if (site.clarity_api_token || site.clarity_project_id) {
+    // Connected-but-no-data-yet must never read as "not connected".
+    data.clarityConnected = true;
+    data.clarityFirstDate = clarity.firstSnapshotDate(site.id);
     data.clarity = clarity.aggregate(site.id, start, end);
     // Same-length window immediately before, for trend arrows on the
     // behaviour cards (null when history doesn't reach back that far).
