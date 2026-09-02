@@ -643,3 +643,31 @@ route). Deployed but only ever run in dry mode.
   Not in Norton's Search Console property (different domain), so GSC
   Removals cannot touch it: Holdens must delete/noindex it, then use
   Google's "Remove outdated content" tool per URL.
+
+## 2 Sep — full site test sweep (HTTP-level) + theme v1.2.5-nbm
+
+Crawled all 87 sitemap URLs + 176 internal links/assets: 0 broken internal
+links or assets. Findings and fixes:
+- FIXED v1.2.5: wheelbase-type archives (lwb/mwb/std/xlwb) 404 because the
+  terms have no vehicles, yet Yoast listed them in the sitemap = the 18 Jul
+  GSC 404 alerts. Excluded via `wpseo_sitemap_exclude_taxonomy`.
+- FIXED v1.2.5: /showroom/ and /careers/ are the vehicle/careers post-type
+  ARCHIVES (has_archive 'showroom'), shadowing pages 706/1355, so page
+  Yoast meta never rendered. Title + description now via wpseo_title /
+  wpseo_metadesc filters on is_post_type_archive().
+- FIXED v1.2.5: share.php Twitter link had a double scheme.
+- OPEN (needs Norton): CF7 form 5 recipients still include
+  lawrence@holdens.agency (plus sales@, veyre@, mkilner@, ljohnston@,
+  moconnor@ steadplan.co.uk). Removal via REST was blocked by the
+  classifier; do in wp-admin > Contact > Contact form > Mail > To.
+- OPEN: no SMTP plugin; CF7 sends via PHP mail() from Hostinger as
+  noreply@steadplan.co.uk. SPF for steadplan.co.uk is Microsoft 365; if it
+  lacks Hostinger's include, enquiries may land in junk. Verify SPF TXT in
+  the Namecheap zone; add `include:_spf.mail.hostinger.com` or move to SMTP.
+- OPEN: vehicle photos are AutoTrader URLs with a literal `{resize}`
+  segment (4177 in DB, nothing in the theme replaces it). Cannot verify
+  from the sandbox (atcdn blocked). Norton to eyeball a vehicle page.
+- Careers job-application mailto goes to slowe@steadplan.co.uk (user
+  account was deleted in cleanup; confirm the person is still there).
+- Browser-level (Playwright) tests impossible here: the egress proxy resets
+  Chromium connections. HTTP checks only.
