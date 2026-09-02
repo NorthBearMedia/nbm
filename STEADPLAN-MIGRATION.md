@@ -508,3 +508,79 @@ password was pasted in chat, revoke + reissue it into the claude.ai env
 (STEADPLAN_WP_USER=lawrence / STEADPLAN_WP_APP_PASSWORD) when convenient.
 Note: Hal's editor account was deleted too — recreate if he ever wants
 wp-admin access.
+
+# ✅✅✅ GO-LIVE COMPLETE — steadplan.co.uk is LIVE on Hostinger
+
+Date: 2026-09-02. The migration is finished.
+
+## How the DNS blocker was actually resolved
+
+The long access saga had a false premise. The `steadplansales` Namecheap
+account Pete supplied does NOT hold steadplan.co.uk — it holds only
+`steadplanclassics.com` (which is separately suspended for contact
+verification; flag to Hal). The domain REGISTRATION sits with Creative
+World, but the live DNS ZONE was in that account's cPanel all along:
+
+  Namecheap → Hosting List → cPanel → Zone Editor → steadplan.co.uk
+
+Nameservers: dns1/dns2.namecheaphosting.com (server premium202.web-hosting.com).
+
+## What was actually changed (ONE record)
+
+  steadplan.co.uk.  A  62.233.100.11 → 77.37.35.74   (TTL 14400 → 300)
+
+That was the entire cutover. Corrections to earlier plans, learned from
+reading the real zone:
+- `www` is a **CNAME → steadplan.co.uk**, not an A record. It follows the
+  root automatically. Never needs changing.
+- The Mailchimp DKIM records **already existed** (`k2._domainkey` →
+  dkim2.mcsv.net, `k3._domainkey` → dkim3.mcsv.net). Sam's domain
+  authentication was already done. Nothing was added.
+- MX (Microsoft 365), SPF TXT, DKIM, autodiscover, Lync/Teams SRVs — all
+  untouched. Email never at risk.
+- No `_dmarc` TXT exists. Optional future add: `v=DMARC1; p=none;`.
+
+## The "corrupted URLs" were never real
+
+Earlier crawls showed canonicals and mailto addresses on the preview
+domain, and a DB search-replace was planned. A serialize-safe dry run
+across every table found **exactly 1 occurrence** of the preview domain
+(a Wordfence config blob). The database always held steadplan.co.uk.
+Hostinger injects the preview domain at serve time (WP_SITEURL/WP_HOME
+override + output rewriting), so it evaporated the moment the site was
+served on its real domain. **No search-replace was needed or run.**
+Tool kept for reference: `steadplan-tools/steadplan-url-fix.php`
+(serialize-aware replace + siteurl/home, exposed as an authenticated REST
+route). Deployed but only ever run in dry mode.
+
+## Go-live sequence as it happened
+
+1. A record changed → propagated within minutes.
+2. Brief `ERR_SSL_PROTOCOL_ERROR` — expected gap: DNS pointing at
+   Hostinger before the certificate existed. Confirms cutover worked.
+3. Hostinger auto-issued **Lifetime SSL, Active**. Site live and secure.
+4. Verified: steadplan.co.uk serves the new site, no bounce to the preview
+   domain, NBM footer present, nav/hours/contact intact.
+
+## Post-go-live actions completed
+
+- WordPress admin email moved off **peternicholson26@gmail.com** (Pete's
+  personal Gmail) → info@northbearmedia.co.uk.
+- One-off plugins removed: `steadplan-media-restore`, `nbm-footer-patch`.
+  (`steadplan-url-fix` pending removal once verification finishes.)
+- Footer credit reworded "Built & Maintained By" → **"Maintained By"**
+  (Holdens built it; NBM maintains it). Theme v1.1.8-nbm.
+
+## Still outstanding
+
+1. Change the Namecheap account password — it was emailed in plaintext
+   across several inboxes (`Vans2022!`). Also revoke the WP application
+   password pasted in chat and move it to env vars.
+2. ACF Pro licence + Wordfence re-register/alert email.
+3. Search Console: submit sitemap on the live domain, clear the 18 Jul 4xx
+   errors, request removal of the old indexed staging site.
+4. The 90-day audit plan proper: vehicle titles with make/model, Vehicle +
+   AutoDealer schema, location pages (Leeds/Rochdale/Burnley), blog restart.
+5. Sam: Conversions gallery images still awaited (Ford section already
+   removed). Confirm Meta Pixel firing on the live domain.
+6. Consider moving DNS to Hostinger so this access mess never recurs.

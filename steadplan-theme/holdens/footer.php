@@ -74,7 +74,7 @@
         .nbm-banner img{width:105px;height:auto;display:block;}
         </style>
         <a href="https://northbearmedia.co.uk/" title="North Bear Media" target="_blank">
-            <span>Built &amp; Maintained By</span>
+            <span>Maintained By</span>
             <img src="<?php echo get_template_directory_uri(); ?>/images/nbm-logo.png" alt="North Bear Media" loading="lazy">
         </a>
     </section>
