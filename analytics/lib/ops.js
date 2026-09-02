@@ -1193,6 +1193,15 @@ async function verifySourceIntegrity() {
 // edits a site's keywords by hand, this stops touching that site forever.
 const KW_JUNK = /(^|\s)(-site|site:|https?:|www\.|\.com|\.co\.uk)|[<>{}[\]|\\^~`]/i;
 
+// Significant words of a search: punctuation stripped, plurals folded,
+// filler dropped — the basis for both the relevance gate and duplicate
+// detection, so the two always agree on what a query is "about".
+const KW_STOP = new Set(['the', 'and', 'for', 'near', 'best', 'top', 'in', 'me', 'my', 'uk', 'a', 'of', 'to', 'what', 'do', 'is', 'are', 'you', 'your']);
+function sigWords(q) {
+  return new Set(String(q).toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+    .map(w => w.replace(/s$/, '')).filter(w => w.length > 2 && !KW_STOP.has(w)));
+}
+
 function pickKeywords(rows, domain, clientName) {
   const brandWords = new Set(String(clientName || '').toLowerCase().split(/\s+/).filter(w => w.length > 2)
     .concat(domain.replace(/\.(co\.uk|com|uk|net|org)$/,'').split(/[-.]/).filter(w => w.length > 2)));
@@ -1202,8 +1211,27 @@ function pickKeywords(rows, domain, clientName) {
     .filter(r => r.impressions >= 3);
   const words = q => q.split(/\s+/).length;
   const isBrand = q => [...brandWords].some(b => q.includes(b));
-  // Opportunity: visible but not yet winning — the terms worth working on.
-  const striking = clean.filter(r => r.position > 3.5 && r.position <= 40 && !isBrand(r.q))
+
+  // RELEVANCE GATE. Impressions alone are not evidence a search matters to
+  // the business: a site picks up accidental rankings for anything nearby.
+  // Alphashunt (shunter vehicle hire) was targeting "what to do in belper"
+  // and "belper river gardens play area"; Ivy House (a care home) was
+  // targeting "ivy grove nursing home" and "ivy meadow childcare" — a
+  // rival's name, in a report headed "your target searches".
+  //
+  // What the business is actually about is revealed by the searches that
+  // EARNED CLICKS, plus its own name. A candidate must share a meaningful
+  // word with that vocabulary to qualify.
+  const vocab = new Set(brandWords);
+  for (const r of clean) {
+    if (r.clicks > 0) for (const w of sigWords(r.q)) vocab.add(w);
+  }
+  const relevant = q => [...sigWords(q)].some(w => vocab.has(w));
+
+  // Opportunity: visible, plausibly reachable, and genuinely about this
+  // business. Position capped at 25 — beyond that it is an accident, not a
+  // target worth putting in front of a client.
+  const striking = clean.filter(r => r.position > 3.5 && r.position <= 25 && !isBrand(r.q) && relevant(r.q))
     .sort((a, b) => (b.impressions * (words(b.q) > 1 ? 1.6 : 1)) - (a.impressions * (words(a.q) > 1 ? 1.6 : 1)));
   // Established: already strong, worth showing as retained ground.
   const winning = clean.filter(r => r.position <= 3.5)
@@ -1215,10 +1243,11 @@ function pickKeywords(rows, domain, clientName) {
   // instead: heavy overlap means the same search intent, so keep only the
   // strongest and spend the remaining slots on the client's other
   // services. (Validated against North Bear Media's own 705-query export.)
-  const STOP = new Set(['the', 'and', 'for', 'near', 'best', 'top', 'in', 'me', 'my', 'uk', 'a', 'of', 'to']);
-  const sig = q => new Set(q.split(/\s+/).map(w => w.replace(/s$/, '')).filter(w => w.length > 2 && !STOP.has(w)));
   const sameIntent = (a, b) => {
-    const A = sig(a), B = sig(b);
+    // "kids club" / "kid's club" / "kidsclub" are one search intent; the
+    // apostrophe and the missing space were letting all three through.
+    if (a.replace(/[^a-z0-9]/g, '') === b.replace(/[^a-z0-9]/g, '')) return true;
+    const A = sigWords(a), B = sigWords(b);
     if (!A.size || !B.size) return false;
     let shared = 0;
     for (const w of A) if (B.has(w)) shared++;
@@ -1257,7 +1286,11 @@ export async function deriveTargetKeywords() {
     try { rows = await fetchTopQueries(site.gsc_site_url, start, end, 500); }
     catch (e) { console.log('[keywords]', d, 'query fetch failed:', String(e.message || e).slice(0, 70)); continue; }
     const picked = pickKeywords(rows, d, site.client_name);
-    if (picked.length < 3) continue; // not enough real signal yet — leave the seed alone
+    // Any genuinely relevant keyword beats a longer list of irrelevant
+    // ones. Requiring three would have left Alphashunt advertising
+    // "what to do in belper" to a shunter-hire client simply because the
+    // honest replacement was shorter.
+    if (!picked.length) continue;
     const value = picked.join(', ');
     if (value === current) continue;
     db.prepare('UPDATE sites SET target_keywords = ? WHERE id = ?').run(value, site.id);
