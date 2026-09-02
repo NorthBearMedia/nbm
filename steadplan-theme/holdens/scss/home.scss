@@ -4014,3 +4014,15 @@ $titleFont: 'Sora', sans-serif;
         }
     }
 }
+// NBM: accordion recoloured to brand palette (greys, blacks, white, red).
+// Compiled copy appended to css/home.css by hand; keep both in sync.
+.allAccordions .accordionWrapper {
+    &:nth-of-type(odd), &:nth-of-type(odd):before, &:nth-of-type(odd):after { background-color: #2B2E34; }
+    &:nth-of-type(even), &:nth-of-type(even):before, &:nth-of-type(even):after { background-color: #1F2125; }
+    &:nth-of-type(odd) .panel .bg .logoBG path { fill: #1F2125; }
+    &:nth-of-type(even) .panel .bg .logoBG path { fill: #2B2E34; }
+    .accordion, .panel .content, .panel .content p { color: #ffffff; }
+    &:nth-of-type(odd) .accordion.active, &:nth-of-type(odd) .accordion:hover,
+    &:nth-of-type(even) .accordion.active, &:nth-of-type(even) .accordion:hover { color: #ED4233; }
+    .panel .content a { color: #ED4233; }
+}

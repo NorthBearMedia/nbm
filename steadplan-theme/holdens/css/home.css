@@ -4614,3 +4614,34 @@
 .homeAbout .wrapper .text p a:hover {
   color: #2B2E34;
 }/*# sourceMappingURL=home.css.map */
+/* NBM: accordion recoloured to brand palette (greys, blacks, white, red) */
+.allAccordions .accordionWrapper:nth-of-type(odd),
+.allAccordions .accordionWrapper:nth-of-type(odd):before,
+.allAccordions .accordionWrapper:nth-of-type(odd):after {
+  background-color: #2B2E34;
+}
+.allAccordions .accordionWrapper:nth-of-type(even),
+.allAccordions .accordionWrapper:nth-of-type(even):before,
+.allAccordions .accordionWrapper:nth-of-type(even):after {
+  background-color: #1F2125;
+}
+.allAccordions .accordionWrapper:nth-of-type(odd) .panel .bg .logoBG path {
+  fill: #1F2125;
+}
+.allAccordions .accordionWrapper:nth-of-type(even) .panel .bg .logoBG path {
+  fill: #2B2E34;
+}
+.allAccordions .accordionWrapper .accordion,
+.allAccordions .accordionWrapper .panel .content,
+.allAccordions .accordionWrapper .panel .content p {
+  color: #ffffff;
+}
+.allAccordions .accordionWrapper:nth-of-type(odd) .accordion.active,
+.allAccordions .accordionWrapper:nth-of-type(odd) .accordion:hover,
+.allAccordions .accordionWrapper:nth-of-type(even) .accordion.active,
+.allAccordions .accordionWrapper:nth-of-type(even) .accordion:hover {
+  color: #ED4233;
+}
+.allAccordions .accordionWrapper .panel .content a {
+  color: #ED4233;
+}
