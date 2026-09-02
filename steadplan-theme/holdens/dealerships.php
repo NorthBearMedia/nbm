@@ -43,7 +43,7 @@
                     <div class="address">
                         <p>
                             The Old Railway Yard<br>
-                            Fishwich Street<br>
+                            Fishwick Street<br>
                             Rochdale<br>
                             OL16 5NA
                         </p>

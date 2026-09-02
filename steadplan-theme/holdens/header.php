@@ -63,6 +63,9 @@
         src="https://www.facebook.com/tr?id=1072733728753651&ev=PageView&noscript=1"
         /></noscript>
         <!-- End Meta Pixel Code -->
+        <!-- Fathom - beautiful, simple website analytics -->
+        <script src="https://cdn.usefathom.com/script.js" data-site="ENQREIEU" defer></script>
+        <!-- / Fathom -->
 	</head>
 	
 	<body data-breakpoint-mobile="(max-width: 639px)"

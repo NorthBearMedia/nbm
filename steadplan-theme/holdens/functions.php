@@ -1100,3 +1100,185 @@ add_filter('acf/load_field_group', function ($group) {
 add_filter('acf/settings/rest_api_format', function () {
     return 'light';
 });
+
+/* ==========================================================================
+   North Bear Media — SEO layer
+   Added 2026-09. Titles, descriptions and structured data for the vehicle
+   stock and the three branches. Nothing here changes visible page content.
+   ========================================================================== */
+
+/**
+ * Expose Yoast's per-page fields to the REST API (owner-level only) so SEO
+ * settings can be managed programmatically rather than page by page.
+ */
+add_action('init', function () {
+    $keys = array(
+        '_yoast_wpseo_title',
+        '_yoast_wpseo_metadesc',
+        '_yoast_wpseo_meta-robots-noindex',
+        '_yoast_wpseo_meta-robots-nofollow',
+        '_yoast_wpseo_canonical',
+        '_yoast_wpseo_focuskw',
+    );
+    foreach (array('page', 'post', 'vehicle') as $type) {
+        foreach ($keys as $key) {
+            register_post_meta($type, $key, array(
+                'type'          => 'string',
+                'single'        => true,
+                'show_in_rest'  => true,
+                'auth_callback' => function () { return current_user_can('manage_options'); },
+            ));
+        }
+    }
+});
+
+/** Safe ACF read: returns a trimmed string whatever the field type. */
+function nbm_f($key, $post_id = null) {
+    if (!function_exists('get_field')) { return ''; }
+    $v = get_field($key, $post_id);
+    if (is_array($v)) { $v = reset($v); }
+    if (is_object($v)) { return ''; }
+    return trim((string) $v);
+}
+
+/** "MAN TGE 2.0 3140d LION XC ..." — make and model first, as buyers search. */
+function nbm_vehicle_label($post_id) {
+    $bits = array_filter(array(
+        nbm_f('make', $post_id),
+        nbm_f('model', $post_id),
+        get_the_title($post_id),
+    ));
+    return trim(preg_replace('/\s+/', ' ', implode(' ', $bits)));
+}
+
+/**
+ * Vehicle title tags previously omitted the make and model entirely, so stock
+ * was invisible for "MAN TGE" style searches. The H1 always had them.
+ */
+add_filter('wpseo_title', function ($title) {
+    if (!is_singular('vehicle')) { return $title; }
+    $label = nbm_vehicle_label(get_queried_object_id());
+    if ($label === '') { return $title; }
+    return $label . ' | ' . get_bloginfo('name');
+}, 20);
+
+/** Vehicle meta descriptions, generated from the live stock data. */
+add_filter('wpseo_metadesc', function ($desc) {
+    if (!is_singular('vehicle')) { return $desc; }
+    $id    = get_queried_object_id();
+    $label = nbm_vehicle_label($id);
+    if ($label === '') { return $desc; }
+
+    $parts = array();
+    $price = preg_replace('/[^0-9.]/', '', nbm_f('supplied_price', $id));
+    if ($price !== '') {
+        $parts[] = '£' . number_format((float) $price) . (nbm_f('vat_excluded', $id) ? ' + VAT' : '');
+    }
+    $miles = preg_replace('/[^0-9]/', '', nbm_f('mileage', $id));
+    if ($miles !== '') { $parts[] = number_format((int) $miles) . ' miles'; }
+    foreach (array('transmission', 'engine_size', 'registered') as $k) {
+        $v = nbm_f($k, $id);
+        if ($v !== '') { $parts[] = $v; }
+    }
+
+    $out = $label . ' for sale at Steadplan.';
+    if ($parts) { $out .= ' ' . implode('. ', array_slice($parts, 0, 4)) . '.'; }
+    $out .= ' Commercial vehicle sales, leasing and maintenance in Leeds, Rochdale and Burnley.';
+
+    if (function_exists('mb_substr') && mb_strlen($out) > 158) {
+        $cut = mb_substr($out, 0, 155);
+        $sp  = mb_strrpos($cut, ' ');
+        if ($sp !== false) { $cut = mb_substr($cut, 0, $sp); }
+        $out = rtrim($cut, " ,.;:-") . '.';
+    }
+    return $out;
+}, 20);
+
+/** The three branches, used for local structured data. */
+function nbm_branches() {
+    return array(
+        array('name' => 'Steadplan Leeds',    'street' => 'Whitehall Industrial Estate, Ashfield Way', 'city' => 'Leeds',  'postcode' => 'LS12 5JB', 'phone' => '+441132797901'),
+        array('name' => 'Steadplan Rochdale', 'street' => 'The Old Railway Yard, Fishwick Street',     'city' => 'Rochdale', 'postcode' => 'OL16 5NA', 'phone' => '+441706868668'),
+        array('name' => 'Steadplan Burnley',  'street' => 'Lomeshaye Industrial Estate, Kirby Road',   'city' => 'Nelson',  'postcode' => 'BB9 6RS',  'phone' => '+441282611616'),
+    );
+}
+
+/**
+ * Structured data. Google gets no machine-readable description of the stock or
+ * the branches otherwise, which is what rich results and local packs run on.
+ */
+add_action('wp_head', function () {
+    $graph = array();
+
+    if (is_singular('vehicle')) {
+        $id    = get_queried_object_id();
+        $label = nbm_vehicle_label($id);
+        $car   = array(
+            '@type' => 'Car',
+            '@id'   => get_permalink($id) . '#vehicle',
+            'name'  => $label,
+            'url'   => get_permalink($id),
+        );
+        $map = array(
+            'make'          => 'brand',
+            'model'         => 'model',
+            'vehicle_type'  => 'bodyType',
+            'transmission'  => 'vehicleTransmission',
+            'condition'     => 'itemCondition',
+        );
+        foreach ($map as $field => $prop) {
+            $v = nbm_f($field, $id);
+            if ($v !== '') { $car[$prop] = $v; }
+        }
+        $desc = nbm_f('vehicle_description', $id);
+        if ($desc !== '') { $car['description'] = wp_strip_all_tags($desc); }
+
+        $miles = preg_replace('/[^0-9]/', '', nbm_f('mileage', $id));
+        if ($miles !== '') {
+            $car['mileageFromOdometer'] = array('@type' => 'QuantitativeValue', 'value' => (int) $miles, 'unitCode' => 'SMI');
+        }
+        if (has_post_thumbnail($id)) {
+            $car['image'] = get_the_post_thumbnail_url($id, 'large');
+        }
+        $price = preg_replace('/[^0-9.]/', '', nbm_f('supplied_price', $id));
+        if ($price !== '') {
+            $car['offers'] = array(
+                '@type'         => 'Offer',
+                'price'         => (float) $price,
+                'priceCurrency' => 'GBP',
+                'availability'  => 'https://schema.org/InStock',
+                'url'           => get_permalink($id),
+                'valueAddedTaxIncluded' => nbm_f('vat_excluded', $id) ? false : true,
+                'seller'        => array('@type' => 'AutoDealer', 'name' => 'Steadplan'),
+            );
+        }
+        $graph[] = $car;
+    }
+
+    if (is_front_page() || is_page('contact')) {
+        foreach (nbm_branches() as $b) {
+            $graph[] = array(
+                '@type'     => 'AutoDealer',
+                '@id'       => home_url('/#' . sanitize_title($b['name'])),
+                'name'      => $b['name'],
+                'url'       => home_url('/'),
+                'telephone' => $b['phone'],
+                'parentOrganization' => array('@type' => 'Organization', 'name' => 'Steadplan'),
+                'address'   => array(
+                    '@type'           => 'PostalAddress',
+                    'streetAddress'   => $b['street'],
+                    'addressLocality' => $b['city'],
+                    'postalCode'      => $b['postcode'],
+                    'addressCountry'  => 'GB',
+                ),
+                'areaServed' => array('Leeds', 'Rochdale', 'Burnley', 'North West England', 'Yorkshire'),
+            );
+        }
+    }
+
+    if (!$graph) { return; }
+    echo "\n" . '<script type="application/ld+json">'
+        . wp_json_encode(array('@context' => 'https://schema.org', '@graph' => $graph),
+                         JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+        . '</script>' . "\n";
+}, 30);
