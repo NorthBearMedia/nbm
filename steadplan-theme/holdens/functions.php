@@ -1309,3 +1309,94 @@ add_action('wp_head', function () {
                          JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
         . '</script>' . "\n";
 }, 30);
+
+// NBM: scheduled AutoTrader stock sync.
+// The theme shipped with only a manual wp-admin button and a per-vehicle webhook,
+// so the showroom went stale whenever nobody pressed the button (stock had not
+// moved since 2 July 2026). This adds an hourly run plus an authenticated REST
+// trigger. It reuses the theme's own get_bearer_token()/handle_vehicle_data()
+// rather than reimplementing the sync, so a scheduled run behaves exactly like
+// the button.
+function nbm_autotrader_sync_run() {
+    if ( ! function_exists( 'get_bearer_token' ) || ! function_exists( 'handle_vehicle_data' ) ) {
+        return new WP_Error( 'nbm_missing', 'AutoTrader sync functions unavailable' );
+    }
+
+    $token = get_bearer_token(); // wp_die()s if AutoTrader auth fails, which aborts before any write
+    if ( empty( $token ) ) {
+        return new WP_Error( 'nbm_no_token', 'No AutoTrader bearer token' );
+    }
+
+    $response = wp_remote_get(
+        'https://api.autotrader.co.uk/stock?advertiserId=10012129&pageSize=200',
+        array(
+            'headers' => array( 'Authorization' => 'Bearer ' . $token ),
+            'timeout' => 60,
+        )
+    );
+    if ( is_wp_error( $response ) ) {
+        update_option( 'nbm_autotrader_last_error', $response->get_error_message() );
+        return $response;
+    }
+
+    $code = wp_remote_retrieve_response_code( $response );
+    $data = json_decode( wp_remote_retrieve_body( $response ), true );
+
+    // Only hand over a payload in the shape handle_vehicle_data() expects. A partial
+    // or error response must never reach the sync, because it deletes vehicles that
+    // the feed reports as sold.
+    if ( 200 !== (int) $code || ! isset( $data['results'] ) || ! is_array( $data['results'] ) ) {
+        update_option( 'nbm_autotrader_last_error', 'Unexpected stock response, HTTP ' . $code );
+        return new WP_Error( 'nbm_bad_payload', 'Unexpected stock response, HTTP ' . $code );
+    }
+
+    handle_vehicle_data( $data );
+
+    $count = count( $data['results'] );
+    update_option( 'nbm_autotrader_last_sync', current_time( 'mysql' ) );
+    update_option( 'nbm_autotrader_last_count', $count );
+    delete_option( 'nbm_autotrader_last_error' );
+    return $count;
+}
+
+add_action( 'nbm_autotrader_sync', 'nbm_autotrader_sync_run' );
+
+add_action( 'init', function () {
+    if ( ! wp_next_scheduled( 'nbm_autotrader_sync' ) ) {
+        wp_schedule_event( time() + 300, 'hourly', 'nbm_autotrader_sync' );
+    }
+} );
+
+// Authenticated trigger, so a sync can be forced without logging in to wp-admin.
+// The admin button posts to admin-ajax, which application passwords cannot reach.
+add_action( 'rest_api_init', function () {
+    register_rest_route( 'nbm/v1', '/sync-vehicles', array(
+        'methods'             => 'POST',
+        'permission_callback' => function () { return current_user_can( 'manage_options' ); },
+        'callback'            => function () {
+            $result = nbm_autotrader_sync_run();
+            if ( is_wp_error( $result ) ) {
+                return new WP_REST_Response( array( 'ok' => false, 'error' => $result->get_error_message() ), 500 );
+            }
+            return array(
+                'ok'        => true,
+                'synced'    => $result,
+                'last_sync' => get_option( 'nbm_autotrader_last_sync' ),
+                'vehicles'  => (int) wp_count_posts( 'vehicle' )->publish,
+            );
+        },
+    ) );
+    register_rest_route( 'nbm/v1', '/sync-status', array(
+        'methods'             => 'GET',
+        'permission_callback' => function () { return current_user_can( 'manage_options' ); },
+        'callback'            => function () {
+            return array(
+                'last_sync'  => get_option( 'nbm_autotrader_last_sync' ),
+                'last_count' => get_option( 'nbm_autotrader_last_count' ),
+                'last_error' => get_option( 'nbm_autotrader_last_error' ),
+                'next_run'   => wp_next_scheduled( 'nbm_autotrader_sync' ),
+                'vehicles'   => (int) wp_count_posts( 'vehicle' )->publish,
+            );
+        },
+    ) );
+} );
