@@ -10,7 +10,7 @@
                     $image_url_large = $image['sizes']['large']; // Use 'large' image size for main slides
             ?>
                     <figure>
-                        <img src="<?php echo $image_url_large; ?>" alt="<?php echo $image['alt']; ?>">
+                        <img src="<?php echo $image_url_large; ?>" alt="<?php echo $image['alt']; ?>" loading="lazy" decoding="async">
                     </figure>
             <?php
                 }
@@ -27,7 +27,7 @@
                     $image = get_sub_field('car_gallery_image');
                     $image_url_thumbnail = $image['sizes']['galleryThumb']; // Use 'thumbnail' image size for thumbnails
             ?>
-                    <div><img src="<?php echo $image_url_thumbnail; ?>" alt="<?php echo $image['alt']; ?>"></div>
+                    <div><img src="<?php echo $image_url_thumbnail; ?>" alt="<?php echo $image['alt']; ?>" loading="lazy" decoding="async"></div>
             <?php
                 }
             }

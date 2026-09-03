@@ -671,3 +671,26 @@ links or assets. Findings and fixes:
   account was deleted in cleanup; confirm the person is still there).
 - Browser-level (Playwright) tests impossible here: the egress proxy resets
   Chromium connections. HTTP checks only.
+
+## 3 Sep — Sam's images: Conversions archive (theme v1.2.6-nbm)
+
+- Source: Drive `Steadplan / wetransfer_.../Steadplan Website Norton : Website
+  Extra : Archive Pictures` (~90 files). Pulled via the Google Drive MCP
+  (`download_file_content` spools oversized results to
+  `~/.claude/projects/<session>/tool-results/*.txt` as JSON `{content: base64}`;
+  decode from there — see `scratchpad/decode.py`). **Connector caps downloads at
+  10 MB**, so 11 of the professional DSC0xxxx May-shoot frames could not be
+  fetched, nor the 148 MB `holdens_steadplan_mayshoot_..._resized.zip`. Get those
+  another way if wanted.
+- 66 images retrieved, 41 selected via contact sheets, EXIF-rotated, resized to
+  max 1800px q82 progressive (~10 MB total), renamed to SEO slugs and uploaded
+  with alt text. Media IDs **2658-2698**. Manifests:
+  `scratchpad/sam/selected.json`, `scratchpad/sam/uploaded.json`.
+- Conversions page (1353): new `text` block "Conversion archive." inserted before
+  the gallery; existing `car_gallery` extended 7 -> 48 images.
+  ⚠️ Only ONE `car_gallery` per page is safe: `dynamic/car_gallery.php` declares
+  `const lightbox` at inline-script top level, so a second instance is a
+  SyntaxError. The `gallery` layout is unusable — it calls the
+  `home-gallery-2` image size, which is not registered in functions.php.
+- v1.2.6-nbm: `loading="lazy" decoding="async"` on car_gallery slides and
+  thumbnails (48 images would otherwise all load eagerly).
