@@ -1,0 +1,73 @@
+{
+ "case": "Pontefract 30 East Drive 1966-69 — Diane Pritchard",
+ "voice": {
+  "name": "Olivia J - Suspense, British Calm",
+  "id": "GsjQ0ydx7QzhDLqInGtT",
+  "note": "poised adult British female — Diane recalling as an adult"
+ },
+ "hook_card": [
+  "It dragged me",
+  "up the stairs",
+  "by my throat."
+ ],
+ "segments": {
+  "p_open": "It dragged me up the stairs, by my throat. Kicking. [pause] When they pulled me free, the marks of its fingers were on my neck.",
+  "p_s1": "It started daft, really. I was twelve. A fine white dust, falling in the lounge — out of nothing, out of mid-air. Then pools of water on the kitchen floor. Mum mopped them up; they came back. Nobody ever found a pipe. [soft laugh] Then it stopped. Two years, nothing. You'd be amazed what you can forget.",
+  "p_s2": "Stronger. Things thrown — proper things. The grandmother clock went down the stairs. Furniture moved while you watched it move. The papers called it Mr Nobody. We called it Fred. [pause] You live with a thing, you give it a name. It felt better, having it named. It shouldn't have.",
+  "p_s3": "It liked me best — that's what they said, after. I'd wake on my bedroom floor with the mattress on top of me. I was pinned under furniture so heavy my dad had to lift it off. [pause] And then one night it took me by the throat, and it dragged me up the stairs. My family pulled me free. The finger marks stayed on my neck for days. Everyone saw them.",
+  "p_s4": "It was seen, in the end. A tall figure, all in black — hooded, like a monk. In a council house, in Pontefract. [pause] Then someone told Mum to hang garlic round the doors. [soft laugh] Garlic. From the market. And whether it was that or not — in sixty-nine, it stopped. Like it lost interest.",
+  "p_s5": "I was fourteen, with the marks of a hand on my throat, and still they said we made it up. All of us — Mum, Dad, our Philip. For three years. For nothing. [pause] An investigator sat with our family and wrote it all down; the book is still in print. The house is still there. People pay to sleep in my old room now. [soft laugh] Ask them how they get on. Make of it what you like."
+ },
+ "cards": {
+  "t1": {
+   "big": [
+    "Pontefract, West Yorkshire.",
+    "1968."
+   ],
+   "small": [
+    "The witness was fourteen years old.",
+    "Dramatised from the Pritchard family's",
+    "accounts to investigator Colin Wilson."
+   ]
+  },
+  "q1": [
+   "When did it start?"
+  ],
+  "q2": [
+   "And then it came back."
+  ],
+  "q3": [
+   "What did it do to you?"
+  ],
+  "q4": [
+   "Did you ever see it?"
+  ],
+  "t4": {
+   "big": [
+    "It is called one of the most",
+    "violent hauntings in Europe."
+   ]
+  },
+  "t5": {
+   "big": [
+    "The house still stands",
+    "at 30 East Drive."
+   ]
+  },
+  "t6": {
+   "big": [
+    "The family never took it back."
+   ]
+  }
+ },
+ "stills": {
+  "p_s1": "../ep45-sauchie/s6-house-night.jpg",
+  "p_s3": "../ep41-cooneen/s1-bedroom.jpg"
+ },
+ "sting": {
+  "file": "door-t.mp3",
+  "at": "p_s3 'it took me by the throat'",
+  "vol": 0.3
+ },
+ "yt_title": "Pontefract: Dragged Up the Stairs"
+}
