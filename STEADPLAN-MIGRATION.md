@@ -694,3 +694,48 @@ links or assets. Findings and fixes:
   `home-gallery-2` image size, which is not registered in functions.php.
 - v1.2.6-nbm: `loading="lazy" decoding="async"` on car_gallery slides and
   thumbnails (48 images would otherwise all load eagerly).
+
+## 3 Sep — Vehicle listings: root cause found (theme v1.2.7-nbm)
+
+**AutoTrader API credentials are INVALID.** A sync returns:
+`401 UnauthorizedException ... Unable to create new Token. Invalid key or
+secret supplied`. Key/secret are hardcoded in `functions.php` ~lines 618-619
+(`$apiKey` / `$apiSecret`). They died around 2 July 2026, which is exactly
+where vehicle `lastmod` dates stop. AutoTrader had 40 live vs 30 on the site.
+**Blocked until Steadplan supply fresh credentials for advertiser 10012129.**
+
+How the listings were supposed to update:
+- `wp_ajax_fetch_vehicles` -> `manual_fetch_vehicles_function()`, fired by the
+  "Update Vehicles" button in wp-admin. Pulls up to 200 from AutoTrader and
+  calls `handle_vehicle_data()`.
+- `PUT /wp-json/autotrader/v1/fetch_vehicles/` webhook, HMAC-signed. Route is
+  live and correctly 401s unsigned requests.
+- **No cron existed.** Zero `wp_schedule_event` calls in the original theme.
+
+⚠️ `js/admin-fetch-vehicles.js` alerts "Autotrader API Data Fetched. Your
+vehicles will now be all up to date." from the jQuery success callback, so it
+fires even when the PHP wp_die()s with an error. Anyone pressing that button
+since July got a false confirmation. FIX THIS when credentials land.
+
+Safety note: `delete_posts_not_in_api_response()` exists but is **never
+called**. Deletions only happen per-vehicle at functions.php:785 and :806 when
+the feed reports a vehicle unpublished or sold. Failure aborts before writes.
+
+v1.2.7-nbm adds:
+- `nbm_autotrader_sync_run()` — reuses `get_bearer_token()` /
+  `handle_vehicle_data()`; refuses any non-200 or payload without
+  `results[]` before it can reach the sync; records
+  `nbm_autotrader_last_sync` / `_last_count` / `_last_error`.
+- Hourly `nbm_autotrader_sync` WP-Cron event (Norton approved 3 Sep).
+- `POST /wp-json/nbm/v1/sync-vehicles` and `GET /wp-json/nbm/v1/sync-status`,
+  both `manage_options`. Needed because the admin button posts to
+  admin-ajax.php, which application passwords cannot authenticate against.
+
+⚠️ KNOWN GAP: `get_bearer_token()` calls `wp_die()` on auth failure, so on the
+auth-failure path `nbm_autotrader_last_error` is never written and
+sync-status reads clean while the sync is actually broken. Route the token
+fetch through a non-fatal wrapper when the credentials are replaced.
+
+Other: account has 4 Hostinger cron jobs, two of which fetch and execute
+`https://nbm-production-604e.up.railway.app/ix/.../steadplan.co.uk` every
+minute. Flagged to Norton 3 Sep; presumed his own infrastructure.
