@@ -1,0 +1,73 @@
+{
+ "case": "Raynham Hall Brown Lady photograph 1936 — Indre Shira",
+ "voice": {
+  "name": "Stephen S",
+  "id": "fariASUQDOMFXjtC2kjb",
+  "note": "mature English male, London accent, deep — a 1930s professional photographer"
+ },
+ "hook_card": [
+  "You have seen",
+  "my photograph."
+ ],
+ "segments": {
+  "r_open": "You have seen my photograph. Most people have. [pause] I was there, at the foot of the staircase, when she came down it.",
+  "r_s1": "A job. Country Life sent us — me and Captain Provand — to photograph a country house in Norfolk. Furniture. Panelling. Staircases. [soft laugh] The dullest work in photography. We had done the staircase once already. Provand had his head under the black cloth, setting up a second plate. I was behind him, looking up the stairs.",
+  "r_s2": "A vapoury form — gradually taking the appearance of a woman. Those are my words from the time. I have never found better ones. She was coming down the stairs, towards us. Not walking, quite. Descending. [pause] I shouted. Provand couldn't see a thing — his head was still under the cloth. The cap came off the lens, the flash fired. And she was gone.",
+  "r_s3": "He thought I had lost my mind. [soft laugh] He had seen nothing, and he said there could be nothing on that plate but a staircase. I told him there would be. We were still arguing in the darkroom when the negative came up. [pause] And there she was. On the stairs. Exactly where I had watched her come down.",
+  "r_s4": "Everyone said we faked it. So Harry Price came — the man who spent his life catching fraudulent mediums. He questioned the two of us, and he examined the negative, and his verdict was printed: I could not shake their story, and I had no right to disbelieve them. The negative, he wrote, is entirely innocent of any faking. [pause] The house had a name for her long before we came. The Brown Lady. She had been seen on those stairs for a hundred years.",
+  "r_s5": "Country Life printed her that Christmas, and she has never stopped being printed. People have had a lifetime to prove a trick — double exposure, grease on the lens, a fault of light. Let them try. [pause] Provand never claimed to see her. He was under the cloth, and he said so plainly all his life — that is an honest man. I did see her. I saw her before the flash, not after. [pause] It is the most famous photograph of a ghost in the world. I only pressed the trigger. Make of it what you like."
+ },
+ "cards": {
+  "t1": {
+   "big": [
+    "Raynham Hall, Norfolk.",
+    "September, 1936."
+   ],
+   "small": [
+    "The witness is a professional photographer.",
+    "Dramatised from Indre Shira's published",
+    "account in Country Life, 1936."
+   ]
+  },
+  "q1": [
+   "Why were you there?"
+  ],
+  "q2": [
+   "What did you see?"
+  ],
+  "q3": [
+   "What did Provand say?"
+  ],
+  "q4": [
+   "Couldn't it be faked?"
+  ],
+  "t4": {
+   "big": [
+    "Harry Price examined the negative.",
+    "",
+    "\"Entirely innocent of any faking.\""
+   ]
+  },
+  "t5": {
+   "big": [
+    "Ninety years on, experts",
+    "still argue about it."
+   ]
+  },
+  "t6": {
+   "big": [
+    "The stairs are still there."
+   ]
+  }
+ },
+ "stills": {
+  "r_s1": "../ep42-borley/fr_s2-rectory_5.jpg",
+  "r_s2": "../ep46-renvyle/s3-corridor.jpg"
+ },
+ "sting": {
+  "file": "door-t.mp3",
+  "at": "r_s3 'there she was'",
+  "vol": 0.3
+ },
+ "yt_title": "Raynham Hall: You Have Seen My Photograph"
+}
