@@ -1,0 +1,74 @@
+{
+ "case": "Cheltenham Ghost 1882-89 — Rosina Despard",
+ "voice": {
+  "name": "Alice - Clear, Engaging Educator",
+  "id": "Xb7hH8MSUJpSbSDYk0k2",
+  "note": "clear middle-aged British female — a physician recounting her own documented case"
+ },
+ "hook_card": [
+  "I put threads",
+  "across the stairs.",
+  "She walked",
+  "through them."
+ ],
+ "segments": {
+  "c_open": "I strung threads across the staircase. Thin ones, in the dark, where nobody could see them. [pause] She came down through them. Not one was broken.",
+  "c_s1": "June, eighteen eighty-two. I was nineteen, and I was studying medicine — which is to say I was being trained to observe a thing carefully and write it down. [pause] Somebody was at my door. I opened it: nobody. A few steps along the passage, and there she was, at the head of the stairs. A tall lady, in black. I followed her down. My candle-end burnt itself out, and I lost her in the dark.",
+  "c_s2": "Black — a soft woollen material; you could hear it move. Widow's weeds, cuffs at both wrists. And the face hidden, in a handkerchief, held in the right hand. [pause] Always the right hand. She was not transparent. She was not a mist. Seventeen people saw her, over four years, and most took her for a living woman in the house.",
+  "c_s3": "I spoke to her. The twenty-ninth of January, eighteen eighty-four — I asked her if I could help her. [pause] I got a slight gasp. Nothing more. I tried to touch her; my hand met nothing, and she was past me. I cornered her once, in a room with one door. She simply was not there any more. So I stopped chasing, and I started measuring. Threads. Across the stairs, at intervals. She passed. Nothing broke.",
+  "c_s4": "I wrote it all down as it happened — dates, times, who was in the house, what each of them saw. Then I sent it to the Society for Psychical Research, and they printed it. [pause] The gentleman who edited it called it one of the best authenticated instances of haunting on record. He also described me, in print, as a lady of scientific training. He meant it kindly. It was also a defence.",
+  "c_s5": "She came less often after eighty-seven, and after eighty-nine, not at all. [pause] I qualified. I was the twenty-third woman in England to take a medical degree, and I spent my working life as a physician — some of it inside a women's prison, where nobody has time for ghosts. I never claimed to know what she was. I claimed what I saw, and what I did to test it. [pause] The threads were not broken. Make of that what you will."
+ },
+ "cards": {
+  "t1": {
+   "big": [
+    "Pittville Circus Road,",
+    "Cheltenham. 1882."
+   ],
+   "small": [
+    "The witness is a medical student.",
+    "Dramatised from Rosina Despard's account,",
+    "published by the SPR in 1892."
+   ]
+  },
+  "q1": [
+   "When did you first see her?"
+  ],
+  "q2": [
+   "What did she look like?"
+  ],
+  "q3": [
+   "Did you try to reach her?"
+  ],
+  "q4": [
+   "Who believed you?"
+  ],
+  "t4": {
+   "big": [
+    "Seventeen people saw her",
+    "between 1882 and 1886."
+   ]
+  },
+  "t5": {
+   "big": [
+    "Rosina Despard became one of",
+    "England's first women doctors."
+   ]
+  },
+  "t6": {
+   "big": [
+    "Her record is still in print."
+   ]
+  }
+ },
+ "stills": {
+  "c_s1": "../ep42-borley/fr_s2-rectory_5.jpg",
+  "c_s3": "../ep46-renvyle/s3-corridor.jpg"
+ },
+ "sting": {
+  "file": "door-t.mp3",
+  "at": "c_s3 'not there any more'",
+  "vol": 0.3
+ },
+ "yt_title": "Cheltenham: She Walked Through My Threads"
+}
