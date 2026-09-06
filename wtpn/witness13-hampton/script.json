@@ -1,0 +1,73 @@
+{
+ "case": "Hampton Court Palace CCTV 2003 — James Faukes, security guard",
+ "voice": {
+  "name": "Jeremy",
+  "id": "QxoPNd3JQgChdkV8LbP7",
+  "note": "North London British male — palace security guard, plain and unshowy"
+ },
+ "hook_card": [
+  "The face",
+  "just didn't",
+  "look human."
+ ],
+ "segments": {
+  "f_open": "It was incredibly spooky, because the face just didn't look human. [pause] That is what I said at the time, on camera. I was a security guard. I was looking at our own CCTV.",
+  "f_s1": "It started as a fault. A fire door, down one of the corridors, kept being found open. [soft laugh] That is the whole job, really — doors. You watch doors for a living. Three nights running, the alarm goes for that same door. So you do what anybody would do. You go back and you look at the tape, to see who keeps leaving it open.",
+  "f_s2": "The doors come open on their own. Nobody there. [pause] Then, the next night — the doors open again, and somebody steps out of the doorway. Long robe. Pale face. He reaches out, takes hold of the door, and pulls it shut behind him. Like a man tidying up after himself.",
+  "f_s3": "My first reaction was that somebody was having a laugh. So I asked my colleagues to come and look. [pause] Then we went to the costumed guides — we have people in Tudor dress, all day, every day, it is that sort of palace. We asked them. They don't own a costume like that.",
+  "f_s4": "It went out to the papers that December, and it went round the world in about a day. Our press office said it plainly: it is not a joke, we haven't manufactured it, we genuinely don't know who it is or what it is. [pause] Nobody has ever come forward. No visitor, no member of staff, no actor. In twenty-odd years, nobody has said, that was me.",
+  "f_s5": "I have watched a lot of people on a lot of screens. You get very good at knowing how a person moves through a doorway. [pause] I am not going to tell you it was a ghost. I don't know what it was, and the palace has never claimed to know either — they still show the clip, and they still can't explain it. [pause] I know what the camera recorded, and I know the face didn't look right. Make of it what you like."
+ },
+ "cards": {
+  "t1": {
+   "big": [
+    "Hampton Court Palace.",
+    "October, 2003."
+   ],
+   "small": [
+    "The witness is a palace security guard.",
+    "Dramatised from James Faukes'",
+    "statements to the press, 2003."
+   ]
+  },
+  "q1": [
+   "Why were you watching the tape?"
+  ],
+  "q2": [
+   "What was on it?"
+  ],
+  "q3": [
+   "Could it have been staff?"
+  ],
+  "q4": [
+   "Did anyone explain it?"
+  ],
+  "t4": {
+   "big": [
+    "The palace said the footage",
+    "was not manufactured."
+   ]
+  },
+  "t5": {
+   "big": [
+    "Nobody has ever come forward."
+   ]
+  },
+  "t6": {
+   "big": [
+    "The palace still cannot",
+    "explain the figure."
+   ]
+  }
+ },
+ "stills": {
+  "f_s1": "../ep46-renvyle/s3-corridor.jpg",
+  "f_s3": "../ep46-renvyle/s1-door.jpg"
+ },
+ "sting": {
+  "file": "door-t.mp3",
+  "at": "f_s2 'pulls it shut'",
+  "vol": 0.3
+ },
+ "yt_title": "Hampton Court: The Face Didn't Look Human"
+}
