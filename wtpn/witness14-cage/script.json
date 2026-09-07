@@ -1,0 +1,75 @@
+{
+ "case": "The Cage, St Osyth 2004-08 — Vanessa Mitchell",
+ "voice": {
+  "name": "WTPN Samantha - Essex",
+  "id": "125VaT82UBJoVCbJxSya",
+  "note": "middle-aged Essex woman — the witness in her own register"
+ },
+ "hook_card": [
+  "Something",
+  "slapped me.",
+  "I was alone",
+  "in the house."
+ ],
+ "segments": {
+  "v_open": "Something slapped me. Hard enough to turn my head. [pause] I was alone in the house, with my baby asleep upstairs.",
+  "v_s1": "I did not buy a haunted house. I bought a house. [soft laugh] A little cottage, in the village I grew up in — I knew the building all my life. It is old. Part of it was the village lock-up; they held people accused of witchcraft in there, hundreds of years ago. That is history. That is on a plaque. It is not the same as living in it.",
+  "v_s2": "The first day. Not the first month — the first day. [pause] A figure walked through my room. Not a shadow, not a trick of the light. Walked through it, while I stood there. And then it kept happening. Growling — a low growl, in a room with nothing in it. You tell yourself pipes. There is only so long you can do that.",
+  "v_s3": "It touched me. That is the part people go quiet about. [pause] Slapped. Pushed. Shoved by hands that were not there — and once when I was pregnant, which I will not forgive. And blood. Spots of blood appearing on the floor, in a house with nobody bleeding in it. I cleaned it up. It came back.",
+  "v_s4": "Three years I stayed. [exhales] People say — why would you stay three years? Because it was my home, and my money. You get used to being frightened; that is the truth of it. You start to think it is normal. [pause] Then one day you look at your little boy, asleep in that house, and you think: no. And you go.",
+  "v_s5": "I put my name on a book about it, with an investigator, so nobody can say I whispered it and ran. I have said it on television with my face on the screen. [pause] People tell me I made it up for money. I bought that house to live in — and I still own the thing, and I still cannot sell it. [soft laugh] Some investment. I know what hit me. Make of it what you like."
+ },
+ "cards": {
+  "t1": {
+   "big": [
+    "The Cage, St Osyth.",
+    "Essex, 2004."
+   ],
+   "small": [
+    "The witness bought the house to live in.",
+    "Dramatised from Vanessa Mitchell's",
+    "published account and interviews."
+   ]
+  },
+  "q1": [
+   "What did you buy?"
+  ],
+  "q2": [
+   "When did it start?"
+  ],
+  "q3": [
+   "Did it ever touch you?"
+  ],
+  "q4": [
+   "Why did you stay?"
+  ],
+  "t4": {
+   "big": [
+    "She left in 2008,",
+    "after three years."
+   ]
+  },
+  "t5": {
+   "big": [
+    "She co-wrote a book",
+    "about it under her own name."
+   ]
+  },
+  "t6": {
+   "big": [
+    "She has never",
+    "changed her account."
+   ]
+  }
+ },
+ "stills": {
+  "v_s1": "../ep45-sauchie/s6-house-night.jpg",
+  "v_s3": "../ep41-cooneen/s1-bedroom.jpg"
+ },
+ "sting": {
+  "file": "door-t.mp3",
+  "at": "v_s3 'Slapped'",
+  "vol": 0.3
+ },
+ "yt_title": "The Cage: Something Slapped Me"
+}
