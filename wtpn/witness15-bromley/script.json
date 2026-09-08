@@ -1,0 +1,76 @@
+{
+ "case": "Bromley poltergeist 1973-75 — Tony Elms",
+ "voice": {
+  "name": "WTPN Grizzled - Raspy British",
+  "id": "dEKbODj1fSHsx7xQNNLa",
+  "note": "grizzled older British male — a retired man in a garden-supplies hut"
+ },
+ "hook_card": [
+  "It tore my shirt",
+  "off my back",
+  "and put a saw",
+  "down it."
+ ],
+ "segments": {
+  "m_open": "It tore the shirt off my back, and pushed a saw down it. [pause] Two men from the Society for Psychical Research were standing in that shed watching it happen.",
+  "m_s1": "We were three old men selling compost. [soft laugh] That is all it was. Me, Alf Taylor and Cliff Jewiss — the Kentish Garden Guild, two sheds on the allotments at Grove Park. Seed potatoes. Fertiliser. Somewhere to go of a morning when you have finished working for a living.",
+  "m_s2": "It started on a spring morning. Powder went up and hit the ceiling. Then a little jug flew across the room. Cliff put that jug in a box, and shut the box — and the jug was on the floor again. [pause] After that it did not stop. Things went round the hut like skittles. A seven-pound weight went round and round Alf's head. Bags I could not lift shifted on their own.",
+  "m_s3": "I tried to have it out with it. I went in and did what I had been told to do, and the men outside heard the walls going and the iron doors swinging, and I came out cut and bruised. [pause] Next morning the shed looked like a bomb had hit it. And the sign of the cross was scratched and painted everywhere — the walls, the chairs, the bins. Not by any of us.",
+  "m_s4": "So the Society sent two of their people down — a lady and a gentleman, notebooks, the lot. And it did it in front of them. [pause] Things hanging in the air. Bolts gone off the doors. Blows on the walls hard enough to shake it. My shirt off my back and a saw shoved down it, and a bulb forced into my mouth. They wrote every bit of it down and they said what everyone said: no man could have done it.",
+  "m_s5": "Nearly two years, that went on, in a shed on an allotment. [exhales] I was a pensioner. I had nothing to gain, and I got hurt, and I got laughed at, and I stayed. [pause] One of them put it in a book after, and he called it my persecution — which is the right word, because it picked me. I never said I knew what it was. I know what it did to me. Make of it what you like."
+ },
+ "cards": {
+  "t1": {
+   "big": [
+    "Grove Park allotments,",
+    "Bromley. 1973."
+   ],
+   "small": [
+    "The witness is a retired man",
+    "running a garden-supplies hut.",
+    "Dramatised from the SPR case record."
+   ]
+  },
+  "q1": [
+   "What was the place?"
+  ],
+  "q2": [
+   "How did it start?"
+  ],
+  "q3": [
+   "Did you fight it?"
+  ],
+  "q4": [
+   "Did anyone see it but you?"
+  ],
+  "t4": {
+   "big": [
+    "It began on 26 April 1973.",
+    "",
+    "Two SPR investigators witnessed",
+    "the attacks and found no deception."
+   ]
+  },
+  "t5": {
+   "big": [
+    "It lasted nearly two years."
+   ]
+  },
+  "t6": {
+   "big": [
+    "The case was published",
+    "under his name."
+   ]
+  }
+ },
+ "stills": {
+  "m_s1": "../ep41-cooneen/s2-farmhouse.jpg",
+  "m_s3": "../ep46-renvyle/s1-door.jpg"
+ },
+ "sting": {
+  "file": "door-t.mp3",
+  "at": "m_s2 'flew across the room'",
+  "vol": 0.3
+ },
+ "yt_title": "Bromley: It Put a Saw Down My Shirt"
+}
