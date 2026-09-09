@@ -1,0 +1,76 @@
+{
+ "case": "Ardachie Lodge 1953 — Peter McEwan",
+ "voice": {
+  "name": "WTPN D-hector",
+  "id": "dgkKQcJqyy5AP0dqleUU",
+  "note": "middle-aged Scottish male — a farmer and academic, measured"
+ },
+ "hook_card": [
+  "A woman crawled",
+  "along my corridor",
+  "carrying a candle."
+ ],
+ "segments": {
+  "a_open": "A woman crawled along the upstairs corridor of my house, on her hands and knees, carrying a candle. [pause] My housekeeper watched her do it. And I am the man who wrote it down for a scientific journal.",
+  "a_s1": "I had bought a hill farm. That is all I wanted — Ardachie, above Loch Ness, land to work. [soft laugh] We took the lodge in the December. Months later we advertised for a housekeeper and a farmhand, and a married couple came to us and moved in.",
+  "a_s2": "She started hearing footsteps at night. Somebody walking about the house when nobody was walking about the house. [pause] And I did what any employer does. I told her it was an old building. Timbers. The cold. Things settle. I believed that when I said it.",
+  "a_s3": "Then one night she woke, and there was an old woman in the corridor — crawling. Slowly. On her hands and knees, with a candle in her hand. [pause] By the time anyone else was up, there was nothing there. Which is the part that gets you dismissed. That is always the part.",
+  "a_s4": "Except the knocking did not care who was in the room. [pause] Everybody in that house heard it. Me. My wife. Both of them. Knocking, and footsteps, night after night, with all of us awake and listening and finding nothing. You can call one frightened woman excitable. You cannot call a whole household excitable and leave it there.",
+  "a_s5": "They did not stay. I do not blame them. [exhales] I wrote the case up and sent it to the Society for Psychical Research, and they printed it — and I did not tidy it. I put the doubts in it. That she was an excitable woman. That parts of it invite suspicion. And that nobody could find a single reason for her to lie. [pause] The lodge was pulled down years ago. The knocking is still in the record, under my name. Make of it what you will."
+ },
+ "cards": {
+  "t1": {
+   "big": [
+    "Ardachie Lodge,",
+    "Loch Ness. 1953."
+   ],
+   "small": [
+    "The witness owned the house.",
+    "Dramatised from Peter McEwan's own",
+    "case report in the SPR Journal, 1955."
+   ]
+  },
+  "q1": [
+   "What were you doing there?"
+  ],
+  "q2": [
+   "What did she report?"
+  ],
+  "q3": [
+   "Did you believe her?"
+  ],
+  "q4": [
+   "What happened after?"
+  ],
+  "t4": {
+   "big": [
+    "The knocking and footsteps",
+    "were heard by everyone",
+    "in the house."
+   ]
+  },
+  "t5": {
+   "big": [
+    "The investigators called her",
+    "excitable — and found",
+    "no motive to lie."
+   ]
+  },
+  "t6": {
+   "big": [
+    "He published it anyway,",
+    "under his own name."
+   ]
+  }
+ },
+ "stills": {
+  "a_s1": "../ep45-sauchie/s6-house-night.jpg",
+  "a_s3": "../ep46-renvyle/s3-corridor.jpg"
+ },
+ "sting": {
+  "file": "door-t.mp3",
+  "at": "a_s3 'crawling'",
+  "vol": 0.3
+ },
+ "yt_title": "Ardachie: The Woman Who Crawled"
+}
