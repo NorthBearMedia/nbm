@@ -1,0 +1,77 @@
+{
+ "case": "Cooneen ghost 1913 — Fr Eugene Coyle",
+ "voice": {
+  "name": "WTPN Northern Ireland - John",
+  "id": "7uDxvtPDB7zMehaRUyXh",
+  "note": "warm-toned Northern Irish male — a country parish priest"
+ },
+ "hook_card": [
+  "The bedclothes",
+  "rose and fell,",
+  "as if someone",
+  "underneath",
+  "was breathing."
+ ],
+ "segments": {
+  "n_open": "The clothes on that bed rose and fell, slow and regular — the way blankets move over a sleeping man. [pause] There was nobody in the bed. I am a priest. I stood and I watched it breathe.",
+  "n_s1": "A widow, up the mountain at Cooneen, with a house full of children and her husband lately dead. [pause] That is who sent for me. Not a fanciful woman. A woman with the milking to do. She told me there was knocking at her door with nobody at it, and feet crossing the loft over their heads at night, and I said what a priest says. That grief plays tricks. That a house makes noise.",
+  "n_s2": "Then she told me the rest. [pause] The pots came off the walls. The sheets were pulled off the beds while the children were in them. And the drawers — the drawers would shut on their fingers. [exhales] That is what turned it for me. Noises are one thing. A thing that hurts children in the dark is another thing entirely.",
+  "n_s3": "So I went up, and I stayed, and I saw what I have told you. The bed breathing with nobody in it. [pause] I had been ordained a good many years by then. I had sat with the dying and I had buried the drowned. I knew what I was looking at, and I knew that I had no name for it.",
+  "n_s4": "And I was not the only one. Neighbours came. Men who would not be made fools of came and went away quiet. A man who later sat as a Member of Parliament put his name to what happened in that house. [pause] The newspapers had it — the Herald, the Impartial Reporter. It was not a whisper in a townland. It was a public thing, in print, with names on it.",
+  "n_s5": "They could not live in it. They went to America, and I do not blame one of them for going. [exhales] I stayed a priest in that country another lifetime, and I never took a word of it back, and I never dressed it up either. I do not tell you it was a soul in torment. I do not tell you it was the devil. [pause] I tell you I watched an empty bed breathe, in a house where children were being hurt. Make of it what you will."
+ },
+ "cards": {
+  "t1": {
+   "big": [
+    "Cooneen, County Fermanagh.",
+    "1913."
+   ],
+   "small": [
+    "The witness is the parish priest.",
+    "Dramatised from contemporary press reports",
+    "and the documented accounts of the case."
+   ]
+  },
+  "q1": [
+   "Who sent for you?"
+  ],
+  "q2": [
+   "What was happening to them?"
+  ],
+  "q3": [
+   "What did you see yourself?"
+  ],
+  "q4": [
+   "Did anyone believe it?"
+  ],
+  "t4": {
+   "big": [
+    "The case was reported at the time",
+    "in the Fermanagh Herald and",
+    "the Impartial Reporter."
+   ]
+  },
+  "t5": {
+   "big": [
+    "The family emigrated",
+    "to America in 1913."
+   ]
+  },
+  "t6": {
+   "big": [
+    "The house still stands,",
+    "empty, on the mountain."
+   ]
+  }
+ },
+ "stills": {
+  "n_s1": "../ep41-cooneen/s2-farmhouse.jpg",
+  "n_s3": "../ep41-cooneen/s1-bedroom.jpg"
+ },
+ "sting": {
+  "file": "door-t.mp3",
+  "at": "n_s2 'shut on their fingers'",
+  "vol": 0.3
+ },
+ "yt_title": "Cooneen: I Watched an Empty Bed Breathe"
+}
