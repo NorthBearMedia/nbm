@@ -1,0 +1,77 @@
+{
+ "case": "Sauchie poltergeist 1960 — Margaret Stewart, teacher",
+ "voice": {
+  "name": "WTPN Isla - Scottish",
+  "id": "TVmbglAk3F1GkiCoOq47",
+  "note": "middle-aged Scottish female — a 1960 primary schoolteacher"
+ },
+ "hook_card": [
+  "A desk lifted",
+  "off my classroom",
+  "floor.",
+  "Nobody was",
+  "near it."
+ ],
+ "segments": {
+  "g_open": "An empty desk rose off the floor of my classroom. About an inch. [pause] Nobody was near it. I had twenty-odd children in front of me, and every one of them saw it.",
+  "g_s1": "She was eleven. New in, from Ireland, living at her brother's. [pause] Shy wee thing — well-behaved, bright enough, the sort that sits quiet and does the work. That is all she was to me for weeks. A quiet lassie in the third row.",
+  "g_s2": "Then the lid of her desk went up. [pause] Steeply — not the way a child lifts a lid, up and back on its hinge, and she was not moving it. I could see her hands. I have been watching children's hands across a classroom my whole working life; that is the job. Her hands were nowhere near it.",
+  "g_s3": "And then the desk behind her — an empty one, nobody in it — came up off the floor. [pause] The class went up like a firework. Screaming. And I am standing there with the chalk in my hand, thinking: what do I do now? There is nothing in the training for this. There is no page for it.",
+  "g_s4": "It was not only me, and it was not only the school. At the house they watched a great linen chest rock, and lift, and travel eighteen inches across the floor and back again. Her own doctor saw the pillow turn under her head while she lay on it — turned in a way she could not have done herself. [pause] Doctors. A minister. A teacher. They brought a camera and a tape recorder into a wee girl's bedroom in Clackmannanshire, and the tape still exists.",
+  "g_s5": "What I keep is not the desk. [pause] It is her face when the class started screaming — because she knew, in that second, that they were screaming at her. Eleven years old. And whatever that was, it was not her doing, and every man that examined her said so. [pause] I taught for a long time after that. I never saw anything like it again, and I have never once said it did not happen. Make of that what you will."
+ },
+ "cards": {
+  "t1": {
+   "big": [
+    "Sauchie, Clackmannanshire.",
+    "November, 1960."
+   ],
+   "small": [
+    "The witness is the girl's schoolteacher.",
+    "Dramatised from the documented",
+    "accounts of the Sauchie case."
+   ]
+  },
+  "q1": [
+   "Who was she?"
+  ],
+  "q2": [
+   "What did you see first?"
+  ],
+  "q3": [
+   "What did the class do?"
+  ],
+  "q4": [
+   "Did anyone else see it?"
+  ],
+  "t4": {
+   "big": [
+    "Her doctor said the girl",
+    "was not responsible",
+    "for what happened."
+   ]
+  },
+  "t5": {
+   "big": [
+    "Three GPs, a minister and",
+    "her teacher witnessed it."
+   ]
+  },
+  "t6": {
+   "big": [
+    "None of them",
+    "ever took it back."
+   ]
+  }
+ },
+ "stills": {
+  "g_s1": "../ep45-sauchie/s3-parlour.jpg",
+  "g_s4": "../ep45-sauchie/s6-house-night.jpg"
+ },
+ "sting": {
+  "file": "door-t.mp3",
+  "at": "g_s3 'came up off the floor'",
+  "vol": 0.3
+ },
+ "yt_title": "Sauchie: A Desk Lifted Off My Classroom Floor"
+}
