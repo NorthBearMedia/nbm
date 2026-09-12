@@ -200,10 +200,18 @@ and their ask: first-person, interview, feels real.
   The ingestion TRIGGER is passing "saveExternalMediaFiles": true in the CREATE body
   (the stored field always reads false afterwards — it's a trigger, not a setting;
   confirmed 27 Aug when omitting it left the raw temp URL on the post).
-- Episodes so far: Cardiff/Matthews (pub 27 Aug), Enfield/Heeps (pub 28 Aug),
-  Willington/Drury (armed 29 Aug, post 367920388, hook v2), Renvyle/Gogarty
-  (armed 30 Aug, post 367920465, hook v2). Never re-tell the same case as witness twice.
-- Witness bench remaining: Battersea (Shirley Hitchings — never covered, no gap needed),
-  Ballechin 1897 vigil diary; gap-constrained ~3wk from their cinematic run: Epworth
-  (~1 Sep), South Shields (~2 Sep), Pontefract (~5 Sep), Borley/Marianne (~11 Sep),
-  Sauchie/Miss Stewart (~14 Sep). Glasgow/Gorbals BBC retrospectives as backup.
+- Witnesses used (NEVER re-tell the same case as a witness twice): Cardiff/Matthews,
+  Enfield/Heeps, Willington/Drury, Renvyle/Gogarty, Battersea/Hitchings, Epworth/Wesley,
+  South Shields/Ritson, Hinton Ampner/Ricketts, Tedworth/Mompesson, Pontefract/Pritchard,
+  Raynham/Shira, Cheltenham/Despard, Hampton Court/Faukes, The Cage/Mitchell,
+  Bromley/Elms, Ardachie/McEwan, Cooneen/Fr Coyle, Sauchie/Margaret Stewart,
+  Hexham Heads/Dr Anne Ross (armed 15 Sep, post 374826444).
+- Witness bench remaining: thin — needs restocking. Borley/Marianne Foyster is gap-clear
+  from ~11 Sep but she is a documented fabricator, so only use her if a defensible framing
+  can be found. Ballechin 1897 is REJECTED (Ada Goodrich Freer is a documented fabricator).
+  Glasgow/Gorbals BBC retrospectives remain a backup. Rejected on truth/ethics grounds and
+  still rejected: Runcorn 1952 (conflicting sources + a named lodger's fatal fall).
+  Banned throughout: Glamis, Culloden, Treasurer's House York, Greyfriars/Edinburgh vaults,
+  road-ghost stories, real mass-casualty tragedies.
+- Per-episode pipeline scripts are now SAVED with each episode (process.py, mix.py, build.py)
+  — copy them forward rather than rebuilding the audio chain from memory each night.

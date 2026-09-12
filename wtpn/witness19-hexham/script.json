@@ -1,0 +1,84 @@
+{
+ "case": "The Hexham Heads 1971 — Dr Anne Ross",
+ "voice": {
+  "name": "WTPN Eleanor - elderly English",
+  "id": "2qQJWjw5XdG80GreshqG",
+  "note": "refined, seasoned older English female — a senior academic being careful on television"
+ },
+ "hook_card": [
+  "Half wolf,",
+  "half man.",
+  "It walked out",
+  "of my bedroom."
+ ],
+ "segments": {
+  "a_open": "The upper half was a wolf. The lower half was a man. [pause] It walked out of my bedroom — and I followed it down my own stairs.",
+  "a_s1": "Two boys dug them out of a back garden in Hexham. Small carved heads of stone, small enough to hold in one hand. [pause] I had spent my life on the Celtic cult of the head — I wrote that the head was the very seat of the soul. So they came to me. [soft laugh] They sat in my study. I took notes.",
+  "a_s2": "I woke at two in the morning and the room was cold — cold in a way I could not account for. [pause] And something was going out through the door. It was about six feet high, slightly stooping, and it was black against the white door. Half animal and half man. The upper part, I would have said, was a wolf. The lower part was human — covered with a kind of black, very dark fur. It went out on two feet. [exhales] And then it had gone.",
+  "a_s3": "I got out of bed and went after it. [soft laugh] I have thought about that since. I am not a brave woman and I had no business following it. But I did. It went down ahead of me and over the banister in one movement, towards the back of the house. [pause] And I stood there on my own staircase, in my nightdress.",
+  "a_s4": "My daughter came in from school and saw it on the stairs. A big dark shape, over the banister, into the corridor, gone. She did not know what I had seen. I had not told her. [pause] After that it was the whole household. My husband. The cat, which would not pass the foot of the stairs. My study door opening on its own while I sat behind it.",
+  "a_s5": "The heads left the house and it stopped. My husband said it was as if a cloud had lifted. We all said it. [pause] Now — a man in Hexham says he made them himself, for his daughter. A professor at Newcastle says they were moulded, not carved. I have no quarrel with that. It may well be true. [exhales] But I have a doctorate from Edinburgh, and I went on the BBC and described a wolf-headed thing leaving my bedroom. It did my reputation no good at all. I never took a word of it back."
+ },
+ "cards": {
+  "t1": {
+   "big": [
+    "Hexham, Northumberland.",
+    "1971."
+   ],
+   "small": [
+    "The witness is the Celtic scholar",
+    "who took the stone heads home.",
+    "Dramatised from Dr Anne Ross's",
+    "BBC interview, 20 February 1976."
+   ]
+  },
+  "q1": [
+   "How did the heads reach you?"
+  ],
+  "q2": [
+   "What happened first?"
+  ],
+  "q3": [
+   "What did you do?"
+  ],
+  "q4": [
+   "Did anyone else see it?"
+  ],
+  "t4": {
+   "big": [
+    "Desmond Craigie said he made",
+    "them in 1956 for his daughter.",
+    "",
+    "Prof. Dearman at Newcastle",
+    "found them moulded,",
+    "not carved."
+   ]
+  },
+  "t5": {
+   "big": [
+    "She said it on BBC television",
+    "on 20 February 1976.",
+    "",
+    "She never withdrew it."
+   ]
+  },
+  "t6": {
+   "big": [
+    "The heads have since vanished.",
+    "",
+    "Nobody knows where they are."
+   ]
+  }
+ },
+ "stills": {
+  "a_s1": "../ep45-sauchie/s3-parlour.jpg",
+  "a_s2": "../ep41-cooneen/s1-bedroom.jpg",
+  "a_s4": "../ep46-renvyle/s3-corridor.jpg"
+ },
+ "sting": {
+  "file": "door-t.mp3",
+  "at": "a_s4 'study' (study door opening on its own)",
+  "vol": 0.3
+ },
+ "yt_title": "Hexham: The Upper Half Was a Wolf"
+}
