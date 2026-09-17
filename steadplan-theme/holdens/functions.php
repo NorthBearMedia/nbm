@@ -1403,8 +1403,15 @@ function nbm_autotrader_sync_run( $dry = false, $sandbox = false ) {
 add_action( 'nbm_autotrader_sync', 'nbm_autotrader_sync_run' );
 
 add_action( 'init', function () {
-    if ( ! wp_next_scheduled( 'nbm_autotrader_sync' ) ) {
-        wp_schedule_event( time() + 300, 'hourly', 'nbm_autotrader_sync' );
+    // AutoTrader expect real-time updates to come via the webhook and cap polling
+    // without one at three calls a day, so the full reconcile runs twice daily.
+    $next = wp_next_scheduled( 'nbm_autotrader_sync' );
+    if ( $next && 'twicedaily' !== wp_get_schedule( 'nbm_autotrader_sync' ) ) {
+        wp_clear_scheduled_hook( 'nbm_autotrader_sync' );
+        $next = false;
+    }
+    if ( ! $next ) {
+        wp_schedule_event( time() + 300, 'twicedaily', 'nbm_autotrader_sync' );
     }
 } );
 
