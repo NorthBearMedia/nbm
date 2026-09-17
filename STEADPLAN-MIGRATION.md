@@ -760,3 +760,28 @@ minute. Flagged to Norton 3 Sep; presumed his own infrastructure.
   down this session.
 - Hal has not replied to the 3 Sep update: GBP manager access, workshop
   hours confirmation, and "who to pester" all still open.
+
+## 17 Sep (later) — AutoTrader sandbox credentials received
+
+- Sandbox key `NorthBearMedia-Sandbox-17-09-2026`, advertiser 10012129 (secret
+  held by Norton, NOT in repo). Sandbox creds auto-delete after 12 weeks.
+- api-sandbox.autotrader.co.uk is egress-blocked from the Claude sandbox, so
+  the check must run on the WordPress server: `steadplan-tools/
+  nbm-at-sandbox-check/` (read-only plugin, GET `nbm/v1/at-sandbox-check`).
+  Fill the two constants on the deploy copy only.
+- Theme deploys are ON HOLD until production cutover: the deploy copy of
+  functions.php with the live webhook signing secret was lost with the
+  container, the Drive backup zip (692 MB) exceeds the Drive connector's
+  10 MB cap, and the classifier blocks recovering it from the transcript.
+  The new integration issues a new signing secret, so at cutover
+  functions.php gets key + secret + signing secret in one go and the old
+  value is never needed. Pending theme commits (v1.2.8 socials, sandbox
+  dry-run, twice-daily reconcile) ship with that deploy.
+- AutoTrader onboarding: without a webhook, polling is capped at 3 calls/day
+  -> reconcile schedule changed hourly -> twicedaily (committed).
+- Go-live: Integration Fundamentals + Stock Sync checklists (HubSpot links,
+  blocked here; Norton to paste). Then API Licence Agreement (Norton signs),
+  then production creds. Partner team: autotraderpartnerteam@autotrader.co.uk;
+  tech: integration.management@autotrader.co.uk.
+- Blockers this session: GitHub connector token expired (3 commits unpushed),
+  all Hostinger MCP servers CONNECTION_CLOSED (no deploys).
