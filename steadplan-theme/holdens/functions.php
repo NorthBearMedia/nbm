@@ -1317,18 +1317,42 @@ add_action('wp_head', function () {
 // trigger. It reuses the theme's own get_bearer_token()/handle_vehicle_data()
 // rather than reimplementing the sync, so a scheduled run behaves exactly like
 // the button.
-function nbm_autotrader_sync_run() {
+function nbm_autotrader_sync_run( $dry = false, $sandbox = false ) {
     if ( ! function_exists( 'get_bearer_token' ) || ! function_exists( 'handle_vehicle_data' ) ) {
         return new WP_Error( 'nbm_missing', 'AutoTrader sync functions unavailable' );
     }
 
-    $token = get_bearer_token(); // wp_die()s if AutoTrader auth fails, which aborts before any write
-    if ( empty( $token ) ) {
-        return new WP_Error( 'nbm_no_token', 'No AutoTrader bearer token' );
+    // Sandbox credentials are a separate account on a separate host, and sandbox
+    // stock is not Steadplan's stock, so a sandbox run is ALWAYS a dry run.
+    if ( $sandbox ) {
+        $dry = true;
+        if ( ! defined( 'NBM_AT_SANDBOX_KEY' ) || ! defined( 'NBM_AT_SANDBOX_SECRET' ) ) {
+            return new WP_Error( 'nbm_no_sandbox', 'Sandbox credentials not configured' );
+        }
+        $auth = wp_remote_post( 'https://api-sandbox.autotrader.co.uk/authenticate', array(
+            'headers' => array( 'Content-Type' => 'application/x-www-form-urlencoded' ),
+            'body'    => array( 'key' => NBM_AT_SANDBOX_KEY, 'secret' => NBM_AT_SANDBOX_SECRET ),
+            'timeout' => 30,
+        ) );
+        if ( is_wp_error( $auth ) ) {
+            return $auth;
+        }
+        $auth_body = json_decode( wp_remote_retrieve_body( $auth ) );
+        if ( 200 !== (int) wp_remote_retrieve_response_code( $auth ) || empty( $auth_body->access_token ) ) {
+            return new WP_Error( 'nbm_sandbox_auth', 'Sandbox auth failed, HTTP ' . wp_remote_retrieve_response_code( $auth ) . ': ' . wp_remote_retrieve_body( $auth ) );
+        }
+        $token = $auth_body->access_token;
+        $host  = 'https://api-sandbox.autotrader.co.uk';
+    } else {
+        $token = get_bearer_token(); // wp_die()s if AutoTrader auth fails, which aborts before any write
+        if ( empty( $token ) ) {
+            return new WP_Error( 'nbm_no_token', 'No AutoTrader bearer token' );
+        }
+        $host = 'https://api.autotrader.co.uk';
     }
 
     $response = wp_remote_get(
-        'https://api.autotrader.co.uk/stock?advertiserId=10012129&pageSize=200',
+        $host . '/stock?advertiserId=10012129&pageSize=200',
         array(
             'headers' => array( 'Authorization' => 'Bearer ' . $token ),
             'timeout' => 60,
@@ -1347,12 +1371,29 @@ function nbm_autotrader_sync_run() {
     // the feed reports as sold.
     if ( 200 !== (int) $code || ! isset( $data['results'] ) || ! is_array( $data['results'] ) ) {
         update_option( 'nbm_autotrader_last_error', 'Unexpected stock response, HTTP ' . $code );
-        return new WP_Error( 'nbm_bad_payload', 'Unexpected stock response, HTTP ' . $code );
+        return new WP_Error( 'nbm_bad_payload', 'Unexpected stock response, HTTP ' . $code . ': ' . substr( wp_remote_retrieve_body( $response ), 0, 300 ) );
+    }
+
+    $count = count( $data['results'] );
+
+    if ( $dry ) {
+        // Report what the feed holds without creating, updating or deleting anything.
+        $sample = array();
+        foreach ( array_slice( $data['results'], 0, 5 ) as $r ) {
+            $v        = isset( $r['vehicle'] ) ? $r['vehicle'] : array();
+            $sample[] = trim( ( isset( $v['make'] ) ? $v['make'] : '' ) . ' ' . ( isset( $v['model'] ) ? $v['model'] : '' ) . ' ' . ( isset( $v['derivative'] ) ? $v['derivative'] : '' ) );
+        }
+        return array(
+            'dry'          => true,
+            'sandbox'      => (bool) $sandbox,
+            'count'        => $count,
+            'totalResults' => isset( $data['totalResults'] ) ? $data['totalResults'] : null,
+            'sample'       => $sample,
+        );
     }
 
     handle_vehicle_data( $data );
 
-    $count = count( $data['results'] );
     update_option( 'nbm_autotrader_last_sync', current_time( 'mysql' ) );
     update_option( 'nbm_autotrader_last_count', $count );
     delete_option( 'nbm_autotrader_last_error' );
@@ -1373,10 +1414,15 @@ add_action( 'rest_api_init', function () {
     register_rest_route( 'nbm/v1', '/sync-vehicles', array(
         'methods'             => 'POST',
         'permission_callback' => function () { return current_user_can( 'manage_options' ); },
-        'callback'            => function () {
-            $result = nbm_autotrader_sync_run();
+        'callback'            => function ( $request ) {
+            $dry     = '1' === (string) $request->get_param( 'dry' );
+            $sandbox = '1' === (string) $request->get_param( 'sandbox' );
+            $result  = nbm_autotrader_sync_run( $dry, $sandbox );
             if ( is_wp_error( $result ) ) {
                 return new WP_REST_Response( array( 'ok' => false, 'error' => $result->get_error_message() ), 500 );
+            }
+            if ( is_array( $result ) ) {
+                return array_merge( array( 'ok' => true ), $result );
             }
             return array(
                 'ok'        => true,
