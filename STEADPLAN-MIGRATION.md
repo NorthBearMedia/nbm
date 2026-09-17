@@ -785,3 +785,13 @@ minute. Flagged to Norton 3 Sep; presumed his own infrastructure.
   tech: integration.management@autotrader.co.uk.
 - Blockers this session: GitHub connector token expired (3 commits unpushed),
   all Hostinger MCP servers CONNECTION_CLOSED (no deploys).
+- 17 Sep, sandbox check RUN (plugin `nbm-at-sandbox-check` active on the site,
+  GET `nbm/v1/at-sandbox-check`): authenticate 200, stock 200, **totalResults 0**
+  for sandbox advertiser 10012129, so payload shape could not be validated.
+  Token response carries `expires_at` ~15 min after issue -> add transient
+  token caching (14 min) to the sync at cutover; the theme currently
+  re-authenticates on every call. Asked Integration Management for sandbox
+  test stock. Remove the check plugin after go-live.
+- Hostinger MCP fix: package ships non-executable server files; `.mcp.json`
+  now launches via `scripts/hostinger-mcp.sh` (installs to
+  ~/.nbm-hostinger-mcp, chmods, execs node).
