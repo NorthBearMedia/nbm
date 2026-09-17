@@ -39,7 +39,7 @@ function nbm_at_sb_check( WP_REST_Request $request ) {
     }
     // Report token metadata (not the token) so we know the lifetime for caching.
     $out['token_fields'] = array_values( array_diff( array_keys( $auth_body ), array( 'access_token' ) ) );
-    foreach ( array( 'expires_in', 'expires', 'expiresIn', 'token_type' ) as $k ) {
+    foreach ( array( 'expires_in', 'expires', 'expiresIn', 'expires_at', 'token_type' ) as $k ) {
         if ( isset( $auth_body[ $k ] ) ) { $out[ 'token_' . $k ] = $auth_body[ $k ]; }
     }
 
