@@ -739,3 +739,24 @@ fetch through a non-fatal wrapper when the credentials are replaced.
 Other: account has 4 Hostinger cron jobs, two of which fetch and execute
 `https://nbm-production-604e.up.railway.app/ix/.../steadplan.co.uk` every
 minute. Flagged to Norton 3 Sep; presumed his own infrastructure.
+
+## 17 Sep — status check, footer socials (v1.2.8-nbm, NOT YET DEPLOYED)
+
+- AutoTrader: new integration being set up under North Bear Media Ltd
+  (AT Partner ticket 810970, Abir; Felix ticket 796962). Holdens' API key was
+  deleted by AutoTrader for inactivity (nobody pressed the button), not
+  revoked. Webhook half still works: vehicles updated 4/6/8/14/15 Sep, site at
+  34. Pull sync still 401 until new key+secret arrive; webhook signing secret
+  will change with the new integration — swap both in functions.php together.
+- Contact form delivery CONFIRMED: Vicky Eyre received the 2 Sep test at
+  sales@ and forwarded it (so no SPF problem for M365 delivery).
+- Staging site steadplan.andholdens.agency no longer resolves (Holdens removed it).
+- Sam (4 Sep): wants a "van colours" gallery (colours = USP); Instagram is
+  instagram.com/steadplanltd, TikTok tiktok.com/@steadplanltd.
+- footer.php: Instagram href fixed to steadplanltd, TikTok icon added.
+  Scratchpad theme copy was lost with the container; to deploy, re-stage the
+  repo theme and restore the real AutoTrader secret line in functions.php
+  (from the live theme / Drive backup) before uploading. Hostinger MCP was
+  down this session.
+- Hal has not replied to the 3 Sep update: GBP manager access, workshop
+  hours confirmation, and "who to pester" all still open.
