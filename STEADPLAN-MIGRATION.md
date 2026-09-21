@@ -819,3 +819,41 @@ minute. Flagged to Norton 3 Sep; presumed his own infrastructure.
   "who to pester" still unanswered. No AutoTrader reply on sandbox test stock.
 - Hostinger MCP now shows as a connector needing authorisation in this
   session; no deploys possible until Norton authorises it.
+
+## 21 Sep (later) — Sam's images live: sponsors, fleet, conversions
+
+Source: Drive > Steadplan > `wetransfer_steadplan-website-updates_2026-09-21_1150`
+(unzipped by Norton; subfolders Steadplan Sponors / Trucks : Fleet / Rogue
+Wheels / Extras). Drive connector caps downloads at 10MB and drops the session
+on anything over ~7MB, so only the smaller originals came through. Everything
+resized to web (max 1600px, q82, EXIF stripped), renamed for SEO, alt text set.
+
+Media uploaded (IDs): Scars Racing logo 2711, Accrington Stanley Women FC
+2712, Conrod Coffee Co 2713 (png), Pendle Triathlon Club 2714, John McGuinness
+2715, Ian Hutchinson 2716, Lee Johnston 2717 (2716/2717 unused; existing 1517
+and 1800 are higher-res), fleet MAN TGX Polyflor 2718–2721, mods 2722 (wheel
+close-up, duplicates existing 2685 so unused), orange van 2723, white van 2724,
+van line-up 2725.
+
+- About (704) `sponsors` repeater now, in Sam's order: Scars Racing, John
+  McGuinness, Conrod Coffee Co, Ian Hutchinson, Lee Johnston, Dunny Bees,
+  Accrington Stanley Women FC, Pendle Triathlon Club. Names taken from the
+  logos (Sam wrote "Scar Racing", "Connor Rod Coffee", "Accrington Stanley FC
+  Girls"). Terratorque NOT added: no logo in the folder and about.php prints
+  `<img src="">` when the image is empty. New rows have short neutral blurbs
+  and no social links; Sam to supply handles/wording if she wants them.
+- Fleet Sales (708): "Helping your business grow" image 1713 (cab interior)
+  swapped for 2718. New "Recent fleet deliveries." text block + car_gallery
+  (2718–2721) inserted after that section; the "largest stock of TGE vans"
+  strip now sits between the gallery and the contact form (same pattern as
+  Conversions). 13 blocks. Sam can add fleet deals to this gallery.
+- Conversions (1353): 2723, 2724, 2725 prepended to the archive gallery
+  (51 images). Lead sections unchanged.
+- Not ingested (over the connector limit, still in Drive): Trucks DSC02479,
+  DSC02499, DSC02514, DSC02590 (9.5–13MB, plus "-2" duplicates); Rogue Wheels
+  DSC01782, DSC01979, DSC02153, DSC03684/85/87, DSC03959, DSC04810/15/19,
+  DSC06061-2, DSC06801, DSC08754-2, DSC09133, DSC09199; Extras DSC03129,
+  DSC03282, IMG_1303/04/05, IMG_1408.HEIC, IMG_1548-2. If wanted, ask Sam for
+  web-sized exports (under 5MB) or Norton to resize before dropping in Drive.
+- Backups of the ACF before each write: scratchpad sep21/sponsors-before-2.json,
+  fleet-before.json, conv-before-2.json.
