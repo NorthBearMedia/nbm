@@ -615,8 +615,21 @@ add_action('init', 'register_colour_taxonomy');
 
 
 function get_bearer_token() {
-    $apiKey = $_SERVER['API_KEY'];
-    $apiSecret = $_SERVER['API_SECRET'];
+    // NBM: tokens last about 15 minutes, so reuse one across webhook bursts and the
+    // scheduled run instead of authenticating on every request.
+    $cached = get_transient( 'nbm_at_token' );
+    if ( is_string( $cached ) && '' !== $cached ) {
+        return $cached;
+    }
+
+    // NBM: production credentials come from wp_options (POST nbm/v1/at-config) and fall
+    // back to the server environment the theme originally used.
+    $apiKey = nbm_at_cfg( 'key' );
+    $apiSecret = nbm_at_cfg( 'secret' );
+    if ( '' === $apiKey || '' === $apiSecret ) {
+        $apiKey = isset( $_SERVER['API_KEY'] ) ? $_SERVER['API_KEY'] : '';
+        $apiSecret = isset( $_SERVER['API_SECRET'] ) ? $_SERVER['API_SECRET'] : '';
+    }
 
     $args = array(
         'headers' => array(
@@ -646,6 +659,7 @@ function get_bearer_token() {
     }
 
     if (isset($result->access_token)) {
+        set_transient( 'nbm_at_token', $result->access_token, 14 * MINUTE_IN_SECONDS );
         return $result->access_token;
     } else {
         wp_die("No bearer token in response: " . print_r($result, true));
@@ -1029,8 +1043,11 @@ function fetch_vehicles_page() {
 // Function to verify the AutoTrader-Signature header
 function verify_autotrader_signature( WP_REST_Request $request ) {
     // Your secret key for 'AutoTrader-Signature' header, provided by Auto Trader
-    // $your_secret_key = 'REDACTED-see-STEADPLAN-MIGRATION.md';
-    $your_secret_key = 'REDACTED-see-STEADPLAN-MIGRATION.md';
+    // NBM: the signing secret lives in wp_options (POST nbm/v1/at-config), never in this file.
+    $your_secret_key = nbm_at_cfg( 'webhook_secret' );
+    if ( '' === $your_secret_key ) {
+        return false;
+    }
 
     // Get the 'AutoTrader-Signature' header
     $autotraderSignatureHeader = $request->get_header('AutoTrader-Signature');
@@ -1317,6 +1334,15 @@ add_action('wp_head', function () {
 // trigger. It reuses the theme's own get_bearer_token()/handle_vehicle_data()
 // rather than reimplementing the sync, so a scheduled run behaves exactly like
 // the button.
+// NBM: AutoTrader credentials live in wp_options, never in theme files, so the theme can
+// be deployed without carrying secrets. Production: option nbm_autotrader_config (key,
+// secret, webhook_secret) set via POST nbm/v1/at-config. Sandbox: option nbm_at_sb_config,
+// shared with the sandbox-check plugin.
+function nbm_at_cfg( $name, $sandbox = false ) {
+    $cfg = get_option( $sandbox ? 'nbm_at_sb_config' : 'nbm_autotrader_config', array() );
+    return ( is_array( $cfg ) && isset( $cfg[ $name ] ) ) ? trim( (string) $cfg[ $name ] ) : '';
+}
+
 function nbm_autotrader_sync_run( $dry = false, $sandbox = false ) {
     if ( ! function_exists( 'get_bearer_token' ) || ! function_exists( 'handle_vehicle_data' ) ) {
         return new WP_Error( 'nbm_missing', 'AutoTrader sync functions unavailable' );
@@ -1326,12 +1352,14 @@ function nbm_autotrader_sync_run( $dry = false, $sandbox = false ) {
     // stock is not Steadplan's stock, so a sandbox run is ALWAYS a dry run.
     if ( $sandbox ) {
         $dry = true;
-        if ( ! defined( 'NBM_AT_SANDBOX_KEY' ) || ! defined( 'NBM_AT_SANDBOX_SECRET' ) ) {
-            return new WP_Error( 'nbm_no_sandbox', 'Sandbox credentials not configured' );
+        $sb_key    = nbm_at_cfg( 'key', true );
+        $sb_secret = nbm_at_cfg( 'secret', true );
+        if ( '' === $sb_key || '' === $sb_secret ) {
+            return new WP_Error( 'nbm_no_sandbox', 'Sandbox credentials not configured (POST nbm/v1/at-sb-config)' );
         }
         $auth = wp_remote_post( 'https://api-sandbox.autotrader.co.uk/authenticate', array(
             'headers' => array( 'Content-Type' => 'application/x-www-form-urlencoded' ),
-            'body'    => array( 'key' => NBM_AT_SANDBOX_KEY, 'secret' => NBM_AT_SANDBOX_SECRET ),
+            'body'    => array( 'key' => $sb_key, 'secret' => $sb_secret ),
             'timeout' => 30,
         ) );
         if ( is_wp_error( $auth ) ) {
@@ -1451,5 +1479,35 @@ add_action( 'rest_api_init', function () {
                 'vehicles'   => (int) wp_count_posts( 'vehicle' )->publish,
             );
         },
+    ) );
+    // Production credentials. GET reports only whether each value is set, never the value.
+    register_rest_route( 'nbm/v1', '/at-config', array(
+        array(
+            'methods'             => 'GET',
+            'permission_callback' => function () { return current_user_can( 'manage_options' ); },
+            'callback'            => function () {
+                return array(
+                    'key'            => '' !== nbm_at_cfg( 'key' ),
+                    'secret'         => '' !== nbm_at_cfg( 'secret' ),
+                    'webhook_secret' => '' !== nbm_at_cfg( 'webhook_secret' ),
+                    'env_key'        => ! empty( $_SERVER['API_KEY'] ),
+                );
+            },
+        ),
+        array(
+            'methods'             => 'POST',
+            'permission_callback' => function () { return current_user_can( 'manage_options' ); },
+            'callback'            => function ( $request ) {
+                $cfg = get_option( 'nbm_autotrader_config', array() );
+                if ( ! is_array( $cfg ) ) { $cfg = array(); }
+                foreach ( array( 'key', 'secret', 'webhook_secret' ) as $k ) {
+                    $v = $request->get_param( $k );
+                    if ( null !== $v ) { $cfg[ $k ] = trim( (string) $v ); }
+                }
+                update_option( 'nbm_autotrader_config', $cfg, false );
+                delete_transient( 'nbm_at_token' );
+                return array( 'ok' => true, 'set' => array_keys( array_filter( $cfg ) ) );
+            },
+        ),
     ) );
 } );

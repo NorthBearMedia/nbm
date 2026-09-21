@@ -904,3 +904,29 @@ theme deploys stay on hold until cutover. Cutover plan: move the theme's
 AutoTrader key/secret/webhook secret into wp_options (same pattern as the
 plugin) so the theme deploy carries no credentials, then set the production
 values via REST once AutoTrader issues them.
+
+### Cutover runbook (theme v1.2.8-nbm, prepared 21 Sep, NOT yet deployed)
+
+Where the credentials live today: `.htaccess` sets `API_KEY`/`API_SECRET`
+(the dead Holdens pair) as server env, which `get_bearer_token()` reads; the
+webhook signing secret is a literal in the live functions.php (unrecoverable
+from here). functions.php in the repo now reads all three from wp_options
+`nbm_autotrader_config` via `nbm_at_cfg()`, falling back to the env pair, and
+caches the bearer token in transient `nbm_at_token` for 14 min. Sandbox creds
+come from `nbm_at_sb_config` (set by the plugin route). No secrets in files,
+so the theme can go through the Hostinger deploy tool.
+
+When AutoTrader issue production key + secret + webhook signing secret:
+1. `hosting_deployWordpressTheme` from `steadplan-theme/holdens` (slug holdens),
+   poll `/wp-content/themes/holdens/style.css` for `Version: 1.2.8-nbm`.
+2. Write the three values to a scratchpad JSON and
+   `POST nbm/v1/at-config` (GET returns booleans + env_key). Webhooks 401 in the
+   minute between steps 1 and 2; the reconcile covers it.
+3. `POST nbm/v1/sync-vehicles?dry=1` and check count/sample against the ~40 live
+   listings. Then `POST nbm/v1/sync-vehicles` (full run: creates/updates from
+   the feed and deletes site vehicles not in it). Check /showroom/.
+4. Confirm `GET nbm/v1/sync-status` shows last_sync, and that a real webhook
+   event lands (put_file.log in web root is the theme's own log).
+5. Deactivate/remove the nbm-at-sandbox-check plugin (its rest_pre_dispatch
+   only matches the sandbox secret, so it is harmless if left).
+6. Optionally strip the Holdens `SetEnv` lines from .htaccess.
