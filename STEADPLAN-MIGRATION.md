@@ -857,3 +857,15 @@ van line-up 2725.
   web-sized exports (under 5MB) or Norton to resize before dropping in Drive.
 - Backups of the ACF before each write: scratchpad sep21/sponsors-before-2.json,
   fleet-before.json, conv-before-2.json.
+
+## 21 Sep (later) — Finance commission disclosure LIVE
+
+Mark's PDF was recovered from Gmail via `get_message` RAW (raw MIME includes
+attachments as base64; parse with Python `email`, text via PyMuPDF). Wording
+posted verbatim to `nbm/v1/finance-disclosure` (three paragraphs: FCA/credit
+broker statement, "other offers" paragraph, then the registered office /
+VAT / Company / FCA / ICO numbers line, since the footer had no company
+details). Renders below the footer on every page via the
+nbm-finance-disclosure plugin. Copy kept at scratchpad sep21/disclosure.json
+and commission-disclosure.txt. Still to do at the next theme release: move
+the wording into footer.php and retire the plugin.
