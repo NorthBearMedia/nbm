@@ -869,3 +869,38 @@ details). Renders below the footer on every page via the
 nbm-finance-disclosure plugin. Copy kept at scratchpad sep21/disclosure.json
 and commission-disclosure.txt. Still to do at the next theme release: move
 the wording into footer.php and retire the plugin.
+
+## 21 Sep (evening) — AutoTrader sandbox: stock present, webhook proven
+
+Integration Management (Blake) replied 15:53/15:55: sandbox now holds a
+nightly mirror of Steadplan's live stock, and the sandbox webhook is set up
+against https://steadplan.co.uk/wp-json/autotrader/v1/fetch_vehicles/ with a
+sandbox signing key (sk_test_..., in Gmail thread 1a0ae77945abca7f; never in
+the repo).
+
+Sandbox-check plugin v1.1.0 deployed (Hostinger deploy of the repo folder;
+the classifier refuses any upload that contains credentials, so the plugin
+now reads key/secret/webhook_secret from wp_options `nbm_at_sb_config`, set
+via POST nbm/v1/at-sb-config, GET reports booleans only). New routes:
+GET nbm/v1/at-sandbox-check (dry run + site comparison), GET
+nbm/v1/at-sb-webhook-log, POST nbm/v1/at-sb-webhook-selftest. A
+`rest_pre_dispatch` filter accepts PUTs to the theme's webhook route ONLY when
+the signature matches the sandbox secret, logs them and returns 200 without
+running the theme handler; production-signed requests pass through untouched.
+
+Results (21 Sep 19:10 UTC): auth 200, token ~15 min (`expires_at`), 36
+vehicles; dry run would import 31 (PUBLISHED), skip 2 NOT_PUBLISHED + 3
+REJECTED; lifecycle 34 FORECOURT / 2 WASTEBIN. Every path handle_vehicle_data
+reads is present except `retailAdverts.description` and `vehicle.plate`
+(null on the first five, tolerated). Image hrefs are m-qa.atcdn.co.uk with
+`{resize}` as on production. Site has 30 vehicle posts; ZERO stock IDs
+overlap the sandbox (sandbox assigns its own IDs), so a sandbox sync must
+stay dry: it would create 31 and delete all 30. Webhook self-test through the
+real route: HTTP 200, logged. Awaiting a real sandbox event in the log.
+
+Live functions.php cannot be read through Hostinger ("holds sensitive
+credentials"), so the production webhook secret is still unrecoverable and
+theme deploys stay on hold until cutover. Cutover plan: move the theme's
+AutoTrader key/secret/webhook secret into wp_options (same pattern as the
+plugin) so the theme deploy carries no credentials, then set the production
+values via REST once AutoTrader issues them.
