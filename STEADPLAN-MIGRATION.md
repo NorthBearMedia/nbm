@@ -795,3 +795,27 @@ minute. Flagged to Norton 3 Sep; presumed his own infrastructure.
 - Hostinger MCP fix: package ships non-executable server files; `.mcp.json`
   now launches via `scripts/hostinger-mcp.sh` (installs to
   ~/.nbm-hostinger-mcp, chmods, execs node).
+
+## 21 Sep — Sam/Hal update list + Mark's finance disclosure
+
+- Conversions page (1353) refocused per Sam/Hal: hero copy now about everyday
+  mods; three new two_columns sections lead (wheels/tyres 2685, bull bar +
+  lights 2684, roof rack 2697); archive gallery reordered so mods and detail
+  shots come first, campers/overlanders last. 16 blocks now.
+- About page (704) sponsors repeater: removed Josh Bridges and Birchall
+  Motorsport (not on Sam's list). Kept Ian Hutchinson, Lee Johnston, Dunny
+  Bees. TO ADD when images arrive: Scar Racing, John McGuinness, Connor Rod
+  Coffee, Terratorque, Accrington Stanley FC Girls, Pendle Triathlon. Sponsor
+  rows need accordion_item_title / accordion_item_desciption (sic) /
+  accordion_item_image / facebook / instagram.
+- Sam's WeTransfer (fleet trucks, sponsors, conversions):
+  https://we.tl/t-3qGMDPZHqReNcFvt — we.tl is egress-blocked; Norton to drop
+  into Drive > Steadplan as before.
+- Mark Kilner: finance commission disclosure PDF to go in the footer small
+  print on every page (cf. perrys.co.uk / lookers.co.uk). Gmail connector has
+  no attachment download; Norton to paste the text. Needs a theme deploy
+  (footer.php) — bundle with v1.2.8 pending deploy.
+- Hal replied "That's great" to the 17 Sep update; GBP access, hours and
+  "who to pester" still unanswered. No AutoTrader reply on sandbox test stock.
+- Hostinger MCP now shows as a connector needing authorisation in this
+  session; no deploys possible until Norton authorises it.
