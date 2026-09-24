@@ -1431,15 +1431,16 @@ function nbm_autotrader_sync_run( $dry = false, $sandbox = false ) {
 add_action( 'nbm_autotrader_sync', 'nbm_autotrader_sync_run' );
 
 add_action( 'init', function () {
-    // AutoTrader expect real-time updates to come via the webhook and cap polling
-    // without one at three calls a day, so the full reconcile runs twice daily.
+    // Real-time updates come via the webhook. AutoTrader (Integration Management,
+    // 24 Sep 2026) advised a baseline Stock API pull no more than once a day, so the
+    // full reconcile runs daily.
     $next = wp_next_scheduled( 'nbm_autotrader_sync' );
-    if ( $next && 'twicedaily' !== wp_get_schedule( 'nbm_autotrader_sync' ) ) {
+    if ( $next && 'daily' !== wp_get_schedule( 'nbm_autotrader_sync' ) ) {
         wp_clear_scheduled_hook( 'nbm_autotrader_sync' );
         $next = false;
     }
     if ( ! $next ) {
-        wp_schedule_event( time() + 300, 'twicedaily', 'nbm_autotrader_sync' );
+        wp_schedule_event( time() + 300, 'daily', 'nbm_autotrader_sync' );
     }
 } );
 

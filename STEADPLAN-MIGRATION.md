@@ -930,3 +930,21 @@ When AutoTrader issue production key + secret + webhook signing secret:
 5. Deactivate/remove the nbm-at-sandbox-check plugin (its rest_pre_dispatch
    only matches the sandbox secret, so it is harmless if left).
 6. Optionally strip the Holdens `SetEnv` lines from .htaccess.
+
+## 24 Sep — AutoTrader go-live checks PASSED
+
+- Integrator Support (09:21): integration passed Go Live checks. Remaining:
+  sign the API licence agreement (not yet received as of 24 Sep 10:00),
+  then production keys in 1-3 working days. Integration Manager will ask for
+  contact details. Keys refresh every 6 months.
+- Blake (09:21): webhook traffic looks as expected. Asked us to confirm the
+  production webhook URL (same: https://steadplan.co.uk/wp-json/autotrader/v1/fetch_vehicles/).
+  Advised baseline Stock API pull at most once a day (or weekly to keep creds
+  alive); the theme schedule in the repo is now `daily` (was twicedaily).
+  Noted a partner integration gets ONE webhook URL, so a second retailer
+  would need a central NBM receiver that routes by advertiser ID.
+- Sandbox webhook log: 25 real signed events 23 Sep 12:13 to 24 Sep 07:10
+  UTC, 3 stock IDs, top keys id/time/type/data/stockEventSource/changedFields,
+  data keys advertiser/metadata/vehicle/adverts/media/features/highlights/check.
+  Matches the theme's PUT branch (`$data['data']['vehicle']`).
+- Live site still 29 published vehicles, no successful sync (Holdens creds dead).
