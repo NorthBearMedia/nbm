@@ -1071,31 +1071,56 @@ function verify_autotrader_signature( WP_REST_Request $request ) {
     return hash_equals($calculatedHmac, $receivedHash);
 }
 
-// A no-op function that logs the request data and returns a success status.
-function noop_callback( WP_REST_Request $request ) {
+// NBM: private audit log for AutoTrader activity. The API licence (clause 9.3)
+// requires records of API access and data use, but the data itself must not be
+// published, so this keeps one compact line per event (no payload) outside the
+// public web root. The theme previously appended every raw webhook body to
+// ABSPATH/put_file.log, which was publicly downloadable.
+function nbm_at_private_log_dir() {
+    foreach ( array( dirname( ABSPATH ) . '/nbm-private-logs', WP_CONTENT_DIR . '/nbm-private-logs' ) as $dir ) {
+        if ( ! is_dir( $dir ) ) { wp_mkdir_p( $dir ); }
+        if ( is_dir( $dir ) && is_writable( $dir ) ) {
+            if ( 0 === strpos( $dir, WP_CONTENT_DIR ) && ! file_exists( $dir . '/.htaccess' ) ) {
+                file_put_contents( $dir . '/.htaccess', "Require all denied\nDeny from all\n" );
+                file_put_contents( $dir . '/index.php', "<?php // Silence.\n" );
+            }
+            return $dir;
+        }
+    }
+    return '';
+}
 
+function nbm_at_audit_log( $event, array $fields = array() ) {
+    $dir = nbm_at_private_log_dir();
+    if ( '' === $dir ) { return; }
+    $file = $dir . '/autotrader-audit.log';
+    if ( file_exists( $file ) && filesize( $file ) > 5 * 1024 * 1024 ) {
+        @rename( $file, $file . '.' . gmdate( 'Ymd-His' ) );
+    }
+    $line = gmdate( 'c' ) . ' ' . $event;
+    foreach ( $fields as $k => $v ) {
+        $line .= ' ' . $k . '=' . ( is_scalar( $v ) || null === $v ? var_export( $v, true ) : wp_json_encode( $v ) );
+    }
+    file_put_contents( $file, $line . "\n", FILE_APPEND | LOCK_EX );
+}
+
+// Webhook handler: process the stock change, record it, acknowledge.
+function noop_callback( WP_REST_Request $request ) {
     $json_data = $request->get_json_params();
-    
+
     if (!empty($json_data)) {
         handle_vehicle_data($json_data);
     }
 
-    // Get the raw request body
-    $body = $request->get_body();
-    file_put_contents(ABSPATH . 'put_file.log', "Raw Body: " . $body . "\n", FILE_APPEND);
-
-    // Get and log JSON payload if available
-    $json_data = $request->get_json_params();
-    $json_string = json_encode($json_data, JSON_PRETTY_PRINT);
-    $json_string = $json_data;
-    file_put_contents(ABSPATH . 'put_file.log', "Parsed JSON: " . $json_string . "\n", FILE_APPEND);
-
-    // // Log headers
-    // $headers = $request->get_headers();
-    // $headers_string = json_encode($headers, JSON_PRETTY_PRINT);
-    // file_put_contents(ABSPATH . 'put_headers.log', $headers_string . "\n", FILE_APPEND);
-    
-    // file_put_contents(ABSPATH . 'put_full_request.log', print_r($request, true), FILE_APPEND);
+    $d = ( is_array( $json_data ) && isset( $json_data['data'] ) && is_array( $json_data['data'] ) ) ? $json_data['data'] : array();
+    nbm_at_audit_log( 'webhook', array(
+        'id'        => isset( $json_data['id'] ) ? $json_data['id'] : null,
+        'type'      => isset( $json_data['type'] ) ? $json_data['type'] : null,
+        'stockId'   => isset( $d['metadata']['stockId'] ) ? $d['metadata']['stockId'] : null,
+        'lifecycle' => isset( $d['metadata']['lifecycleState'] ) ? $d['metadata']['lifecycleState'] : null,
+        'status'    => isset( $d['adverts']['retailAdverts']['advertiserAdvert']['status'] ) ? $d['adverts']['retailAdverts']['advertiserAdvert']['status'] : null,
+        'bytes'     => strlen( (string) $request->get_body() ),
+    ) );
 
     return new WP_REST_Response('Success', 200);
 }
@@ -1422,6 +1447,7 @@ function nbm_autotrader_sync_run( $dry = false, $sandbox = false ) {
 
     handle_vehicle_data( $data );
 
+    nbm_at_audit_log( 'stock_pull', array( 'host' => $host, 'count' => $count ) );
     update_option( 'nbm_autotrader_last_sync', current_time( 'mysql' ) );
     update_option( 'nbm_autotrader_last_count', $count );
     delete_option( 'nbm_autotrader_last_error' );

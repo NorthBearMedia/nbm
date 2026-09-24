@@ -2,7 +2,7 @@
 /**
  * Plugin Name: NBM AutoTrader Sandbox Check (one-off)
  * Description: Read-only checks of AutoTrader Connect sandbox: credentials, stock payload shape, a dry run of the theme's import rules, and a sandbox webhook receiver that verifies the sandbox signing secret and logs events without touching vehicles. Never creates, updates or deletes vehicles. Remove after go-live.
- * Version: 1.1.0
+ * Version: 1.2.0
  * Author: North Bear Media
  */
 
@@ -275,5 +275,63 @@ add_action( 'rest_api_init', function () {
             $code = (int) wp_remote_retrieve_response_code( $resp );
             return array( 'ok' => 200 === $code, 'url' => $url, 'http' => $code, 'body' => substr( wp_remote_retrieve_body( $resp ), 0, 300 ) );
         },
+    ) );
+} );
+
+// Interim fix until theme 1.2.8-nbm is deployed. The live theme appends every raw
+// AutoTrader webhook body to ABSPATH/put_file.log, which is publicly downloadable.
+// This moves that file's contents to a private directory (outside the web root when
+// possible) and removes the public copy, both on demand and after every webhook.
+function nbm_at_sb_private_dir() {
+    foreach ( array( dirname( ABSPATH ) . '/nbm-private-logs', WP_CONTENT_DIR . '/nbm-private-logs' ) as $dir ) {
+        if ( ! is_dir( $dir ) ) { wp_mkdir_p( $dir ); }
+        if ( is_dir( $dir ) && is_writable( $dir ) ) {
+            if ( 0 === strpos( $dir, WP_CONTENT_DIR ) && ! file_exists( $dir . '/.htaccess' ) ) {
+                file_put_contents( $dir . '/.htaccess', "Require all denied\nDeny from all\n" );
+                file_put_contents( $dir . '/index.php', "<?php // Silence.\n" );
+            }
+            return $dir;
+        }
+    }
+    return '';
+}
+
+function nbm_at_sb_secure_put_log() {
+    $pub = ABSPATH . 'put_file.log';
+    if ( ! file_exists( $pub ) ) { return array( 'moved' => false, 'reason' => 'no public log' ); }
+    $dir = nbm_at_sb_private_dir();
+    if ( '' === $dir ) { return array( 'moved' => false, 'reason' => 'no writable private dir' ); }
+    $dest = $dir . '/put_file.log';
+    $in   = fopen( $pub, 'rb' );
+    $out  = fopen( $dest, 'ab' );
+    if ( ! $in || ! $out ) { return array( 'moved' => false, 'reason' => 'could not open files' ); }
+    $copied = stream_copy_to_stream( $in, $out );
+    fclose( $in ); fclose( $out );
+    clearstatcache();
+    if ( false === $copied || $copied < filesize( $pub ) ) {
+        return array( 'moved' => false, 'reason' => 'copy incomplete, public file left in place' );
+    }
+    $removed = @unlink( $pub );
+    return array(
+        'moved'        => $removed,
+        'private_dir'  => ( 0 === strpos( $dir, WP_CONTENT_DIR ) ) ? 'wp-content (denied by .htaccess)' : 'outside web root',
+        'copied_bytes' => $copied,
+        'private_size' => filesize( $dest ),
+    );
+}
+
+add_filter( 'rest_post_dispatch', function ( $response, $server, $request ) {
+    if ( $request instanceof WP_REST_Request && 'PUT' === $request->get_method()
+        && preg_match( '#^/autotrader/v1/fetch_vehicles/?$#', (string) $request->get_route() ) ) {
+        nbm_at_sb_secure_put_log();
+    }
+    return $response;
+}, 10, 3 );
+
+add_action( 'rest_api_init', function () {
+    register_rest_route( 'nbm/v1', '/secure-put-log', array(
+        'methods'             => 'POST',
+        'permission_callback' => function () { return current_user_can( 'manage_options' ); },
+        'callback'            => 'nbm_at_sb_secure_put_log',
     ) );
 } );

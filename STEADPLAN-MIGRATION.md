@@ -948,3 +948,23 @@ When AutoTrader issue production key + secret + webhook signing secret:
   data keys advertiser/metadata/vehicle/adverts/media/features/highlights/check.
   Matches the theme's PUT branch (`$data['data']['vehicle']`).
 - Live site still 29 published vehicles, no successful sync (Holdens creds dead).
+
+## 24 Sep — Licence agreement received; public webhook log found
+
+- AutoTrader API Licence Agreement (Partner Customer, third-party integrator,
+  Version March 2026) arrived by DocuSign 13:15 UK. Copy reviewed from Norton's
+  upload (scratchpad atla/agreement.pdf, not in repo). Review and suggested
+  amendments sent to Norton; NOT signed yet.
+- LEAK: https://steadplan.co.uk/put_file.log is publicly downloadable. The theme's
+  webhook handler (noop_callback) appends every raw verified webhook body to
+  ABSPATH/put_file.log: 1.7MB, 95 events 2 to 23 Sep, full stock records incl.
+  unpublished adverts; no consumer personal data seen. Production webhooks from
+  the old Holdens integration are still arriving and verifying.
+- Fix in repo: theme noop_callback now writes one compact line per event (no
+  payload) to nbm-private-logs/autotrader-audit.log outside the web root
+  (fallback wp-content/nbm-private-logs with deny .htaccess); stock pulls are
+  logged too (licence clause 9.3 records). Plugin nbm-at-sandbox-check 1.2.0 adds
+  POST nbm/v1/secure-put-log and a rest_post_dispatch hook that moves the public
+  file into the private dir after each webhook, as an interim fix until the theme
+  deploys. Deploy of the plugin was refused by the platform (production deploy
+  needs Norton's go-ahead).
