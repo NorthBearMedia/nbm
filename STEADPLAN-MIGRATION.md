@@ -968,3 +968,12 @@ When AutoTrader issue production key + secret + webhook signing secret:
   file into the private dir after each webhook, as an interim fix until the theme
   deploys. Deploy of the plugin was refused by the platform (production deploy
   needs Norton's go-ahead).
+- 24 Sep 13:55 UK: Norton approved the deploy. Plugin nbm-at-sandbox-check 1.2.0
+  deployed and active; POST nbm/v1/secure-put-log moved all 1,725,347 bytes
+  of put_file.log outside the web root (dirname(ABSPATH)/nbm-private-logs).
+  https://…/put_file.log now 404; website + CDN cache cleared. Each new
+  production webhook's write is moved by the rest_post_dispatch hook until the
+  theme 1.2.8 deploy removes the write entirely.
+- Licence: Norton is fine with clause 10.4 (change of control). Amendment email
+  asks only for (1) Stock Manager only + remove Schedule 4, (2) mutual cap in
+  11.5 and narrower 3.17, plus confirmation of no new fees to Steadplan.
