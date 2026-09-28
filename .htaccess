@@ -10,10 +10,11 @@ DirectoryIndex index.php
 RewriteRule ^sectors\.php$ /projects.php [R=301,L]
 RewriteRule ^sectors$ /projects [R=301,L]
 
-# Remove .php extension; a matching page file wins over a same-named
-# directory (/services and /services/ both serve services.php)
-RewriteCond %{DOCUMENT_ROOT}/$1.php -f
-RewriteRule ^(.+?)/?$ /$1.php [L]
+# Remove .php extension; serve /foo via foo.php even when a foo/ directory
+# also exists (so /services and /projects work alongside their sub-page dirs)
+RewriteCond %{REQUEST_URI} !\.php$
+RewriteCond %{DOCUMENT_ROOT}%{REQUEST_URI}.php -f
+RewriteRule ^ %{REQUEST_URI}.php [L]
 
 # Force HTTPS
 RewriteCond %{HTTPS} !=on
