@@ -1,0 +1,31 @@
+name: Live Site Check
+
+on:
+  push:
+    branches:
+      - claude/musk-engineering-php-site-d5Kfw
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check live site for new logo
+        run: |
+          set -uo pipefail
+          html=$(curl -sS -L --max-time 25 "https://muskengineering.co.uk/" || echo "FETCH_FAILED")
+          code=$(curl -sS -o /dev/null -L --max-time 25 -w '%{http_code}' "https://muskengineering.co.uk/" || echo "000")
+          echo "homepage HTTP $code"
+          if echo "$html" | grep -q "images/musk-logo.png"; then
+            echo "RESULT: NEW LOGO LIVE (header references images/musk-logo.png)"
+          elif echo "$html" | grep -q "untitled-design-1"; then
+            echo "RESULT: OLD LOGO STILL LIVE (zyrosite untitled-design-1 still referenced)"
+          else
+            echo "RESULT: INCONCLUSIVE — neither marker found"
+          fi
+          echo "--- logo/favicon/og references found in homepage HTML:"
+          echo "$html" | grep -oE '(src|href|content)="[^"]*(musk-logo|untitled-design|og-image|favicon|apple-touch)[^"]*"' | sort -u || true
+          echo "--- other pages:"
+          for p in about services projects contact; do
+            c=$(curl -sS -o /dev/null -L --max-time 20 -w '%{http_code}' "https://muskengineering.co.uk/$p" || echo "000")
+            echo "/$p HTTP $c"
+          done
