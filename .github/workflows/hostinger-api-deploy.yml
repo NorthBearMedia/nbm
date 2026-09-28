@@ -1,0 +1,147 @@
+name: Hostinger API Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      hostinger_token:
+        description: 'Hostinger API token (not stored; used for this run only)'
+        required: true
+        type: string
+
+concurrency:
+  group: hostinger-api-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      DOMAIN: muskengineering.co.uk
+      API: https://api.hostinger.com
+    steps:
+      - name: Mask token
+        env:
+          HTOKEN: ${{ inputs.hostinger_token }}
+        run: |
+          echo "::add-mask::$HTOKEN"
+          echo "token masked"
+
+      - uses: actions/checkout@v4
+
+      - name: Resolve hosting account username
+        env:
+          HTOKEN: ${{ inputs.hostinger_token }}
+        run: |
+          set -euo pipefail
+          resp=$(curl -sS -w '\n%{http_code}' -H "Authorization: Bearer $HTOKEN" \
+            "$API/api/hosting/v1/websites?domain=$DOMAIN")
+          code=$(echo "$resp" | tail -1)
+          body=$(echo "$resp" | sed '$d')
+          echo "list websites HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "response keys: $(echo "$body" | jq -r 'if type=="object" then keys|join(",") else type end' 2>/dev/null || echo unparseable)"
+            exit 1
+          fi
+          username=$(echo "$body" | jq -r '(.data // .)[] | select((.domain // .name // "")|test("muskengineering")) | .username // .account // empty' | head -1)
+          if [ -z "$username" ]; then
+            echo "could not find username; top-level keys: $(echo "$body" | jq -r 'if type=="object" then keys|join(",") else "array len \(length)" end')"
+            echo "first item keys: $(echo "$body" | jq -r '(.data // .)[0] | keys | join(",")' 2>/dev/null || true)"
+            exit 1
+          fi
+          echo "::add-mask::$username"
+          echo "HOSTING_USERNAME=$username" >> "$GITHUB_ENV"
+          echo "username resolved"
+
+      - name: Build site archive
+        run: |
+          set -euo pipefail
+          zip -qr site.zip . \
+            -x "site.zip" \
+            -x ".git/*" -x ".github/*" -x "*/.git/*" \
+            -x "branding/*" \
+            -x "*.md" \
+            -x "preview.html" -x "generate-preview.php" \
+            -x "Website Update Text.docx" \
+            -x "RMS Fire Blanket - Cover Photo.png" \
+            -x "*Redraw*.png"
+          ls -la site.zip
+          unzip -l site.zip | tail -3
+
+      - name: Fetch upload credentials
+        env:
+          HTOKEN: ${{ inputs.hostinger_token }}
+        run: |
+          set -euo pipefail
+          resp=$(curl -sS -w '\n%{http_code}' -X POST \
+            -H "Authorization: Bearer $HTOKEN" -H "Content-Type: application/json" \
+            -d "{\"username\":\"$HOSTING_USERNAME\",\"domain\":\"$DOMAIN\"}" \
+            "$API/api/hosting/v1/files/upload-urls")
+          code=$(echo "$resp" | tail -1)
+          body=$(echo "$resp" | sed '$d')
+          echo "upload-urls HTTP $code"
+          echo "response keys: $(echo "$body" | jq -r 'if type=="object" then keys|join(",") else type end' 2>/dev/null || echo unparseable)"
+          [ "$code" = "200" ] || exit 1
+          UPLOAD_URL=$(echo "$body" | jq -r '.uploadUrl // .upload_url // .url // empty')
+          AUTH_TOKEN=$(echo "$body" | jq -r '.authToken // .auth_token // .auth_key // empty')
+          AUTH_REST=$(echo "$body" | jq -r '.authRestToken // .auth_rest_token // .rest_auth_key // empty')
+          for v in "$UPLOAD_URL" "$AUTH_TOKEN" "$AUTH_REST"; do
+            [ -n "$v" ] || { echo "missing credential field"; exit 1; }
+            echo "::add-mask::$v"
+          done
+          {
+            echo "UPLOAD_URL=$UPLOAD_URL"
+            echo "AUTH_TOKEN=$AUTH_TOKEN"
+            echo "AUTH_REST=$AUTH_REST"
+          } >> "$GITHUB_ENV"
+          echo "credentials received"
+
+      - name: Upload archive (TUS)
+        run: |
+          set -euo pipefail
+          size=$(stat -c%s site.zip)
+          url="${UPLOAD_URL%/}/site.zip?override=true"
+          pre=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$url" \
+            -H "X-Auth: $AUTH_TOKEN" -H "X-Auth-Rest: $AUTH_REST" \
+            -H "upload-length: $size" -H "upload-offset: 0" \
+            -H "Tus-Resumable: 1.0.0" -d '')
+          echo "pre-upload HTTP $pre"
+          [ "$pre" = "201" ] || exit 1
+          up=$(curl -sS -o /dev/null -w '%{http_code}' -X PATCH "$url" \
+            -H "X-Auth: $AUTH_TOKEN" -H "X-Auth-Rest: $AUTH_REST" \
+            -H "Tus-Resumable: 1.0.0" -H "Upload-Offset: 0" \
+            -H "Content-Type: application/offset+octet-stream" \
+            --data-binary @site.zip)
+          echo "tus patch HTTP $up"
+          case "$up" in 200|204) ;; *) exit 1 ;; esac
+          echo "archive uploaded ($size bytes)"
+
+      - name: Trigger deploy
+        env:
+          HTOKEN: ${{ inputs.hostinger_token }}
+        run: |
+          set -euo pipefail
+          resp=$(curl -sS -w '\n%{http_code}' -X POST \
+            -H "Authorization: Bearer $HTOKEN" -H "Content-Type: application/json" \
+            -d '{"archive_path":"site.zip"}' \
+            "$API/api/hosting/v1/accounts/$HOSTING_USERNAME/websites/$DOMAIN/deploy")
+          code=$(echo "$resp" | tail -1)
+          body=$(echo "$resp" | sed '$d')
+          echo "deploy HTTP $code"
+          echo "response keys: $(echo "$body" | jq -r 'if type=="object" then keys|join(",") else type end' 2>/dev/null || echo unparseable)"
+          [ "$code" = "200" ] || exit 1
+          echo "deploy triggered"
+
+      - name: Verify live site
+        run: |
+          set -euo pipefail
+          ok=0
+          for i in $(seq 1 12); do
+            sleep 15
+            html=$(curl -sS -L --max-time 20 "https://$DOMAIN/" || true)
+            if echo "$html" | grep -q "images/musk-logo.png"; then
+              ok=1; echo "new logo found in live homepage after $((i*15))s"; break
+            fi
+            echo "attempt $i: not live yet"
+          done
+          [ "$ok" = "1" ] || { echo "new logo not detected on live site after 3 minutes"; exit 1; }
+          curl -sS -o /dev/null -w 'live homepage HTTP %{http_code}\n' "https://$DOMAIN/"
