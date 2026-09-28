@@ -25,7 +25,7 @@ jobs:
           echo "--- logo/favicon/og references found in homepage HTML:"
           echo "$html" | grep -oE '(src|href|content)="[^"]*(musk-logo|untitled-design|og-image|favicon|apple-touch)[^"]*"' | sort -u || true
           echo "--- other pages:"
-          for p in about services projects contact; do
+          for p in about services projects contact services/design services/skids projects/water-treatment; do
             c=$(curl -sS -o /dev/null -L --max-time 20 -w '%{http_code}' "https://muskengineering.co.uk/$p" || echo "000")
             echo "/$p HTTP $c"
           done
