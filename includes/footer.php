@@ -7,7 +7,7 @@
                     </a>
                     <h5 class="footer-title">Musk Engineering Ltd</h5>
                     <p class="footer-desc">Steve Musk Engineering provides precision-driven mechanical process solutions with over 50 years of expertise. From design to installation, we deliver trusted engineering services for industry leaders.</p>
-                    <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=375,h=316,fit=crop/Yanqkw6EPbi7qy6G/musk-engineering-UkIrDbzowfyWOjjS.png" alt="Musk Engineering" class="footer-musk-logo">
+                    <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/musk-logo-white.png" alt="Musk Engineering" class="footer-musk-logo">
                 </div>
                 <div class="footer-col footer-col-right">
                     <h5 class="footer-contact-heading">Contact</h5>
