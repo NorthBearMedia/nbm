@@ -993,3 +993,33 @@ When AutoTrader issue production key + secret + webhook signing secret:
   cutover removes sold vans, adds missing ones and refreshes all photos.
 - Cutover still needs: theme 1.2.8-nbm deploy (platform requires Norton's
   go-ahead for production deploys) then POST nbm/v1/at-config.
+
+## 1 Oct — CUTOVER DONE: Steadplan on the new AutoTrader integration
+
+- Production credentials (NBM integration, key dated 01-10-26) arrived by
+  Purview encrypted email 11:31 UK; Norton pasted them in session. Stored ONLY
+  in wp_options `nbm_autotrader_config` via POST nbm/v1/at-config (GET returns
+  booleans: key/secret/webhook_secret all true). Never in the repo; scratchpad
+  copy deleted after use.
+- Theme 1.2.8-nbm deployed (deploy tool timed out at 60s as usual; WordPress
+  reports holdens 1.2.8-nbm active; CDN kept serving the old style.css, so
+  check `wp/v2/themes?status=active` rather than style.css after deploys).
+- Dry run: auth OK, 65 stock records. Full sync 14:36 UK: 65 processed,
+  published vehicles 28 -> 37. Every vehicle page modified today except one:
+  /vehicle/88-5kwh-auto-l1-h1-5dr/ (MAXUS eDeliver 7 88.5kWh, GBP 24,000, last
+  modified 26 Jun) is not in AutoTrader's feed at all and is still published.
+  delete_posts_not_in_api_response() exists in the theme but is never called,
+  so feed-absent vehicles are never removed. Needs trashing in wp-admin
+  (vehicle post type is not in REST).
+- Showroom: 37 vehicle links, each with an m.atcdn.co.uk image. Image URLs keep
+  AutoTrader's literal `{resize}` segment (theme never substitutes it); this is
+  how the site has always worked, m.atcdn is egress-blocked from the sandbox so
+  could not be tested here.
+- Daily reconcile scheduled (`daily`). Webhooks now verify against the new
+  production signing secret and write one line each to the private audit log.
+- Website + CDN cache cleared.
+- Still to do: confirm the first live production webhook lands (audit log is
+  outside the web root, so add a read route or check via file access); remove
+  the stale Maxus listing; retire nbm-at-sandbox-check once the sandbox webhook
+  subscription is removed; optionally call delete_posts_not_in_api_response()
+  at the end of a full sync; tell Mark.
