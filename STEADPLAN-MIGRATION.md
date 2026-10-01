@@ -977,3 +977,19 @@ When AutoTrader issue production key + secret + webhook signing secret:
 - Licence: Norton is fine with clause 10.4 (change of control). Amendment email
   asks only for (1) Stock Manager only + remove Schedule 4, (2) mutual cap in
   11.5 and narrower 3.17, plus confirmation of no new fees to Steadplan.
+
+## 1 Oct — Licence agreement SIGNED
+
+- 30 Sep: Claire (Partner Team) removed Schedule 4 and limited the products to
+  the agreed scope; refused changes to 11.5/3.17 (standard terms); confirmed no
+  new Licence Fees for Steadplan (advertiser 10012129). Revised envelope arrived
+  30 Sep 16:16 UK after a nudge.
+- 1 Oct 09:08 UK: DocuSign "Completed", all parties signed. Production key,
+  secret and webhook signing secret due within 1-3 working days. Sandbox
+  credentials previously came as a Microsoft Purview encrypted message that
+  Norton had to open and paste; expect the same.
+- Mark Kilner (1 Oct) asked whether the link is fixed (sold vans still showing,
+  some vans without photos). Reply drafted in Norton's Gmail: full pull at
+  cutover removes sold vans, adds missing ones and refreshes all photos.
+- Cutover still needs: theme 1.2.8-nbm deploy (platform requires Norton's
+  go-ahead for production deploys) then POST nbm/v1/at-config.
