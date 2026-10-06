@@ -1061,8 +1061,8 @@ LIVE: Fleet Sales (page 708) Yoast title/desc. Old values: title
 %%sitename%%", desc "At Steadplan we partner with fleet operators of all sizes
 to offer complete commercial and heavy goods vehicle solutions."
 
-READY, NOT PUSHED (classifier wants explicit go-ahead for production writes):
-payloads in steadplan-tools/seo-2026-10/, POST each to wp/v2/<type>/<id>
+LIVE 6 Oct (Norton's explicit go-ahead), all HTTP 200 and rendered titles
+verified, /2565-2/ 301s to /van-types-by-industry/. Payloads in steadplan-tools/seo-2026-10/, POST each to wp/v2/<type>/<id>
 (file name = <type>-<id>.json):
 - pages 1349 maintenance, 1353 conversions, 1351 leasing: title/desc only.
   Old titles were "%%title%% %%page%% %%sep%% <tagline> %%sep%% %%sitename%%".
@@ -1080,3 +1080,12 @@ domain show darkcyan-dog URLs (Hostinger rewrite), never write those back.
 Still open: trash the stale MAXUS eDeliver 7 vehicle in wp-admin (the theme
 301s deleted vehicle URLs to /showroom/); GBP manager access for the three
 branches; no blog post since 26 Feb 2026.
+
+### 6 Oct — Backups secured (Norton's explicit go-ahead)
+nbm-site-hygiene deployed (active, folder nbm-site-hygiene-HhYbNcQM) and POST
+nbm/v1/secure-root-files moved all 9 files (sql, zip, 4 wp-config copies,
+readme.html.nbmbak, .DS_Store, new.php) to dirname(ABSPATH)/nbm-private-backups,
+skipped none. Cache cleared; sql/zip/readme/.DS_Store/"wp-config copy.php" all
+404, home 200. Plugin left active (admin-only report route). Next: reset
+wp-admin passwords, confirm old host closed, Steadplan (controller) told so
+they can decide on ICO reporting.
