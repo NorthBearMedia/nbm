@@ -1039,3 +1039,44 @@ touched). Needs Norton's go-ahead to deploy. After the move: rotate the
 database password (the dump and config copies exposed it) and consider whether
 the ICO breach-assessment duty applies (dump likely holds contact-form
 submissions and user records; access logs would show whether it was fetched).
+
+Re-checked 6 Oct ~10:00Z: both still HTTP 200 (text/x-sql 47901522,
+application/zip 69375611). Deploy attempt classifier-blocked ("you have
+access, work it out" was not read as explicit deploy consent). Risk notes:
+remote MySQL access list for the account is empty, so the live DB password is
+not usable off-server; the dump itself holds no DB password but does hold
+Nov 2025 user password hashes, CFDB7 enquiries and audit logs; the slim zip
+holds the OLD host's wp-config and the old .htaccess SetEnv API_KEY/SECRET.
+The files arrived with our 11 Aug Hostinger import.
+
+## 6 Oct — SEO pass from the GSC export (Jul to 3 Oct)
+
+Correction to the first write-up: vehicle titles already lead with make and
+model and carry Car/Offer JSON-LD (theme SEO layer, live since Sept); location
+pages were rewritten 2 Sep. Most of the GSC window predates both.
+/vehicle-showroom/ (ppc-showroom.php, PPC landing page) is already noindex.
+
+LIVE: Fleet Sales (page 708) Yoast title/desc. Old values: title
+"%%title%% %%page%% %%sep%% Complete Commercial Vehicle Solutions %%sep%%
+%%sitename%%", desc "At Steadplan we partner with fleet operators of all sizes
+to offer complete commercial and heavy goods vehicle solutions."
+
+READY, NOT PUSHED (classifier wants explicit go-ahead for production writes):
+payloads in steadplan-tools/seo-2026-10/, POST each to wp/v2/<type>/<id>
+(file name = <type>-<id>.json):
+- pages 1349 maintenance, 1353 conversions, 1351 leasing: title/desc only.
+  Old titles were "%%title%% %%page%% %%sep%% <tagline> %%sep%% %%sitename%%".
+- post 2297 used-van guide: checklist, paperwork/load-area/diesel checks,
+  dealer vs private, FAQs, internal links (~1,570 words from 976).
+- posts 2359/2368: 2025 -> 2026 titles and copy, dashes removed, slugs kept.
+- post 2597 end of lease: bold lines -> H2s, bullets -> lists, renew and
+  early-termination sections, links to /leasing/ and /contact/.
+- post 2461: title/desc. post 2565: slug 2565-2 -> van-types-by-industry
+  (WP old-slug redirect covers the old URL) + title/desc.
+Originals for rollback: steadplan-tools/seo-2026-10/originals/ (posts); page meta old values above.
+Content written with https://steadplan.co.uk links: REST reads via the temp
+domain show darkcyan-dog URLs (Hostinger rewrite), never write those back.
+
+Still open: trash the stale MAXUS eDeliver 7 vehicle in wp-admin (the theme
+301s deleted vehicle URLs to /showroom/); GBP manager access for the three
+branches; no blog post since 26 Feb 2026.
