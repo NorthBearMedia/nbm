@@ -2,6 +2,7 @@
 // Build a clean, canonical URL for this page: https, apex host, no .php, no query.
 $canonPath = isset($_SERVER['REQUEST_URI']) ? strtok($_SERVER['REQUEST_URI'], '?') : '/';
 $canonPath = preg_replace('/\.php$/', '', $canonPath);
+$canonPath = rtrim($canonPath, '/');
 if ($canonPath === '' || $canonPath === '/index') { $canonPath = '/'; }
 $canonicalUrl = 'https://muskengineering.co.uk' . $canonPath;
 ?>

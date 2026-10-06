@@ -16,6 +16,12 @@ RewriteCond %{REQUEST_URI} !\.php$
 RewriteCond %{DOCUMENT_ROOT}%{REQUEST_URI}.php -f
 RewriteRule ^ %{REQUEST_URI}.php [L]
 
+# The server adds a trailing slash to directory-named URLs (/services ->
+# /services/) before the rule above runs, so serve the page file for the
+# slash form too instead of a 403 directory listing
+RewriteCond %{DOCUMENT_ROOT}/$1.php -f
+RewriteRule ^(.+)/$ /$1.php [L]
+
 # Force HTTPS
 RewriteCond %{HTTPS} !=on
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
