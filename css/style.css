@@ -1096,7 +1096,22 @@ h1, h2, h3, h4, h5, h6 {
     margin-bottom: 0.75rem;
 }
 
+.footer-phone {
+    display: block;
+    color: var(--white);
+    font-size: 1rem;
+    opacity: 0.9;
+    margin-bottom: 0.4rem;
+    transition: opacity var(--transition);
+}
+
+.footer-phone:hover {
+    opacity: 1;
+    color: var(--white);
+}
+
 .footer-email {
+    display: block;
     color: var(--white);
     font-size: 1rem;
     opacity: 0.9;
@@ -1580,6 +1595,44 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--gray-text);
     font-size: 1.05rem;
     line-height: 1.8;
+}
+
+.contact-details {
+    list-style: none;
+    padding: 0;
+    margin: 2rem 0 0;
+}
+
+.contact-details li {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-top: 1px solid rgba(13, 20, 26, 0.1);
+}
+
+.contact-details li:last-child {
+    border-bottom: 1px solid rgba(13, 20, 26, 0.1);
+}
+
+.contact-details-label {
+    flex: 0 0 72px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--primary-teal);
+}
+
+.contact-details a {
+    color: var(--dark-text);
+    font-size: 1.1rem;
+    font-weight: 500;
+    transition: color var(--transition);
+}
+
+.contact-details a:hover {
+    color: var(--primary-teal);
 }
 
 .contact-form-card {

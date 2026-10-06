@@ -18,27 +18,47 @@ $canonicalUrl = 'https://muskengineering.co.uk' . $canonPath;
     <!-- Structured Data -->
     <script type="application/ld+json">
     {
-        "@context": "https://schema.org/",
-        "@type": "WebSite",
-        "name": "Musk Engineering Ltd | Precision and Innovation in Engineering",
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "Steve Musk Engineering Ltd",
+        "alternateName": "Musk Engineering Ltd",
         "url": "https://muskengineering.co.uk",
+        "logo": "https://muskengineering.co.uk/images/musk-logo-square.png",
+        "image": "https://muskengineering.co.uk/images/og-image.jpg",
         "description": "With a legacy in mechanical process engineering, Musk Engineering provides high-quality, precision-driven solutions for complex industrial projects.",
-        "inLanguage": "en"
+        "telephone": "+441773307300",
+        "address": {
+            "@type": "PostalAddress",
+            "addressRegion": "Derbyshire",
+            "addressCountry": "GB"
+        },
+        "contactPoint": {
+            "@type": "ContactPoint",
+            "telephone": "+441773307300",
+            "email": "info@muskengineering.co.uk",
+            "contactType": "customer service",
+            "areaServed": "GB"
+        },
+        "sameAs": [
+            "https://www.linkedin.com/company/steve-musk-engineering"
+        ]
     }
     </script>
 
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" sizes="16x16" href="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/favicon-16.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/favicon-32.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/favicon-192.png">
-    <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/apple-touch-icon.png">
+    <!-- Favicon (served from this domain so search engines pick up the current icon) -->
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="icon" type="image/svg+xml" href="/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/images/favicon-192.png">
+    <link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
 
     <!-- Open Graph / Social Share -->
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Musk Engineering Ltd">
     <meta property="og:title" content="<?php echo isset($pageTitle) ? $pageTitle . ' | ' : ''; ?>Musk Engineering Ltd | Precision and Innovation in Engineering">
     <meta property="og:description" content="<?php echo isset($pageDescription) ? $pageDescription : 'With a legacy in mechanical process engineering, Musk Engineering provides high-quality, precision-driven solutions for complex industrial projects.'; ?>">
-    <meta property="og:image" content="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/og-image.jpg">
+    <meta property="og:image" content="https://muskengineering.co.uk/images/og-image.jpg">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="Musk Engineering Ltd">
@@ -47,7 +67,7 @@ $canonicalUrl = 'https://muskengineering.co.uk' . $canonPath;
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="<?php echo isset($pageTitle) ? $pageTitle . ' | ' : ''; ?>Musk Engineering Ltd | Precision and Innovation in Engineering">
     <meta name="twitter:description" content="<?php echo isset($pageDescription) ? $pageDescription : 'With a legacy in mechanical process engineering, Musk Engineering provides high-quality, precision-driven solutions for complex industrial projects.'; ?>">
-    <meta name="twitter:image" content="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/og-image.jpg">
+    <meta name="twitter:image" content="https://muskengineering.co.uk/images/og-image.jpg">
 
     <!-- NBM-GA-TAG --><script>(function(d,w){if(d.querySelector('script[src*="gtag/js?id=G-ZFNRCD6V17"]'))return;var g=d.createElement('script');g.async=true;g.src='https://www.googletagmanager.com/gtag/js?id=G-ZFNRCD6V17';d.head.appendChild(g);w.dataLayer=w.dataLayer||[];function gtag(){w.dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-ZFNRCD6V17');})(document,window);(function(d,w){if(d.querySelector('script[src*="clarity.ms/tag/xg3udlsbmh"]'))return;(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(w,d,"clarity","script","xg3udlsbmh");})(document,window);(function(d){if(d.querySelector('script[data-site="TPVLKMAX"]'))return;var f=d.createElement('script');f.src='https://cdn.usefathom.com/script.js';f.setAttribute('data-site','TPVLKMAX');f.defer=true;d.head.appendChild(f);})(document);</script><!-- /NBM-GA-TAG -->
 
@@ -62,7 +82,7 @@ $canonicalUrl = 'https://muskengineering.co.uk' . $canonPath;
         <div class="container">
             <div class="header-inner">
                 <a href="/" class="logo">
-                    <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/musk-logo.png" alt="Musk Engineering Ltd" class="logo-img">
+                    <img src="/images/musk-logo.png" alt="Musk Engineering Ltd" class="logo-img">
                 </a>
                 <nav class="main-nav" id="mainNav">
                     <ul>

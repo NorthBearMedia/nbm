@@ -7,10 +7,11 @@
                     </a>
                     <h5 class="footer-title">Musk Engineering Ltd</h5>
                     <p class="footer-desc">Steve Musk Engineering provides precision-driven mechanical process solutions with over 50 years of expertise. From design to installation, we deliver trusted engineering services for industry leaders.</p>
-                    <img src="https://raw.githubusercontent.com/NorthBearMedia/nbm/claude/musk-engineering-php-site-d5Kfw/images/musk-logo-white.png" alt="Musk Engineering" class="footer-musk-logo">
+                    <img src="/images/musk-logo-white.png" alt="Musk Engineering" class="footer-musk-logo">
                 </div>
                 <div class="footer-col footer-col-right">
                     <h5 class="footer-contact-heading">Contact</h5>
+                    <a href="tel:+441773307300" class="footer-phone">01773 307300</a>
                     <a href="mailto:info@muskengineering.co.uk" class="footer-email">info@muskengineering.co.uk</a>
                 </div>
             </div>

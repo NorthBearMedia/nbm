@@ -41,6 +41,16 @@ include 'includes/header.php';
                 <div class="contact-hero-text">
                     <h1 class="contact-hero-h1 slide-up">Get in Touch</h1>
                     <p class="contact-hero-subtitle fade-in">We value your enquiries. Reach out to discuss your engineering needs and discover our innovative solutions.</p>
+                    <ul class="contact-details fade-in">
+                        <li>
+                            <span class="contact-details-label">Phone</span>
+                            <a href="tel:+441773307300">01773 307300</a>
+                        </li>
+                        <li>
+                            <span class="contact-details-label">Email</span>
+                            <a href="mailto:info@muskengineering.co.uk">info@muskengineering.co.uk</a>
+                        </li>
+                    </ul>
                 </div>
                 <div class="contact-form-card scale-in">
                     <?php if ($formSubmitted): ?>
