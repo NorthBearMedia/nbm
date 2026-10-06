@@ -1023,3 +1023,19 @@ When AutoTrader issue production key + secret + webhook signing secret:
   the stale Maxus listing; retire nbm-at-sandbox-check once the sandbox webhook
   subscription is removed; optionally call delete_posts_not_in_api_response()
   at the end of a full sync; tell Mark.
+
+## 6 Oct — Public backups in the web root (URGENT, fix ready)
+
+Found while auditing SEO: public_html holds steadplanco_nov25.sql (47.9MB
+database dump) and steadplan_slim_20260811.zip (69.4MB site backup, the
+migration archive), both HTTP 200 and downloadable by anyone with the URL.
+Also wp-config-new.php, wp-config-2.php, "wp-config copy.php",
+wp-config-ddev.php (execute, 500, but hold DB credentials), readme.html.nbmbak
+and .DS_Store (served as text), new.php. Fix: plugin
+steadplan-tools/nbm-site-hygiene (GET nbm/v1/root-files report, POST
+nbm/v1/secure-root-files moves the listed files to
+dirname(ABSPATH)/nbm-private-backups; nothing deleted; live wp-config.php never
+touched). Needs Norton's go-ahead to deploy. After the move: rotate the
+database password (the dump and config copies exposed it) and consider whether
+the ICO breach-assessment duty applies (dump likely holds contact-form
+submissions and user records; access logs would show whether it was fetched).
