@@ -71,6 +71,33 @@ db.exec(`
   );
 `);
 
+// Website monitoring (lib/monitor.js). Kept small on purpose: one summary
+// row per site per day and one row per incident. Never a row per check.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS monitor_daily (
+    site_id INTEGER NOT NULL,
+    day TEXT NOT NULL,
+    checks INTEGER NOT NULL DEFAULT 0,
+    failures INTEGER NOT NULL DEFAULT 0,
+    ms_total INTEGER NOT NULL DEFAULT 0,
+    ms_count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (site_id, day),
+    FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS monitor_incidents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    site_id INTEGER NOT NULL,
+    started_at TEXT NOT NULL,
+    ended_at TEXT,
+    reason TEXT NOT NULL DEFAULT '',
+    status_code INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_monitor_incidents_site ON monitor_incidents(site_id, id);
+`);
+
 // ─── Lightweight idempotent migrations ───────────────────────────
 function addColumnIfMissing(table, column, definition) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all();
@@ -90,6 +117,15 @@ addColumnIfMissing('sites', 'delivery_hold', 'INTEGER NOT NULL DEFAULT 0');
 // Live himself, from its card, when he's happy — nothing reaches a client
 // without a deliberate per-site click.
 addColumnIfMissing('sites', 'delivery_live', 'INTEGER NOT NULL DEFAULT 0');
+// Monitoring flags. paused = skip every check while the owner moves the
+// site. hidden_ok = this site is meant to be hidden from Google, so a
+// noindex tag is not a problem.
+addColumnIfMissing('sites', 'monitor_paused', 'INTEGER NOT NULL DEFAULT 0');
+addColumnIfMissing('sites', 'monitor_hidden_ok', 'INTEGER NOT NULL DEFAULT 0');
+// Show the uptime score on this site's client dashboard and PDF. On by
+// default; the owner can switch it off per site in the Uptime view. It is
+// still never shown until there are 14 well measured days in the period.
+addColumnIfMissing('sites', 'uptime_in_reports', 'INTEGER NOT NULL DEFAULT 1');
 
 export function newDashboardToken() {
   return randomBytes(24).toString('hex');

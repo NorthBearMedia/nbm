@@ -100,6 +100,33 @@ with no contact email or frequency "No schedule yet" never send anything.
 Failures show in the site's **History**; with a BCC set you get a copy of
 every report. Times use `TIMEZONE` (default `Europe/London`).
 
+## Website monitoring
+
+Pulse checks every active client site's homepage every 5 minutes (a plain
+GET with an "NBM Pulse" user agent, 15 second timeout, one retry). A site is
+called down only after two failed checks in a row; if most sites fail at
+once, that is treated as Pulse's own connection and nothing is marked down.
+Once a day at 04:10 it reads each site's certificate date (warning at 14 and
+3 days) and domain expiry date from Hostinger or RDAP (warning at 30 and 7
+days; "not known" where neither says). It also flags a homepage that tells
+Google not to list it (noindex), unless the site is marked as meant to be
+hidden.
+
+- **Alerts** go to the owner address in Settings only: DOWN, BACK UP (with
+  how long), and each warning. The same problem is emailed at most once a day.
+- **Uptime** (top bar) shows every site now, uptime for 24 hours, 7 and 30
+  days, response time, certificate and domain days left, the last incident,
+  and switches to pause a site, mark it hidden from Google, or hide its
+  uptime from client reports.
+- **Client reports and dashboards** show a "Website availability" score
+  (uptime, time offline, outages) built from confirmed outages only, and only
+  once the period has 14 well measured days.
+- **Status feed**: a read only JSON link behind a long random token, shown at
+  the bottom of the Uptime view. A stale "lastRound" means Pulse has stopped.
+
+Storage stays small: one summary row per site per day and one row per
+incident.
+
 ## Useful commands
 
 ```bash

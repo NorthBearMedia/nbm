@@ -824,6 +824,134 @@ $('#connectionsBtn').onclick = async (e) => {
   e.target.disabled = false; e.target.textContent = 'Connections';
 };
 
+// ─── Uptime: is every client site up, in date and listed on Google ─────
+// Owner only. Nothing here is shown on client dashboards or in reports.
+function ukWhen(iso) {
+  if (!iso) return '-';
+  return new Date(iso).toLocaleString('en-GB', { timeZone: 'Europe/London', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+function pctCell(v) {
+  if (v == null) return '<span class="hint">no data yet</span>';
+  const colour = v >= 99.5 ? 'var(--green)' : v >= 97 ? '#d9a400' : '#d9534f';
+  return `<strong style="color:${colour}">${v}%</strong>`;
+}
+function daysCell(days, warnAt, sourceNote) {
+  if (days == null) return '<span class="hint">not known</span>';
+  const colour = days <= warnAt ? '#d9534f' : 'inherit';
+  const txt = days < 0 ? `expired ${Math.abs(days)} days ago` : `${days} days`;
+  return `<span style="color:${colour}">${esc(txt)}</span>${sourceNote ? `<br><span class="hint">${esc(sourceNote)}</span>` : ''}`;
+}
+function minutesText(m) {
+  if (m < 60) return `${Math.max(1, m)} min`;
+  const h = Math.floor(m / 60), r = m % 60;
+  return h < 24 ? `${h} h${r ? ` ${r} min` : ''}` : `${Math.floor(h / 24)} d ${h % 24} h`;
+}
+
+async function showUptime() {
+  const u = await api('/api/uptime');
+  const last = u.lastRound;
+  const staleMs = last ? Date.now() - Date.parse(last.at) : Infinity;
+  const banner = !last
+    ? '<div class="panel" style="margin:6px 0 12px">No checks have run yet. The first round runs within five minutes of Pulse starting.</div>'
+    : staleMs > 15 * 60_000
+      ? `<div class="panel" style="margin:6px 0 12px;border-color:#d9534f"><strong>Monitoring has not run since ${esc(ukWhen(last.at))}.</strong> Pulse itself may be stopped or restarting.</div>`
+      : last.massFailure
+        ? `<div class="panel" style="margin:6px 0 12px;border-color:#d9a400"><strong>The last round (${esc(ukWhen(last.at))}) could not reach ${last.failed} of ${last.checked} sites at once.</strong> That points at Pulse's own connection, so nothing was marked down.</div>`
+        : '';
+  const down = u.sites.filter(r => r.status === 'down');
+  const warn = u.sites.filter(r => r.status !== 'paused' && (r.noindexFailing || (r.certDays != null && r.certDays <= 14) || (r.domainDays != null && r.domainDays <= 30) || r.certTrusted === false));
+  const summary = `<div class="panel" style="margin:6px 0 12px;border-color:${down.length ? '#d9534f' : 'var(--green)'}">
+      <strong style="font-size:15px">${down.length ? `${down.length} site${down.length === 1 ? '' : 's'} down now: ${esc(down.map(r => r.domain).join(', '))}` : `All ${u.sites.filter(r => r.status !== 'paused').length} monitored sites are up`}</strong>
+      ${warn.length ? `<div class="hint" style="margin-top:6px">Needs a look: ${esc(warn.map(r => r.domain).join(', '))}</div>` : ''}
+    </div>`;
+  const statusCell = r => {
+    if (r.status === 'paused') return '⏸️ <strong>Paused</strong>';
+    if (r.status === 'down') return `🔴 <strong>Down</strong><br><span class="hint">${esc(r.lastError || '')}</span>`;
+    if (r.status === 'up') return `🟢 <strong>Up</strong><br><span class="hint">HTTP ${esc(r.lastStatus)} in ${esc(r.lastMs)} ms</span>`;
+    return r.lastChecked && r.lastError
+      ? `🟠 <strong>One failed check</strong><br><span class="hint">rechecking (${esc(r.lastError)})</span>`
+      : '⚪ <span class="hint">not checked yet</span>';
+  };
+  const googleCell = r => r.noindex
+    ? (r.hiddenOk ? '<span class="hint">Hidden on purpose</span>' : '<strong style="color:#d9534f">NOINDEX</strong><br><span class="hint">telling Google not to list it</span>')
+    : (r.lastChecked ? 'Listed' : '<span class="hint">-</span>');
+  const certCell = r => r.certTrusted === false && r.certExpiresAt
+    ? `<strong style="color:#d9534f">Not trusted</strong><br><span class="hint">${esc(r.certUntrustedReason)}</span>`
+    : daysCell(r.certDays, 14, r.certError && !r.certExpiresAt ? r.certError : '');
+  const incidentCell = r => {
+    const i = r.lastIncident;
+    if (!i) return '<span class="hint">none</span>';
+    return i.open
+      ? `<strong style="color:#d9534f">Down since ${esc(ukWhen(i.startedAt))}</strong><br><span class="hint">${esc(i.reason)}</span>`
+      : `Down ${esc(minutesText(i.minutes))} on ${esc(ukWhen(i.startedAt))}<br><span class="hint">${esc(i.reason)}</span>`;
+  };
+  const th = t => `<th style="text-align:left;padding:6px 8px;white-space:nowrap">${t}</th>`;
+  const td = h => `<td style="padding:6px 8px;vertical-align:top">${h}</td>`;
+  $('#modalRoot').innerHTML = `
+    <div class="modal-backdrop" id="backdrop"><div class="modal" style="max-width:1200px">
+      <h3>Uptime</h3>
+      <p class="hint" style="margin:4px 0 10px">Every site's homepage is checked every ${u.roundMinutes} minutes. A site is called down only after two failed checks in a row. Certificates and domains are read once a day. Alerts go to you only. Clients see only an uptime score in their dashboard and PDF, once there are 14 days of data, and only for sites with "In client reports" ticked.${last ? ` Last check: ${esc(ukWhen(last.at))}.` : ''}</p>
+      ${banner}${summary}
+      <div style="overflow:auto;max-height:62vh">
+      <table class="data" style="width:100%;font-size:13px">
+        <thead><tr>${th('Site')}${th('Now')}${th('24 hours')}${th('7 days')}${th('30 days')}${th('Avg response')}${th('Certificate')}${th('Domain')}${th('Google')}${th('Last incident')}${th('Monitor')}${th('Hidden from Google')}${th('In client reports')}</tr></thead>
+        <tbody>${u.sites.map(r => `<tr>
+          ${td(`<strong>${esc(r.client)}</strong><br><span class="hint">${esc(r.domain)}</span>`)}
+          ${td(statusCell(r))}
+          ${td(pctCell(r.uptime24h))}${td(pctCell(r.uptime7d))}${td(pctCell(r.uptime30d))}
+          ${td(r.avgMs7d == null ? '<span class="hint">-</span>' : `${esc(r.avgMs7d)} ms`)}
+          ${td(certCell(r))}
+          ${td(daysCell(r.domainDays, 30, r.domainExpiresAt ? (r.domainSource === 'rdap' ? 'from the registry' : 'from Hostinger') : ''))}
+          ${td(googleCell(r))}
+          ${td(incidentCell(r))}
+          ${td(`<label style="white-space:nowrap"><input type="checkbox" data-mon-pause="${r.id}" ${r.paused ? '' : 'checked'}> on</label>`)}
+          ${td(`<label style="white-space:nowrap"><input type="checkbox" data-mon-hidden="${r.id}" ${r.hiddenOk ? 'checked' : ''}> yes</label>`)}
+          ${td(`<label style="white-space:nowrap"><input type="checkbox" data-mon-reports="${r.id}" ${r.inReports ? 'checked' : ''}> show</label>`)}
+        </tr>`).join('')}</tbody>
+      </table></div>
+      <div class="grant-box" style="margin-top:12px"><strong>Status feed for your assistant</strong>
+        <div class="hint" style="margin:4px 0 6px">Read only. Gives the time of the last check and every site's state. Keep this link private.</div>
+        <code id="uptimeFeedUrl" style="user-select:all;word-break:break-all">${esc(u.feedUrl)}</code>
+        <button class="btn" id="uptimeFeedCopy" style="margin-left:8px">Copy</button>
+      </div>
+      <div class="modal-actions" style="margin-top:14px">
+        <button class="btn" id="uptimeRefresh">Refresh</button>
+        <button class="btn" onclick="document.getElementById('modalRoot').innerHTML=''">Close</button>
+      </div>
+    </div></div>`;
+  $('#backdrop').onclick = ev => { if (ev.target.id === 'backdrop') closeModal(); };
+  $('#uptimeRefresh').onclick = () => showUptime().catch(err => toast(err.message, 'err'));
+  $('#uptimeFeedCopy').onclick = async () => {
+    try { await navigator.clipboard.writeText(u.feedUrl); toast('Feed link copied'); } catch { toast('Select the link and copy it', 'err'); }
+  };
+  document.querySelectorAll('[data-mon-pause]').forEach(el => el.onchange = async () => {
+    try {
+      await api(`/api/sites/${el.dataset.monPause}/monitor`, { method: 'POST', body: { paused: !el.checked } });
+      toast(el.checked ? 'Monitoring switched back on' : 'Monitoring paused for this site');
+      showUptime().catch(err => toast(err.message, 'err'));
+    } catch (err) { toast(err.message, 'err'); el.checked = !el.checked; }
+  });
+  document.querySelectorAll('[data-mon-reports]').forEach(el => el.onchange = async () => {
+    try {
+      await api(`/api/sites/${el.dataset.monReports}/monitor`, { method: 'POST', body: { inReports: el.checked } });
+      toast(el.checked ? 'Uptime will show in this client\'s reports (once there are 14 days of data)' : 'Uptime hidden from this client\'s reports');
+    } catch (err) { toast(err.message, 'err'); el.checked = !el.checked; }
+  });
+  document.querySelectorAll('[data-mon-hidden]').forEach(el => el.onchange = async () => {
+    try {
+      await api(`/api/sites/${el.dataset.monHidden}/monitor`, { method: 'POST', body: { hiddenOk: el.checked } });
+      toast(el.checked ? 'Noted: this site is meant to be hidden from Google' : 'Noindex will be flagged for this site again');
+      showUptime().catch(err => toast(err.message, 'err'));
+    } catch (err) { toast(err.message, 'err'); el.checked = !el.checked; }
+  });
+}
+
+$('#uptimeBtn').onclick = async (e) => {
+  e.target.disabled = true; e.target.textContent = 'Loading…';
+  try { await showUptime(); } catch (err) { toast(err.message, 'err'); }
+  e.target.disabled = false; e.target.textContent = 'Uptime';
+};
+
 // One click → the entire estate's status on the clipboard as plain text,
 // ready to paste to whoever is helping. The server sees Google, Fathom,
 // Clarity and its own internals; a support session usually can't.

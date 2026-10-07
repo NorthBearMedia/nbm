@@ -7,6 +7,7 @@ import * as clarity from './clarity.js';
 import { gatherFathom } from './fathom.js';
 import { getFathomToken } from './runtime-config.js';
 import { previousPeriod } from './dates.js';
+import { reportUptime } from './monitor.js';
 
 async function attempt(name, warnings, fn) {
   try { return await fn(); } catch (err) {
@@ -172,6 +173,9 @@ export async function gatherReportData(site, start, end, opts = {}) {
   })());
 
   await Promise.all(jobs);
+
+  // Website availability for the period (null unless it may be shown).
+  try { data.uptime = reportUptime(site, start, end); } catch { data.uptime = null; }
 
   if (site.clarity_api_token || site.clarity_project_id) {
     data.clarity = clarity.aggregate(site.id, start, end);

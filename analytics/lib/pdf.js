@@ -506,6 +506,19 @@ export async function generateReportPdf(data) {
     ], { perRow: 3 });
   }
 
+  // ── Website availability (uptime monitoring) ──
+  const up = data.uptime;
+  if (up) {
+    y = ensureSpace(doc, data, y, 150);
+    y = sectionTitle(doc, y, 'Website availability',
+      `Your homepage was checked every 5 minutes, day and night${up.measuredFrom ? `, from ${formatDate(up.measuredFrom)}` : ''}. Only outages confirmed by two checks in a row count.`);
+    y = kpiCards(doc, y, [
+      { label: 'Uptime', value: `${up.uptimePct}%`, note: up.uptimePct >= 99.9 ? 'excellent' : up.uptimePct >= 99 ? 'good' : 'needs attention' },
+      { label: 'Time offline', value: up.downtimeShort, note: 'this period' },
+      { label: 'Outages', value: String(up.outages), note: up.outages ? (up.outages === 1 ? 'one interruption' : 'separate interruptions') : 'no interruptions' },
+    ], { perRow: 3 });
+  }
+
   // ── Insights & recommendations ──
   if (data.insights?.recommendations?.length) {
     const ins = data.insights;

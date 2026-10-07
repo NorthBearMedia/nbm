@@ -8,6 +8,7 @@ import { config } from '../config.js';
 import { runReport } from './reporter.js';
 import { syncSite } from './clarity.js';
 import { nextRunAt, addDays, todayISO } from './dates.js';
+import { runRound, runDailyChecks, ensureFeedToken } from './monitor.js';
 
 function nowStamp() {
   // "YYYY-MM-DD HH:mm" in the configured timezone — same format as next_report_at
@@ -91,5 +92,15 @@ export function startScheduler() {
   // Hourly rolling database backups (kept: last 48) + one shortly after boot.
   cron.schedule('50 * * * *', () => backupDatabase().catch(e => console.error('[backup]', e)), { timezone: config.timezone });
   setTimeout(() => backupDatabase('boot').catch(e => console.error('[backup]', e)), 30_000);
+  // Website monitoring: every site's homepage every five minutes, and the
+  // certificate and domain dates once a day. The first round waits for
+  // the app to settle after boot; the daily pass runs once per calendar
+  // day however many times Pulse restarts.
+  ensureFeedToken();
+  cron.schedule('*/5 * * * *', () => runRound().catch(e => console.error('[monitor]', e.message)), { timezone: config.timezone });
+  cron.schedule('10 4 * * *', () => runDailyChecks().catch(e => console.error('[monitor-daily]', e.message)), { timezone: config.timezone });
+  setTimeout(() => runRound().catch(e => console.error('[monitor]', e.message)), 20_000);
+  setTimeout(() => runDailyChecks().catch(e => console.error('[monitor-daily]', e.message)), 90_000);
   console.log(`[scheduler] running (timezone ${config.timezone}) — reports hourly, Clarity 03:40+13:40, DB backup hourly`);
+  console.log('[monitor] site monitoring every 5 minutes, certificate and domain dates daily at 04:10');
 }
