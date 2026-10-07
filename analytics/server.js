@@ -23,6 +23,7 @@ import * as hostinger from './lib/hostinger.js';
 import * as fathom from './lib/fathom.js';
 import { scheduleOpsSweep, runOpsSweep, runInjectionTest, runInjectionRollout, managedGscDiagnosis } from './lib/ops.js';
 import { buildInjectorScript, buildSnippet, rootDirFor } from './lib/inject.js';
+import { uptimeOverview, statusFeed, feedTokenMatches, setMonitorFlags } from './lib/monitor.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -468,6 +469,35 @@ app.get('/api/diagnostic', requireAdmin, async (req, res) => {
 
 // Per-site connections health for the admin "Connections" panel — the
 // no-email replacement for diagnostic emails.
+// ─── Website monitoring (owner only) ─────────────────────────────
+app.get('/api/uptime', requireAdmin, (req, res) => {
+  try { res.json(uptimeOverview()); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Pause monitoring (moving a site) or mark a site as meant to be hidden
+// from Google (so a noindex tag is not flagged).
+app.post('/api/sites/:id/monitor', requireAdmin, (req, res) => {
+  const site = db.prepare('SELECT id FROM sites WHERE id = ?').get(req.params.id);
+  if (!site) return res.status(404).json({ error: 'Site not found' });
+  const body = req.body || {};
+  setMonitorFlags(site.id, {
+    paused: body.paused === undefined ? undefined : Boolean(body.paused),
+    hiddenOk: body.hiddenOk === undefined ? undefined : Boolean(body.hiddenOk),
+    inReports: body.inReports === undefined ? undefined : Boolean(body.inReports),
+  });
+  res.json({ ok: true });
+});
+
+// Read only status feed for the owner's assistant, behind a long random
+// token kept in settings. A stale lastRound tells the reader that Pulse
+// itself has stopped. Nothing here is ever linked from a client page.
+app.get('/u/:token', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  if (!feedTokenMatches(req.params.token)) return res.status(404).json({ error: 'Not found' });
+  res.json(statusFeed());
+});
+
 app.get('/api/connections', requireAdmin, async (req, res) => {
   try {
     const { connectionsHealth } = await import('./lib/health.js');

@@ -230,6 +230,16 @@ function render(d) {
     </div>`;
   }
 
+  if (d.uptime) {
+    const u = d.uptime;
+    html += section('Website availability', `Your homepage is checked every 5 minutes, day and night${u.measuredFrom ? ` (measured from ${esc(new Date(u.measuredFrom).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }))})` : ''}.`);
+    html += `<div class="kpi-grid">
+      <div class="kpi"><div class="label">Uptime</div><div class="value">${esc(u.uptimePct)}%</div><div class="delta flat">${u.uptimePct >= 99.9 ? 'excellent' : u.uptimePct >= 99 ? 'good' : 'needs attention'}</div></div>
+      <div class="kpi"><div class="label">Time offline</div><div class="value">${esc(u.downtimeShort)}</div><div class="delta flat">this period</div></div>
+      <div class="kpi"><div class="label">Outages</div><div class="value">${esc(u.outages)}</div><div class="delta flat">${u.outages ? 'confirmed interruptions' : 'no interruptions'}</div></div>
+    </div>`;
+  }
+
   if (d.insights?.recommendations?.length) {
     html += section('What this means & what to do next');
     html += `<div class="panel">`;
