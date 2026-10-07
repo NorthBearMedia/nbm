@@ -19,7 +19,10 @@ export const ROUND_MINUTES = 5;
 const TIMEOUT_MS = 15_000;
 const RETRY_WAIT_MS = 3_000;
 const CONCURRENCY = 6;
-const USER_AGENT = 'NBM Pulse monitor (+https://northbearmedia.co.uk)';
+// The standard "compatible" form: clearly NBM Pulse, but not mistaken for
+// a malicious bot by hosting firewalls that block non-browser agents (the
+// existing health check uses the same Mozilla prefix and gets through).
+const USER_AGENT = 'Mozilla/5.0 (compatible; NBM Pulse monitor; +https://northbearmedia.co.uk)';
 // Down only after this many failed rounds in a row.
 const CONFIRM_ROUNDS = 2;
 // More than this share of sites failing in one round means Pulse's own
