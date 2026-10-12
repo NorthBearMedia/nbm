@@ -18,7 +18,7 @@ import db, { getSetting, setSetting, newDashboardToken } from '../database.js';
 import { config } from '../config.js';
 import { nextRunAt, addDays, todayISO } from './dates.js';
 import { googleClient } from './google.js';
-import { getGscReaderEmail, getHostingerToken, getEmailBcc, getSmtp, getEmailFrom, getAppUrl } from './runtime-config.js';
+import { getGscReaderEmail, getHostingerToken, getFathomToken, getEmailBcc, getSmtp, getEmailFrom, getAppUrl } from './runtime-config.js';
 import { mailer } from './email.js';
 import { randomBytes } from 'crypto';
 import { ensureInjectCron, deleteInjectCrons, injectCronOutput, verifyTag, ensureCron, cronOutputMatching, deleteCronsMatching, HOSTINGER_USER, rootDirFor, SNIPPET_VERSION } from './inject.js';
