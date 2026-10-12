@@ -169,7 +169,13 @@ export async function fathomHostnames(fathomSiteId, start, end) {
     date_from: dt(start), date_to: dt(end, true), timezone: 'Europe/London',
   });
   return rows(d)
-    .map(r => ({ host: String(r.hostname || '').toLowerCase().replace(/^www\./, ''), n: num(r.pageviews) }))
+    // Fathom reports hostnames WITH the scheme ("https://example.co.uk"),
+    // seen live on every site the first time the integrity check actually
+    // ran: stripping only "www." left the scheme on, no hostname ever
+    // matched its own domain, and 14 healthy Fathom connections were
+    // flagged as carrying another site's traffic. Strip scheme, port and
+    // path down to the bare host before comparing.
+    .map(r => ({ host: String(r.hostname || '').toLowerCase().replace(/^[a-z+.-]+:\/\//, '').replace(/[/:?#].*$/, '').replace(/^www\./, ''), n: num(r.pageviews) }))
     .filter(r => r.host);
 }
 
