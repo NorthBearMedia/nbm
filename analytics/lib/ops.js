@@ -244,6 +244,8 @@ const TARGET_KEYWORDS = {
   'muskengineering.co.uk': 'process services peterborough, industrial pipework contractors, musk engineering',
   'woodlandwalkdaycare.co.uk': 'day nursery bottesford, childcare bottesford, woodland walk daycare',
   'melanieparker.co.uk': 'physiotherapy belper, home visit physio derbyshire, private physiotherapist derby',
+  // Starter value only. The live list for this client is set deliberately
+  // from their own ideal client profile, see STRATEGIC_KEYWORDS below.
   'williscooper.com': 'willis cooper',
   'active-personnel.co.uk': 'recruitment agency, active personnel',
   'ensohr.co.uk': 'enso hr, hr consultant',
@@ -268,6 +270,44 @@ const NEW_SITES = [
   { name: 'Enso HR', domain: 'ensohr.co.uk' },
   { name: 'CN Maintenance', domain: 'cn-maintenance.com' },
 ];
+
+// Keyword lists agreed with a client, rather than derived from their search
+// data. deriveTargetKeywords() must never overwrite these, so each one is
+// written straight onto the site and its entry removed from the auto
+// register: a value matching neither the starter map nor an auto entry
+// reads as owner authored, which is exactly what it is.
+//
+// Bump STRATEGIC_KEYWORDS_VERSION to roll out a revision. Raising the
+// version re-applies every row, so edit a list and bump together.
+const STRATEGIC_KEYWORDS_VERSION = 1;
+const STRATEGIC_KEYWORDS = {
+  // From Willis Cooper's ideal client profile, October 2026: a Xero and
+  // Dext user who wants the full service and values advice. Price led
+  // terms are left out on purpose, they attract the opposite client.
+  'williscooper.com': 'chartered accountant belper, xero accountant derbyshire, cloud accounting belper, accountant for small business derbyshire, willis cooper',
+};
+
+export function applyStrategicKeywords() {
+  const stamp = String(STRATEGIC_KEYWORDS_VERSION);
+  if (getSetting('strategic_keywords_version') === stamp) return [];
+  let auto = {};
+  try { auto = JSON.parse(getSetting('target_keywords_auto') || '{}'); } catch { /* fresh */ }
+  const applied = [];
+  const sites = db.prepare('SELECT id, client_name, domain, target_keywords FROM sites').all();
+  for (const site of sites) {
+    const d = (site.domain || '').toLowerCase().replace(/^www\./, '');
+    const kws = STRATEGIC_KEYWORDS[d];
+    if (!kws) continue;
+    if ((site.target_keywords || '').trim() === kws) { delete auto[d]; continue; }
+    db.prepare('UPDATE sites SET target_keywords = ? WHERE id = ?').run(kws, site.id);
+    delete auto[d];
+    applied.push(site.client_name);
+    console.log('[keywords] strategy applied:', site.client_name);
+  }
+  setSetting('target_keywords_auto', JSON.stringify(auto));
+  setSetting('strategic_keywords_version', stamp);
+  return applied;
+}
 
 function ensureManagedSites() {
   // Managed sites are held until their GSC verifies (verifyManagedSitesGsc
@@ -1760,6 +1800,7 @@ export function scheduleOpsSweep() {
   // Contacts load on every boot (cheap, offline, idempotent).
   try { ensureManagedSites(); } catch (e) { console.error('[ops] managed sites:', e.message); }
   try { loadClientContacts(); } catch (e) { console.error('[ops]', e.message); }
+  try { applyStrategicKeywords(); } catch (e) { console.error('[ops] strategic keywords:', e.message); }
   // GA auto-install proof on the demo site (never a client site), then a
   // recurring background pass that confirms pending injections + cleans up.
   if (getSetting('inject_mech_version') !== INJECT_MECH_VERSION) {
