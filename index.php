@@ -26,7 +26,7 @@ include 'includes/header.php';
                 <div class="who-text slide-up">
                     <h3>Who We Are</h3>
                     <p class="who-accent">Engineering solutions that deliver results.</p>
-                    <p class="who-body">With a legacy in mechanical process engineering, Steve Musk Engineering provides high-quality, precision-driven solutions for complex industrial projects. Our reputation is built on <span class="teal-highlight"><strong>innovation, reliability, and over five decades of expertise.</strong></span></p>
+                    <p class="who-body">With a legacy in mechanical process engineering, Musk Engineering provides high-quality, precision-driven solutions for complex industrial projects. Our reputation is built on <span class="teal-highlight"><strong>innovation, reliability, and over five decades of expertise.</strong></span></p>
                     <p class="who-body">We work with industry leaders to develop custom solutions, from <span class="teal-highlight"><strong>design and fabrication to on-site installation.</strong></span> Whether optimising efficiency or delivering full-scale mechanical process systems, our team is trusted to get the job done.</p>
                     <a href="/about.php" class="btn btn-outline-teal">Learn More...</a>
                 </div>

@@ -1,7 +1,7 @@
 <?php
 $currentPage = 'services';
 $pageTitle = 'Services';
-$pageDescription = 'Complete mechanical and process engineering solutions from Musk Engineering Ltd - advanced mechanical process systems, custom fabrication, and seamless integration and installation.';
+$pageDescription = 'Complete mechanical and process engineering solutions from Musk Engineering - advanced mechanical process systems, custom fabrication, and seamless integration and installation.';
 include 'includes/header.php';
 ?>
 
@@ -9,7 +9,7 @@ include 'includes/header.php';
     <section class="services-hero">
         <div class="container">
             <h1 class="services-title slide-up">Our Services</h1>
-            <p class="services-subtitle fade-in">At Steve Musk Engineering, we provide complete mechanical and process engineering solutions. From design to fabrication and installation, our expertise ensures precision, efficiency, and reliability in every project.</p>
+            <p class="services-subtitle fade-in">At Musk Engineering, we provide complete mechanical and process engineering solutions. From design to fabrication and installation, our expertise ensures precision, efficiency, and reliability in every project.</p>
         </div>
     </section>
 

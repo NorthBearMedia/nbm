@@ -11,7 +11,7 @@ $canonicalUrl = 'https://muskengineering.co.uk' . $canonPath;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo isset($pageTitle) ? $pageTitle . ' | ' : ''; ?>Musk Engineering Ltd | Precision and Innovation in Engineering</title>
+    <title><?php echo isset($pageTitle) ? $pageTitle . ' | ' : ''; ?>Musk Engineering | Precision and Innovation in Engineering</title>
     <meta name="description" content="<?php echo isset($pageDescription) ? $pageDescription : 'With a legacy in mechanical process engineering, Musk Engineering provides high-quality, precision-driven solutions for complex industrial projects.'; ?>">
     <link rel="canonical" href="<?php echo htmlspecialchars($canonicalUrl, ENT_QUOTES); ?>">
     <meta property="og:url" content="<?php echo htmlspecialchars($canonicalUrl, ENT_QUOTES); ?>">
@@ -21,8 +21,8 @@ $canonicalUrl = 'https://muskengineering.co.uk' . $canonPath;
     {
         "@context": "https://schema.org",
         "@type": "Organization",
-        "name": "Steve Musk Engineering Ltd",
-        "alternateName": "Musk Engineering Ltd",
+        "name": "Musk Engineering",
+        "legalName": "Steve Musk Engineering Ltd",
         "url": "https://muskengineering.co.uk",
         "logo": "https://muskengineering.co.uk/images/musk-logo-square.png",
         "image": "https://muskengineering.co.uk/images/og-image.jpg",
@@ -30,7 +30,10 @@ $canonicalUrl = 'https://muskengineering.co.uk' . $canonPath;
         "telephone": "+441773307300",
         "address": {
             "@type": "PostalAddress",
+            "streetAddress": "Unit B, Heage Road Industrial Estate",
+            "addressLocality": "Ripley",
             "addressRegion": "Derbyshire",
+            "postalCode": "DE5 3GH",
             "addressCountry": "GB"
         },
         "contactPoint": {
@@ -56,17 +59,17 @@ $canonicalUrl = 'https://muskengineering.co.uk' . $canonPath;
 
     <!-- Open Graph / Social Share -->
     <meta property="og:type" content="website">
-    <meta property="og:site_name" content="Musk Engineering Ltd">
-    <meta property="og:title" content="<?php echo isset($pageTitle) ? $pageTitle . ' | ' : ''; ?>Musk Engineering Ltd | Precision and Innovation in Engineering">
+    <meta property="og:site_name" content="Musk Engineering">
+    <meta property="og:title" content="<?php echo isset($pageTitle) ? $pageTitle . ' | ' : ''; ?>Musk Engineering | Precision and Innovation in Engineering">
     <meta property="og:description" content="<?php echo isset($pageDescription) ? $pageDescription : 'With a legacy in mechanical process engineering, Musk Engineering provides high-quality, precision-driven solutions for complex industrial projects.'; ?>">
     <meta property="og:image" content="https://muskengineering.co.uk/images/og-image.jpg">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="Musk Engineering Ltd">
+    <meta property="og:image:alt" content="Musk Engineering">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="<?php echo isset($pageTitle) ? $pageTitle . ' | ' : ''; ?>Musk Engineering Ltd | Precision and Innovation in Engineering">
+    <meta name="twitter:title" content="<?php echo isset($pageTitle) ? $pageTitle . ' | ' : ''; ?>Musk Engineering | Precision and Innovation in Engineering">
     <meta name="twitter:description" content="<?php echo isset($pageDescription) ? $pageDescription : 'With a legacy in mechanical process engineering, Musk Engineering provides high-quality, precision-driven solutions for complex industrial projects.'; ?>">
     <meta name="twitter:image" content="https://muskengineering.co.uk/images/og-image.jpg">
 
@@ -83,7 +86,7 @@ $canonicalUrl = 'https://muskengineering.co.uk' . $canonPath;
         <div class="container">
             <div class="header-inner">
                 <a href="/" class="logo">
-                    <img src="/images/musk-logo.png" alt="Musk Engineering Ltd" class="logo-img">
+                    <img src="/images/musk-logo.png" alt="Musk Engineering" class="logo-img">
                 </a>
                 <nav class="main-nav" id="mainNav">
                     <ul>

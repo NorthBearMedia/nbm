@@ -1,7 +1,7 @@
 <?php
 $currentPage = 'about';
 $pageTitle = 'About Us';
-$pageDescription = 'Learn about Musk Engineering Ltd - over five decades of expertise in mechanical process engineering, delivering precision-driven solutions for complex industrial projects.';
+$pageDescription = 'Learn about Musk Engineering - over five decades of expertise in mechanical process engineering, delivering precision-driven solutions for complex industrial projects.';
 include 'includes/header.php';
 ?>
 
@@ -9,7 +9,7 @@ include 'includes/header.php';
     <section class="about-centered-section about-white">
         <div class="container">
             <h3 class="about-heading slide-up">About Musk Engineering</h3>
-            <p class="about-body-gray fade-in">Founded on a legacy of precision and reliability, Steve Musk Engineering delivers high-quality mechanical process solutions for industry leaders. With decades of expertise, we specialise in mechanical design, fabrication, and installation.</p>
+            <p class="about-body-gray fade-in">Founded on a legacy of precision and reliability, Musk Engineering delivers high-quality mechanical process solutions for industry leaders. With decades of expertise, we specialise in mechanical design, fabrication, and installation.</p>
         </div>
     </section>
 
@@ -39,7 +39,7 @@ include 'includes/header.php';
     <section class="about-centered-section about-teal">
         <div class="container">
             <h3 class="about-heading about-heading-white slide-up">Our Approach</h3>
-            <p class="about-body-white fade-in">At Steve Musk Engineering, we focus on <strong>precision, efficiency, and safety</strong> in every project. Whether designing complex mechanical systems or executing full-scale installations, our team ensures seamless project execution with a commitment to <strong>excellence and innovation</strong>.</p>
+            <p class="about-body-white fade-in">At Musk Engineering, we focus on <strong>precision, efficiency, and safety</strong> in every project. Whether designing complex mechanical systems or executing full-scale installations, our team ensures seamless project execution with a commitment to <strong>excellence and innovation</strong>.</p>
         </div>
     </section>
 

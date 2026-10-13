@@ -1,7 +1,7 @@
 <?php
 $currentPage = 'contact';
 $pageTitle = 'Contact';
-$pageDescription = 'Get in touch with Musk Engineering Ltd for your mechanical process engineering requirements. Based in Derbyshire, serving clients across the UK.';
+$pageDescription = 'Get in touch with Musk Engineering for your mechanical process engineering requirements. Based in Ripley, Derbyshire, serving clients across the UK.';
 
 $formSubmitted = false;
 $formError = false;
@@ -49,6 +49,15 @@ include 'includes/header.php';
                         <li>
                             <span class="contact-details-label">Email</span>
                             <a href="mailto:info@muskengineering.co.uk">info@muskengineering.co.uk</a>
+                        </li>
+                        <li>
+                            <span class="contact-details-label">Address</span>
+                            <address class="contact-details-address">
+                                Musk Engineering<br>
+                                Unit B, Heage Road Industrial Estate<br>
+                                Ripley, Derbyshire<br>
+                                DE5 3GH
+                            </address>
                         </li>
                     </ul>
                 </div>

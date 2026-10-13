@@ -1123,6 +1123,14 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--white);
 }
 
+.footer-address {
+    font-style: normal;
+    font-size: 1rem;
+    line-height: 1.6;
+    opacity: 0.9;
+    margin-top: 0.75rem;
+}
+
 .footer-bottom {
     border-top: 1px solid rgba(255,255,255,0.2);
     padding: 24px 0;
@@ -1633,6 +1641,14 @@ h1, h2, h3, h4, h5, h6 {
 
 .contact-details a:hover {
     color: var(--primary-teal);
+}
+
+.contact-details-address {
+    font-style: normal;
+    color: var(--dark-text);
+    font-size: 1.1rem;
+    font-weight: 500;
+    line-height: 1.6;
 }
 
 .contact-form-card {
