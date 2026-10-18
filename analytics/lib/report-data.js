@@ -8,6 +8,7 @@ import { gatherFathom } from './fathom.js';
 import { getFathomToken } from './runtime-config.js';
 import { previousPeriod } from './dates.js';
 import { reportUptime } from './monitor.js';
+import { gaAiTraffic, fathomAiTraffic } from './ai-traffic.js';
 
 async function attempt(name, warnings, fn) {
   try { return await fn(); } catch (err) {
@@ -66,6 +67,7 @@ export async function gatherReportData(site, start, end, opts = {}) {
     return missedDays <= Math.max(2, periodDays * 0.15);
   };
 
+  let aiRaw = null;
   jobs.push((async () => {
     let fathomBlock = null;
     if (useFathom) {
@@ -74,10 +76,12 @@ export async function gatherReportData(site, start, end, opts = {}) {
       // whose Fathom was connected days ago would otherwise headline a
       // month's report with a couple of days of visits — which is exactly
       // what made EVC Citysprint's report claim its tracking was broken.
-      if (fathomBlock && coversPeriod(fathomBlock)) { data.ga4 = fathomBlock; return; }
-      if (fathomBlock) warnings.push('Fathom history starts mid-period — using Google Analytics for this report so the totals cover the whole period.');
+      // (No early return here: the AI-assistant count at the end of this
+      // job must run whichever source wins.)
+      if (fathomBlock && coversPeriod(fathomBlock)) data.ga4 = fathomBlock;
+      else if (fathomBlock) warnings.push('Fathom history starts mid-period — using Google Analytics for this report so the totals cover the whole period.');
     }
-    if (site.ga4_property_id) {
+    if (!data.ga4 && site.ga4_property_id) {
       const pid = site.ga4_property_id;
       const [overview, prevOverview, timeseries, topPages, channels, devices] = await Promise.all([
         attempt('Analytics overview', warnings, () => ga4.fetchOverview(pid, start, end)),
@@ -101,6 +105,20 @@ export async function gatherReportData(site, start, end, opts = {}) {
     // GA unusable after all (no property, silent, or wrong property)?
     // Fathom's partial history still beats reporting nothing.
     if (!data.ga4 && fathomBlock) data.ga4 = fathomBlock;
+
+    // Visits that came from AI assistants, read from the SAME source that
+    // supplies the headline numbers so the share is apples to apples.
+    if (data.ga4?.sourceLabel === 'Fathom Analytics') {
+      aiRaw = {
+        cur: await attempt('AI assistant visits', warnings, () => fathomAiTraffic(site.fathom_site_id, start, end)),
+        prev: await attempt('AI assistant visits (prev)', warnings, () => fathomAiTraffic(site.fathom_site_id, prev.start, prev.end)),
+      };
+    } else if (data.ga4?.sourceLabel === 'Google Analytics' && site.ga4_property_id) {
+      aiRaw = {
+        cur: await attempt('AI assistant visits', warnings, () => gaAiTraffic(site.ga4_property_id, start, end)),
+        prev: await attempt('AI assistant visits (prev)', warnings, () => gaAiTraffic(site.ga4_property_id, prev.start, prev.end)),
+      };
+    }
   })());
 
   if (site.gsc_site_url) {
@@ -212,6 +230,19 @@ export async function gatherReportData(site, start, end, opts = {}) {
       data.ga4.independentTraffic = gscClicks;
       warnings.push(`Traffic source under-counting: ${data.ga4.sourceLabel} shows ${sessions} sessions but Search Console recorded ${gscClicks} clicks from Google alone — the tracking tag likely isn't firing on the live site.`);
     }
+  }
+
+  // Visits from AI assistants: attached only when the traffic source is
+  // trusted (never alongside an under-counting tag), zero included: "no
+  // AI visits yet" is a true and useful answer for a client.
+  if (aiRaw?.cur && data.ga4?.overview && !data.ga4.unreliable) {
+    const sessions = Number(data.ga4.overview.sessions || 0);
+    data.aiTraffic = {
+      visits: aiRaw.cur.visits,
+      prevVisits: aiRaw.prev ? aiRaw.prev.visits : null,
+      sharePct: sessions > 0 ? Math.round((aiRaw.cur.visits / sessions) * 1000) / 10 : null,
+      top: aiRaw.cur.top.slice(0, 3),
+    };
   }
 
   // AI-written (or rules-based) insights, computed once the data is in.

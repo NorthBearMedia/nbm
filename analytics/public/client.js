@@ -134,6 +134,14 @@ function render(d) {
     html += `</div>`;
   }
 
+  if (!gaBad && d.aiTraffic) {
+    const ai = d.aiTraffic;
+    html += `<div class="panel" style="margin-top:12px"><strong>Visits from AI assistants</strong> <span class="hint">ChatGPT, Perplexity, Gemini, Copilot and co</span>
+      <div style="margin-top:6px">${ai.visits > 0
+        ? `<strong style="font-size:18px">${fmtInt(ai.visits)}</strong>${ai.sharePct != null ? ` <span class="hint">(${esc(ai.sharePct)}% of visits)</span>` : ''}${ai.top?.length ? ` <span class="hint">· ${ai.top.map(t => esc(t.source) + ' ' + fmtInt(t.visits)).join(', ')}</span>` : ''}`
+        : `<span class="hint">None recorded this period. As more people search with AI tools, visitors they send will show here.</span>`}</div></div>`;
+  }
+
   if (s && d.search.empty) {
     html += section('Google search performance', 'Average position = where you rank in Google. 1–10 is page one.');
     html += `<div class="panel"><p class="hint">Your site is connected to Google Search Console, but Google hasn't recorded any searches leading to it in this period yet. As your site builds authority, the terms people find you with will appear here.</p></div>`;

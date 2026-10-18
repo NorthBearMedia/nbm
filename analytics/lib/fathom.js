@@ -3,6 +3,7 @@
 // Fathom API key is configured. The data is mapped into the same shape the
 // PDF and dashboard already expect for GA4, so everything renders for free.
 import { getFathomToken } from './runtime-config.js';
+import { bareHost, aiLabelFor } from './ai-traffic.js';
 import { previousPeriod } from './dates.js';
 
 const BASE = 'https://api.usefathom.com/v1';
@@ -121,12 +122,19 @@ function overviewFrom(row) {
 
 function friendlyRef(host) {
   if (!host) return 'Direct';
-  host = String(host).replace(/^www\./, '');
-  if (/google\./.test(host)) return 'Google search';
-  if (/bing\./.test(host)) return 'Bing';
-  if (/duckduckgo/.test(host)) return 'DuckDuckGo';
-  if (/(facebook|instagram|t\.co|twitter|x\.com|linkedin|tiktok)/.test(host)) return 'Social media';
-  return host;
+  // Hosts arrive scheme-prefixed from Fathom; label the bare host. AI
+  // assistants are named before anything else: the old social-media rule
+  // used the t.co shortener as a substring, and "chatgpt.com" contains
+  // "t.co", so ChatGPT referrals were being labelled Social media.
+  const h = bareHost(host);
+  if (!h) return 'Direct';
+  const ai = aiLabelFor(h);
+  if (ai) return `${ai} (AI)`;
+  if (/google\./.test(h)) return 'Google search';
+  if (/bing\./.test(h)) return 'Bing';
+  if (/duckduckgo/.test(h)) return 'DuckDuckGo';
+  if (h === 't.co' || /(facebook|instagram|twitter|x\.com|linkedin|tiktok)/.test(h)) return 'Social media';
+  return h;
 }
 
 // Returns a block in the same shape report-data builds for GA4, tagged with
@@ -177,6 +185,16 @@ export async function fathomHostnames(fathomSiteId, start, end) {
     // path down to the bare host before comparing.
     .map(r => ({ host: String(r.hostname || '').toLowerCase().replace(/^[a-z+.-]+:\/\//, '').replace(/[/:?#].*$/, '').replace(/^www\./, ''), n: num(r.pageviews) }))
     .filter(r => r.host);
+}
+
+// Raw referrer hosts and visit counts, for the AI-assistant counter.
+export async function fathomReferrers(fathomSiteId, start, end, limit = 100) {
+  const d = await fathomGet('/aggregations', {
+    entity: 'pageview', entity_id: fathomSiteId, aggregates: 'visits',
+    field_grouping: 'referrer_hostname', sort_by: 'visits:desc', limit,
+    date_from: dt(start), date_to: dt(end, true), timezone: 'Europe/London',
+  });
+  return rows(d).map(r => ({ host: String(r.referrer_hostname || ''), visits: num(r.visits) })).filter(r => r.host);
 }
 
 export async function testConnection() {
