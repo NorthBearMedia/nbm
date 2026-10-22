@@ -373,6 +373,25 @@ export async function generateReportPdf(data) {
     y = yAfterBars + 16;
   }
 
+  // ── Visits from AI assistants ──
+  if (data.aiTraffic && data.ga4?.overview && !data.ga4.unreliable) {
+    const ai = data.aiTraffic;
+    y = ensureSpace(doc, data, y, 50);
+    doc.roundedRect(M, y, CW, 38, 6).fill(C.card);
+    doc.roundedRect(M, y, CW, 38, 6).lineWidth(0.75).stroke(C.border);
+    doc.rect(M, y + 6, 2.5, 26).fill(C.green);
+    doc.font('Helvetica-Bold').fontSize(7.5).fillColor(C.sub)
+      .text('VISITS FROM AI ASSISTANTS (CHATGPT, PERPLEXITY, GEMINI, COPILOT…)', M + 12, y + 8, { characterSpacing: 0.8, lineBreak: false, ellipsis: true, width: CW - 24 });
+    const aiText = ai.visits > 0
+      ? `${fmtInt(ai.visits)} visit${ai.visits === 1 ? '' : 's'}`
+        + (ai.sharePct != null ? ` (${ai.sharePct}% of all visits)` : '')
+        + (ai.top.length ? ` · ${ai.top.map(t => `${t.source} ${fmtInt(t.visits)}`).join(', ')}` : '')
+        + (ai.prevVisits != null && ai.prevVisits !== ai.visits ? ` · previous period: ${fmtInt(ai.prevVisits)}` : '')
+      : 'None recorded this period. As more people search with AI tools, visitors they send will show here.';
+    doc.font('Helvetica').fontSize(9).fillColor(C.ink).text(aiText, M + 12, y + 21, { width: CW - 24, lineBreak: false, ellipsis: true });
+    y += 50;
+  }
+
   // ── Page 2: Search performance ──
   doc.addPage();
   y = slimHeader(doc, data);

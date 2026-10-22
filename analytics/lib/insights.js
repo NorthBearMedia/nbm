@@ -36,6 +36,8 @@ function snapshot(data) {
     search: s ? { clicks: s.clicks, impressions: s.impressions, avgPosition: s.position } : null,
     topQueries: (data.search?.topQueries || []).slice(0, 5).map(q => ({ query: q.query, clicks: q.clicks, position: q.position })),
     clarity: data.clarity ? { deadClicks: data.clarity.deadClicks, rageClicks: data.clarity.rageClicks, avgScrollDepth: data.clarity.avgScrollDepth } : null,
+    aiAssistantVisits: data.aiTraffic ? data.aiTraffic.visits : undefined,
+    topAiAssistant: data.aiTraffic?.top?.[0]?.source,
   };
   return f;
 }
@@ -49,6 +51,7 @@ Rules:
 - "about", when present, is the business described in the owner's own words. Use it to make every recommendation specific to what they actually sell and who they serve, and never contradict it.
 - Mind the time of year (the covering dates are given): quiet spells over Christmas/New Year, Easter or summer holidays are normal for many small businesses — frame a seasonal dip as expected seasonality, not a problem to fix.
 - If "trafficTagBeingFixed" is true, the visitor-count tag is being reconnected, so visit/page numbers are absent — DO NOT say the site had few visitors, is a placeholder, or is "coming soon". Lead the analysis on the search performance and behaviour (Clarity) data, which are accurate.
+- "aiAssistantVisits", when present, counts visitors who arrived from AI assistants such as ChatGPT or Perplexity. A notable or growing number is worth one upbeat mention (people are finding this business through AI answers); a zero is normal today and must never be framed as a failing.
 - Reply with ONLY a JSON object, no prose around it:
   {"headline": "one encouraging plain-English sentence summarising the month",
    "recommendations": [{"title": "3-5 word bold label", "detail": "1-2 sentence specific insight or action"}]}

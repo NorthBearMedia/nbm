@@ -91,6 +91,22 @@ export async function fetchDevices(propertyId, start, end) {
   }));
 }
 
+// Session sources by raw referrer host ("chatgpt.com", "google",
+// "perplexity.ai"), the input for counting visits from AI assistants.
+export async function fetchSources(propertyId, start, end, limit = 250) {
+  const report = await runReport(propertyId, {
+    dateRanges: [{ startDate: start, endDate: end }],
+    dimensions: [{ name: 'sessionSource' }],
+    metrics: [{ name: 'sessions' }],
+    orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+    limit,
+  });
+  return (report.rows || []).map(r => ({
+    source: r.dimensionValues[0].value,
+    sessions: Number(r.metricValues[0].value),
+  }));
+}
+
 // Quick connectivity check used by the admin "test connection" button.
 export async function testConnection(propertyId) {
   await fetchOverview(propertyId, '7daysAgo', 'yesterday');
