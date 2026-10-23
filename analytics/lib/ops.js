@@ -978,13 +978,17 @@ async function onboardNewSites() {
       // Create: in the account that owns the agency's own property.
       const home = summaries.find(a => (a.propertySummaries || []).some(p => p.property === 'properties/526994009')) || summaries[0];
       if (!home) { console.log('[onboard]', s.d, 'no GA account visible — cannot create property'); continue; }
+      // Creates are not idempotent: never let the shared retry policy
+      // re-send one after a timeout or 5xx (that made duplicate properties).
       const prop = await gReq({
         url: 'https://analyticsadmin.googleapis.com/v1beta/properties', method: 'POST',
         data: { parent: home.account, displayName: s.client_name || s.d, timeZone: 'Europe/London', currencyCode: 'GBP' },
+        retryConfig: { retry: 0 },
       }, editAuth);
       const stream = await gReq({
         url: `https://analyticsadmin.googleapis.com/v1beta/${prop.name}/dataStreams`, method: 'POST',
         data: { type: 'WEB_DATA_STREAM', displayName: s.client_name || s.d, webStreamData: { defaultUri: 'https://' + s.d } },
+        retryConfig: { retry: 0 },
       }, editAuth);
       index.push({ property: prop.name, webStreams: [stream] });
       db.prepare('UPDATE sites SET ga4_property_id = ?, ga4_measurement_id = ? WHERE id = ?')
@@ -1962,7 +1966,12 @@ export function scheduleOpsSweep() {
   setTimeout(() => finalizeSearchConsole().catch(e => console.error('[gsc]', e.message)), 150_000);
   setTimeout(() => verifyManagedSitesGsc().catch(e => console.error('[gsc-managed]', e.message)), 165_000);
   try {
-    cron.schedule('7 * * * *', () => { finalizeSearchConsole().catch(e => console.error('[gsc]', e.message)); verifyManagedSitesGsc().catch(e => console.error('[gsc-managed]', e.message)); healGscProperties().catch(e => console.error('[gsc-heal]', e.message)); }, { timezone: config.timezone, noOverlap: true });
+    // Return the combined promise so noOverlap knows how long the pass runs.
+    cron.schedule('7 * * * *', () => Promise.allSettled([
+      finalizeSearchConsole().catch(e => console.error('[gsc]', e.message)),
+      verifyManagedSitesGsc().catch(e => console.error('[gsc-managed]', e.message)),
+      healGscProperties().catch(e => console.error('[gsc-heal]', e.message)),
+    ]), { timezone: config.timezone, noOverlap: true });
   } catch (e) { console.error('[gsc] schedule failed:', e.message); }
   setTimeout(() => healGscProperties().catch(e => console.error('[gsc-heal]', e.message)), 120_000);
   // Keep live pages matching their intended tag set (Clarity added later,
@@ -1991,7 +2000,10 @@ export function scheduleOpsSweep() {
   // Repair shared Fathom IDs (one client seeing another's numbers) and GA
   // properties that report nothing because the tag feeds a different one.
   try {
-    cron.schedule('47 * * * *', () => { fixDuplicateFathomIds().catch(e => console.error('[fathom-dupe]', e.message)); healGa4MeasurementIds().catch(e => console.error('[ga-mid]', e.message)).then(() => healGa4Properties().catch(e => console.error('[ga-heal]', e.message))); }, { timezone: config.timezone, noOverlap: true });
+    cron.schedule('47 * * * *', () => Promise.allSettled([
+      fixDuplicateFathomIds().catch(e => console.error('[fathom-dupe]', e.message)),
+      healGa4MeasurementIds().catch(e => console.error('[ga-mid]', e.message)).then(() => healGa4Properties().catch(e => console.error('[ga-heal]', e.message))),
+    ]), { timezone: config.timezone, noOverlap: true });
   } catch (e) { console.error('[heal] schedule failed:', e.message); }
   setTimeout(() => fixDuplicateFathomIds().catch(e => console.error('[fathom-dupe]', e.message)), 90_000);
   setTimeout(() => healGa4MeasurementIds().catch(e => console.error('[ga-mid]', e.message))

@@ -96,21 +96,21 @@ function overLimit(map, key, limit, windowMs) {
 }
 
 // Brute-force guard for the single admin password: an address is locked
-// for 15 minutes after 8 wrong guesses, and 60 wrong guesses from anywhere
-// inside 15 minutes pause login for everyone (the owner is emailed once).
-// Each wrong guess also costs 750 ms, so naive tools crawl.
+// for 15 minutes after 8 wrong guesses. Wrong guesses cost 750 ms each,
+// and once 60 arrive from anywhere inside 15 minutes they slow to 3 s and
+// the owner is emailed once. The global count never blocks anyone: a
+// flood from many addresses must not be able to lock the owner out.
 const LOGIN_WINDOW_MS = 15 * 60_000;
 const loginFails = new Map();
 let globalFails = { count: 0, first: 0 };
 function loginBlocked(ip) {
   const now = Date.now();
-  if (now - globalFails.first > LOGIN_WINDOW_MS) globalFails = { count: 0, first: now };
-  if (globalFails.count >= 60) return true;
   const rec = loginFails.get(ip);
   if (!rec) return false;
   if (now - rec.first > LOGIN_WINDOW_MS) { loginFails.delete(ip); return false; }
   return rec.count >= 8;
 }
+// Returns true while the fleet-wide flood level is reached.
 function noteLoginFail(ip) {
   const now = Date.now();
   // Bound the table under a flood from many addresses.
@@ -120,10 +120,11 @@ function noteLoginFail(ip) {
   if (now - globalFails.first > LOGIN_WINDOW_MS) globalFails = { count: 0, first: now };
   globalFails.count++;
   if (globalFails.count === 60) {
-    sendAlert('login-bruteforce', 'PULSE: admin login paused after 60 wrong passwords',
-      `60 wrong admin passwords in 15 minutes from ${loginFails.size} address(es). Login is paused for everyone for 15 minutes. If this was not you, change ADMIN_PASSWORD in the Railway variables.`)
+    sendAlert('login-bruteforce', 'PULSE: 60 wrong admin passwords in 15 minutes',
+      `60 wrong admin passwords in 15 minutes from ${loginFails.size} address(es). Each address is locked after 8 guesses and wrong guesses now answer slowly. If this was not you, change ADMIN_PASSWORD in the Railway variables.`)
       .catch(e => console.error('[auth] alert failed:', e.message));
   }
+  return globalFails.count >= 60;
 }
 
 // Sessions are signed over their expiry and a per-install epoch kept in
@@ -155,8 +156,12 @@ function requireAdmin(req, res, next) {
   // Refuse requests a browser marks as coming from another site: typed
   // URLs and bookmarks arrive as 'none', our own pages as 'same-origin'.
   // Old browsers and curl send nothing and fall through to the cookie.
+  // A plain GET navigation is allowed through (a PDF link the owner
+  // pasted into web mail or chat): admin GETs are read-only, and the Lax
+  // cookie, CORS and frame-ancestors already stop cross-site reads.
   const fetchSite = req.get('sec-fetch-site');
-  if (fetchSite && fetchSite !== 'same-origin' && fetchSite !== 'none') {
+  const readNav = (req.method === 'GET' || req.method === 'HEAD') && req.get('sec-fetch-mode') === 'navigate';
+  if (fetchSite && fetchSite !== 'same-origin' && fetchSite !== 'none' && !readNav) {
     return res.status(403).json({ error: 'Cross-site request refused' });
   }
   if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -183,8 +188,8 @@ app.post('/api/login', async (req, res) => {
   const real = Buffer.from(String(config.adminPassword));
   const okPw = given.length === real.length && timingSafeEqual(given, real);
   if (!okPw) {
-    noteLoginFail(ip);
-    await new Promise(r => setTimeout(r, 750));
+    const flood = noteLoginFail(ip);
+    await new Promise(r => setTimeout(r, flood ? 3000 : 750));
     return res.status(401).json({ error: 'Wrong password' });
   }
   loginFails.delete(ip);
@@ -730,7 +735,7 @@ const INFLIGHT_TTL = 2 * 60 * 1000;
 // These are the attempt() labels report-data.js uses for fetch failures;
 // persistent data-quality warnings keep the full cache time.
 const DEGRADED_TTL = 60 * 1000;
-const FETCH_FAILED = /^(Fathom analytics|Analytics (overview|comparison|daily traffic|top pages|channels|devices)|Search (summary|comparison|top queries|previous queries|target keywords)|AI assistant visits):/;
+const FETCH_FAILED = /^(Fathom analytics|Analytics (overview|comparison|daily traffic|top pages|channels|devices)|Search (summary|comparison|top queries|previous queries|target keywords)|AI assistant visits|Site health)( \(prev\))?:/;
 const dataHits = new Map();
 
 app.get('/api/client/:token/data', async (req, res) => {
@@ -794,11 +799,11 @@ const reportHits = new Map();
 app.post('/api/client/:token/request-report', async (req, res) => {
   const site = siteByToken(req.params.token);
   if (!site) return res.status(404).json({ error: 'Dashboard not found' });
-  if (overLimit(reportHits, req.ip || 'unknown', 5, 60 * 60_000)) {
-    return res.status(429).json({ error: 'Too many report requests from this connection. Please try again in an hour.' });
-  }
   if (reportBusy.has(site.id)) {
     return res.status(409).json({ error: 'Your report is already being prepared. Give it a minute and check your inbox.' });
+  }
+  if (overLimit(reportHits, req.ip || 'unknown', 5, 60 * 60_000)) {
+    return res.status(429).json({ error: 'Too many report requests from this connection. Please try again in an hour.' });
   }
   // Daily cap on SUCCESSFUL sends only: three failures shouldn't lock a
   // client out with a message claiming a report is "already in your inbox".

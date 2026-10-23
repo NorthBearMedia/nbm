@@ -334,11 +334,15 @@ $('#requestReportBtn').onclick = async (e) => {
   const timer = setTimeout(() => ctrl.abort(), 150000);
   const stillGoing = () => { toast('Your report is being prepared and will arrive by email shortly.', 'ok', 8000); return 60000; };
   let holdMs = 0;
+  const started = Date.now();
   try {
     const res = await fetch(`/api/client/${token}/request-report`, { method: 'POST', signal: ctrl.signal });
     const data = await res.json().catch(() => ({}));
     if (res.ok) toast(data.message || 'Report sent — check your inbox!', 'ok', 8000);
-    else if (res.status === 502 || res.status === 504) holdMs = stillGoing();
+    // A gateway timeout after a long wait means the server is still working;
+    // a fast 502 means the app was not reachable and nothing was started.
+    else if ((res.status === 502 || res.status === 504) && Date.now() - started > 20000) holdMs = stillGoing();
+    else if (res.status === 409) { toast(data.error || 'Your report is already being prepared. Give it a minute and check your inbox.', 'ok', 8000); holdMs = 60000; }
     else toast(data.error || 'Could not send the report just now.', 'err', 8000);
   } catch (err) {
     if (err && err.name === 'AbortError') holdMs = stillGoing();
