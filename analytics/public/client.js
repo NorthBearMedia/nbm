@@ -327,13 +327,28 @@ async function load() {
 $('#requestReportBtn').onclick = async (e) => {
   const btn = e.target;
   btn.disabled = true; btn.textContent = 'Preparing your report…';
+  // The server builds and emails the report inside this request, which
+  // can take a few minutes. A dropped connection or gateway timeout does
+  // not mean it failed, so say so and hold the button for a minute.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 150000);
+  const stillGoing = () => { toast('Your report is being prepared and will arrive by email shortly.', 'ok', 8000); return 60000; };
+  let holdMs = 0;
+  const started = Date.now();
   try {
-    const res = await fetch(`/api/client/${token}/request-report`, { method: 'POST' });
+    const res = await fetch(`/api/client/${token}/request-report`, { method: 'POST', signal: ctrl.signal });
     const data = await res.json().catch(() => ({}));
     if (res.ok) toast(data.message || 'Report sent — check your inbox!', 'ok', 8000);
+    // A gateway timeout after a long wait means the server is still working;
+    // a fast 502 means the app was not reachable and nothing was started.
+    else if ((res.status === 502 || res.status === 504) && Date.now() - started > 20000) holdMs = stillGoing();
+    else if (res.status === 409) { toast(data.error || 'Your report is already being prepared. Give it a minute and check your inbox.', 'ok', 8000); holdMs = 60000; }
     else toast(data.error || 'Could not send the report just now.', 'err', 8000);
-  } catch { toast('Could not send the report just now.', 'err'); }
-  btn.disabled = false; btn.textContent = '✉ Email me a fresh report';
+  } catch (err) {
+    if (err && err.name === 'AbortError') holdMs = stillGoing();
+    else toast('Could not send the report just now.', 'err');
+  } finally { clearTimeout(timer); }
+  setTimeout(() => { btn.disabled = false; btn.textContent = '✉ Email me a fresh report'; }, holdMs);
 };
 
 load();

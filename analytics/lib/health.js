@@ -8,9 +8,14 @@ import { syncSite } from './clarity.js';
 import { gatherFathom } from './fathom.js';
 import { getFathomToken } from './runtime-config.js';
 import { addDays, todayISO } from './dates.js';
+import { readBodyCapped } from './fetch-body.js';
 
 const ok = detail => ({ ok: true, detail });
 const bad = detail => ({ ok: false, detail });
+// Twenty sites are checked at once, each holding its own copy of these
+// JSON blobs across several awaits. Decisions use the early copy, but every
+// write re-reads the stored blob first so sites cannot overwrite each other.
+const readJson = key => { try { return JSON.parse(getSetting(key) || '{}'); } catch { return {}; } };
 
 // The live homepage (cache-busted), for tag-presence checks: a saved API
 // token or property ID says nothing about whether the tracking code is
@@ -22,7 +27,7 @@ async function fetchHomepage(domain) {
       headers: { 'User-Agent': 'Mozilla/5.0 (NBM Pulse health check)' },
     });
     if (!res.ok) return null;
-    return await res.text();
+    return await readBodyCapped(res, 2_000_000);
   } catch { return null; }
 }
 
@@ -85,7 +90,7 @@ async function siteHealth(site, start, end) {
     // doesn't exist. Name the real possibilities instead.
     if (!fathomTagOn) return bad('not on the live page yet — sites Pulse can edit get it automatically within the hour. Otherwise add this site\'s Tracking code wherever its pages get their <head>: the site builder\'s custom-code box, the CMS theme header, or a header include/template — and if the code is already in a repo, check the deployed copy is up to date.');
     const since = pending[domain] || Date.now();
-    if (pending[domain] !== since) { pending[domain] = since; setSetting('fathom_pending', JSON.stringify(pending)); }
+    if (!pending[domain]) { const cur = readJson('fathom_pending'); cur[domain] = since; setSetting('fathom_pending', JSON.stringify(cur)); }
     const waited = Date.now() - since;
     return waited < GRACE_MS
       ? ok('script installed ✓ — waiting on the first visitor for data')
@@ -98,7 +103,7 @@ async function siteHealth(site, start, end) {
     : await gatherFathom(site.fathom_site_id, start, end)
         .then(m => {
           if (m?.overview) {
-            if (pending[domain]) { delete pending[domain]; setSetting('fathom_pending', JSON.stringify(pending)); }
+            if (pending[domain]) { const cur = readJson('fathom_pending'); delete cur[domain]; setSetting('fathom_pending', JSON.stringify(cur)); }
             return ok(`${Math.round(m.overview.sessions)} visits (7d)${integ.fathom?.status === 'verified' ? ' · traffic verified from this domain ✓' : ''}`);
           }
           return noData();
@@ -208,7 +213,7 @@ async function siteHealth(site, start, end) {
     if (key === 'fathom' && /waiting on the first visitor/.test(v.detail || '')) continue;
     if (seenWorking[key] !== today) { seenWorking[key] = today; recorded = true; }
   }
-  if (recorded) { lastOk[domain] = seenWorking; setSetting('source_last_ok', JSON.stringify(lastOk)); }
+  if (recorded) { const cur = readJson('source_last_ok'); cur[domain] = seenWorking; setSetting('source_last_ok', JSON.stringify(cur)); }
 
   out.delivery = !last ? bad('no reports generated yet')
     : last.status === 'sent' ? ok(`last report sent ${String(last.created_at).slice(0, 10)} (${last.period_label})`)

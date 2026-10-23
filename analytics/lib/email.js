@@ -21,6 +21,10 @@ export function mailer() {
       host: smtp.host,
       port: smtp.port,
       secure: smtp.secure,
+      // Without implicit TLS (port 465) insist on a STARTTLS upgrade: never
+      // fall back to a plaintext session carrying the mailbox password and
+      // client PDFs.
+      requireTLS: !smtp.secure,
       auth: { user: smtp.user, pass: smtp.pass },
       // Fail fast with a clear error instead of hanging for minutes when
       // a host is typo'd or unreachable.
@@ -34,6 +38,7 @@ export function mailer() {
 }
 
 const nf = new Intl.NumberFormat('en-GB');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 function trendHtml(pct, invert = false) {
   if (pct == null || !isFinite(pct)) return '';
@@ -83,8 +88,8 @@ export function reportEmailHtml(site, data, periodText) {
       <tr><td style="padding:32px;">
         <h1 style="font-family:Arial,sans-serif;font-size:20px;color:#23262c;margin:0 0 6px;">Your website report is ready</h1>
         <p style="font-family:Arial,sans-serif;font-size:14px;color:#5c6470;margin:0 0 20px;line-height:1.6;">
-          Hi${site.contact_name ? ' ' + site.contact_name.split(' ')[0] : ''}, here's the performance report for
-          <strong>${site.domain || site.client_name}</strong> covering <strong>${periodText}</strong>.
+          Hi${site.contact_name ? ' ' + esc(site.contact_name.split(' ')[0]) : ''}, here's the performance report for
+          <strong>${esc(site.domain || site.client_name)}</strong> covering <strong>${esc(periodText)}</strong>.
           The full report is attached as a PDF.
         </p>
         ${stats.length ? `<table width="100%" cellpadding="0" cellspacing="8"><tr>${stats.join('')}</tr></table>` : ''}
