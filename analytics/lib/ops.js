@@ -137,6 +137,7 @@ const CLIENT_EMAILS = {
   'wowstays.co.uk': 'paul@investedinproperty.co.uk',
   'ivyhouseresidentialhome.co.uk': 'julie@williscooper.com',
   'richfordvehiclesales.co.uk': 'phil@richfordmotors.com, csaunders@richfordmotors.com',
+  'reynoldslogisticservices.com': 'darren@reynoldsls.co.uk',
 };
 
 // Microsoft Clarity project IDs, keyed by domain — provided by the owner
@@ -250,6 +251,7 @@ const TARGET_KEYWORDS = {
   'active-personnel.co.uk': 'recruitment agency, active personnel',
   'ensohr.co.uk': 'enso hr, hr consultant',
   'cn-maintenance.com': 'cn maintenance, property maintenance',
+  'reynoldslogisticservices.com': 'haulage nottingham, pallet distribution nottingham, warehousing nottingham, reynolds logistics',
 };
 
 // Sites the owner manages but whose DOMAINS he doesn't control (so no
@@ -269,6 +271,7 @@ const MANAGED_SITES = [
 const NEW_SITES = [
   { name: 'Enso HR', domain: 'ensohr.co.uk' },
   { name: 'CN Maintenance', domain: 'cn-maintenance.com' },
+  { name: 'Reynolds Logistics', domain: 'reynoldslogisticservices.com' },
 ];
 
 // Keyword lists agreed with a client, rather than derived from their search
