@@ -14,6 +14,7 @@ import db, { getSetting, setSetting } from '../database.js';
 import { config } from '../config.js';
 import { mailer } from './email.js';
 import { getEmailFrom, getOwnerEmail, getAppUrl, getHostingerToken } from './runtime-config.js';
+import { readBodyCapped } from './fetch-body.js';
 
 export const ROUND_MINUTES = 5;
 const TIMEOUT_MS = 15_000;
@@ -96,6 +97,12 @@ export function ensureFeedToken() {
   return t;
 }
 
+export function rotateFeedToken() {
+  const t = randomBytes(24).toString('hex');
+  setSetting('monitor_feed_token', t);
+  return t;
+}
+
 export function feedTokenMatches(given) {
   const real = Buffer.from(ensureFeedToken());
   const g = Buffer.from(String(given || ''));
@@ -133,7 +140,7 @@ export async function fetchOnce(url) {
       method: 'GET', redirect: 'follow', signal: AbortSignal.timeout(TIMEOUT_MS),
       headers: { 'User-Agent': USER_AGENT, 'Accept': 'text/html,*/*;q=0.8', 'Cache-Control': 'no-cache' },
     });
-    const body = (await res.text().catch(() => '')).slice(0, BODY_CAP);
+    const body = await readBodyCapped(res, BODY_CAP).catch(() => '');
     return {
       ok: res.status >= 200 && res.status < 300, status: res.status, ms: Date.now() - started,
       body, robotsHeader: res.headers.get('x-robots-tag') || '', finalUrl: res.url || url, error: '',

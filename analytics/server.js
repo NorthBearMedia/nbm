@@ -1,6 +1,6 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHmac, timingSafeEqual, randomBytes } from 'crypto';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync } from 'fs';
@@ -21,9 +21,9 @@ import { autoConnectSite } from './lib/autoconnect.js';
 import { seedFirstCustomer } from './lib/seed.js';
 import * as hostinger from './lib/hostinger.js';
 import * as fathom from './lib/fathom.js';
-import { scheduleOpsSweep, runOpsSweep, runInjectionTest, runInjectionRollout, managedGscDiagnosis } from './lib/ops.js';
-import { buildInjectorScript, buildSnippet, rootDirFor } from './lib/inject.js';
-import { uptimeOverview, statusFeed, feedTokenMatches, setMonitorFlags } from './lib/monitor.js';
+import { scheduleOpsSweep, runOpsSweep, runInjectionTest, runInjectionRollout, managedGscDiagnosis, rotateInjectToken } from './lib/ops.js';
+import { buildInjectorScript, buildSnippet, rootDirFor, ID_RULES, ID_HINTS } from './lib/inject.js';
+import { uptimeOverview, statusFeed, feedTokenMatches, setMonitorFlags, sendAlert, rotateFeedToken } from './lib/monitor.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -50,65 +50,154 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
+  // Scripts only from this origin (no inline handlers anywhere in the
+  // pages), so a missed escape in a template can never run code.
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
   next();
 });
 
-// ─── Admin auth (single password, stateless HMAC-signed cookie) ──
-const SECRET = createHmac('sha256', 'nbm-pulse-v1').update(config.adminPassword || 'unset').digest();
+// Nothing under /api, /r or /u may be cached: admin JSON carries dashboard
+// tokens and contact emails, /u is a secret feed, /api/client is client
+// data. no-store keeps it out of the browser's disk cache after logout.
+app.use(['/api', '/r', '/u'], (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
 
-// Simple in-memory brute-force guard for the single admin password:
-// lock an IP for 15 min after 8 failed attempts in a rolling 15-min window.
+// ─── Admin auth (single password, stateless HMAC-signed cookie) ──
+// The signing key mixes a random per-install seed (kept in settings on the
+// volume, or SESSION_SECRET in the environment) with the admin password.
+// The seed never leaves the server, so a captured cookie cannot be used to
+// brute-force the password offline (the old fixed salt was public in this
+// repo); the password is still mixed in so changing it logs everyone out.
+let sessionSeed = process.env.SESSION_SECRET || getSetting('session_secret');
+if (!sessionSeed) {
+  sessionSeed = randomBytes(32).toString('hex');
+  setSetting('session_secret', sessionSeed);
+}
+const SECRET = createHmac('sha256', sessionSeed).update(config.adminPassword || 'unset').digest();
+if (config.adminPassword && config.adminPassword.length < 12) {
+  console.error('[auth] ADMIN_PASSWORD is shorter than 12 characters. Set a long random value in the Railway variables.');
+}
+
+// Small per-key counters for the public routes, same shape as loginFails:
+// true when `key` has gone over `limit` hits inside the rolling window.
+function overLimit(map, key, limit, windowMs) {
+  const now = Date.now();
+  if (map.size > 2000) for (const [k, r] of map) if (now - r.first > windowMs) map.delete(k);
+  const rec = map.get(key);
+  if (!rec || now - rec.first > windowMs) { map.set(key, { count: 1, first: now }); return false; }
+  rec.count++;
+  return rec.count > limit;
+}
+
+// Brute-force guard for the single admin password: an address is locked
+// for 15 minutes after 8 wrong guesses, and 60 wrong guesses from anywhere
+// inside 15 minutes pause login for everyone (the owner is emailed once).
+// Each wrong guess also costs 750 ms, so naive tools crawl.
+const LOGIN_WINDOW_MS = 15 * 60_000;
 const loginFails = new Map();
+let globalFails = { count: 0, first: 0 };
 function loginBlocked(ip) {
+  const now = Date.now();
+  if (now - globalFails.first > LOGIN_WINDOW_MS) globalFails = { count: 0, first: now };
+  if (globalFails.count >= 60) return true;
   const rec = loginFails.get(ip);
   if (!rec) return false;
-  if (Date.now() - rec.first > 15 * 60_000) { loginFails.delete(ip); return false; }
+  if (now - rec.first > LOGIN_WINDOW_MS) { loginFails.delete(ip); return false; }
   return rec.count >= 8;
 }
 function noteLoginFail(ip) {
-  const rec = loginFails.get(ip) || { count: 0, first: Date.now() };
+  const now = Date.now();
+  // Bound the table under a flood from many addresses.
+  if (loginFails.size > 5000) for (const [k, r] of loginFails) if (now - r.first > LOGIN_WINDOW_MS) loginFails.delete(k);
+  const rec = loginFails.get(ip) || { count: 0, first: now };
   rec.count++; loginFails.set(ip, rec);
+  if (now - globalFails.first > LOGIN_WINDOW_MS) globalFails = { count: 0, first: now };
+  globalFails.count++;
+  if (globalFails.count === 60) {
+    sendAlert('login-bruteforce', 'PULSE: admin login paused after 60 wrong passwords',
+      `60 wrong admin passwords in 15 minutes from ${loginFails.size} address(es). Login is paused for everyone for 15 minutes. If this was not you, change ADMIN_PASSWORD in the Railway variables.`)
+      .catch(e => console.error('[auth] alert failed:', e.message));
+  }
+}
+
+// Sessions are signed over their expiry and a per-install epoch kept in
+// settings. Logging out rotates the epoch, which is the only way a
+// stateless cookie can be revoked before it expires.
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+function sessionEpoch() {
+  let e = getSetting('session_epoch');
+  if (!e) { e = randomBytes(16).toString('hex'); setSetting('session_epoch', e); }
+  return e;
 }
 
 function signSession(expiresMs) {
-  const sig = createHmac('sha256', SECRET).update(String(expiresMs)).digest('hex');
+  const sig = createHmac('sha256', SECRET).update(`${expiresMs}.${sessionEpoch()}`).digest('hex');
   return `${expiresMs}.${sig}`;
 }
 
 function isValidSession(token) {
   if (!token || !config.adminPassword) return false;
-  const [expires, sig] = token.split('.');
-  if (!expires || !sig || Number(expires) < Date.now()) return false;
-  const expected = createHmac('sha256', SECRET).update(expires).digest('hex');
+  const [expires, sig] = String(token).split('.');
+  if (!expires || !sig) return false;
+  const exp = Number(expires);
+  if (!Number.isFinite(exp) || exp < Date.now() || exp > Date.now() + SESSION_TTL_MS) return false;
+  const expected = createHmac('sha256', SECRET).update(`${expires}.${sessionEpoch()}`).digest('hex');
   try { return timingSafeEqual(Buffer.from(sig), Buffer.from(expected)); } catch { return false; }
 }
 
 function requireAdmin(req, res, next) {
+  // Refuse requests a browser marks as coming from another site: typed
+  // URLs and bookmarks arrive as 'none', our own pages as 'same-origin'.
+  // Old browsers and curl send nothing and fall through to the cookie.
+  const fetchSite = req.get('sec-fetch-site');
+  if (fetchSite && fetchSite !== 'same-origin' && fetchSite !== 'none') {
+    return res.status(403).json({ error: 'Cross-site request refused' });
+  }
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    const origin = req.get('origin');
+    if (origin) {
+      let originHost = null;
+      try { originHost = new URL(origin).host; } catch { originHost = null; }
+      if (originHost !== req.get('host')) return res.status(403).json({ error: 'Cross-site request refused' });
+    }
+  }
   if (!isValidSession(req.cookies?.pulse_session)) return res.status(401).json({ error: 'Not authenticated' });
+  // Admin responses carry client tokens and report PDFs: never leave them
+  // in a browser cache after logout.
+  res.setHeader('Cache-Control', 'no-store');
   next();
 }
 
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   if (!config.adminPassword) return res.status(500).json({ error: 'ADMIN_PASSWORD is not set on the server' });
-  const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+  const ip = req.ip || 'unknown';
   if (loginBlocked(ip)) return res.status(429).json({ error: 'Too many attempts — try again in 15 minutes.' });
   // Timing-safe comparison so response time can't reveal the password.
   const given = Buffer.from(String(req.body?.password || ''));
   const real = Buffer.from(String(config.adminPassword));
   const okPw = given.length === real.length && timingSafeEqual(given, real);
-  if (!okPw) { noteLoginFail(ip); return res.status(401).json({ error: 'Wrong password' }); }
+  if (!okPw) {
+    noteLoginFail(ip);
+    await new Promise(r => setTimeout(r, 750));
+    return res.status(401).json({ error: 'Wrong password' });
+  }
   loginFails.delete(ip);
-  const expires = Date.now() + 7 * 24 * 60 * 60 * 1000;
+  const expires = Date.now() + SESSION_TTL_MS;
   const secure = req.secure || req.headers['x-forwarded-proto'] === 'https';
   res.cookie('pulse_session', signSession(expires), { httpOnly: true, maxAge: expires - Date.now(), sameSite: 'lax', secure });
   res.json({ ok: true });
 });
 
 app.post('/api/logout', (req, res) => {
+  // Only a valid session may rotate the epoch, so a stranger cannot log
+  // the owner out; the rotation signs out every browser at once.
+  if (isValidSession(req.cookies?.pulse_session)) setSetting('session_epoch', randomBytes(16).toString('hex'));
   res.clearCookie('pulse_session');
   res.json({ ok: true });
 });
@@ -266,6 +355,13 @@ function cleanSiteBody(body) {
     if (bad.length) throw Object.assign(new Error(`These don't look like valid email addresses: ${bad.join(', ')}`), { status: 400 });
     out.contact_emails = emails.join(', ');
   }
+  // Tracking IDs end up inside the tag block written into client pages,
+  // so only well-formed ones may be saved (a pasted script tag or a stray
+  // quote would otherwise break every page the injector touches).
+  if (out.ga4_measurement_id) out.ga4_measurement_id = out.ga4_measurement_id.toUpperCase();
+  for (const [field, rule] of Object.entries(ID_RULES)) {
+    if (out[field] && !rule.test(out[field])) throw Object.assign(new Error(ID_HINTS[field]), { status: 400 });
+  }
   return out;
 }
 
@@ -377,6 +473,16 @@ app.post('/api/sites/:id/rotate-token', requireAdmin, (req, res) => {
   if (!site) return res.status(404).json({ error: 'Site not found' });
   db.prepare('UPDATE sites SET dashboard_token = ? WHERE id = ?').run(newDashboardToken(), site.id);
   res.json(siteSummary(db.prepare('SELECT * FROM sites WHERE id = ?').get(site.id)));
+});
+
+// The two other long-lived secrets can be replaced the same way: the
+// status feed link (pasted into the owner's assistant) and the injector
+// script token baked into the Hostinger cron commands.
+app.post('/api/uptime/rotate-feed-token', requireAdmin, (req, res) => {
+  try { rotateFeedToken(); res.json(uptimeOverview()); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/inject/rotate-token', requireAdmin, async (req, res) => {
+  try { res.json(await rotateInjectToken()); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/sites/:id/send-report', requireAdmin, async (req, res) => {
@@ -611,26 +717,54 @@ function siteByToken(token) {
 }
 
 // Live dashboard data is cached briefly to stay well inside API quotas.
+// An entry is { at, data } (good), { at, promise } (a gather in flight,
+// which every concurrent caller awaits, so a burst of hits costs one
+// upstream gather) or { at, error } (a recent failure, held for a minute
+// so a broken source is not hammered on every reload).
 const dataCache = new Map();
 const CACHE_TTL = 10 * 60 * 1000;
+const ERROR_TTL = 60 * 1000;
+const INFLIGHT_TTL = 2 * 60 * 1000;
+// A payload built while a configured source's API call failed is held for
+// a minute only, so a quota blip is not pinned on the client for 10 minutes.
+// These are the attempt() labels report-data.js uses for fetch failures;
+// persistent data-quality warnings keep the full cache time.
+const DEGRADED_TTL = 60 * 1000;
+const FETCH_FAILED = /^(Fathom analytics|Analytics (overview|comparison|daily traffic|top pages|channels|devices)|Search (summary|comparison|top queries|previous queries|target keywords)|AI assistant visits):/;
+const dataHits = new Map();
 
 app.get('/api/client/:token/data', async (req, res) => {
   const site = siteByToken(req.params.token);
   if (!site) return res.status(404).json({ error: 'Dashboard not found' });
+  res.setHeader('Cache-Control', 'no-store');
+  // A real dashboard makes one request per page load or range click.
+  if (overLimit(dataHits, req.ip || 'unknown', 60, 10 * 60_000)) {
+    return res.status(429).json({ error: 'Too many requests. Please try again in a few minutes.' });
+  }
   const rangeDays = { '7': 7, '30': 30, '90': 90 }[String(req.query.range)] || 30;
   const cacheKey = `${site.id}:${rangeDays}`;
-  const cached = dataCache.get(cacheKey);
-  if (cached && cached.at > Date.now() - CACHE_TTL) return res.json(cached.data);
+  const fail = () => res.status(500).json({ error: 'Could not load analytics right now. Please try again shortly.' });
+  const now = Date.now();
+  const entry = dataCache.get(cacheKey);
+  if (entry) {
+    if (entry.data && entry.at > now - (entry.ttl || CACHE_TTL)) return res.json(entry.data);
+    if (entry.error && entry.at > now - ERROR_TTL) return fail();
+    if (entry.promise && entry.at > now - INFLIGHT_TTL) {
+      try { return res.json((await entry.promise).payload); } catch { return fail(); }
+    }
+  }
 
   const end = addDays(todayISO(), -1);
   const start = addDays(end, -(rangeDays - 1));
-  try {
+  const promise = (async () => {
     // fast: cached-only PageSpeed + rules-based insights, so a client's
     // page load never waits on a Lighthouse run or a live AI call.
     const data = await gatherReportData(site, start, end, { fast: true });
     // Never expose internal gather warnings (raw API error strings, property
     // IDs) to the client browser — they're for the admin console only.
-    const { warnings, ...clientData } = data;
+    // `site` carries the admin Notes field and the row id; neither belongs
+    // on a client page. clientName and domain are copied explicitly below.
+    const { warnings, site: _site, previousPeriod: _prev, ...clientData } = data;
     const payload = {
       clientName: site.client_name,
       domain: site.domain,
@@ -638,23 +772,53 @@ app.get('/api/client/:token/data', async (req, res) => {
       rangeDays,
       ...clientData,
     };
-    dataCache.set(cacheKey, { at: Date.now(), data: payload });
+    return { payload, degraded: (warnings || []).some(w => FETCH_FAILED.test(w)) };
+  })();
+  dataCache.set(cacheKey, { at: now, promise });
+  try {
+    const { payload, degraded } = await promise;
+    dataCache.set(cacheKey, { at: Date.now(), ttl: degraded ? DEGRADED_TTL : CACHE_TTL, data: payload });
     res.json(payload);
   } catch (err) {
-    res.status(500).json({ error: 'Could not load analytics right now. Please try again shortly.' });
+    dataCache.set(cacheKey, { at: Date.now(), error: true });
+    fail();
   }
 });
+
+// Guards for the public "Email me a fresh report" button. The reports row
+// is only written after the whole gather, PDF and email pipeline, so the
+// database counts alone cannot see a run that is still in flight.
+const reportBusy = new Set();
+const reportHits = new Map();
 
 app.post('/api/client/:token/request-report', async (req, res) => {
   const site = siteByToken(req.params.token);
   if (!site) return res.status(404).json({ error: 'Dashboard not found' });
-  // Rate limit on SUCCESSFUL sends only — three failures shouldn't lock a
+  if (overLimit(reportHits, req.ip || 'unknown', 5, 60 * 60_000)) {
+    return res.status(429).json({ error: 'Too many report requests from this connection. Please try again in an hour.' });
+  }
+  if (reportBusy.has(site.id)) {
+    return res.status(409).json({ error: 'Your report is already being prepared. Give it a minute and check your inbox.' });
+  }
+  // Daily cap on SUCCESSFUL sends only: three failures shouldn't lock a
   // client out with a message claiming a report is "already in your inbox".
   const recent = db.prepare(`SELECT COUNT(*) AS n FROM reports WHERE site_id = ? AND trigger_type = 'requested' AND status = 'sent' AND created_at > datetime('now', '-1 day')`).get(site.id).n;
   if (recent >= 3) {
     return res.status(429).json({ error: 'You can request up to 3 reports a day. Need another? Email info@northbearmedia.co.uk and we’ll send one over.' });
   }
-  const result = await runReport(site, { trigger: 'requested' });
+  // Attempts (sent or failed) are also capped over a short window, so a
+  // broken mailbox cannot be used to re-run the expensive pipeline forever.
+  const attempts = db.prepare(`SELECT COUNT(*) AS n FROM reports WHERE site_id = ? AND trigger_type = 'requested' AND created_at > datetime('now', '-15 minutes')`).get(site.id).n;
+  if (attempts >= 3) {
+    return res.status(429).json({ error: 'We have had a few requests for this report in the last few minutes. Please try again in 15 minutes, or email info@northbearmedia.co.uk.' });
+  }
+  reportBusy.add(site.id);
+  let result;
+  try {
+    result = await runReport(site, { trigger: 'requested' });
+  } finally {
+    reportBusy.delete(site.id);
+  }
   // Every honest word matters here: failures are recorded and surfaced in
   // the North Bear admin console, but no human is paged — so say "email
   // us", not "we've been notified". And while delivery is in test/held
@@ -664,11 +828,9 @@ app.post('/api/client/:token/request-report', async (req, res) => {
   if (String(result.sentTo?.[0] || '').startsWith('TEST→')) {
     return res.json({ ok: true, message: `Thanks — your report request has been received. North Bear Media will email your report (${result.periodText}) over shortly.` });
   }
-  const masked = site.contact_emails.split(',').map(e => {
-    const [user, dom] = e.trim().split('@');
-    return user && dom ? `${user.slice(0, 2)}…@${dom}` : e;
-  }).join(', ');
-  res.json({ ok: true, message: `Done! A fresh PDF report (${result.periodText}) is on its way to ${masked}.` });
+  // Never echo recipient addresses, even masked: a forwarded dashboard
+  // link must not tell a stranger who the reports go to.
+  res.json({ ok: true, message: `Done! A fresh PDF report (${result.periodText}) is on its way to the email address we hold for you.` });
 });
 
 // ─── Pages + static ───────────────────────────────────────────────
@@ -693,6 +855,7 @@ app.get('/login', (req, res) => res.sendFile(join(__dirname, 'public', 'login.ht
 
 app.get('/', (req, res) => {
   if (!isValidSession(req.cookies?.pulse_session)) return res.redirect('/login');
+  res.setHeader('Cache-Control', 'no-store');
   res.sendFile(join(__dirname, 'public', 'index.html'));
 });
 

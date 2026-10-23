@@ -3,6 +3,8 @@
 //  · 03:40   — snapshot yesterday's Microsoft Clarity numbers for every site
 // Times run in the configured timezone (default Europe/London).
 import cron from 'node-cron';
+import { readdirSync, statSync, unlinkSync } from 'fs';
+import { join } from 'path';
 import db, { backupDatabase, getSetting, setSetting } from '../database.js';
 import { config } from '../config.js';
 import { runReport } from './reporter.js';
@@ -80,25 +82,44 @@ export async function syncAllClarity() {
   return synced;
 }
 
+// Delete stored PDFs that no report row refers to (left behind by sends
+// that failed part way, before the PDF was written last). Every PDF a
+// report row points at is kept. A file written in the last hour is left
+// alone in case its row is still being written.
+export function pruneOrphanReports() {
+  const referenced = new Set(db.prepare("SELECT pdf_path FROM reports WHERE pdf_path != ''").all().map(r => r.pdf_path));
+  let removed = 0;
+  for (const f of readdirSync(config.reportsDir)) {
+    if (!f.endsWith('.pdf') || referenced.has(f)) continue;
+    const full = join(config.reportsDir, f);
+    if (Date.now() - statSync(full).mtimeMs < 60 * 60_000) continue;
+    unlinkSync(full);
+    removed++;
+  }
+  if (removed) console.log(`[reports] removed ${removed} orphaned PDF(s)`);
+  return removed;
+}
+
 export function startScheduler() {
   initialiseSchedules();
-  cron.schedule('5 * * * *', () => sendDueReports().catch(e => console.error('[scheduler]', e)), { timezone: config.timezone });
+  cron.schedule('5 * * * *', () => sendDueReports().catch(e => console.error('[scheduler]', e)), { timezone: config.timezone, noOverlap: true });
   // Clarity's API only exposes yesterday, so a day the 03:40 run is missed
   // (redeploy, API blip) would be a permanent hole — the 13:40 pass and the
   // boot catch-up are second and third chances at the same snapshot.
-  cron.schedule('40 3 * * *', () => syncAllClarity().catch(e => console.error('[clarity]', e)), { timezone: config.timezone });
-  cron.schedule('40 13 * * *', () => syncAllClarity().catch(e => console.error('[clarity]', e)), { timezone: config.timezone });
+  cron.schedule('40 3 * * *', () => syncAllClarity().catch(e => console.error('[clarity]', e)), { timezone: config.timezone, noOverlap: true });
+  cron.schedule('40 13 * * *', () => syncAllClarity().catch(e => console.error('[clarity]', e)), { timezone: config.timezone, noOverlap: true });
   setTimeout(() => syncAllClarity().catch(e => console.error('[clarity]', e)), 15_000);
   // Hourly rolling database backups (kept: last 48) + one shortly after boot.
-  cron.schedule('50 * * * *', () => backupDatabase().catch(e => console.error('[backup]', e)), { timezone: config.timezone });
+  cron.schedule('50 * * * *', () => backupDatabase().catch(e => console.error('[backup]', e))
+    .then(() => { try { pruneOrphanReports(); } catch (e) { console.error('[reports]', e.message); } }), { timezone: config.timezone, noOverlap: true });
   setTimeout(() => backupDatabase('boot').catch(e => console.error('[backup]', e)), 30_000);
   // Website monitoring: every site's homepage every five minutes, and the
   // certificate and domain dates once a day. The first round waits for
   // the app to settle after boot; the daily pass runs once per calendar
   // day however many times Pulse restarts.
   ensureFeedToken();
-  cron.schedule('*/5 * * * *', () => runRound().catch(e => console.error('[monitor]', e.message)), { timezone: config.timezone });
-  cron.schedule('10 4 * * *', () => runDailyChecks().catch(e => console.error('[monitor-daily]', e.message)), { timezone: config.timezone });
+  cron.schedule('*/5 * * * *', () => runRound().catch(e => console.error('[monitor]', e.message)), { timezone: config.timezone, noOverlap: true });
+  cron.schedule('10 4 * * *', () => runDailyChecks().catch(e => console.error('[monitor-daily]', e.message)), { timezone: config.timezone, noOverlap: true });
   setTimeout(() => runRound().catch(e => console.error('[monitor]', e.message)), 20_000);
   setTimeout(() => runDailyChecks().catch(e => console.error('[monitor-daily]', e.message)), 90_000);
   console.log(`[scheduler] running (timezone ${config.timezone}) — reports hourly, Clarity 03:40+13:40, DB backup hourly`);

@@ -60,7 +60,10 @@ Rules:
 async function aiInsights(data) {
   const key = getAnthropicKey();
   if (!key) return null;
-  const client = new Anthropic({ apiKey: key });
+  // 60 second cap and one retry: a hung endpoint must not stall a report
+  // for half an hour (SDK defaults are 10 minutes times three attempts).
+  // The rules-based insights below are the designed fallback.
+  const client = new Anthropic({ apiKey: key, timeout: 60_000, maxRetries: 1 });
   const msg = await client.messages.create({
     model: getInsightsModel(),
     max_tokens: 1024,
