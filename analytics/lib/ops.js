@@ -1172,6 +1172,8 @@ export async function healGa4Properties() {
 // them. Verdicts land in the Connections panel; a Fathom source feeding a
 // DIFFERENT domain's data is disconnected on the spot (wrong numbers in a
 // client report is the one unforgivable failure), falling back to GA.
+const DEV_HOST = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[?::1\]?)(:\d+)?$|\.(local|localhost|test)(:\d+)?$/;
+
 async function verifySourceIntegrity() {
   const subject = getGscReaderEmail() || 'norton@northbearmedia.co.uk';
   const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND domain != ''").all();
@@ -1190,11 +1192,16 @@ async function verifySourceIntegrity() {
           method: 'POST',
           data: { dateRanges: [{ startDate: start, endDate: end }], dimensions: [{ name: 'hostName' }], metrics: [{ name: 'sessions' }], limit: 10 },
         }, { scopes: ['https://www.googleapis.com/auth/analytics.readonly'], subject });
-        const rows = (rep.rows || [])
+        const all = (rep.rows || [])
           .map(r => ({ host: String(r.dimensionValues?.[0]?.value || '').toLowerCase().replace(/^www\./, ''), n: Number(r.metricValues?.[0]?.value || 0) }))
           .filter(r => r.host);
+        // A developer previewing a copy of the site on their own machine
+        // sends hits as "localhost". That is not another domain's traffic,
+        // so it must neither count as the site nor read as a wrong property.
+        const dev = all.filter(r => DEV_HOST.test(r.host));
+        const rows = all.filter(r => !DEV_HOST.test(r.host));
         const total = rows.reduce((a, r) => a + r.n, 0);
-        v.ga = !total ? { status: 'no-data' }
+        v.ga = !total ? (dev.length ? { status: 'dev-only', hosts: dev.slice(0, 3).map(r => r.host) } : { status: 'no-data' })
           : own(rows) / total >= 0.5 ? { status: 'verified' }
           : { status: 'mismatch', hosts: rows.slice(0, 3).map(r => r.host) };
         if (v.ga.status === 'mismatch') console.log('[integrity]', d, 'GA property carries traffic for', v.ga.hosts.join(','));

@@ -98,7 +98,9 @@ export async function gatherReportData(site, start, end, opts = {}) {
       if (dead) warnings.push('Analytics: property returned zero traffic for the whole period — treating as not yet recording');
       // A property proven (hourly, by hostname) to carry a DIFFERENT
       // domain's traffic must never supply a client's numbers.
-      const wrongProperty = integrity.ga?.status === 'mismatch';
+      // Likewise a property whose only traffic is a developer's preview
+      // copy (localhost): those hits are not the client's visitors.
+      const wrongProperty = integrity.ga?.status === 'mismatch' || integrity.ga?.status === 'dev-only';
       if (wrongProperty) warnings.push(`Analytics: property carries traffic for ${(integrity.ga.hosts || []).join(', ')}, not this site — excluded from the report.`);
       if (overview && !dead && !wrongProperty) data.ga4 = { sourceLabel: 'Google Analytics', overview, prevOverview, timeseries: timeseries || [], topPages: topPages || [], channels: channels || [], devices: devices || [] };
     }
