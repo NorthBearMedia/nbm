@@ -27,6 +27,22 @@ export function googleClient({ scopes = DEFAULT_SCOPES, subject = null } = {}) {
       key: sa.private_key,
       scopes,
       subject: subject || undefined,
+      // Every Google call through this client (GA4, Search Console, Admin,
+      // Site Verification and the token endpoint) is time-boxed and retried
+      // on passing errors, so a stalled connection cannot hang the report
+      // scheduler or an admin request. Our calls are read-only or idempotent,
+      // except the GA4 creates in ops.js, which opt out with retry: 0.
+      transporterOptions: {
+        timeout: 30_000,
+        retry: true,
+        retryConfig: {
+          retry: 2,
+          retryDelay: 500,
+          noResponseRetries: 1,
+          httpMethodsToRetry: ['GET', 'POST', 'PUT'],
+          statusCodesToRetry: [[429, 429], [500, 599]],
+        },
+      },
     }));
   }
   return clients.get(cacheKey);
