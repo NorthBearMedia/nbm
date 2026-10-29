@@ -124,7 +124,11 @@ async function siteHealth(site, start, end) {
         .catch(e => bad(e.message.slice(0, 90)));
   const gscClicks = Number((out.search?.detail || '').match(/^(\d+) clicks/)?.[1] || 0);
 
-  out.ga = integ.ga?.status === 'mismatch'
+  out.ga = integ.ga?.status === 'dev-only'
+    ? bad(gaTagFound
+      ? `NOT RECEIVING THE LIVE SITE: in 14 days Analytics recorded no visits from ${domain}, only hits from a developer's preview copy (${(integ.ga.hosts || []).join(', ')}). The tag is on the live page, so Analytics itself is discarding real visitors. Check Admin, Data filters for an active filter, especially one set to Include.`
+      : `NOT RECEIVING THE LIVE SITE: in 14 days Analytics recorded no visits from ${domain}, only hits from a developer's preview copy (${(integ.ga.hosts || []).join(', ')}), and the tag was not found on the live page.`)
+    : integ.ga?.status === 'mismatch'
     ? bad(`WRONG PROPERTY — its traffic is from ${(integ.ga.hosts || []).join(', ')}, not this site. North Bear is on it; don't paste anything.`)
     : !site.ga4_property_id ? bad('no property ID')
     : await ga4.fetchOverview(site.ga4_property_id, start, end)
