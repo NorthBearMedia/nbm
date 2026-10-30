@@ -1,0 +1,22 @@
+name: Temporary live tag check
+on:
+  push:
+    branches: [claude/tmp-live-tag-check]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check northbearmedia.co.uk for tracking scripts
+        run: |
+          for path in / /mot /web-design-derbyshire.html /prices; do
+            url="https://northbearmedia.co.uk$path"
+            code=$(curl -sSL -m 20 -A 'Mozilla/5.0' -o page.html -w '%{http_code}' "$url" || echo ERR)
+            echo "=== $url http=$code bytes=$(wc -c < page.html)"
+            echo "fathom script tags: $(grep -o 'cdn.usefathom.com/script.js[^>]*' page.html | sort -u | tr '\n' ' ')"
+            echo "gtag ids: $(grep -o 'gtag/js?id=[A-Za-z0-9-]*' page.html | sort -u | tr '\n' ' ')"
+            echo "NBM-GA-TAG marker: $(grep -c 'NBM-GA-TAG' page.html)"
+            echo "clarity: $(grep -o 'clarity.ms/tag/[a-z0-9]*' page.html | sort -u | tr '\n' ' ')"
+            echo "consent mentions: $(grep -o -i "consent[a-z_']*" page.html | sort | uniq -c | tr '\n' ' ')"
+            echo "data-site attrs: $(grep -o 'data-site="[A-Z0-9]*"' page.html | sort -u | tr '\n' ' ')"
+          done
+          curl -sSI -m 20 https://northbearmedia.co.uk/ | grep -i 'last-modified\|content-security\|server\|x-powered'
