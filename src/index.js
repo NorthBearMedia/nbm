@@ -27,6 +27,7 @@ import {
 import { postApprovedMessage } from "./facebook/poster.js";
 import { verifyAction } from "./utils/sign.js";
 import { escapeHtml } from "./utils/text.js";
+import { buildAdsReport, formatAdsReportHtml, scheduleAdsReport } from "./services/adsreport.js";
 
 // Initialise database (use DATA_DIR for persistent volume on Railway)
 initDatabase(config.storage.dataDir);
@@ -116,6 +117,12 @@ app.get("/postlog.csv", requireAdmin, (req, res) => {
   res.set("Content-Type", "text/csv; charset=utf-8");
   res.set("Content-Disposition", 'attachment; filename="spotted-post-log.csv"');
   res.send(postLogToCsv());
+});
+
+// The same paid-ads report that gets emailed, viewable any time.
+app.get("/ads-report", requireAdmin, (req, res) => {
+  res.set("Referrer-Policy", "no-referrer");
+  res.send(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font-family:sans-serif;max-width:800px;margin:20px auto;padding:0 16px;">${formatAdsReportHtml(buildAdsReport(readPostLog()))}</body>`);
 });
 
 app.post("/retry-flagged", requireAdmin, (req, res) => {
@@ -380,6 +387,9 @@ app.listen(config.server.port, () => {
 
   // Initialise email notifications (non-blocking)
   initEmail();
+
+  // Weekly paid-ads report by email (first one ~1 minute after deploy)
+  scheduleAdsReport(config.storage.dataDir);
 
   // If the DB had to recover from corruption, tell the owner
   const warning = getLoadWarning();

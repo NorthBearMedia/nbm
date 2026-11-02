@@ -42,6 +42,11 @@ async function send(subject, html) {
 /**
  * Operational alert (token death, repeated failures, recovery, crash).
  */
+/** True once Resend is configured and initialised. */
+export function emailEnabled() {
+  return resend !== null;
+}
+
 export async function sendAlert(subject, html) {
   await send(subject, html);
 }
