@@ -465,7 +465,7 @@ export async function generateReportPdf(data) {
         { label: 'Movement', key: 'movement', width: 90, align: 'right', bold: true, format: tMove, color: tColor },
       ], rows) + 4;
       doc.font('Helvetica-Oblique').fontSize(7).fillColor(C.faint)
-        .text('These are the searches you\u2019ve told us matter most. "Not appearing yet" means Google didn\u2019t show the site for that search this period \u2014 a clear opportunity.', M, y, { width: CW });
+        .text('These are the searches you\u2019ve told us matter most. Position is the average across every search containing that phrase. "Not appearing yet" means Google didn\u2019t show the site for that search this period \u2014 a clear opportunity.', M, y, { width: CW });
       y += 14;
     }
   } else {
@@ -505,7 +505,7 @@ export async function generateReportPdf(data) {
     ], { perRow: 4 });
     doc.font('Helvetica-Oblique').fontSize(7).fillColor(C.faint)
       .text(`Based on ${cl.daysCovered} day${cl.daysCovered === 1 ? '' : 's'} of Clarity measurement in this period`
-        + (cl.quickBacks ? ` · ${fmtInt(cl.quickBacks)} quick-backs (visitors who left a page straight away)` : '') + '.', M, y - 6, { width: CW });
+        + (cl.quickBacks ? ` · ${fmtInt(cl.quickBacks)} quick-back${cl.quickBacks === 1 ? '' : 's'} (visitor${cl.quickBacks === 1 ? '' : 's'} who left a page straight away)` : '') + '.', M, y - 6, { width: CW });
     y += 8;
   } else {
     y = emptyNote(doc, y, 'Microsoft Clarity is not connected for this site yet — once connected, you’ll see how people actually use your pages (scrolling, clicks and frustration signals).');
