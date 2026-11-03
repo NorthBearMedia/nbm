@@ -165,15 +165,25 @@ export async function gatherReportData(site, start, end, opts = {}) {
             const q = r.query.toLowerCase();
             return q.includes(kw) || kw.includes(q);
           });
+          // Position is the impression-weighted average over the matching
+          // searches, the same way Google averages. The best single match
+          // flattered the table: "recovery driver jobs" read 1.0 here (from
+          // one long-tail variant) while the top-terms table above showed
+          // the phrase itself at 7.8.
+          const avgPos = rows => {
+            const imp = rows.reduce((a, r) => a + r.impressions, 0);
+            if (!rows.length) return null;
+            if (!imp) return Math.min(...rows.map(r => r.position));
+            return rows.reduce((a, r) => a + r.position * r.impressions, 0) / imp;
+          };
           data.search.targets = kws.map(kw => {
             const cur = match(deep, kw), prv = match(prevDeep, kw);
-            const best = cur.length ? Math.min(...cur.map(r => r.position)) : null;
-            const prevBest = prv.length ? Math.min(...prv.map(r => r.position)) : null;
+            const pos = avgPos(cur), prevPos = avgPos(prv);
             return {
               keyword: kw,
-              position: best,
-              prevPosition: prevBest,
-              movement: best != null && prevBest != null ? prevBest - best : null, // + = up
+              position: pos,
+              prevPosition: prevPos,
+              movement: pos != null && prevPos != null ? prevPos - pos : null, // + = up
               clicks: cur.reduce((a, r) => a + r.clicks, 0),
               impressions: cur.reduce((a, r) => a + r.impressions, 0),
             };

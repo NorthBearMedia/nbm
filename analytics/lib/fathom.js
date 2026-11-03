@@ -133,8 +133,22 @@ function friendlyRef(host) {
   if (/google\./.test(h)) return 'Google search';
   if (/bing\./.test(h)) return 'Bing';
   if (/duckduckgo/.test(h)) return 'DuckDuckGo';
-  if (h === 't.co' || /(facebook|instagram|twitter|x\.com|linkedin|tiktok)/.test(h)) return 'Social media';
+  // Name the platform: several hosts all labelled "Social media" printed
+  // as three identical rows in Richford's report.
+  if (/facebook|^fb\.(com|me)$/.test(h)) return 'Facebook';
+  if (/instagram/.test(h)) return 'Instagram';
+  if (/linkedin|^lnkd\.in$/.test(h)) return 'LinkedIn';
+  if (/tiktok/.test(h)) return 'TikTok';
+  if (h === 't.co' || /twitter|^x\.com$/.test(h)) return 'X (Twitter)';
   return h;
+}
+
+// Many referrer hosts share one label (google.com and google.co.uk,
+// m.facebook.com and l.facebook.com); report each label once.
+function mergeChannels(list) {
+  const by = new Map();
+  for (const c of list) by.set(c.channel, (by.get(c.channel) || 0) + c.sessions);
+  return [...by].map(([channel, sessions]) => ({ channel, sessions })).sort((a, b) => b.sessions - a.sessions);
 }
 
 // Returns a block in the same shape report-data builds for GA4, tagged with
@@ -146,7 +160,7 @@ export async function gatherFathom(fathomSiteId, start, end) {
     agg(fathomSiteId, { aggregates: AGG, date_from: prev.start, date_to: prev.end }),
     agg(fathomSiteId, { aggregates: 'visits,uniques', date_from: start, date_to: end, date_grouping: 'day' }),
     agg(fathomSiteId, { aggregates: 'pageviews,visits', date_from: start, date_to: end, field_grouping: 'pathname', sort_by: 'pageviews:desc', limit: 10 }),
-    agg(fathomSiteId, { aggregates: 'visits', date_from: start, date_to: end, field_grouping: 'referrer_hostname', sort_by: 'visits:desc', limit: 8 }),
+    agg(fathomSiteId, { aggregates: 'visits', date_from: start, date_to: end, field_grouping: 'referrer_hostname', sort_by: 'visits:desc', limit: 30 }),
     agg(fathomSiteId, { aggregates: 'visits', date_from: start, date_to: end, field_grouping: 'device_type', sort_by: 'visits:desc' }),
   ]);
 
@@ -160,9 +174,14 @@ export async function gatherFathom(fathomSiteId, start, end) {
     sourceLabel: 'Fathom Analytics',
     overview,
     prevOverview: overviewFrom(prv[0]),
-    timeseries: ts.map(r => ({ date: String(r.date || r.date_formatted || '').slice(0, 10), sessions: num(r.visits), users: num(r.uniques) })).filter(r => r.date),
+    // Fathom returns the day groups in no particular order. Unsorted, the
+    // chart ran backwards and the report took a mid-period day as the
+    // first day of tracking ("installed on 26 Oct" on a site tracked for
+    // months).
+    timeseries: ts.map(r => ({ date: String(r.date || r.date_formatted || '').slice(0, 10), sessions: num(r.visits), users: num(r.uniques) })).filter(r => r.date)
+      .sort((a, b) => a.date.localeCompare(b.date)),
     topPages: pages.map(r => ({ path: r.pathname || '/', title: '', views: num(r.pageviews), sessions: num(r.visits) })),
-    channels: refs.map(r => ({ channel: friendlyRef(r.referrer_hostname), sessions: num(r.visits) })),
+    channels: mergeChannels(refs.map(r => ({ channel: friendlyRef(r.referrer_hostname), sessions: num(r.visits) }))),
     devices: devices.map(r => ({ device: r.device_type || 'unknown', sessions: num(r.visits) })),
   };
 }

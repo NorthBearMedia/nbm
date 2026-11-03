@@ -51,6 +51,7 @@ Rules:
 - "about", when present, is the business described in the owner's own words. Use it to make every recommendation specific to what they actually sell and who they serve, and never contradict it.
 - Mind the time of year (the covering dates are given): quiet spells over Christmas/New Year, Easter or summer holidays are normal for many small businesses — frame a seasonal dip as expected seasonality, not a problem to fix.
 - If "trafficTagBeingFixed" is true, the visitor-count tag is being reconnected, so visit/page numbers are absent — DO NOT say the site had few visitors, is a placeholder, or is "coming soon". Lead the analysis on the search performance and behaviour (Clarity) data, which are accurate.
+- North Bear Media built these websites mobile-first, so they already work on phones. A high share of phone visitors is a fact worth noting, never a sign the site needs to be made "phone-friendly" or "mobile-optimised": don't recommend that.
 - "aiAssistantVisits", when present, counts visitors who arrived from AI assistants such as ChatGPT or Perplexity. A notable or growing number is worth one upbeat mention (people are finding this business through AI answers); a zero is normal today and must never be framed as a failing.
 - Reply with ONLY a JSON object, no prose around it:
   {"headline": "one encouraging plain-English sentence summarising the month",
@@ -98,7 +99,7 @@ function rulesInsights(data) {
   const devTotal = (s.devices || []).reduce((a, d) => a + d.visits, 0);
   if (mobile && devTotal) {
     const mp = Math.round((mobile.visits / devTotal) * 100);
-    recs.push({ title: 'Mostly on mobile', detail: `${mp}% of visitors are on a phone — make sure buttons, forms and calls-to-action look great on a small screen.` });
+    recs.push({ title: 'Mostly on mobile', detail: `${mp}% of visitors are on a phone, so phone numbers and enquiry buttons near the top of each page win the most enquiries.` });
   }
   if (s.search?.avgPosition) {
     const near = (data.search?.topQueries || []).find(q => q.position > 10 && q.position <= 20);
