@@ -21,7 +21,7 @@ import { googleClient } from './google.js';
 import { getGscReaderEmail, getHostingerToken, getFathomToken, getEmailBcc, getSmtp, getEmailFrom, getAppUrl } from './runtime-config.js';
 import { mailer } from './email.js';
 import { randomBytes } from 'crypto';
-import { ensureInjectCron, deleteInjectCrons, injectCronOutput, verifyTag, ensureCron, cronOutputMatching, deleteCronsMatching, HOSTINGER_USER, rootDirFor, SNIPPET_VERSION } from './inject.js';
+import { ensureInjectCron, deleteInjectCrons, injectCronOutput, verifyTag, ensureCron, cronOutputMatching, deleteCronsMatching, HOSTINGER_USER, rootDirFor, SNIPPET_VERSION, injectorEnabled } from './inject.js';
 
 // Per-install secret guarding the injector-script endpoint. Created once.
 function injectToken() {
@@ -730,6 +730,7 @@ function isAutoTaggable(domain) {
 // window (whatever failed it may since be fixed — it was), so no site is
 // ever permanently stranded. Emits one summary the first time it places.
 export async function reconcileRolloutCrons() {
+  if (!injectorEnabled()) return { skipped: 'injector switched off' };
   if (injectState()['nbmdemosite2.co.uk']?.status !== 'verified') return { skipped: 'demo not verified' };
   const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND domain != ''").all();
   const state = injectState();
@@ -789,6 +790,7 @@ async function fetchLivePage(domain) {
 }
 
 export async function retrofitTags() {
+  if (!injectorEnabled()) return { skipped: 'injector switched off' };
   if (!getHostingerToken()) return { skipped: 'no Hostinger token' };
   if (injectState()['nbmdemosite2.co.uk']?.status !== 'verified') return { skipped: 'demo not verified' };
   const banner = getSetting('consent_banner') === 'true';

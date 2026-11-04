@@ -22,7 +22,7 @@ import { seedFirstCustomer } from './lib/seed.js';
 import * as hostinger from './lib/hostinger.js';
 import * as fathom from './lib/fathom.js';
 import { scheduleOpsSweep, runOpsSweep, runInjectionTest, runInjectionRollout, managedGscDiagnosis } from './lib/ops.js';
-import { buildInjectorScript, buildSnippet, rootDirFor } from './lib/inject.js';
+import { buildInjectorScript, buildSnippet, rootDirFor, injectorEnabled } from './lib/inject.js';
 import { uptimeOverview, statusFeed, feedTokenMatches, setMonitorFlags } from './lib/monitor.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -709,6 +709,9 @@ app.get('/ix/:token/:domain', (req, res) => {
   if (!tokenOk) {
     return res.status(403).type('text/plain').send('echo "NBM: bad token"');
   }
+  // Switched off: any job still firing on the server downloads a script
+  // that does nothing and exits at once.
+  if (!injectorEnabled()) return res.status(200).type('text/x-shellscript').send('echo "NBM: injector switched off"\nexit 0\n');
   const domain = String(req.params.domain).toLowerCase().replace(/[^a-z0-9.-]/g, '');
   const demoId = 'G-MS3V4KS3PB';
   try {
