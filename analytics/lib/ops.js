@@ -21,7 +21,8 @@ import { googleClient } from './google.js';
 import { getGscReaderEmail, getHostingerToken, getFathomToken, getEmailBcc, getSmtp, getEmailFrom, getAppUrl } from './runtime-config.js';
 import { mailer } from './email.js';
 import { randomBytes } from 'crypto';
-import { ensureInjectCron, deleteInjectCrons, injectCronOutput, verifyTag, ensureCron, cronOutputMatching, deleteCronsMatching, HOSTINGER_USER, rootDirFor, SNIPPET_VERSION, injectorEnabled } from './inject.js';
+import { ensureInjectCron, deleteInjectCrons, injectCronOutput, verifyTag, ensureCron, cronOutputMatching, deleteCronsMatching, HOSTINGER_USER, rootDirFor, SNIPPET_VERSION } from './inject.js';
+import { injectorEnabled } from './inject.js';
 
 // Per-install secret guarding the injector-script endpoint. Created once.
 function injectToken() {
