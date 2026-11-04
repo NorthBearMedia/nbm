@@ -12,8 +12,24 @@
 // This edits live website files, so callers should test on a demo site and
 // verify before rolling out to client sites.
 import { getHostingerToken } from './runtime-config.js';
+import { getSetting } from '../database.js';
 
 const HB = 'https://developers.hostinger.com';
+
+// Master switch for every cron job Pulse creates on the hosting account.
+// OFF unless the owner sets injector_enabled to true. On 4 Nov 2026 the
+// injector's every-minute jobs piled up on the shared account until it
+// hit its process limit and every client site served 403. Hostinger's
+// cron list API also failed to show entries that were still running, so
+// nothing that reads that list can be trusted to stop a runaway. While
+// this is off no job is ever created, and /ix serves a script that does
+// nothing, so any job still firing on the server is harmless.
+export function injectorEnabled() {
+  return getSetting('injector_enabled') === 'true';
+}
+function assertInjectorEnabled() {
+  if (!injectorEnabled()) throw new Error('injector switched off (injector_enabled is not true), no cron job created');
+}
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // Every North Bear site lives under this Hostinger account; public_html
@@ -180,7 +196,10 @@ export const stagePathFor = domain => `/home/${HOSTINGER_USER}/nbm-ix-${domain}.
 // download lands; both crons are deleted once the tag verifies.
 export function buildCronCommands(scriptUrl, domain) {
   const stage = stagePathFor(domain);
-  return [`curl -fsS -o ${stage} ${scriptUrl}`, `sh ${stage}`];
+  // Fail fast: a download that cannot connect must give up in seconds,
+  // never sit in the process table (a hung curl per site per minute is
+  // what filled the account on 4 Nov).
+  return [`curl -fsS --connect-timeout 10 --max-time 30 -o ${stage} ${scriptUrl}`, `sh ${stage}`];
 }
 
 export async function listCrons(username) {
@@ -190,6 +209,7 @@ export async function listCrons(username) {
 
 // Generic cron helpers (used by diagnostics like the docroot survey).
 export async function ensureCron(username, command) {
+  assertInjectorEnabled();
   const existing = (await listCrons(username).catch(() => [])).find(j => (j.command || '').trim() === command);
   if (existing) return { uid: existing.uid || existing.id, created: false };
   const created = await hg(`/api/hosting/v1/accounts/${username}/cron-jobs`, 'POST', { time: '* * * * *', command });
@@ -245,6 +265,7 @@ export async function deleteInjectCrons(username, domain = null) {
 // A background pass (verifyPendingInjections) confirms via the live page and
 // then removes the crons. Returns immediately after ensuring they exist.
 export async function ensureInjectCron({ username, domain, scriptUrl }) {
+  assertInjectorEnabled();
   const existing = await listCrons(username).catch(() => []);
   let created = 0;
   for (const command of buildCronCommands(scriptUrl, domain)) {
