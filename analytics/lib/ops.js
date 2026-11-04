@@ -14,6 +14,7 @@
 //
 // Guarded by a settings flag; unverified domains are retried on later boots.
 import cron from 'node-cron';
+import { injectorEnabled } from './inject.js';
 import db, { getSetting, setSetting, newDashboardToken } from '../database.js';
 import { config } from '../config.js';
 import { nextRunAt, addDays, todayISO } from './dates.js';
@@ -22,7 +23,6 @@ import { getGscReaderEmail, getHostingerToken, getFathomToken, getEmailBcc, getS
 import { mailer } from './email.js';
 import { randomBytes } from 'crypto';
 import { ensureInjectCron, deleteInjectCrons, injectCronOutput, verifyTag, ensureCron, cronOutputMatching, deleteCronsMatching, HOSTINGER_USER, rootDirFor, SNIPPET_VERSION } from './inject.js';
-import { injectorEnabled } from './inject.js';
 
 // Per-install secret guarding the injector-script endpoint. Created once.
 function injectToken() {
