@@ -21,7 +21,7 @@ import { googleClient } from './google.js';
 import { getGscReaderEmail, getHostingerToken, getFathomToken, getEmailBcc, getSmtp, getEmailFrom, getAppUrl } from './runtime-config.js';
 import { mailer } from './email.js';
 import { randomBytes } from 'crypto';
-import { ensureInjectCron, deleteInjectCrons, injectCronOutput, verifyTag, ensureCron, cronOutputMatching, deleteCronsMatching, HOSTINGER_USER, rootDirFor, SNIPPET_VERSION } from './inject.js';
+import { ensureInjectCron, deleteInjectCrons, injectCronOutput, verifyTag, ensureCron, cronOutputMatching, deleteCronsMatching, HOSTINGER_USER, rootDirFor, SNIPPET_VERSION, listCrons } from './inject.js';
 
 // Per-install secret guarding the injector-script endpoint. Created once.
 function injectToken() {
@@ -30,6 +30,72 @@ function injectToken() {
   return t;
 }
 const scriptUrlFor = domain => `${getAppUrl()}/ix/${injectToken()}/${domain}`;
+
+// ── Injector cron guard. Every placement goes through placeInjector().
+// The injector crons run every minute on the SHARED Hostinger account that
+// serves every client site, and its process limit is 120. On 4 Nov 2026 the
+// hourly retrofit kept re-placing the pair for steadplan.co.uk (WordPress:
+// its pages are PHP, so editing .html files can never put the tag on the
+// live page and the check never passes). They ran all day, the account hit
+// its process limit and Hostinger served 403s on a dozen client sites.
+// So: only plain file sites get a cron, a pair lives 30 minutes at most
+// (one run is enough; if the tag isn't live by then it won't be), a domain
+// gets a fresh pair at most every 6 hours, and no more than 2 sites have
+// crons at once (a snippet version bump must not fan out to the fleet).
+const INJECT_LIFETIME_MS = 30 * 60_000;
+const INJECT_COOLDOWN_MS = 6 * 3600_000;
+const INJECT_MAX_SITES = 2;
+const placedState = () => { try { return JSON.parse(getSetting('inject_placed') || '{}'); } catch { return {}; } };
+const savePlaced = s => setSetting('inject_placed', JSON.stringify(s));
+
+// Hostinger's own classification, cached for a day. Only website_type
+// 'other' (a plain docroot of files) can take the file injector: WordPress
+// serves PHP, builder/Horizons sites have no files, Node apps are built.
+async function injectorPlatform(domain) {
+  let cache = {};
+  try { cache = JSON.parse(getSetting('inject_platforms') || '{}'); } catch { /* fresh */ }
+  if (!cache.at || Date.now() - cache.at > 24 * 3600_000) {
+    const inv = await hostingerWebsiteInventory();
+    cache = { at: Date.now(), types: {} };
+    for (const w of inv || []) cache.types[(w.domain || '').toLowerCase().replace(/^www\./, '')] = w.website_type || w.type || 'unknown';
+    setSetting('inject_platforms', JSON.stringify(cache));
+  }
+  return cache.types[domain] || 'not-on-hostinger';
+}
+
+async function placeInjector(domain) {
+  const platform = await injectorPlatform(domain);
+  if (platform !== 'other') throw new Error(`not a plain file site (Hostinger type: ${platform}), add the tag by hand`);
+  const placed = placedState();
+  const last = placed[domain];
+  if (last && Date.now() - last < INJECT_COOLDOWN_MS) throw new Error('injector already ran in the last 6 hours');
+  const crons = await listCrons(HOSTINGER_USER).catch(() => []);
+  const busy = new Set(crons.map(j => ((j.command || '').match(/nbm-ix-([^ ]+?)\.sh/) || [])[1]).filter(Boolean));
+  busy.delete(domain);
+  if (busy.size >= INJECT_MAX_SITES) throw new Error(`injector busy on ${[...busy].join(', ')}, will try a later pass`);
+  await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
+  placed[domain] = Date.now();
+  savePlaced(placed);
+}
+
+// Runs every 10 minutes: removes any injector pair older than 30 minutes,
+// including ones placed before this guard existed (first seen = start of
+// their 30 minutes).
+export async function expireInjectorCrons() {
+  const crons = await listCrons(HOSTINGER_USER);
+  const placed = placedState();
+  const removed = [];
+  for (const domain of new Set(crons.map(j => ((j.command || '').match(/nbm-ix-([^ ]+?)\.sh/) || [])[1]).filter(Boolean))) {
+    if (!placed[domain]) { placed[domain] = Date.now(); continue; }
+    if (Date.now() - placed[domain] > INJECT_LIFETIME_MS) {
+      await deleteInjectCrons(HOSTINGER_USER, domain);
+      removed.push(domain);
+    }
+  }
+  savePlaced(placed);
+  if (removed.length) console.log('[inject] expired injector crons:', removed.join(', '));
+  return { removed };
+}
 
 // Injection progress lives in a settings JSON: { domain: {status, tries} }.
 // status: 'pending' (cron placed, awaiting first run) | 'verified' | 'failed'.
@@ -40,7 +106,7 @@ const MEASUREMENT_FOR_DEMO = { 'nbmdemosite2.co.uk': 'G-MS3V4KS3PB' };
 // Place the injector cron for a domain and mark it pending. Doesn't wait —
 // verifyPendingInjections confirms later (cron activation can lag minutes).
 async function beginInjection(domain, measurementId) {
-  await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
+  await placeInjector(domain);
   const s = injectState();
   // Fresh attempt: tries resets to 0; spread keeps failure history
   // (lastFailSig) so repeat identical failures stay email-suppressed.
@@ -474,7 +540,7 @@ async function hostingerAddTxt(domain, content) {
 export async function hostingerWebsiteInventory() {
   const token = getHostingerToken();
   if (!token) throw new Error('no Hostinger token in settings');
-  const res = await fetch('https://developers.hostinger.com/api/hosting/v1/websites', {
+  const res = await fetch('https://developers.hostinger.com/api/hosting/v1/websites?per_page=100', {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`Hostinger websites ${res.status}: ${(await res.text().catch(() => '')).slice(0, 160)}`);
@@ -742,7 +808,7 @@ export async function reconcileRolloutCrons() {
     if (!site.ga4_measurement_id) { noId.push(domain); continue; }
     if (isAutoTaggable(domain)) {
       try {
-        await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
+        await placeInjector(domain);
         state[domain] = { ...(state[domain] || {}), status: 'pending', tries: 0, measurementId: site.ga4_measurement_id, at: Date.now() };
         placed.push(domain);
       } catch (e) { console.error('[reconcile]', domain, e.message); }
@@ -858,7 +924,7 @@ export async function retrofitTags() {
         !fathomOk ? 'Fathom' : null,
       ].filter(Boolean);
       try {
-        await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
+        await placeInjector(domain);
         cur.tries++;
         placed++;
         console.log('[retrofit]', domain, `mismatch — injector placed (try ${cur.tries})`, cur.missing.join('+'));
@@ -899,9 +965,12 @@ async function onboardNewSites() {
       const extra = new Set(JSON.parse(getSetting('file_hosted_extra') || '[]'));
       for (const s of unknown) {
         const row = (inv || []).find(w => (w.domain || '').toLowerCase().replace(/^www\./, '') === s.d);
-        const builder = row && /builder|horizons/i.test(String(row.type || row.platform || ''));
+        // Hostinger calls the field website_type (wordpress, builder, horizons,
+        // nodejs, other); reading .type made every site look file-hosted.
+        const platform = row ? String(row.website_type || row.type || row.platform || 'unknown') : 'not-on-hostinger';
+        const builder = platform !== 'other';
         if (row && !builder) extra.add(s.d);
-        state[s.d] = { ...(state[s.d] || {}), classified: true, platform: row ? String(row.type || row.platform || 'unknown') : 'not-on-hostinger' };
+        state[s.d] = { ...(state[s.d] || {}), classified: true, platform };
         console.log('[onboard]', s.d, 'platform:', state[s.d].platform, builder ? '(builder — tag via paste)' : '(file injector eligible)');
       }
       setSetting('file_hosted_extra', JSON.stringify([...extra]));
@@ -1949,6 +2018,8 @@ export function scheduleOpsSweep() {
     // Self-heal a stalled rollout: place crons for any unverified client
     // site. Runs shortly after boot and every 10 min thereafter.
     cron.schedule('*/10 * * * *', () => reconcileRolloutCrons().catch(e => console.error('[reconcile]', e.message)), { timezone: config.timezone });
+    // Injector crons never outlive 30 minutes (see placeInjector).
+    cron.schedule('*/10 * * * *', () => expireInjectorCrons().catch(e => console.error('[inject-expire]', e.message)), { timezone: config.timezone });
   } catch (e) { console.error('[inject] schedule failed:', e.message); }
   setTimeout(() => reconcileRolloutCrons().catch(e => console.error('[reconcile]', e.message)), 360_000);
   // The network sweep retries on boots until fully done (v2 adds the
