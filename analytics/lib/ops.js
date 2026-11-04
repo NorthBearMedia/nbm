@@ -710,14 +710,19 @@ const AUTO_TAGGABLE = new Set([
   'melanieparker.co.uk',
 ]);
 
-// New sites aren't in the July survey above — onboardNewSites() classifies
-// them from the Hostinger website inventory (builder = no files to edit)
-// and records file-hosted ones here. The injector is harmless on a false
-// positive (NBM-NO-DOCROOT diagnostic, exit 0), so this errs inclusive.
+// New sites aren't in the July survey above. onboardNewSites() classifies
+// them from the Hostinger website inventory and records them here, but a
+// recorded site only counts when Hostinger reported it as plain files
+// ('other'). It must never err inclusive: on a WordPress, builder or
+// Node site the injector can never succeed, so its every-minute cron jobs
+// were left running on the hosting account (live: steadplan.co.uk, a
+// WordPress site that had been recorded as "unknown").
 function isAutoTaggable(domain) {
   if (AUTO_TAGGABLE.has(domain)) return true;
-  try { return JSON.parse(getSetting('file_hosted_extra') || '[]').includes(domain); }
-  catch { return false; }
+  try {
+    if (!JSON.parse(getSetting('file_hosted_extra') || '[]').includes(domain)) return false;
+    return (JSON.parse(getSetting('onboard_state') || '{}')[domain] || {}).platform === 'other';
+  } catch { return false; }
 }
 
 // Self-healing rollout reconciler. Runs every 10 min once the demo has
@@ -806,7 +811,16 @@ export async function retrofitTags() {
   let checked = 0, placed = 0;
   for (const site of sites) {
     const domain = (site.domain || '').toLowerCase().replace(/^www\./, '');
-    if (!isAutoTaggable(domain)) continue;
+    if (!isAutoTaggable(domain)) {
+      // A site that has stopped counting as file-hosted may still carry our
+      // install jobs from before: remove them (only ours, by their nbm-ix- name).
+      if (!(state[domain] || {}).cleaned) {
+        await deleteInjectCrons(HOSTINGER_USER, domain).catch(() => {});
+        state[domain] = { ...(state[domain] || {}), cleaned: true };
+        console.log('[retrofit]', domain, 'not file-hosted: injector jobs removed, no more will be placed');
+      }
+      continue;
+    }
     // Includes SNIPPET_VERSION so a change to the tag CODE (not just the
     // IDs) re-deploys to sites already marked done.
     const want = `v${SNIPPET_VERSION}|${site.ga4_measurement_id}|${site.clarity_project_id || ''}|${banner ? 1 : 0}|${site.fathom_site_id || ''}`;
@@ -861,6 +875,9 @@ export async function retrofitTags() {
         await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
         cur.tries++;
         placed++;
+        // Out of tries: never leave every-minute jobs running on the account
+        // until the daily re-check.
+        if (cur.tries >= 15) await deleteInjectCrons(HOSTINGER_USER, domain).catch(() => {});
         console.log('[retrofit]', domain, `mismatch — injector placed (try ${cur.tries})`, cur.missing.join('+'));
       } catch (e) { console.error('[retrofit]', domain, e.message.slice(0, 90)); }
     }
@@ -890,8 +907,8 @@ async function onboardNewSites() {
   try { state = JSON.parse(getSetting('onboard_state') || '{}'); } catch { /* fresh */ }
   const save = () => setSetting('onboard_state', JSON.stringify(state));
 
-  // Platform classification (once per unknown domain): builder sites can't
-  // take the file injector; everything else can try (harmless if wrong).
+  // Platform classification (once per unknown domain). Only a site Hostinger
+  // reports as plain files ('other') can take the file injector.
   const unknown = needy.filter(s => !isAutoTaggable(s.d) && !(state[s.d] || {}).classified);
   if (unknown.length && getHostingerToken()) {
     try {
@@ -899,10 +916,11 @@ async function onboardNewSites() {
       const extra = new Set(JSON.parse(getSetting('file_hosted_extra') || '[]'));
       for (const s of unknown) {
         const row = (inv || []).find(w => (w.domain || '').toLowerCase().replace(/^www\./, '') === s.d);
-        const builder = row && /builder|horizons/i.test(String(row.type || row.platform || ''));
-        if (row && !builder) extra.add(s.d);
-        state[s.d] = { ...(state[s.d] || {}), classified: true, platform: row ? String(row.type || row.platform || 'unknown') : 'not-on-hostinger' };
-        console.log('[onboard]', s.d, 'platform:', state[s.d].platform, builder ? '(builder — tag via paste)' : '(file injector eligible)');
+        const platform = row ? String(row.website_type || row.type || row.platform || 'unknown').toLowerCase() : 'not-on-hostinger';
+        const files = platform === 'other';
+        if (files) extra.add(s.d);
+        state[s.d] = { ...(state[s.d] || {}), classified: true, platform };
+        console.log('[onboard]', s.d, 'platform:', platform, files ? '(file injector eligible)' : '(no injector: tag via paste or CMS)');
       }
       setSetting('file_hosted_extra', JSON.stringify([...extra]));
       save();
