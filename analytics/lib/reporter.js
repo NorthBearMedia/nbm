@@ -26,14 +26,23 @@ export async function runReport(site, { trigger = 'scheduled', period } = {}) {
     }
     const pdf = await generateReportPdf(data);
     const filename = `${slug(site.client_name)}-report-${p.start}-to-${p.end}.pdf`;
-    const storedName = `${site.id}-${Date.now()}-${filename}`;
-    writeFileSync(join(config.reportsDir, storedName), pdf);
-
     const sentTo = await sendReportEmail(site, data, pdf, periodText, filename);
+    // Store the PDF for the admin download button only once the email has
+    // gone: a failed send used to leave an orphaned file on the volume, and
+    // a full disk must never turn a sent email into a 'failed' row (which
+    // would make the scheduler send it again tomorrow).
+    let storedName = `${site.id}-${Date.now()}-${filename}`;
+    try {
+      writeFileSync(join(config.reportsDir, storedName), pdf);
+    } catch (e) {
+      console.error(`[report] sent but could not store the PDF: ${e.message}`);
+      storedName = '';
+    }
     db.prepare(`INSERT INTO reports (site_id, period_start, period_end, period_label, pdf_path, sent_to, trigger_type, status)
                 VALUES (?, ?, ?, ?, ?, ?, ?, 'sent')`)
       .run(site.id, p.start, p.end, periodText, storedName, sentTo.join(', '), trigger);
-    console.log(`[report] sent ${site.client_name} (${periodText}) → ${sentTo.join(', ')}`);
+    const previewed = sentTo.some(t => t.startsWith('TEST→'));
+    console.log(`[report] sent ${site.client_name} (${periodText}) → ${sentTo.length} recipient(s)${previewed ? ' [preview to owner, site not live]' : ''}`);
     return { ok: true, sentTo, periodText, warnings: data.warnings };
   } catch (err) {
     db.prepare(`INSERT INTO reports (site_id, period_start, period_end, period_label, sent_to, trigger_type, status, error)

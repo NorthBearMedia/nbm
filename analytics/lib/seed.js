@@ -25,7 +25,7 @@ export function seedFirstCustomer() {
       VALUES (@client_name, @contact_name, @contact_emails, @domain, @report_frequency, @notes, @token, @next)`)
     .run({ ...FIRST_CUSTOMER, token: newDashboardToken(), next: nextRunAt(FIRST_CUSTOMER.report_frequency) });
   const siteId = info.lastInsertRowid;
-  console.log(`[seed] created first customer: ${FIRST_CUSTOMER.client_name} (${FIRST_CUSTOMER.domain}) → reports to ${FIRST_CUSTOMER.contact_emails}`);
+  console.log(`[seed] created first customer: ${FIRST_CUSTOMER.client_name} (${FIRST_CUSTOMER.domain})`);
 
   // Fire-and-forget: fill in whatever can be discovered. Never blocks boot.
   autoConnectSite(siteId)

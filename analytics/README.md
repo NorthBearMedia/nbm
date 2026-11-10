@@ -34,6 +34,11 @@ set *Root Directory* to `analytics` → add **one environment variable**:
 ADMIN_PASSWORD = something-long-and-private
 ```
 
+Optional: `SESSION_SECRET` (any long random string) pins the key that
+signs admin login cookies. Without it Pulse generates one on first boot
+and keeps it in the database on the volume. Changing it signs every
+browser out.
+
 …and **attach a Volume** mounted at `/data` with env `DATA_DIR=/data`
 (without it the database and PDFs are wiped on each deploy). Railway
 gives you a URL — open it, log in.

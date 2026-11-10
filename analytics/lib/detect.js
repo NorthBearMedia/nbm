@@ -2,6 +2,8 @@
 // installed — GA4 measurement ID, Microsoft Clarity project ID, and Google
 // Tag Manager. Lets sites be plugged in without hunting through page source.
 
+import { readBodyCapped } from './fetch-body.js';
+
 const UA = 'Mozilla/5.0 (compatible; NorthBearPulse/1.0; +https://northbearmedia.co.uk)';
 
 async function fetchHtml(url) {
@@ -14,7 +16,7 @@ async function fetchHtml(url) {
       signal: controller.signal,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return (await res.text()).slice(0, 2_000_000);
+    return await readBodyCapped(res, 2_000_000);
   } finally { clearTimeout(timer); }
 }
 

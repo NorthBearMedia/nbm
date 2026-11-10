@@ -755,10 +755,11 @@ $('#siteAuditBtn').onclick = async (e) => {
         <tbody>${rows}</tbody></table></div>
       <div class="modal-actions" style="margin-top:14px;display:flex;gap:8px">
         ${missing.length ? '<button class="btn primary" id="auditImportBtn">Import ticked sites</button>' : ''}
-        <button class="btn" onclick="document.getElementById('modalRoot').innerHTML=''">Close</button>
+        <button class="btn" id="closeBtn">Close</button>
       </div>
     </div></div>`;
     $('#backdrop').onclick = ev => { if (ev.target.id === 'backdrop') closeModal(); };
+    $('#closeBtn').onclick = closeModal;
     $('#auditImportBtn')?.addEventListener('click', async (ev) => {
       const domains = [...document.querySelectorAll('.audit-import:checked')].map(c => c.value);
       if (!domains.length) return toast('Tick at least one site to import', 'err');
@@ -817,9 +818,10 @@ $('#connectionsBtn').onclick = async (e) => {
           <code style="user-select:all;display:inline-block;margin-top:6px;word-break:break-all">${esc(r.gscDiag.tag)}</code>` : ''}</div>
         </td></tr>` : ''}`).join('')}</tbody>
       </table></div>
-      <div class="modal-actions" style="margin-top:14px"><button class="btn" onclick="document.getElementById('modalRoot').innerHTML=''">Close</button></div>
+      <div class="modal-actions" style="margin-top:14px"><button class="btn" id="closeBtn">Close</button></div>
     </div></div>`;
     $('#backdrop').onclick = ev => { if (ev.target.id === 'backdrop') closeModal(); };
+    $('#closeBtn').onclick = closeModal;
   } catch (err) { toast(err.message, 'err'); }
   e.target.disabled = false; e.target.textContent = 'Connections';
 };
@@ -913,16 +915,23 @@ async function showUptime() {
         <div class="hint" style="margin:4px 0 6px">Read only. Gives the time of the last check and every site's state. Keep this link private.</div>
         <code id="uptimeFeedUrl" style="user-select:all;word-break:break-all">${esc(u.feedUrl)}</code>
         <button class="btn" id="uptimeFeedCopy" style="margin-left:8px">Copy</button>
+        <button class="btn" id="uptimeFeedRotate" style="margin-left:4px">New link</button>
       </div>
       <div class="modal-actions" style="margin-top:14px">
         <button class="btn" id="uptimeRefresh">Refresh</button>
-        <button class="btn" onclick="document.getElementById('modalRoot').innerHTML=''">Close</button>
+        <button class="btn" id="closeBtn">Close</button>
       </div>
     </div></div>`;
   $('#backdrop').onclick = ev => { if (ev.target.id === 'backdrop') closeModal(); };
+  $('#closeBtn').onclick = closeModal;
   $('#uptimeRefresh').onclick = () => showUptime().catch(err => toast(err.message, 'err'));
   $('#uptimeFeedCopy').onclick = async () => {
     try { await navigator.clipboard.writeText(u.feedUrl); toast('Feed link copied'); } catch { toast('Select the link and copy it', 'err'); }
+  };
+  $('#uptimeFeedRotate').onclick = async () => {
+    if (!confirm('Generate a new status feed link? The current one stops working immediately, so paste the new one into your assistant.')) return;
+    try { await api('/api/uptime/rotate-feed-token', { method: 'POST' }); toast('New feed link generated'); await showUptime(); }
+    catch (err) { toast(err.message, 'err'); }
   };
   document.querySelectorAll('[data-mon-pause]').forEach(el => el.onchange = async () => {
     try {
@@ -970,10 +979,11 @@ $('#diagnosticBtn').onclick = async (e) => {
       <textarea id="diagText" rows="18" style="width:100%;font-family:ui-monospace,Menlo,monospace;font-size:11.5px">${esc(text)}</textarea>
       <div class="modal-actions" style="margin-top:12px">
         <button class="btn primary" id="diagCopy">Copy again</button>
-        <button class="btn" onclick="document.getElementById('modalRoot').innerHTML=''">Close</button>
+        <button class="btn" id="closeBtn">Close</button>
       </div>
     </div></div>`;
     $('#backdrop').onclick = ev => { if (ev.target.id === 'backdrop') closeModal(); };
+    $('#closeBtn').onclick = closeModal;
     $('#diagCopy').onclick = async () => {
       const ta = $('#diagText'); ta.select();
       try { await navigator.clipboard.writeText(ta.value); toast('Copied'); }
