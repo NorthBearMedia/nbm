@@ -14,6 +14,7 @@
 //
 // Guarded by a settings flag; unverified domains are retried on later boots.
 import cron from 'node-cron';
+import { injectorEnabled } from './inject.js';
 import db, { getSetting, setSetting, newDashboardToken } from '../database.js';
 import { config } from '../config.js';
 import { nextRunAt, addDays, todayISO } from './dates.js';
@@ -730,6 +731,7 @@ function isAutoTaggable(domain) {
 // window (whatever failed it may since be fixed — it was), so no site is
 // ever permanently stranded. Emits one summary the first time it places.
 export async function reconcileRolloutCrons() {
+  if (!injectorEnabled()) return { skipped: 'injector switched off' };
   if (injectState()['nbmdemosite2.co.uk']?.status !== 'verified') return { skipped: 'demo not verified' };
   const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND domain != ''").all();
   const state = injectState();
@@ -789,6 +791,7 @@ async function fetchLivePage(domain) {
 }
 
 export async function retrofitTags() {
+  if (!injectorEnabled()) return { skipped: 'injector switched off' };
   if (!getHostingerToken()) return { skipped: 'no Hostinger token' };
   if (injectState()['nbmdemosite2.co.uk']?.status !== 'verified') return { skipped: 'demo not verified' };
   const banner = getSetting('consent_banner') === 'true';
