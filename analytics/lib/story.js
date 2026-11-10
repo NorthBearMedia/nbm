@@ -39,6 +39,9 @@ export function trend(cur, prev) {
 }
 
 const pctText = t => (t.pct == null ? '' : `${Math.abs(t.pct).toFixed(0)}%`);
+// "up 228%" on 18 going to 59 is true and silly. Under 50 the two
+// numbers say it better than a percentage.
+const riseText = (t, prev) => (prev < 50 ? `up from ${n0(prev)}` : `up ${pctText(t)}`);
 
 function monthName(key) {
   return new Date(key + '-15T12:00:00Z').toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
@@ -125,15 +128,15 @@ export function buildStory(data) {
     const ctx = historyContext(data.history, 'visits', o.sessions, data);
     wins.push({
       key: 'visits',
-      title: `Visits up ${pctText(visits)}`,
+      title: po.sessions < 50 ? `Visits ${riseText(visits, po.sessions)} to ${n0(o.sessions)}` : `Visits up ${pctText(visits)}`,
       detail: `${n0(o.sessions)} visits, against ${n0(po.sessions)} in ${period.prev}${ctx && (ctx.kind === 'best' || ctx.kind === 'above') ? `, ${ctx.text}` : ''}.`,
     });
   }
   if (clicks.dir === 'up') {
-    wins.push({ key: 'clicks', title: `More people clicking through from Google`, detail: `${n0(s.clicks)} clicks, up ${pctText(clicks)} on ${period.prev}.` });
+    wins.push({ key: 'clicks', title: `More people clicking through from Google`, detail: `${n0(s.clicks)} clicks, ${riseText(clicks, ps.clicks)} in ${period.prev}.`.replace(/up (\d+%) in /, 'up $1 on ') });
   }
   if (shown.dir === 'up') {
-    wins.push({ key: 'shown', title: `Showing up in more Google searches`, detail: `You appeared ${n0(s.impressions)} times, up ${pctText(shown)} on ${period.prev}.` });
+    wins.push({ key: 'shown', title: `Showing up in more Google searches`, detail: `You appeared ${n0(s.impressions)} times, ${riseText(shown, ps.impressions)} in ${period.prev}.`.replace(/up (\d+%) in /, 'up $1 on ') });
   }
   const ga = trusted ? data.ga4 : null;
   const topPage = (ga?.topPages || [])[0];
@@ -202,13 +205,13 @@ export function buildStory(data) {
   // One or two plain sentences, best true thing first.
   const facts = [];
   if (o) {
-    facts.push(visits.dir === 'up' ? `visits rose ${pctText(visits)} to ${n0(o.sessions)}`
+    facts.push(visits.dir === 'up' ? (po.sessions < 50 ? `visits rose to ${n0(o.sessions)} from ${n0(po.sessions)}` : `visits rose ${pctText(visits)} to ${n0(o.sessions)}`)
       : visits.dir === 'down' ? `visits were ${n0(o.sessions)}, down ${pctText(visits)} on ${period.prev}`
       : visits.dir === 'level' ? `visits held level at ${n0(o.sessions)}`
       : `the site had ${n0(o.sessions)} visit${Math.round(o.sessions) === 1 ? '' : 's'}`);
   }
   if (s) {
-    facts.push(clicks.dir === 'up' ? `clicks from Google rose ${pctText(clicks)} to ${n0(s.clicks)}`
+    facts.push(clicks.dir === 'up' ? (ps.clicks < 50 ? `clicks from Google rose to ${n0(s.clicks)} from ${n0(ps.clicks)}` : `clicks from Google rose ${pctText(clicks)} to ${n0(s.clicks)}`)
       : clicks.dir === 'down' ? `clicks from Google were ${n0(s.clicks)}, down ${pctText(clicks)}`
       : clicks.dir === 'level' && s.clicks >= 20 ? `Google sent a steady ${n0(s.clicks)} clicks`
       : `Google sent ${n0(s.clicks)} click${Math.round(s.clicks) === 1 ? '' : 's'}`);

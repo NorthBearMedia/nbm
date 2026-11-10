@@ -264,3 +264,79 @@ code.snippet {
   padding: 14px; font-family: 'SF Mono', Consolas, monospace; font-size: 11.5px;
   white-space: pre-wrap; word-break: break-all; color: #c8e6d8; max-height: 300px; overflow-y: auto;
 }
+
+/* ── Brand refresh (admin console and login) ──────────────────────────
+   The current North Bear look: ink and green, Archivo headlines, Martian
+   Mono labels, square corners, ruled lines. Written as overrides at the
+   end of the file so every layout rule above stays exactly as it was. */
+@font-face { font-family: 'Archivo'; font-style: normal; font-weight: 100 900; font-stretch: 62% 125%; font-display: swap; src: url(/fonts/archivo-latin.woff2) format('woff2'); }
+@font-face { font-family: 'Martian Mono'; font-style: normal; font-weight: 100 800; font-display: swap; src: url(/fonts/martian-mono-latin.woff2) format('woff2'); }
+:root {
+  --bg: #0F1012;
+  --bg-card: #17191C;
+  --bg-elevated: #1D2024;
+  --bg-input: #0F1012;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --border: rgba(255, 255, 255, 0.15);
+  --text: #FFFFFF;
+  --text-secondary: #D5D8DB;
+  --text-muted: #A6ABB1;
+  --green: #4DB88C;
+  --green-light: #4DB88C;
+  --green-bg: rgba(77, 184, 140, 0.14);
+  --red: #E4573F;
+  --red-bg: rgba(228, 87, 63, 0.16);
+  --amber: #F2C230;
+  --amber-bg: rgba(242, 194, 48, 0.14);
+  --blue: #58C3DA;
+  --radius: 2px;
+  --mono: 'Martian Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+  --display: 'Archivo', 'Arial Narrow', Arial, sans-serif;
+}
+body { font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+body::before { background: none; }
+.panel, .login-card, #toast, .modal-backdrop { backdrop-filter: none; }
+.modal { background: var(--bg-card); border-radius: 2px; }
+.btn, .btn.small, .chip, .field input, .field select, .field textarea, .login-card, .login-card input,
+#toast, .wizard-step, .grant-box, code.snippet, .range-switch, .range-switch button,
+.bar-row .bar-track, .bar-row .bar-fill, .kpi::before, .section-head .accent { border-radius: 2px; }
+
+.topbar { border-bottom-color: var(--border); }
+.topbar .title { font-family: var(--display); font-size: 28px; font-weight: 800; font-stretch: 76%; text-transform: uppercase; letter-spacing: 0.01em; line-height: 0.95; }
+.topbar .subtitle { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 5px; }
+.section-head h2, .panel h2, .modal h3, .login-card h1, .site-card .name {
+  font-family: var(--display); font-weight: 800; font-stretch: 76%; text-transform: uppercase; letter-spacing: 0.01em; line-height: 1;
+}
+.section-head h2 { font-size: 26px; }
+.panel h2 { font-size: 21px; margin-bottom: 8px; }
+.modal h3 { font-size: 24px; }
+.login-card h1 { font-size: 28px; margin-bottom: 8px; }
+.site-card .name { font-size: 22px; }
+.section-head .accent { width: 12px; height: 12px; }
+.section-head .hint, .site-card .domain { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.04em; }
+
+.btn { font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: 0.09em; text-transform: uppercase; padding: 10px 13px; }
+.btn.small { font-size: 9px; padding: 7px 9px; }
+.btn:hover { border-color: var(--green); }
+.btn.primary { color: #0F1012; }
+.btn.primary:hover { background: #3FA77C; border-color: #3FA77C; }
+.chip { font-family: var(--mono); font-size: 9px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; padding: 4px 8px; }
+.chip.ok { color: var(--green); }
+
+.kpi::before { top: 0; bottom: 0; }
+.kpi .label, table.data th, .field label { font-family: var(--mono); font-size: 9.5px; font-weight: 500; letter-spacing: 0.09em; text-transform: uppercase; }
+.kpi .value { font-family: var(--display); font-weight: 800; font-stretch: 76%; font-size: 34px; line-height: 1.05; }
+.kpi .delta.down { color: var(--text-muted); }
+table.data th { border-bottom-width: 1px; }
+.bar-row .bar-fill { background: var(--green); }
+.step-badge { border-radius: 2px; font-family: var(--mono); font-size: 10px; }
+.step-badge.done { color: #0F1012; }
+.site-card.inactive { opacity: 0.5; }
+#toast.ok { border-color: var(--green); }
+#toast.err { border-color: var(--red); }
+.spinner { border-top-color: var(--green); }
+.btn { white-space: nowrap; }
+.topbar { flex-wrap: wrap; row-gap: 10px; }
+.topbar .title { white-space: nowrap; }
+.container { max-width: 1280px; }
+.modal .btn, .site-card .btn { white-space: normal; text-align: left; }

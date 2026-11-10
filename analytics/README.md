@@ -98,6 +98,14 @@ handling "send me a fresh report" requests — is automatic.
 - **Client-requested** → instantly, covering the last 30 days (max 3/day per client)
 - **"Send report now"** (admin) → instantly, covering the last 30 days
 
+Every report leads with a verdict for the period ("A strong month",
+"A quieter month"), what went well, and where to go from here, before any
+table of numbers. A change is only called up or down when it is big enough
+to mean something (`lib/story.js`); small wobbles read as "level", and red
+is kept for real faults such as downtime. The PDF, the email and the client
+dashboard share one look (Archivo and Martian Mono, in `assets/fonts` and
+`public/fonts`).
+
 Every email has the PDF attached, headline numbers, and a button to the
 client's live dashboard (their private `/r/<secret>` link — the **Copy
 dashboard link** button gives you the exact URL to send them). Sites
@@ -105,12 +113,24 @@ with no contact email or frequency "No schedule yet" never send anything.
 Failures show in the site's **History**; with a BCC set you get a copy of
 every report. Times use `TIMEZONE` (default `Europe/London`).
 
+## Site health scores
+
+The speed, SEO and best-practice scores come from Google's PageSpeed test.
+Google refuses the test without credentials, so add a free API key in
+Settings ("Site health: Google PageSpeed API key"): in the Google Cloud
+console enable the "PageSpeed Insights API", then APIs and services,
+Credentials, Create credentials, API key. Scores refresh daily for any
+site whose score is more than six days old. The Connections panel says
+when Google is refusing the test.
+
 ## Website monitoring
 
 Pulse checks every active client site's homepage every 5 minutes (a plain
 GET with an "NBM Pulse" user agent, 15 second timeout, one retry). A site is
-called down only after two failed checks in a row; if most sites fail at
-once, that is treated as Pulse's own connection and nothing is marked down.
+called down only after two failed checks in a row. A site that answers
+with an error page always counts as down. If most sites give no answer at
+all AND two unrelated outside pages cannot be reached either, that is
+treated as Pulse's own connection and nothing is marked down.
 Once a day at 04:10 it reads each site's certificate date (warning at 14 and
 3 days) and domain expiry date from Hostinger or RDAP (warning at 30 and 7
 days; "not known" where neither says). It also flags a homepage that tells
