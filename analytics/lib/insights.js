@@ -187,7 +187,7 @@ export function rulesInsights(data) {
   }
   if (story?.trends?.visits?.dir === 'down' && actions.length < 4) {
     actions.push({ owner: 'you', title: 'Share what is new',
-      detail: `Visits were lower in ${the}. A post on your social pages or Google Business Profile linking back to the site is the fastest way to bring people in.` });
+      detail: `Visits were lower ${the.startsWith('this') ? the : `in ${the}`}. A post on your social pages or Google Business Profile linking back to the site is the fastest way to bring people in.` });
   }
   if (actions.length < 3) {
     actions.push({ owner: 'us', title: 'Add fresh content',

@@ -105,6 +105,32 @@ function pageName(path, title) {
   return last ? last.charAt(0).toUpperCase() + last.slice(1) : 'Homepage';
 }
 
+// A click count against the period before, in the same words used
+// everywhere else. Under 50 the two numbers say more than a percentage.
+function clicksChangeHtml(cur, prev) {
+  if (prev == null || !isFinite(prev)) return '<span class="mv"></span>';
+  if (!(prev > 0)) return `<span class="mv${cur > 0 ? ' good' : ''}">${cur > 0 ? 'New' : ''}</span>`;
+  const t = countTrend(cur, prev);
+  if (t.dir === 'level') return '<span class="mv">Level</span>';
+  // A percentage past a few hundred stops meaning anything either.
+  const how = prev < 50 || Math.abs(t.pct) >= 400 ? `from ${fmtBig(prev)}` : `${Math.abs(t.pct).toFixed(0)}%`;
+  return `<span class="mv${t.dir === 'up' ? ' good' : ''}">${t.dir === 'up' ? '\u2191 up' : '\u2193 down'} ${how}</span>`;
+}
+// The path part of a full page address, for naming it.
+function pathOf(url) {
+  try { const u = new URL(String(url)); return u.pathname + (u.hash.startsWith('#/') ? u.hash : ''); } catch { return String(url || '/'); }
+}
+// One side of "against the same month last year", in plain words.
+function yoyPart(name, y) {
+  if (!y || y.now == null || y.then == null) return '';
+  if (y.dir === 'level') return `<span>${name} level</span>`;
+  if (y.dir !== 'up' && y.dir !== 'down') return '';
+  const how = y.then < 50 || y.pct == null || !isFinite(y.pct)
+    ? `${fmtInt(y.now)}, ${y.dir} from ${fmtInt(y.then)}`
+    : `${y.dir} ${Math.abs(y.pct).toFixed(0)}%`;
+  return `<span${y.dir === 'up' ? ' class="good"' : ''}>${name} ${how}</span>`;
+}
+
 // ---------- sections ----------
 
 function heroSection(d, ctx) {
@@ -145,12 +171,22 @@ function heroSection(d, ctx) {
   // An under-counting visitor counter never has its history charted either.
   const hasVisits = !gaBad && months.some(m => m.visits != null), hasClicks = months.some(m => m.clicks != null);
   const part = months.some(m => m.partial);
+  // The month tracking began is usually a part month. Only the visits
+  // bars carry it, and a month still running is "so far" first.
+  const began = hasVisits && months.some(m => m.firstTracked && !m.partial && m.visits != null);
+
+  // Against the same month a year ago (calendar-month views only).
+  const yoy = story?.yoy;
+  const yoyParts = yoy ? [o ? yoyPart('Visits', yoy.visits) : '', s ? yoyPart('Clicks from Google', yoy.clicks) : ''].filter(Boolean) : [];
+  const yoyHtml = yoyParts.length && yoy.label
+    ? `<p class="yoy"><span class="yoy-part"><span class="blk"></span><b>Against ${esc(yoy.label)}</b></span>${yoyParts.map(x => `<span class="yoy-part"><i class="sl" aria-hidden="true">//</i>${x}</span>`).join('')}</p>` : '';
 
   return `<section class="sec hero" id="summary"><div class="wrap">
     ${band('P100', 'Summary', d.period ? `${fmtDay(d.period.start)} to ${fmtDay(d.period.end, true)}` : '')}
     <p class="verdict t-${esc(tone)}">${esc(label)}</p>
     ${standfirst ? `<p class="standfirst">${esc(standfirst)}</p>` : ''}
     ${list.length ? `<div class="gap-lg">${figs(list)}</div>` : ''}
+    ${list.length ? yoyHtml : ''}
     ${notes.map(n => `<p class="caption">${n}</p>`).join('')}
     ${showHistory ? `<div class="panel gap-lg">
       <div class="panel-head">
@@ -158,6 +194,7 @@ function heroSection(d, ctx) {
         <div class="legend">
           ${hasVisits ? '<span class="key"><i></i>Visits</span>' : ''}
           ${hasClicks ? `<span class="key"><i class="${hasVisits ? 'k-line' : ''}"></i>Clicks from Google</span>` : ''}
+          ${began ? '<span class="key"><i class="k-first"></i>Month tracking began</span>' : ''}
           ${part ? '<span class="key"><i class="k-part"></i>Month so far</span>' : ''}
         </div>
       </div>
@@ -172,14 +209,24 @@ function storySection(d, ctx) {
   const actions = d.insights?.actions || [];
   const watch = ctx.story?.watch || [];
   const ask = d.insights?.ask || '';
-  if (!wins.length && !actions.length && !watch.length) return '';
-  const two = wins.length && actions.length;
+  // North Bear's work log for the period, as the client reads it.
+  const allWork = (Array.isArray(d.workDone) ? d.workDone : []).filter(w => w && w.title);
+  const work = allWork.slice(0, 10);
+  if (!wins.length && !actions.length && !watch.length && !work.length) return '';
+  const two = (wins.length || work.length) && actions.length;
   const no = i => String(i + 1).padStart(2, '0');
   const winsHtml = wins.length ? `<div>
       <h2 class="col-title">What went well</h2>
       <ol class="items">${wins.map((w, i) => `<li class="item">
         <span class="item-no">${no(i)}</span><span class="item-title">${esc(w.title)}</span>
         <span class="item-detail">${esc(w.detail)}</span></li>`).join('')}</ol>
+    </div>` : '';
+  const workHtml = work.length ? `<div class="work">
+      <h2 class="col-title">What we did for you</h2>
+      <ol class="items">${work.map(w => `<li class="item">
+        <span class="item-no">${/^\d{4}-\d{2}-\d{2}/.test(String(w.date)) ? esc(fmtDay(String(w.date).slice(0, 10))) : ''}</span><span class="item-title">${esc(w.title)}</span>
+        ${w.detail ? `<span class="item-detail">${esc(w.detail)}</span>` : ''}</li>`).join('')}</ol>
+      ${allWork.length > work.length ? `<p class="caption">And ${fmtInt(allWork.length - work.length)} more in this period.</p>` : ''}
     </div>` : '';
   const actionsHtml = actions.length ? `<div>
       <h2 class="col-title">Where we go from here</h2>
@@ -196,7 +243,7 @@ function storySection(d, ctx) {
   const askHtml = ask ? `<div class="ask"><div class="kicker"><span class="blk"></span>One thing from you</div><p>${esc(ask)}</p></div>` : '';
   return `<section class="sec sec--paper" id="story"><div class="wrap">
     ${band('P150', 'What it means')}
-    <div class="story"${two ? '' : ' style="grid-template-columns:1fr"'}>${winsHtml}${actionsHtml}</div>
+    <div class="story"${two ? '' : ' style="grid-template-columns:1fr"'}>${winsHtml && workHtml ? `<div class="story-col">${winsHtml}${workHtml}</div>` : winsHtml || workHtml}${actionsHtml}</div>
     ${watchHtml || askHtml ? `<div class="aside${watchHtml && askHtml ? '' : ' aside--one'}">${watchHtml}${askHtml}</div>` : ''}
   </div></section>`;
 }
@@ -366,6 +413,42 @@ function googleSection(d, ctx) {
         <p class="caption">Movement is places gained or lost on Google against ${esc(ctx.story?.period?.prev || 'the period before')}.</p>
       </div>`;
     }
+
+    const prevWord = esc(ctx.story?.period?.prev || 'the period before');
+    const fresh = (Array.isArray(d.search.newQueries) ? d.search.newQueries : []).filter(q => q && q.query).slice(0, 8);
+    const gPages = (Array.isArray(d.search.pages) ? d.search.pages : []).filter(g => g && g.page).slice(0, 8);
+    let freshHtml = '', pagesHtml = '';
+    if (fresh.length) {
+      freshHtml = `<div class="panel">
+        <div class="panel-head"><h2 class="sub">New searches you appeared for</h2></div>
+        <div class="rows-head rows--new" aria-hidden="true"><span>Search</span><span>Times shown</span><span>Position</span></div>
+        <ol class="rows rows--new">${fresh.map(q => `<li class="row">
+          <span class="row-name">${esc(q.query)}</span>
+          <span class="row-num"><span class="show-s">Shown </span>${fmtBig(q.impressions)}<span class="show-s"> time${Math.round(q.impressions) === 1 ? '' : 's'}</span></span>
+          <span class="row-num">${q.position != null && isFinite(q.position) ? `<span class="show-s">Position </span>${Math.max(1, Math.round(q.position))}` : ''}</span>
+        </li>`).join('')}</ol>
+        <p class="caption">${fresh.length === 1 ? 'Google did not show your site for this search' : 'Google did not show your site for any of these'} in ${prevWord}. New searches are a sign your reach is widening.</p>
+      </div>`;
+    }
+    if (gPages.length) {
+      const compared = gPages.some(g => g.prevClicks != null);
+      pagesHtml = `<div class="panel">
+        <div class="panel-head"><h2 class="sub">Pages Google sent people to</h2></div>
+        <div class="rows-head rows--pages" aria-hidden="true"><span>Page</span><span>Clicks</span><span>${compared ? 'Change' : ''}</span></div>
+        <ol class="rows rows--pages">${gPages.map(g => {
+          const path = pathOf(g.page);
+          // A single-page site keeps the page after the hash ("/#/services").
+          const named = pageName(path.includes('#/') ? path.slice(path.indexOf('#') + 1) : path);
+          return `<li class="row">
+          <span class="row-name" title="${esc(g.page)}">${esc(named)}<span class="page-path">${esc(path)}</span></span>
+          <span class="row-num">${fmtBig(g.clicks)}<span class="show-s"> click${Math.round(g.clicks) === 1 ? '' : 's'}</span></span>
+          ${clicksChangeHtml(g.clicks, g.prevClicks)}
+        </li>`; }).join('')}</ol>
+        <p class="caption">The pages people landed on from a Google search${compared ? `, with clicks compared against ${prevWord}` : ''}.</p>
+      </div>`;
+    }
+    if (freshHtml && pagesHtml) h += `<div class="cols cols--even gap">${freshHtml}${pagesHtml}</div>`;
+    else if (freshHtml || pagesHtml) h += `<div class="stack gap">${freshHtml || pagesHtml}</div>`;
   }
   return h + '</div></section>';
 }
@@ -491,13 +574,18 @@ function chartBase() {
   };
 }
 
-// Diagonal stripes for a month that is not over yet.
-function stripes(ctx) {
+// Diagonal stripes for a month that is not over yet. The month tracking
+// began is also a part month, and gets the same idea leaning the other
+// way and fainter, so the two are never mistaken for each other.
+function stripes(ctx, { back = false, color = '#4DB88C' } = {}) {
   const c = document.createElement('canvas');
   c.width = c.height = 8;
   const g = c.getContext('2d');
-  g.strokeStyle = '#4DB88C'; g.lineWidth = 2;
-  g.beginPath(); g.moveTo(-2, 10); g.lineTo(10, -2); g.moveTo(-2, 2); g.lineTo(2, -2); g.moveTo(6, 10); g.lineTo(10, 6); g.stroke();
+  g.strokeStyle = color; g.lineWidth = 2;
+  g.beginPath();
+  if (back) { g.moveTo(-2, -2); g.lineTo(10, 10); g.moveTo(6, -2); g.lineTo(10, 2); g.moveTo(-2, 6); g.lineTo(2, 10); }
+  else { g.moveTo(-2, 10); g.lineTo(10, -2); g.moveTo(-2, 2); g.lineTo(2, -2); g.moveTo(6, 10); g.lineTo(10, 6); }
+  g.stroke();
   return ctx.createPattern(c, 'repeat');
 }
 
@@ -508,11 +596,16 @@ function drawHistory(months, visitsTrusted = true) {
   const hasClicks = months.some(m => m.clicks != null);
   const barField = hasVisits ? 'visits' : 'clicks';
   const pattern = stripes(ctx);
+  const FIRST = 'rgba(77,184,140,.6)';
+  const firstPattern = stripes(ctx, { back: true, color: FIRST });
+  // Only visits bars can be "the month tracking began"; a month still
+  // running is "so far" before anything else.
+  const began = m => hasVisits && Boolean(m.firstTracked) && !m.partial && m.visits != null;
   const datasets = [{
     type: 'bar', label: hasVisits ? 'Visits' : 'Clicks from Google', order: 2,
     data: months.map(m => m[barField]),
-    backgroundColor: months.map(m => (m.partial ? pattern : '#4DB88C')),
-    borderColor: '#4DB88C', borderWidth: months.map(m => (m.partial ? 1 : 0)),
+    backgroundColor: months.map(m => (m.partial ? pattern : began(m) ? firstPattern : '#4DB88C')),
+    borderColor: months.map(m => (began(m) ? FIRST : '#4DB88C')), borderWidth: months.map(m => (m.partial || began(m) ? 1 : 0)),
     maxBarThickness: 64, categoryPercentage: 0.72, barPercentage: 0.9,
   }];
   if (hasVisits && hasClicks) {
@@ -526,11 +619,11 @@ function drawHistory(months, visitsTrusted = true) {
   }
   const opts = chartBase();
   opts.plugins.tooltip.callbacks = {
-    title: items => { const m = months[items[0].dataIndex]; return m.partial ? `${m.label} so far` : m.label; },
+    title: items => { const m = months[items[0].dataIndex]; return m.partial ? `${m.label} so far` : began(m) ? `${m.label}: tracking began, part month` : m.label; },
     label: item => ` ${item.dataset.label}: ${fmtInt(item.parsed.y)}`,
   };
   charts.history = new Chart(ctx, {
-    data: { labels: months.map(m => (m.partial ? [m.label, 'so far'] : m.label)), datasets },
+    data: { labels: months.map(m => (m.partial ? [m.label, 'so far'] : began(m) ? [m.label, 'began'] : m.label)), datasets },
     options: opts,
   });
 }

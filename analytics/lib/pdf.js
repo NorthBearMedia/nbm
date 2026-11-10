@@ -137,6 +137,31 @@ function moveNote(places) {
   return { text: `${places > 0 ? 'Up' : 'Down'} ${n} place${n === '1' ? '' : 's'}`, kind: places > 0 ? 'up' : 'down' };
 }
 const noteColor = (th, kind) => (kind === 'up' ? th.up : kind === 'level' ? th.quiet : th.faint);
+// Clicks a page earned against the period before. A page with none
+// before is new; under 50 the earlier number says more than a percentage.
+function clicksNote(now, before) {
+  if (before == null) return null;
+  if (!before) return now > 0 ? { text: 'New', kind: 'up' } : null;
+  const c = change(now, before, { count: true });
+  if (!c || c.kind === 'level' || before >= 50) return c;
+  return { text: `${now > before ? 'Up' : 'Down'} from ${fmtInt(before)}`, kind: c.kind };
+}
+// One calm sentence setting the month against the same month a year ago.
+function yoyText(yoy) {
+  if (!yoy) return '';
+  const part = (name, side) => {
+    if (!side) return null;
+    if (side.dir === 'level') return `${name} level`;
+    if (side.dir !== 'up' && side.dir !== 'down') return null;
+    if (side.pct == null || side.then < 50) return `${name} ${side.dir} to ${fmtInt(side.now)} from ${fmtInt(side.then)}`;
+    return `${name} ${side.dir} ${Math.abs(side.pct).toFixed(0)}%`;
+  };
+  const parts = [part('visits', yoy.visits), part('clicks from Google', yoy.clicks)].filter(Boolean);
+  return parts.length ? `Against ${yoy.label}: ${parts.join(', ')}.` : '';
+}
+function shortDate(iso) {
+  return /^\d{4}-\d{2}-\d{2}/.test(String(iso || '')) ? formatDate(String(iso).slice(0, 10), { day: 'numeric', month: 'short' }) : '';
+}
 
 // ---------- text primitives ----------
 function fit(doc, text, maxW, spacing = 0) {
@@ -318,6 +343,21 @@ function niceMax(v) {
 
 // One figure per calendar month as bars. Months inside the reporting
 // period are solid, earlier months are dimmed, a part month is hatched.
+// The month visitor tracking began is a part month too (the tag went
+// live part-way through), so it is hatched the other way: drawn solid it
+// reads as a leap in traffic that never happened.
+const trackingBegan = (m, field) => field === 'visits' && Boolean(m.firstTracked) && !m.partial && m.visits != null;
+function hatch(doc, bx, by, bw, bh, color, backward = false) {
+  doc.save();
+  doc.rect(bx, by, bw, bh).clip();
+  doc.lineWidth(0.8).strokeColor(color);
+  for (let k = -bh; k < bw + bh; k += 4) {
+    if (backward) doc.moveTo(bx + k, by).lineTo(bx + k + bh, by + bh).stroke();
+    else doc.moveTo(bx + k, by + bh).lineTo(bx + k + bh, by).stroke();
+  }
+  doc.restore();
+  doc.rect(bx + 0.4, by + 0.4, bw - 0.8, Math.max(0.5, bh - 0.4)).lineWidth(0.8).stroke(color);
+}
 function monthBars(doc, th, x, y, w, h, months, field, color, title, data) {
   label(doc, title, x, y, { color: th.fg, font: 'monoM', width: w });
   // A source that began part-way through the year has nothing before its
@@ -341,12 +381,11 @@ function monthBars(doc, th, x, y, w, h, months, field, color, title, data) {
     const bh = Math.max(1.5, (v / max) * areaH);
     const bx = cx - bw / 2, by = base - bh;
     if (m.partial) {
-      doc.save();
-      doc.rect(bx, by, bw, bh).clip();
-      doc.lineWidth(0.8).strokeColor(color);
-      for (let k = -bh; k < bw + bh; k += 4) doc.moveTo(bx + k, by + bh).lineTo(bx + k + bh, by).stroke();
+      hatch(doc, bx, by, bw, bh, color);
+    } else if (trackingBegan(m, field)) {
+      doc.save().strokeOpacity(inPeriod(m) ? 1 : 0.6);
+      hatch(doc, bx, by, bw, bh, color, true);
       doc.restore();
-      doc.rect(bx + 0.4, by + 0.4, bw - 0.8, Math.max(0.5, bh - 0.4)).lineWidth(0.8).stroke(color);
     } else {
       doc.save().fillOpacity(inPeriod(m) ? 1 : 0.42).rect(bx, by, bw, bh).fill(color).restore();
     }
@@ -613,7 +652,14 @@ function summaryPage(ctx) {
     label(doc, 'The headline numbers', M, y, { color: th.fg, font: 'monoM' });
     label(doc, `Change is against ${period.prev}`, M + CW / 2, y, { color: th.faint, width: CW / 2, align: 'right' });
     y += 14;
-    y = statRow(doc, th, M, y, CW, cells.slice(0, 4), { valueSize: 40 }) + 22;
+    y = statRow(doc, th, M, y, CW, cells.slice(0, 4), { valueSize: 40 });
+    const lastYear = yoyText(story?.yoy);
+    if (lastYear) {
+      doc.rect(M, y + 12.5, 5, 5).fill(C.cyan);
+      line(doc, lastYear, M + 12, y + 10, { font: 'reg', size: 9.5, color: th.sub, width: CW - 12 });
+      y += 20;
+    }
+    y += 22;
   }
 
   // What went well: measured first so the chart above it can take the
@@ -650,7 +696,19 @@ function summaryPage(ctx) {
   if (showMonths) {
     y += spare * 0.4;
     label(doc, 'The long view', M, y, { color: th.fg, font: 'monoM' });
-    label(doc, `Month by month${months.some(m => m.partial) ? ' // * part month so far' : ''}`, M + CW / 2, y, { color: th.faint, width: CW / 2, align: 'right' });
+    // Legend, right to left: the swatch for the month tracking began
+    // (only when the visits chart shows one), then the part-month star.
+    let legendR = M + CW;
+    if (hasV && months.some(m => trackingBegan(m, 'visits'))) {
+      const txt = 'Tracking began part way through';
+      doc.font('mono').fontSize(6.5);
+      const tw = doc.widthOfString(txt.toUpperCase(), { characterSpacing: 0.9 });
+      label(doc, txt, legendR - tw, y, { color: th.faint });
+      hatch(doc, legendR - tw - 15, y + 0.5, 10, 7, C.green, true);
+      label(doc, '//', legendR - tw - 31, y, { color: th.faint });
+      legendR -= tw + 38;
+    }
+    label(doc, `Month by month${months.some(m => m.partial) ? ' // * part month so far' : ''}`, M + 90, y, { color: th.faint, width: legendR - M - 90, align: 'right' });
     hRule(doc, M, y + 13, CW, th.rule);
     const charts = [];
     if (hasV) charts.push(['visits', C.green, 'Visits']);
@@ -702,7 +760,11 @@ function nextStepsSection(ctx, y) {
   const ins = data.insights, story = data.story;
   const actions = (ins?.actions?.length ? ins.actions : (ins?.recommendations || []).map(r => ({ ...r, owner: 'us' }))).slice(0, 4);
   const watch = (story?.watch || []).slice(0, 4);
-  if (!actions.length && !watch.length && !ins?.summary) return y;
+  // The work log: what North Bear did for this client in the period, in
+  // the owner's own words.
+  const logged = (Array.isArray(data.workDone) ? data.workDone : []).filter(w => w && clean(w.title));
+  const work = logged.slice(0, 8);
+  if (!actions.length && !watch.length && !ins?.summary && !work.length) return y;
 
   // Measure everything first and pick the roomiest spacing that still
   // lets the whole section sit on one page: this page is the answer to
@@ -718,9 +780,15 @@ function nextStepsSection(ctx, y) {
     + paraH(doc, w.detail, { size: 9, width: w2, lineGap: 2 }) + 2;
   const watchRows = [];
   for (let i = 0; i < watch.length; i += 2) watchRows.push(Math.max(itemH(watch[i]), watch[i + 1] ? itemH(watch[i + 1]) : 0));
-  const PADS = [{ row: 20, sum: 20, ask: 24, watch: 14 }, { row: 15, sum: 15, ask: 18, watch: 11 }, { row: 11, sum: 12, ask: 14, watch: 8 }];
+  const workX = M + 72, workW = CW - 72 - 8;
+  const workH = work.map(w => paraH(doc, w.title, { font: 'semi', size: 10.5, width: workW, lineGap: 1.5 })
+    + (clean(w.detail) ? paraH(doc, w.detail, { size: 9, width: workW, lineGap: 2 }) + 2 : 0));
+  const moreWork = logged.length - work.length;
+  const PADS = [{ row: 20, sum: 20, ask: 24, watch: 14, work: 13 }, { row: 15, sum: 15, ask: 18, watch: 11, work: 10 }, { row: 11, sum: 12, ask: 14, watch: 8, work: 8 }];
+  const workTotal = pd => (work.length ? 22 + workH.reduce((a, h) => a + h + pd.work, 0) + (moreWork > 0 ? 14 : 0) + pd.sum - pd.work / 2 : 0);
   const total = pd => 46
     + (sumH ? sumH + 4 + pd.sum : 0)
+    + workTotal(pd)
     + (actions.length ? 22 + actH.reduce((a, h) => a + h + pd.row, 0) + 6 : 0)
     + (askH ? askH + 42 + pd.ask : 0)
     + (watch.length ? 22 + watchRows.reduce((a, h) => a + h + pd.watch, 0) : 0);
@@ -730,6 +798,28 @@ function nextStepsSection(ctx, y) {
   y = opener(ctx, y, 'P200', 'Where we go from here', null, Math.min(total(pd) - 46, 300));
   if (ins?.summary) {
     y += para(doc, ins.summary, M, y + 4, { font: 'reg', size: 11.5, width: span(11), lineGap: 3.5, color: th.fg }) + 4 + pd.sum;
+  }
+
+  if (work.length) {
+    ctx.extended = true;
+    // Kept in one piece when it fits on a page; a long log flows on.
+    const whole = workTotal(pd);
+    y = room(ctx, y, whole <= LIMIT - TOP ? whole : 22 + workH[0] + pd.work);
+    y = subhead(doc, th, M, y, CW, 'What we did for you', `Work completed, ${periodText(data)}`);
+    work.forEach((w, i) => {
+      y = room(ctx, y, workH[i] + pd.work);
+      label(doc, shortDate(w.date), M, y + 2.5, { color: th.faint, width: 52 });
+      doc.rect(M + 56, y + 3, 6, 6).fill(C.greenInk);
+      const h1 = para(doc, w.title, workX, y, { font: 'semi', size: 10.5, width: workW, lineGap: 1.5, color: th.fg });
+      if (clean(w.detail)) para(doc, w.detail, workX, y + h1 + 2, { size: 9, width: workW, lineGap: 2, color: th.sub });
+      y += workH[i] + pd.work;
+      if (i < work.length - 1) hRule(doc, M + 56, y - pd.work / 2, CW - 56, th.rule, 0.5);
+    });
+    if (moreWork > 0) {
+      line(doc, `And ${moreWork} more piece${moreWork === 1 ? '' : 's'} of work this period.`, workX, y - pd.work / 2 + 2, { size: 8.5, color: th.quiet, width: workW });
+      y += 14;
+    }
+    y += pd.sum - pd.work / 2;
   }
 
   if (actions.length) {
@@ -1049,7 +1139,83 @@ function googleSection(ctx, y) {
     if (y + 12 <= LIMIT) y += para(doc, 'Movement is places gained or lost on Google against the period before. "PG 1" marks a search where you appear on the first page.', M, y, { size: 8, width: CW, color: th.quiet, lineGap: 1.5 });
     else y -= 8;
   }
-  return y;
+  return newGround(ctx, y);
+}
+
+// New searches the site started showing for, and the pages Google sent
+// people to. Two short lists side by side (or one across the page when
+// only one has anything to show), kept together as a block.
+function newGround(ctx, y) {
+  const { doc, data } = ctx;
+  const th = PAPER;
+  const sr = data.search;
+  const period = periodNoun(data.period.start, data.period.end);
+  const fresh = (sr.newQueries || []).filter(q => q && clean(q.query)).slice(0, 8);
+  const pages = (sr.pages || []).filter(r => r && r.page).slice(0, 8).map(r => {
+    let path = String(r.page);
+    try { const u = new URL(path); path = u.pathname + (u.hash.length > 2 ? u.hash : ''); } catch { path = path.replace(/^[a-z]+:\/\/[^/]+/i, '') || '/'; }
+    return { ...r, path, name: path === '/' ? 'Homepage' : pageName(path, '') };
+  });
+  if (!fresh.length && !pages.length) return y;
+  ctx.extended = true;
+
+  const both = fresh.length && pages.length;
+  const colW = both ? span(6) - 10 : CW;
+  const during = period.the.startsWith('this') ? period.the : `in ${period.the}`;
+  const freshIntro = `Google showed your site for these searches ${during}. It did not show it for any of them in ${period.prev}.`;
+  const pagesIntro = `Where people landed when they clicked through from a Google search. Change is against ${period.prev}.`;
+  const introOpts = { size: 8.5, width: colW, lineGap: 2, color: th.sub, maxLines: 3 };
+  const introH = Math.max(fresh.length ? paraH(doc, freshIntro, introOpts) : 0, pages.length ? paraH(doc, pagesIntro, introOpts) : 0);
+  const rowH = 19;
+  const rows = Math.max(fresh.length, pages.length);
+  const blockH = 22 + introH + 10 + 13 + rows * rowH + 2;
+
+  y = room(ctx, y + ctx.d.gap, blockH);
+  const head = (x, top, cols) => {
+    let cx = x;
+    cols.forEach(c => { label(doc, c.label, cx, top, { color: th.faint, width: c.width - (c.right ? 0 : 6), align: c.right ? 'right' : 'left' }); cx += c.width; });
+    hRule(doc, x, top + 13, colW, th.fg, 0.9);
+    return top + 13;
+  };
+
+  const lists = [];
+  if (fresh.length) {
+    lists.push(x => {
+      const cols = [{ label: 'Search', width: colW - (both ? 98 : 150) }, { label: 'Shown', width: both ? 44 : 80, right: true }, { label: 'Position', width: both ? 54 : 70, right: true }];
+      let ry = subhead(doc, th, x, y, colW, 'New searches you appeared for');
+      para(doc, freshIntro, x, ry, introOpts);
+      ry = head(x, ry + introH + 10, cols);
+      fresh.forEach(q => {
+        line(doc, q.query, x, ry + 5, { font: 'semi', size: 9, color: th.fg, width: cols[0].width - 8 });
+        line(doc, fmtInt(q.impressions), x + cols[0].width, ry + 5, { size: 9, color: th.fg, width: cols[1].width, align: 'right' });
+        const on1 = q.position != null && q.position <= 10.5;
+        line(doc, q.position != null && isFinite(q.position) ? String(Math.max(1, Math.round(q.position))) : 'n/a', x + cols[0].width + cols[1].width, ry + 5,
+          { font: 'semi', size: 9, color: on1 ? th.up : th.fg, width: cols[2].width, align: 'right' });
+        ry += rowH;
+        hRule(doc, x, ry, colW, th.rule, 0.5);
+      });
+      return ry;
+    });
+  }
+  if (pages.length) {
+    lists.push(x => {
+      const cols = [{ label: 'Page', width: colW - (both ? 126 : 170) }, { label: 'Clicks', width: both ? 44 : 70, right: true }, { label: 'Change', width: both ? 82 : 100, right: true }];
+      let ry = subhead(doc, th, x, y, colW, 'Pages Google sent people to');
+      para(doc, pagesIntro, x, ry, introOpts);
+      ry = head(x, ry + introH + 10, cols);
+      pages.forEach(r => {
+        line(doc, r.name, x, ry + 5, { font: 'semi', size: 9, color: th.fg, width: cols[0].width - 8 });
+        line(doc, fmtInt(r.clicks), x + cols[0].width, ry + 5, { font: 'semi', size: 9, color: th.fg, width: cols[1].width, align: 'right' });
+        const n = clicksNote(r.clicks, r.prevClicks);
+        if (n) line(doc, n.text, x + cols[0].width + cols[1].width, ry + 5.5, { font: 'med', size: 8.5, color: noteColor(th, n.kind), width: cols[2].width, align: 'right' });
+        ry += rowH;
+        hRule(doc, x, ry, colW, th.rule, 0.5);
+      });
+      return ry;
+    });
+  }
+  const ends = lists.map((draw, i) => draw(i ? colX(6) + 10 : M));
+  return Math.max(...ends);
 }
 
 // ================================================================
@@ -1148,9 +1314,30 @@ function closing(ctx, y) {
   const contactH = 64;
   const total = blockH + contactH + 20;
 
+  // Where it goes, in order of preference: after the content with the
+  // usual gap; then, for a report carrying the longer sections (the work
+  // log, new searches, pages from Google), with a tighter gap or in a
+  // short form (sources on one line, no glossary) when that is what
+  // fits. Only then on a page of its own, because a last sheet holding
+  // nothing but this reads as a mistake. Reports without those sections
+  // are laid out exactly as they always were.
   const from = y;
-  if (y > TOP + 1) y += ctx.d.openerGap;
-  if (y + total > LIMIT) { y = newPage(ctx, from); ctx.closingAlone = true; }
+  const shortH = 24 + contactH;
+  let short = false;
+  if (y <= TOP + 1 || y + ctx.d.openerGap + total <= LIMIT) { if (y > TOP + 1) y += ctx.d.openerGap; }
+  else if (ctx.extended && y + 12 + total - 14 <= LIMIT) y += 12; // `total` carries 20 points of slack below the band
+  else if (ctx.extended && sources.length && y + 16 + shortH <= LIMIT) { y += 16; short = true; ctx.closingShort = true; }
+  else { y = newPage(ctx, from); ctx.closingAlone = true; }
+
+  if (short) {
+    // Sit it at the foot of the page when the gap is small enough.
+    const foot = LIMIT - shortH + 4;
+    if (foot > y && foot - y <= 150) y = foot;
+    hRule(doc, M, y, CW, th.rule);
+    label(doc, 'Where the numbers come from', M, y + 8, { color: th.fg, font: 'monoM' });
+    line(doc, sources.map(([, where]) => where).filter((v, i, a) => a.indexOf(v) === i).join(', '), M + 170, y + 6.5, { size: 8.5, color: th.sub, width: CW - 170, align: 'right' });
+    y += 24;
+  } else {
   // Sit the closing matter at the foot of the page when there is spare
   // room, so the last page ends on purpose rather than trailing off.
   // Across a big gap it would leave a hole mid-page, so then it simply
@@ -1173,6 +1360,7 @@ function closing(ctx, y) {
     sy += 15;
   });
   y = Math.max(gy, sy) + 18;
+  }
 
   doc.rect(M, y, CW, contactH).fill(C.ink);
   blocks(doc, M + CW - 18, y + 14, 6, [C.green, C.cyan, C.yellow]);
@@ -1215,7 +1403,7 @@ function build(data, d) {
   doc.on('data', c => chunks.push(c));
   const done = new Promise(resolve => doc.on('end', () => resolve(Buffer.concat(chunks))));
 
-  const ctx = { doc, data, d, tags: [], tag: 'P100', waste: 0, closingAlone: false };
+  const ctx = { doc, data, d, tags: [], tag: 'P100', waste: 0, closingAlone: false, closingShort: false, extended: false };
   summaryPage(ctx);
 
   ctx.tag = 'P200';
@@ -1229,7 +1417,7 @@ function build(data, d) {
   footers(ctx);
   const pages = doc.bufferedPageRange().count;
   doc.end();
-  return { done, pages, alone: ctx.closingAlone, waste: ctx.waste, lastFill: (endY - TOP) / (LIMIT - TOP) };
+  return { done, pages, alone: ctx.closingAlone, rank: ctx.closingAlone ? 2 : ctx.closingShort ? 1 : 0, waste: ctx.waste, lastFill: (endY - TOP) / (LIMIT - TOP) };
 }
 
 export async function generateReportPdf(data) {
@@ -1237,10 +1425,10 @@ export async function generateReportPdf(data) {
   for (const d of DENSITY) {
     const pass = build(data, d);
     const buffer = await pass.done;
-    if (!best || pass.pages < best.pages || (pass.pages === best.pages && best.alone && !pass.alone)) best = { ...pass, buffer };
-    // A last page that is already half full cannot be saved by setting
-    // the rest tighter, so there is nothing to gain from another pass.
-    if (!pass.alone && pass.lastFill >= 0.5) break;
+    if (!best || pass.pages < best.pages || (pass.pages === best.pages && pass.rank < best.rank)) best = { ...pass, buffer };
+    // A last page that is already half full, with the closing matter in
+    // full, cannot be bettered by setting the rest tighter.
+    if (pass.rank === 0 && pass.lastFill >= 0.5) break;
   }
   return best.buffer;
 }

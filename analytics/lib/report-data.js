@@ -6,7 +6,7 @@ import * as gsc from './gsc.js';
 import * as clarity from './clarity.js';
 import { gatherFathom, fathomMonthly } from './fathom.js';
 import { getFathomToken } from './runtime-config.js';
-import { previousPeriod } from './dates.js';
+import { previousPeriod, todayISO } from './dates.js';
 import { reportUptime } from './monitor.js';
 import { gaAiTraffic, fathomAiTraffic } from './ai-traffic.js';
 import { buildStory } from './story.js';
@@ -404,8 +404,10 @@ export async function gatherReportData(site, start, end, opts = {}) {
   // owner in the admin console. Shown beside the results it sits with.
   try {
     const { default: db } = await import('../database.js');
+    // The live dashboard's window ends yesterday, but work logged today
+    // should show there straight away, so its upper bound is today.
     data.workDone = db.prepare('SELECT done_on AS date, title, detail FROM work_log WHERE site_id = ? AND done_on >= ? AND done_on <= ? ORDER BY done_on, id')
-      .all(site.id, start, end);
+      .all(site.id, start, opts.fast ? todayISO() : end);
   } catch { data.workDone = []; }
 
   // Verdict, wins and things to watch, worked out by rules (story.js).

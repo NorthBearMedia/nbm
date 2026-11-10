@@ -106,6 +106,13 @@ h1, h2, h3, p { margin: 0; }
 .fig-note.good { color: var(--good); }
 .fig-note.fault { color: var(--red); }
 .fig-help { margin-top: 8px; font-size: 13px; line-height: 1.35; color: var(--mut); }
+/* Against the same month last year: one calm line under the numbers. */
+.yoy { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-top: 16px; font: 500 11px/1.45 var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--mut); }
+.yoy-part { display: inline-flex; align-items: baseline; gap: 10px; }
+.yoy .blk { align-self: center; margin-right: 0; background: var(--mut); }
+.yoy b { font-weight: 500; color: var(--fg); }
+.yoy i { font-style: normal; }
+.yoy .good { color: var(--good); }
 
 .panel { border: 1px solid var(--rule); background: var(--panel); border-radius: 2px; padding: clamp(16px, 2.2vw, 26px); min-width: 0; }
 .panel-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px 18px; margin-bottom: 18px; }
@@ -114,6 +121,7 @@ h1, h2, h3, p { margin: 0; }
 .key i { width: 10px; height: 10px; background: var(--green); flex: none; }
 .key i.k-line { height: 3px; background: var(--cyan); }
 .key i.k-part { background: repeating-linear-gradient(135deg, var(--green) 0 2px, transparent 2px 5px); }
+.key i.k-first { background: repeating-linear-gradient(45deg, rgba(77, 184, 140, .6) 0 2px, transparent 2px 5px); }
 .chart { position: relative; height: clamp(210px, 26vw, 300px); }
 .chart canvas { position: absolute; inset: 0; }
 
@@ -133,6 +141,10 @@ h1, h2, h3, p { margin: 0; }
 .chip { display: inline-block; font: 500 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; padding: 5px 7px 4px; border-radius: 2px; }
 .chip--us { background: var(--ink); color: var(--green); }
 .chip--you { background: var(--yellow); color: var(--ink); }
+/* What we did for you: the same ruled list, led by the date. */
+.story-col { display: grid; gap: clamp(30px, 4.4vw, 52px); min-width: 0; }
+.work .item { grid-template-columns: 58px minmax(0, 1fr); }
+.work .item-no { white-space: nowrap; text-transform: uppercase; }
 
 .aside { display: grid; grid-template-columns: 1.35fr 1fr; gap: clamp(24px, 4vw, 56px); margin-top: clamp(30px, 4.6vw, 60px); align-items: start; }
 .aside--one { grid-template-columns: 1fr; }
@@ -224,6 +236,20 @@ h1, h2, h3, p { margin: 0; }
 .show-s { display: none; }
 .pg1 { display: inline-block; font: 500 9.5px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--green-ink); border: 1px solid var(--green-ink); padding: 3px 5px 2px; margin-left: 8px; vertical-align: 1px; border-radius: 2px; }
 
+/* New searches, and pages Google sent people to: ruled rows. */
+.cols--even { grid-template-columns: 1fr 1fr; }
+.rows--new { --a: 15ch; --b: 10ch; }
+.rows--pages { --a: 7ch; --b: 15ch; }
+.rows-head, .row { display: grid; grid-template-columns: minmax(0, 1fr) var(--a) var(--b); gap: 4px 16px; align-items: baseline; }
+.rows-head { font: 500 10px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--mut); padding-bottom: 10px; border-bottom: 2px solid var(--fg); }
+.rows-head span + span { text-align: right; }
+.rows { list-style: none; margin: 0; padding: 0; }
+.row { padding: 12px 0; border-bottom: 1px solid var(--rule); }
+.row:last-child { border-bottom: 0; padding-bottom: 0; }
+.row-name { font-weight: 600; font-size: 15.5px; min-width: 0; overflow-wrap: anywhere; }
+.row-num { font: 500 12px/1.3 var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.row .mv { text-align: right; }
+
 /* ---------- behaviour and health ---------- */
 .meters { display: grid; gap: 22px; }
 .meter-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; align-items: end; }
@@ -272,7 +298,7 @@ h1, h2, h3, p { margin: 0; }
   .head-main { grid-template-columns: minmax(0, 1fr) auto; }
   .client { grid-column: 1 / -1; }
   .range { justify-self: start; }
-  .cols { grid-template-columns: 1fr; }
+  .cols, .cols--even { grid-template-columns: 1fr; }
 }
 @media (max-width: 900px) {
   .figs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -295,6 +321,13 @@ h1, h2, h3, p { margin: 0; }
   .fig-value { font-size: clamp(38px, 12.5vw, 56px); }
   .figs--sm .fig-value { font-size: clamp(30px, 9.4vw, 42px); }
   .item { grid-template-columns: 26px minmax(0, 1fr); }
+  .work .item { grid-template-columns: 52px minmax(0, 1fr); }
+  .rows-head { height: 0; padding: 0; overflow: hidden; }
+  .row { grid-template-columns: minmax(0, 1fr) auto; }
+  .row-name { grid-column: 1 / -1; }
+  .row-num, .row .mv { font: 500 11px/1.3 var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--mut); }
+  .row-num:nth-child(2) { text-align: left; }
+  .row .mv.good { color: var(--good); }
   .bar { grid-template-columns: minmax(0, 1fr) auto; gap: 7px 12px; }
   .bar-track { grid-column: 1 / -1; grid-row: 2; }
   .ladder-head { grid-template-columns: 1fr; }
