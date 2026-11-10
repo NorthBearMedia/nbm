@@ -76,12 +76,15 @@ Check the ANALYSIS. Raise a problem with "about": "analysis" when:
 - it makes a promise with a date, or commits North Bear Media to specific work as a certainty, instead of recommending it;
 - it is alarming, blaming, sarcastic, or reads as an excuse; or it would embarrass the agency if the client forwarded it;
 - it mentions anything internal (tracking tags being fixed is allowed only when "trafficTagBeingFixed" is true);
-- it contradicts itself, or a sentence is cut off or garbled.
+- it contradicts itself, or a sentence is cut off or garbled;
+- it celebrates a striking change that rests on almost nothing, such as a big ranking jump for a search with "timesShown" under 10.
 Reasonable inference about what kind of business this is, drawn from page names and searches, is fine. Honest mention of a real fall is fine. Do not nitpick style.
 
-Check the DATA. Raise a problem with "about": "data" only when the numbers look BROKEN, not merely poor: figures that cannot both be true, a pattern that points to a tracking fault or a wrong property, or totals that are implausible for a small business website. A quiet month is not a data problem. Nor is "clarity.recordedVisits" being higher than "visits": the recording tool counts visits by different rules and routinely shows more, so never raise that.
+Check the DATA. Raise a problem with "about": "data" only when the numbers look BROKEN, not merely poor: figures that cannot both be true, a pattern that points to a tracking fault or a wrong property, or totals that are implausible for a small business website. A quiet month is not a data problem, and neither are small totals on a small or new website. Nor is "clarity.recordedVisits" being higher than "visits": the recording tool counts visits by different rules and routinely shows more, so never raise that.
 
-Severity: "block" means the client must not see this as it stands. "note" means worth a look but fine to send. When unsure about the ANALYSIS, choose "block" (a safe standard analysis replaces it automatically, so blocking costs nothing). When unsure about the DATA, choose "note" (blocking holds the whole report for a person to read).
+Only raise a problem you can point to: a sentence in the ANALYSIS or figures in the DATA. Fields that are missing from the DATA ("about", "trafficTagBeingFixed" and others) were simply not provided; treat a missing true/false field as false. List each separate problem once.
+
+Severity: "block" means the client must not see this as it stands. "note" means worth a look but fine to send. For a real problem in the ANALYSIS, when you cannot decide between the two, choose "block" (a safe standard analysis replaces it automatically). For the DATA, when you cannot decide, choose "note" (blocking holds the whole report for a person to read).
 
 Reply with ONLY a JSON object:
 {"problems": [{"about": "analysis" | "data", "severity": "block" | "note", "problem": "one plain sentence a non-technical owner can act on"}]}

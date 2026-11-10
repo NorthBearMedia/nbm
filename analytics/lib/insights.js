@@ -54,7 +54,7 @@ function snapshot(data) {
     wins: (data.story?.wins || []).map(w => `${w.title}. ${w.detail}`),
     worthWatching: (data.story?.watch || []).map(w => `${w.title}. ${w.detail}`),
     targetSearches: (data.search?.targets || []).filter(t => t.position != null).slice(0, 8)
-      .map(t => ({ search: t.keyword, position: Math.round(t.position), placesGained: t.movement == null ? null : Math.round(t.movement) })),
+      .map(t => ({ search: t.keyword, position: Math.round(t.position), placesGained: t.movement == null ? null : Math.round(t.movement), timesShown: t.impressions })),
     periodIsCalendarMonth: data.story?.period?.noun === 'month',
     monthlyHistory: (data.history?.months || []).map(m => ({ month: m.month, visits: m.visits, googleClicks: m.clicks, partMonth: m.partial || undefined })),
     uptime: data.uptime ? { outages: data.uptime.outages, downtime: data.uptime.downtimeText } : undefined,
@@ -68,7 +68,7 @@ const SYSTEM = `You are a senior analyst at North Bear Media, a UK web design an
 How to read the data:
 - "meaningfulChanges" says, for each headline number, whether the change from the previous period is big enough to mean anything: "up", "down", "level" or "none". Treat "level" as no change: small movement from one period to the next is normal and is not news, so never present a "level" figure as a rise or a fall. "none" means there is no earlier figure to compare with, so make no comparison at all.
 - "wins" and "worthWatching" are facts already checked against the numbers. Build on them. "monthlyHistory" shows the longer trend by calendar month, which matters more than one month against the last. When "periodIsCalendarMonth" is false the period is a rolling window, so describe the direction of the monthly figures and do not set the period's total against any single month.
-- "targetSearches" gives each key search's position averaged across every search containing that phrase, while "topQueries" gives the exact phrase alone, so the two can differ for the same words. For a key search, use the "targetSearches" position.
+- "targetSearches" gives each key search's position averaged across every search containing that phrase, while "topQueries" gives the exact phrase alone, so the two can differ for the same words. For a key search, use the "targetSearches" position. Do not celebrate a ranking move for a search with "timesShown" under 10: too few people searched it for the position to mean much.
 - "about", when present, is the business in the owner's own words. Use it to make everything specific to what they sell and who they serve, and never contradict it.
 
 How to write:
