@@ -73,6 +73,7 @@ Check the ANALYSIS. Raise a problem with "about": "analysis" when:
 - it states a figure that is not in the DATA and cannot be worked out from it by a simple share, difference or rounding;
 - it says something rose or fell when "meaningfulChanges" says "level" or "none" for it, or gets a direction wrong;
 - it presents a fact about the business that is not in the DATA or in "about" (stock, vacancies, opening hours, how often they post) as if known;
+- it says North Bear Media did a piece of work that is not listed in "workDoneThisPeriod", or says that work caused a result ("because of") when the data can only show it came after;
 - it makes a promise with a date, or commits North Bear Media to specific work as a certainty, instead of recommending it;
 - it is alarming, blaming, sarcastic, or reads as an excuse; or it would embarrass the agency if the client forwarded it;
 - it mentions anything internal (tracking tags being fixed is allowed only when "trafficTagBeingFixed" is true);

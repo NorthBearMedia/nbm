@@ -22,7 +22,7 @@ const HISTORY_TTL_MS = 12 * 3600_000;
 async function gatherHistory(site, end, source, warnings) {
   const endMonth = end.slice(0, 7);
   const d = new Date(endMonth + '-01T12:00:00Z');
-  d.setUTCMonth(d.getUTCMonth() - 11);
+  d.setUTCMonth(d.getUTCMonth() - 12); // twelve to chart, plus the same month a year ago
   const start = d.toISOString().slice(0, 10);
   const cacheKey = `history_${site.id}`;
   const stamp = `${start}|${end}|${source || '-'}|${site.gsc_site_url || '-'}`;
@@ -41,7 +41,7 @@ async function gatherHistory(site, end, source, warnings) {
   const g = new Map((searchRows || []).map(r => [r.month, r]));
   const lastDay = new Date(Date.UTC(Number(end.slice(0, 4)), Number(end.slice(5, 7)), 0, 12)).toISOString().slice(0, 10);
   let months = [];
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 13; i++) {
     const m = new Date(start + 'T12:00:00Z');
     m.setUTCMonth(m.getUTCMonth() + i);
     const key = m.toISOString().slice(0, 7);
@@ -62,9 +62,18 @@ async function gatherHistory(site, end, source, warnings) {
     const first = firstWith(f);
     months.forEach((m, i) => { if (m[f] != null && (first === -1 || i < first)) m[f] = null; });
   }
+  // The same calendar month a year earlier, kept apart from the chart for
+  // "against last October". Only real when that month has data.
+  const yearAgo = months.shift();
+  const lastYear = yearAgo && (yearAgo.visits != null || yearAgo.clicks != null) ? yearAgo : null;
+  // The first month a source has visits for is rarely a whole month (the
+  // tag went live part-way through), and it charts as a leap in traffic
+  // that never happened. Mark it so it is drawn as a part month.
+  const firstV = firstWith('visits');
+  if (firstV > 0 || (firstV === 0 && !lastYear?.visits)) months[firstV].firstTracked = true; // firstV is -1 when there are no visits at all
   while (months.length && months[0].visits == null && months[0].clicks == null) months.shift();
   const history = months.length >= 2
-    ? { months, visitsSource: source === 'fathom' ? 'Fathom Analytics' : source === 'ga' ? 'Google Analytics' : null }
+    ? { months, lastYear, visitsSource: source === 'fathom' ? 'Fathom Analytics' : source === 'ga' ? 'Google Analytics' : null }
     : null;
   // A fetch that failed must not be remembered: one timeout would blank
   // the long view on every dashboard load for the next twelve hours.
@@ -223,11 +232,39 @@ export async function gatherReportData(site, start, end, opts = {}) {
         // succeeded and the property has data: a failed/empty pull must not
         // masquerade as "you rank for nothing".
         const kws = String(site.target_keywords || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean).slice(0, 12);
-        if (kws.length && !empty) {
-          const [deep, prevDeep] = await Promise.all([
-            attempt('Search target keywords', warnings, () => gsc.fetchTopQueries(url, start, end, 1000)),
-            attempt('Search target keywords (prev)', warnings, () => gsc.fetchTopQueries(url, prev.start, prev.end, 1000)),
+        if (!empty) {
+          const DEEP = 1000;
+          const [deep, prevDeep, pages, prevPages] = await Promise.all([
+            attempt('Search target keywords', warnings, () => gsc.fetchTopQueries(url, start, end, DEEP)),
+            attempt('Search target keywords (prev)', warnings, () => gsc.fetchTopQueries(url, prev.start, prev.end, DEEP)),
+            attempt('Search pages', warnings, () => gsc.fetchTopPages(url, start, end, 25)),
+            attempt('Search pages (prev)', warnings, () => gsc.fetchTopPages(url, prev.start, prev.end, 100)),
           ]);
+
+          // Pages Google sent people to, with the change in clicks. A page
+          // missing from the earlier list had no clicks worth listing then.
+          if (pages) {
+            const before = new Map((prevPages || []).map(r => [r.page, r.clicks]));
+            data.search.pages = pages.slice(0, 8).map(r => ({
+              ...r,
+              prevClicks: prevPages ? (before.get(r.page) ?? 0) : null,
+            }));
+          }
+
+          // Searches the site appeared for now that it did not appear for at
+          // all in the period before. Only claimed when BOTH lists came back
+          // whole: a list cut off at the limit cannot prove a search is new,
+          // and a failed earlier pull would make every search look new.
+          if (deep && prevDeep && deep.length < DEEP && prevDeep.length < DEEP) {
+            const seen = new Set(prevDeep.map(r => r.query));
+            data.search.newQueries = deep
+              .filter(r => !seen.has(r.query) && r.impressions >= 10)
+              .sort((a, b) => b.impressions - a.impressions)
+              .slice(0, 8)
+              .map(r => ({ query: r.query, impressions: r.impressions, clicks: r.clicks, position: r.position }));
+          }
+
+          if (!kws.length) return;
           if (deep == null) return; // fetch failed — skip the table rather than lie
           const match = (rows, kw) => (rows || []).filter(r => {
             const q = r.query.toLowerCase();
@@ -362,6 +399,14 @@ export async function gatherReportData(site, start, end, opts = {}) {
   if (data.ga4?.overview) {
     data.ga4.visitorsSameAsVisits = Math.round(data.ga4.overview.totalUsers || 0) === Math.round(data.ga4.overview.sessions || 0);
   }
+
+  // Work North Bear did for this client in the period, as logged by the
+  // owner in the admin console. Shown beside the results it sits with.
+  try {
+    const { default: db } = await import('../database.js');
+    data.workDone = db.prepare('SELECT done_on AS date, title, detail FROM work_log WHERE site_id = ? AND done_on >= ? AND done_on <= ? ORDER BY done_on, id')
+      .all(site.id, start, end);
+  } catch { data.workDone = []; }
 
   // Verdict, wins and things to watch, worked out by rules (story.js).
   try { data.story = buildStory(data); } catch (err) { warnings.push(`Story: ${err.message}`); data.story = null; }

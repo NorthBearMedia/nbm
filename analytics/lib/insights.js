@@ -55,6 +55,13 @@ function snapshot(data) {
     worthWatching: (data.story?.watch || []).map(w => `${w.title}. ${w.detail}`),
     targetSearches: (data.search?.targets || []).filter(t => t.position != null).slice(0, 8)
       .map(t => ({ search: t.keyword, position: Math.round(t.position), placesGained: t.movement == null ? null : Math.round(t.movement), timesShown: t.impressions })),
+    workDoneThisPeriod: (data.workDone || []).length ? data.workDone.map(w => ({ date: w.date, what: w.title })) : undefined,
+    newSearchesAppearedFor: (data.search?.newQueries || []).slice(0, 6).map(q => ({ search: q.query, timesShown: q.impressions })),
+    sameMonthLastYear: data.story?.yoy ? {
+      month: data.story.yoy.label,
+      visits: data.story.yoy.visits ? { now: data.story.yoy.visits.now, then: data.story.yoy.visits.then, change: data.story.yoy.visits.dir } : undefined,
+      googleClicks: data.story.yoy.clicks ? { now: data.story.yoy.clicks.now, then: data.story.yoy.clicks.then, change: data.story.yoy.clicks.dir } : undefined,
+    } : undefined,
     periodIsCalendarMonth: data.story?.period?.noun === 'month',
     monthlyHistory: (data.history?.months || []).map(m => ({ month: m.month, visits: m.visits, googleClicks: m.clicks, partMonth: m.partial || undefined })),
     uptime: data.uptime ? { outages: data.uptime.outages, downtime: data.uptime.downtimeText } : undefined,
@@ -83,6 +90,9 @@ How to write:
 - Never use an em dash or an en dash. Use commas, full stops or the word "to".
 - If "trafficTagBeingFixed" is true, the visitor counter is being reconnected and visit numbers are absent. Do not say the site had few visitors. Lead on the Google search and behaviour data, which are accurate.
 - North Bear Media builds mobile-first, so a high share of phone visitors is a fact worth noting, never a sign the site needs to be made phone-friendly.
+- "workDoneThisPeriod", when present, is work North Bear Media did on the site in this period. Mention it where it is relevant to a result, and build the next steps on from it instead of recommending what was just done. Say a result came "after" or "since" the work, never "because of" it: the data cannot prove cause.
+- "sameMonthLastYear", when present, is the fairest comparison for a seasonal business. If it tells a different story from the comparison with the period before, say so plainly.
+- "newSearchesAppearedFor" lists searches that showed the site this period and did not in the period before. A handful is worth one mention as a sign the site's reach is widening.
 - "aiAssistantVisits" counts visitors who arrived from AI assistants such as ChatGPT. Three or more deserves one upbeat mention. With fewer than three, do not mention it at all.
 
 Next steps ("actions"):

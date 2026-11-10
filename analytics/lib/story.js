@@ -76,6 +76,7 @@ export function pageLabel(path, title) {
 }
 
 const quote = s => `"${s}"`;
+const cap1 = t => t.charAt(0).toUpperCase() + t.slice(1);
 const pos = p => (p == null ? null : Math.max(1, Math.round(p)));
 
 export function buildStory(data) {
@@ -146,7 +147,7 @@ export function buildStory(data) {
   const topPage = (ga?.topPages || [])[0];
   if (topPage && topPage.views >= 10) {
     const label = topPage.path === '/' ? 'Your homepage' : `Your "${pageLabel(topPage.path, topPage.title)}" page`;
-    wins.push({ key: 'top-page', title: `${label} was the busiest`, detail: `${n0(topPage.views)} views in ${period.the}.` });
+    wins.push({ key: 'top-page', title: `${label} was the busiest`, detail: `${n0(topPage.views)} views ${period.the.startsWith('this') ? period.the : `in ${period.the}`}.` });
   }
   if (data.uptime && data.uptime.outages === 0) {
     wins.push({ key: 'uptime', title: 'No downtime', detail: `Your website was up and answering for all of ${period.the}.` });
@@ -157,6 +158,36 @@ export function buildStory(data) {
   }
   if (o && o.averageSessionDuration >= 60 && visits.dir !== 'up') {
     wins.push({ key: 'time', title: 'Visitors are staying to read', detail: `The average visit lasted ${Math.floor(o.averageSessionDuration / 60)}m ${Math.round(o.averageSessionDuration % 60)}s.` });
+  }
+
+  // New searches the site started appearing for.
+  const fresh = data.search?.newQueries || [];
+  if (fresh.length >= 3) {
+    wins.push({
+      key: 'new-searches',
+      title: `Appearing for ${fresh.length === 8 ? 'at least 8' : fresh.length} new searches`,
+      detail: `Including ${fresh.slice(0, 3).map(q => quote(q.query)).join(', ')}. None of these showed your site in ${period.prev}.`,
+    });
+  }
+
+  // Against the same month a year ago, for calendar-month reports only
+  // (a rolling 30 days has no "same month"). Seasonal businesses read
+  // far more fairly this way than against the month before.
+  let yoy = null;
+  const ly = data.history?.lastYear;
+  if (ly && period.noun === 'month') {
+    const lyName = new Date(ly.month + '-15T12:00:00Z').toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    const side = (now, then) => (now != null && then != null && then > 0 ? { now, then, ...trend(now, then) } : null);
+    yoy = { label: lyName, visits: side(o?.sessions, ly.visits), clicks: side(s?.clicks, ly.clicks) };
+    if (!yoy.visits && !yoy.clicks) yoy = null;
+    const lead = yoy && (yoy.visits?.dir === 'up' ? ['visits', yoy.visits] : yoy.clicks?.dir === 'up' ? ['clicks from Google', yoy.clicks] : null);
+    if (lead) {
+      wins.push({
+        key: 'yoy',
+        title: `Up on the same month last year`,
+        detail: `${cap1(lead[0])}: ${n0(lead[1].now)}, against ${n0(lead[1].then)} in ${lyName}${lead[1].then >= 50 ? ` (up ${pctText(lead[1])})` : ''}.`,
+      });
+    }
   }
 
   // ---------- things to watch (calm, factual, never alarmist) ----------
@@ -184,6 +215,10 @@ export function buildStory(data) {
   if (data.uptime && data.uptime.outages > 0) {
     watch.push({ key: 'downtime', title: 'Some downtime', detail: `The site was unreachable for ${data.uptime.downtimeText} across ${data.uptime.outages} outage${data.uptime.outages === 1 ? '' : 's'}.` });
   }
+
+  // Most telling first: renderers show the first three or four.
+  const ORDER = ['page-one', 'yoy', 'visits', 'clicks', 'climber', 'new-searches', 'shown', 'top-page', 'uptime', 'ai', 'time'];
+  wins.sort((a, b) => ORDER.indexOf(a.key) - ORDER.indexOf(b.key));
 
   // ---------- verdict ----------
   // Tiny sites cannot have a "trend": below about two visits a day the
@@ -232,7 +267,8 @@ export function buildStory(data) {
     verdict: { tone, label, line },
     trends: { visits, clicks, shown },
     pageOne: allTargets.length ? { count: pageOne.length, of: allTargets.length } : null,
-    wins: wins.slice(0, 5),
+    yoy,
+    wins: wins.slice(0, 6),
     watch: watch.slice(0, 4),
     nearly,
   };
