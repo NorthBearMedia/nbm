@@ -44,7 +44,10 @@ export async function fetchScores(domain) {
     const res = await fetch(w.url, { headers: w.headers, signal: AbortSignal.timeout(90_000) });
     j = await res.json().catch(() => ({ error: { message: `HTTP ${res.status}` } }));
     if (!j.error) { note({ ok: true, via: w.via }); break; }
-    lastErr = String(j.error.message || j.error).slice(0, 160);
+    // Keep the FIRST refusal: the key or robot attempt names the real fix
+    // ("API not enabled in project..."), and the keyless fallback after
+    // it only ever says the shared quota is spent.
+    if (!lastErr) lastErr = String(j.error.message || j.error).slice(0, 220);
   }
   if (!j || j.error) {
     note({ ok: false, error: lastErr });

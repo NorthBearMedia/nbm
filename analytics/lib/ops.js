@@ -1179,7 +1179,7 @@ async function ensureFathomSites() {
   for (const site of missing) {
     const d = (site.domain || '').toLowerCase().replace(/^www\./, '');
     try {
-      const match = existing.find(f => !taken.has(String(f.id)) && (norm(f.name) === norm(site.client_name) || norm(f.name) === norm(d)));
+      const match = existing.find(f => !taken.has(String(f.id)) && (norm(f.name) === norm(site.client_name) || norm(f.name) === norm(d) || norm(f.name) === norm(d.split('.')[0])));
       const id = String(match ? match.id : await createSite(site.client_name || d));
       if (taken.has(id)) { console.log('[fathom-ensure]', d, 'skipped — id', id, 'already belongs to another site'); continue; }
       db.prepare('UPDATE sites SET fathom_site_id = ? WHERE id = ?').run(id, site.id);
@@ -1213,7 +1213,8 @@ export async function fixDuplicateFathomIds() {
     const sites = db.prepare('SELECT * FROM sites WHERE fathom_site_id = ? AND active = 1 ORDER BY id').all(dupe.id);
     const fathomName = names.find(f => String(f.id) === String(dupe.id))?.name;
     const keeper = (fathomName && sites.find(s => norm(s.client_name) === norm(fathomName)
-      || norm((s.domain || '').replace(/^www\./, '')) === norm(fathomName))) || sites[0];
+      || norm((s.domain || '').replace(/^www\./, '')) === norm(fathomName)
+      || norm((s.domain || '').replace(/^www\./, '').split('.')[0]) === norm(fathomName))) || sites[0];
     for (const s of sites) {
       if (s.id === keeper.id) continue;
       db.prepare("UPDATE sites SET fathom_site_id = '' WHERE id = ?").run(s.id);

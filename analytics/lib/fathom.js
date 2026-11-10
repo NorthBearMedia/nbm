@@ -155,13 +155,16 @@ function mergeChannels(list) {
 // a sourceLabel so the report can say where the numbers came from.
 export async function gatherFathom(fathomSiteId, start, end) {
   const prev = previousPeriod(start, end);
-  const [cur, prv, ts, pages, refs, devices] = await Promise.all([
+  const [cur, prv, ts, pages, refs, devices, prvDays] = await Promise.all([
     agg(fathomSiteId, { aggregates: AGG, date_from: start, date_to: end }),
     agg(fathomSiteId, { aggregates: AGG, date_from: prev.start, date_to: prev.end }),
     agg(fathomSiteId, { aggregates: 'visits,uniques', date_from: start, date_to: end, date_grouping: 'day' }),
     agg(fathomSiteId, { aggregates: 'pageviews,visits', date_from: start, date_to: end, field_grouping: 'pathname', sort_by: 'pageviews:desc', limit: 10 }),
     agg(fathomSiteId, { aggregates: 'visits', date_from: start, date_to: end, field_grouping: 'referrer_hostname', sort_by: 'visits:desc', limit: 30 }),
     agg(fathomSiteId, { aggregates: 'visits', date_from: start, date_to: end, field_grouping: 'device_type', sort_by: 'visits:desc' }),
+    // Only to learn the first recorded day of the period before (see
+    // the partly-tracked check in report-data.js). Never fatal.
+    agg(fathomSiteId, { aggregates: 'visits', date_from: prev.start, date_to: prev.end, date_grouping: 'day' }).catch(() => []),
   ]);
 
   // All-zero Fathom (quiet period or stale site ID) returns null so the
@@ -188,6 +191,7 @@ export async function gatherFathom(fathomSiteId, start, end) {
     sourceLabel: 'Fathom Analytics',
     overview,
     prevOverview: overviewFrom(prv[0]),
+    prevFirstDay: prvDays.map(r => String(r.date || r.date_formatted || '').slice(0, 10)).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort()[0] || null,
     timeseries,
     topPages: pages.map(r => ({ path: r.pathname || '/', title: '', views: num(r.pageviews), sessions: num(r.visits) })),
     channels: mergeChannels(refs.map(r => ({ channel: friendlyRef(r.referrer_hostname), sessions: num(r.visits) }))),

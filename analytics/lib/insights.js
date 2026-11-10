@@ -99,8 +99,18 @@ Reply with ONLY a JSON object, no prose around it:
  "ask": "one sentence, or null"}
 Give 2 to 4 wins and 3 to 4 actions.`;
 
-const clip = (v, n) => String(v || '').replace(/\s*[\u2014\u2013]\s*/g, ', ').trim().slice(0, n);
-const item = (r, n = 340) => ({ title: clip(r.title, 80), detail: clip(r.detail, n) });
+// Trim to a limit without ever leaving a sentence cut off mid-word in a
+// client's report: end at the last full sentence that fits, or failing
+// that at the last whole word.
+const clip = (v, n) => {
+  const t = String(v || '').replace(/\s*[\u2014\u2013]\s*/g, ', ').replace(/\s+/g, ' ').trim();
+  if (t.length <= n) return t;
+  const cut = t.slice(0, n);
+  const stop = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('? '), cut.lastIndexOf('! '));
+  if (stop > n * 0.5) return cut.slice(0, stop + 1);
+  return cut.slice(0, cut.lastIndexOf(' ')).replace(/[,;:]$/, '') + '...';
+};
+const item = (r, n = 520) => ({ title: clip(r.title, 90), detail: clip(r.detail, n) });
 
 // One shape for both writers. "recommendations" is kept as a copy of the
 // actions for anything still reading the old field.
@@ -108,11 +118,11 @@ function shape(source, v) {
   const actions = (v.actions || []).slice(0, 4).map(r => ({ ...item(r), owner: r.owner === 'you' ? 'you' : 'us' }));
   return {
     source,
-    headline: clip(v.headline, 240),
-    summary: clip(v.summary, 800),
-    wins: (v.wins || []).slice(0, 4).map(r => item(r, 240)),
+    headline: clip(v.headline, 280),
+    summary: clip(v.summary, 900),
+    wins: (v.wins || []).slice(0, 4).map(r => item(r, 320)),
     actions,
-    ask: v.ask ? clip(v.ask, 260) : null,
+    ask: v.ask ? clip(v.ask, 300) : null,
     recommendations: actions.map(({ title, detail }) => ({ title, detail })),
   };
 }

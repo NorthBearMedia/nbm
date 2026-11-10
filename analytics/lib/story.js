@@ -41,11 +41,7 @@ export function trend(cur, prev) {
 const pctText = t => (t.pct == null ? '' : `${Math.abs(t.pct).toFixed(0)}%`);
 // "up 228%" on 18 going to 59 is true and silly. Under 50 the two
 // numbers say it better than a percentage.
-const riseText = (t, prev) => (prev < 50 ? `up from ${n0(prev)}` : `up ${pctText(t)}`);
-
-function monthName(key) {
-  return new Date(key + '-15T12:00:00Z').toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
-}
+const riseText = (t, prev, prevWord) => (prev < 50 ? `up from ${n0(prev)} in ${prevWord}` : `up ${pctText(t)} on ${prevWord}`);
 
 // Where this period sits against the site's own recent history, in one
 // honest clause. Needs at least four earlier full months to say anything.
@@ -68,9 +64,14 @@ function historyContext(history, field, current, data) {
 // "/recovery-sales" reads as "Recovery sales".
 export function pageLabel(path, title) {
   if (title) return title;
-  const clean = String(path || '/').split('?')[0].replace(/\/+$/, '');
+  // Single-page sites put the page after a hash ("/#/services").
+  const raw = String(path || '/');
+  const clean = (raw.includes('#') ? raw.slice(raw.indexOf('#') + 1) : raw).split('?')[0].replace(/\/+$/, '');
   if (!clean) return 'Homepage';
-  const last = decodeURIComponent(clean.split('/').pop() || '').replace(/\.(html?|php)$/i, '').replace(/[-_]+/g, ' ').trim();
+  let seg = clean.split('/').pop() || '';
+  // A badly encoded address (bots send them) must never stop a report.
+  try { seg = decodeURIComponent(seg); } catch { /* keep it as it came */ }
+  const last = seg.replace(/\.(html?|php)$/i, '').replace(/[-_]+/g, ' ').trim();
   return last ? last.charAt(0).toUpperCase() + last.slice(1) : 'Homepage';
 }
 
@@ -96,13 +97,16 @@ export function buildStory(data) {
   const ofKey = allTargets.length === 1 ? 'your key search'
     : pageOne.length === allTargets.length ? `all ${allTargets.length} of your key searches`
     : `${pageOne.length} of your ${allTargets.length} key searches`;
-  const climbers = [...targets, ...(data.search?.topQueries || []).map(q => ({ keyword: q.query, position: q.position, movement: q.positionChange }))]
-    .filter(t => t.movement != null && t.movement >= 1.5 && t.position <= 12.5)
+  // A climb only counts with enough searches behind it. "woodland day
+  // nursery" once read as "climbed 51 places" on two impressions.
+  const MIN_SHOWN = 10;
+  const climbers = [...targets, ...(data.search?.topQueries || []).map(q => ({ keyword: q.query, position: q.position, movement: q.positionChange, impressions: q.impressions }))]
+    .filter(t => t.movement != null && t.movement >= 1.5 && t.position <= 12.5 && (t.impressions || 0) >= MIN_SHOWN)
     .sort((a, b) => b.movement - a.movement);
   const seen = new Set();
   const topClimbers = climbers.filter(t => !seen.has(t.keyword) && seen.add(t.keyword)).slice(0, 3);
   const nearly = [...targets, ...(data.search?.topQueries || []).map(q => ({ keyword: q.query, position: q.position, impressions: q.impressions }))]
-    .filter(t => t.position > 10.5 && t.position <= 16)
+    .filter(t => t.position > 10.5 && t.position <= 16 && (t.impressions || 0) >= MIN_SHOWN)
     .sort((a, b) => (b.impressions || 0) - (a.impressions || 0))[0] || null;
 
   // ---------- wins ----------
@@ -128,15 +132,15 @@ export function buildStory(data) {
     const ctx = historyContext(data.history, 'visits', o.sessions, data);
     wins.push({
       key: 'visits',
-      title: po.sessions < 50 ? `Visits ${riseText(visits, po.sessions)} to ${n0(o.sessions)}` : `Visits up ${pctText(visits)}`,
+      title: po.sessions < 50 ? `Visits up to ${n0(o.sessions)} from ${n0(po.sessions)}` : `Visits up ${pctText(visits)}`,
       detail: `${n0(o.sessions)} visits, against ${n0(po.sessions)} in ${period.prev}${ctx && (ctx.kind === 'best' || ctx.kind === 'above') ? `, ${ctx.text}` : ''}.`,
     });
   }
   if (clicks.dir === 'up') {
-    wins.push({ key: 'clicks', title: `More people clicking through from Google`, detail: `${n0(s.clicks)} clicks, ${riseText(clicks, ps.clicks)} in ${period.prev}.`.replace(/up (\d+%) in /, 'up $1 on ') });
+    wins.push({ key: 'clicks', title: `More people clicking through from Google`, detail: `${n0(s.clicks)} clicks, ${riseText(clicks, ps.clicks, period.prev)}.` });
   }
   if (shown.dir === 'up') {
-    wins.push({ key: 'shown', title: `Showing up in more Google searches`, detail: `You appeared ${n0(s.impressions)} times, ${riseText(shown, ps.impressions)} in ${period.prev}.`.replace(/up (\d+%) in /, 'up $1 on ') });
+    wins.push({ key: 'shown', title: `Showing up in more Google searches`, detail: `You appeared ${n0(s.impressions)} times, ${riseText(shown, ps.impressions, period.prev)}.` });
   }
   const ga = trusted ? data.ga4 : null;
   const topPage = (ga?.topPages || [])[0];
@@ -243,4 +247,3 @@ export function isAutoName(clientName, domain) {
   return String(clientName || '').trim() === auto;
 }
 
-export { monthName };

@@ -256,6 +256,10 @@ async function roundInner({ now, urlFor, notify, controlUrls }) {
   const events = [];
   for (let i = 0; i < sites.length; i++) {
     const s = sites[i], r = results[i];
+    // "429 Too Many Requests" is the host telling the MONITOR to slow
+    // down, not a fault a visitor would see. It proves nothing either
+    // way, so the site is left exactly as it was this round.
+    if (r.status === 429) continue;
     const st = state[s.d] = state[s.d] || {};
     if (st.lastChecked && new Date(now).getTime() - Date.parse(st.lastChecked) > GAP_MS) {
       st.fails = 0; st.firstFailAt = null;

@@ -66,7 +66,10 @@ async function gatherHistory(site, end, source, warnings) {
   const history = months.length >= 2
     ? { months, visitsSource: source === 'fathom' ? 'Fathom Analytics' : source === 'ga' ? 'Google Analytics' : null }
     : null;
-  try { setSetting(cacheKey, JSON.stringify({ stamp, at: Date.now(), history })); } catch { /* cache is a nicety */ }
+  // A fetch that failed must not be remembered: one timeout would blank
+  // the long view on every dashboard load for the next twelve hours.
+  const failed = (source && visitRows == null) || (site.gsc_site_url && searchRows == null);
+  if (!failed) { try { setSetting(cacheKey, JSON.stringify({ stamp, at: Date.now(), history })); } catch { /* cache is a nicety */ } }
   return history;
 }
 
@@ -327,6 +330,23 @@ export async function gatherReportData(site, start, end, opts = {}) {
   const histSource = data.ga4 && !data.ga4.unreliable
     ? (data.ga4.sourceLabel === 'Fathom Analytics' ? 'fathom' : 'ga') : null;
   try { data.history = await gatherHistory(site, end, histSource, warnings); } catch { data.history = null; }
+
+  // Was the period BEFORE only partly tracked? A site's second report
+  // otherwise compares a full month with the few days after its tag went
+  // live and announces "visits rose 950%". When the first recorded day
+  // of the previous period is well inside it, and the monthly history
+  // shows no visits in any earlier month, there is nothing fair to
+  // compare with: the comparison is dropped everywhere, not just hidden.
+  if (data.ga4?.prevOverview && data.ga4.prevFirstDay) {
+    const lateBy = Math.round((Date.parse(data.ga4.prevFirstDay) - Date.parse(prev.start)) / 86400000);
+    const firstMonth = (data.history?.months || []).find(m => m.visits > 0)?.month;
+    if (lateBy > Math.max(2, periodDays * 0.15) && firstMonth && firstMonth >= prev.start.slice(0, 7)) {
+      data.ga4.prevPartialFrom = data.ga4.prevFirstDay;
+      data.ga4.prevOverview = null;
+      warnings.push(`Previous period only tracked from ${data.ga4.prevFirstDay}: comparison with it left out.`);
+    }
+  }
+  if (data.ga4) delete data.ga4.prevFirstDay;
 
   // The day tracking began, set only when the source genuinely started
   // inside this period. Renderers show their "figures cover from this
