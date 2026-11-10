@@ -40,73 +40,105 @@ export function mailer() {
 const nf = new Intl.NumberFormat('en-GB');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-function trendHtml(pct, invert = false) {
-  if (pct == null || !isFinite(pct)) return '';
-  const good = invert ? pct <= 0 : pct >= 0;
-  const color = good ? '#1e8a61' : '#d9534f';
-  const arrow = pct >= 0 ? '\u25b2' : '\u25bc';
-  return `<div style="font-size:11px;font-weight:bold;color:${color};font-family:Arial,sans-serif;margin-top:3px;">${arrow} ${Math.abs(pct).toFixed(1)}%</div>`;
+// The report email leads with the same story as the PDF: the verdict,
+// the wins, then the numbers, then what happens next. Change notes come
+// from the story layer, so a wobble inside normal variation reads as
+// "level" in grey instead of a red arrow, and red is never used for a
+// figure that merely went down.
+const INK = '#0f1012', PAPER = '#f1eee7', GREEN = '#4db88c', GREEN_INK = '#1e6b4a', MUTED = '#575b61', SOFT = '#d5d8db';
+const SANS = "Arial,'Helvetica Neue',Helvetica,sans-serif";
+const label = (text, color = MUTED) => `<div style="font-family:${SANS};font-size:10px;font-weight:bold;letter-spacing:1.6px;text-transform:uppercase;color:${color};">${text}</div>`;
+
+function changeNote(t, prevWord) {
+  if (!t || t.dir === 'none') return '';
+  const pct = t.pct == null ? '' : ` ${Math.abs(t.pct).toFixed(0)}%`;
+  if (t.dir === 'up') return `<div style="font-family:${SANS};font-size:11px;font-weight:bold;color:${GREEN_INK};margin-top:4px;">up${pct}</div>`;
+  if (t.dir === 'down') return `<div style="font-family:${SANS};font-size:11px;color:${MUTED};margin-top:4px;">down${pct}</div>`;
+  return `<div style="font-family:${SANS};font-size:11px;color:#8a8e94;margin-top:4px;">level with ${prevWord}</div>`;
 }
 
-function stat(label, value, trend = '') {
-  return `<td align="center" style="padding:14px 8px;background:#f5f6f8;border-radius:8px;">
-    <div style="font-size:22px;font-weight:bold;color:#23262c;font-family:Arial,sans-serif;">${value}</div>
-    ${trend}
-    <div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;font-family:Arial,sans-serif;margin-top:4px;">${label}</div>
+function stat(name, value, note = '') {
+  return `<td valign="top" width="25%" style="padding:14px 10px 14px 0;border-top:2px solid ${INK};">
+    ${label(name)}
+    <div style="font-family:${SANS};font-size:26px;font-weight:bold;color:${INK};line-height:1.1;margin-top:6px;">${value}</div>
+    ${note}
   </td>`;
 }
 
-function pctOf(cur, prev) {
-  if (prev == null || cur == null || !prev) return null;
-  return ((cur - prev) / prev) * 100;
+function listRows(items, marker) {
+  return items.map((it, k) => `<tr>
+    <td valign="top" width="26" style="padding:0 0 12px;font-family:${SANS};font-size:12px;font-weight:bold;color:${GREEN_INK};">${marker(k)}</td>
+    <td valign="top" style="padding:0 0 12px;font-family:${SANS};font-size:14px;line-height:1.5;color:#16181b;">
+      <strong>${esc(it.title)}</strong><br><span style="color:${MUTED};">${esc(it.detail)}</span></td>
+  </tr>`).join('');
 }
 
-export function reportEmailHtml(site, data, periodText) {
-  const o = data.ga4?.overview, po = data.ga4?.prevOverview || {};
-  const s = data.search?.summary, ps = data.search?.prevSummary || {};
-  const dashUrl = `${getAppUrl()}/r/${site.dashboard_token}`;
-  const stats = [];
-  if (o) {
-    stats.push(stat('Visits', nf.format(Math.round(o.sessions)), trendHtml(pctOf(o.sessions, po.sessions))));
-    stats.push(stat('Visitors', nf.format(Math.round(o.totalUsers)), trendHtml(pctOf(o.totalUsers, po.totalUsers))));
-  }
-  if (s) stats.push(stat('Google clicks', nf.format(Math.round(s.clicks)), trendHtml(pctOf(s.clicks, ps.clicks))));
-  if (s && s.position) {
-    // Rank movement in places — plain English, not a percentage.
-    const move = ps.position ? ps.position - s.position : null;
-    const moveHtml = move == null ? ''
-      : `<div style="font-size:11px;font-weight:bold;color:${move >= 0 ? '#1e8a61' : '#d9534f'};font-family:Arial,sans-serif;margin-top:3px;">${move >= 0 ? '\u25b2 up' : '\u25bc down'} ${Math.abs(move).toFixed(1)} places</div>`;
-    stats.push(stat('Google position', s.position.toFixed(1), moveHtml));
-  }
+const firstName = site => String(site.contact_name || '').trim().split(/\s+/)[0] || '';
 
-  return `<!doctype html><html><body style="margin:0;padding:0;background:#eef0f3;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#eef0f3;padding:24px 0;"><tr><td align="center">
-    <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;">
-      <tr><td style="background:#221f20;padding:28px 32px;border-bottom:3px solid #2eaa7b;">
-        <img src="cid:nbmlogo" alt="North Bear Media" height="44" style="display:block;">
+export function reportEmailHtml(site, data, periodText) {
+  const trusted = data.ga4?.overview && !data.ga4.unreliable;
+  const o = trusted ? data.ga4.overview : null;
+  const s = data.search && !data.search.empty ? data.search.summary : null;
+  const story = data.story, ins = data.insights;
+  const prevWord = story?.period?.prev || 'the period before';
+  const dashUrl = `${getAppUrl()}/r/${site.dashboard_token}`;
+  const name = firstName(site);
+
+  const stats = [];
+  if (o) stats.push(stat('Visits', nf.format(Math.round(o.sessions)), changeNote(story?.trends?.visits, prevWord)));
+  if (s) stats.push(stat('Google clicks', nf.format(Math.round(s.clicks)), changeNote(story?.trends?.clicks, prevWord)));
+  if (s) stats.push(stat('Shown on Google', nf.format(Math.round(s.impressions)), changeNote(story?.trends?.shown, prevWord)));
+  if (story?.pageOne) stats.push(stat('Page-one searches', `${story.pageOne.count} of ${story.pageOne.of}`));
+
+  const wins = (ins?.wins?.length ? ins.wins : (story?.wins || [])).slice(0, 3);
+  const actions = (ins?.actions || []).slice(0, 2);
+  const verdict = story?.verdict?.label || 'Your website report';
+  const standfirst = ins?.headline || story?.verdict?.line || '';
+
+  return `<!doctype html><html><body style="margin:0;padding:0;background:${PAPER};">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:${PAPER};padding:24px 0;"><tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;background:#ffffff;">
+      <tr><td style="background:${INK};padding:26px 32px 0;">
+        <table width="100%" cellpadding="0" cellspacing="0"><tr>
+          <td><img src="cid:nbmlogo" alt="North Bear Media" height="40" style="display:block;"></td>
+          <td align="right">${label('Website report', GREEN)}<div style="height:3px;"></div>${label(esc(periodText), SOFT)}</td>
+        </tr></table>
       </td></tr>
-      <tr><td style="padding:32px;">
-        <h1 style="font-family:Arial,sans-serif;font-size:20px;color:#23262c;margin:0 0 6px;">Your website report is ready</h1>
-        <p style="font-family:Arial,sans-serif;font-size:14px;color:#5c6470;margin:0 0 20px;line-height:1.6;">
-          Hi${site.contact_name ? ' ' + esc(site.contact_name.split(' ')[0]) : ''}, here's the performance report for
-          <strong>${esc(site.domain || site.client_name)}</strong> covering <strong>${esc(periodText)}</strong>.
-          The full report is attached as a PDF.
+      <tr><td style="background:${INK};padding:30px 32px 30px;border-bottom:4px solid ${GREEN};">
+        ${label(esc(site.client_name), '#a6abb1')}
+        <h1 style="font-family:'Arial Narrow',${SANS};font-size:34px;line-height:1.02;font-weight:bold;text-transform:uppercase;letter-spacing:.3px;color:#ffffff;margin:8px 0 12px;">${esc(verdict)}</h1>
+        ${standfirst ? `<p style="font-family:${SANS};font-size:15px;line-height:1.55;color:${SOFT};margin:0;">${esc(standfirst)}</p>` : ''}
+      </td></tr>
+      <tr><td style="padding:28px 32px 6px;">
+        <p style="font-family:${SANS};font-size:14px;color:#16181b;margin:0 0 20px;line-height:1.6;">
+          ${name ? `Hi ${esc(name)},` : 'Hello,'} here is the report for <strong>${esc(site.domain || site.client_name)}</strong>
+          covering <strong>${esc(periodText)}</strong>. The full report is attached as a PDF.
         </p>
-        ${stats.length ? `<table width="100%" cellpadding="0" cellspacing="8"><tr>${stats.join('')}</tr></table>` : ''}
-        <table cellpadding="0" cellspacing="0" style="margin:24px auto 8px;"><tr><td style="border-radius:8px;background:#2eaa7b;">
-          <a href="${dashUrl}" style="display:inline-block;padding:13px 28px;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;color:#ffffff;text-decoration:none;">View your live dashboard</a>
+        ${stats.length ? `<table width="100%" cellpadding="0" cellspacing="0"><tr>${stats.join('')}</tr></table>` : ''}
+      </td></tr>
+      ${wins.length ? `<tr><td style="padding:18px 32px 4px;">
+        ${label('What went well', GREEN_INK)}
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px;">${listRows(wins, () => '&#9632;')}</table>
+      </td></tr>` : ''}
+      ${actions.length ? `<tr><td style="padding:10px 32px 4px;">
+        ${label('Where we go from here', GREEN_INK)}
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px;">${listRows(actions, k => `0${k + 1}`)}</table>
+      </td></tr>` : ''}
+      <tr><td style="padding:14px 32px 30px;">
+        <table cellpadding="0" cellspacing="0"><tr><td style="background:${GREEN};">
+          <a href="${dashUrl}" style="display:inline-block;padding:14px 26px;font-family:${SANS};font-size:12px;font-weight:bold;letter-spacing:1.4px;text-transform:uppercase;color:${INK};text-decoration:none;">Open your live dashboard</a>
         </td></tr></table>
-        <p style="font-family:Arial,sans-serif;font-size:12px;color:#98a0ac;text-align:center;margin:8px 0 0;">
-          Want an up-to-the-minute report? Open your dashboard and tap <strong>"Email me a fresh report"</strong> any time.
+        <p style="font-family:${SANS};font-size:12px;color:${MUTED};margin:14px 0 0;line-height:1.5;">
+          Your dashboard is always up to date. Have a question about anything here? Just reply to this email.
         </p>
       </td></tr>
-      <tr><td style="background:#f5f6f8;padding:20px 32px;">
-        <p style="font-family:Arial,sans-serif;font-size:11px;color:#98a0ac;margin:0;text-align:center;">
+      <tr><td style="background:${PAPER};padding:18px 32px;border-top:1px solid #d9d5cc;">
+        <p style="font-family:${SANS};font-size:11px;color:${MUTED};margin:0;">
           North Bear Media · northbearmedia.co.uk · info@northbearmedia.co.uk
         </p>
-        <p style="font-family:Arial,sans-serif;font-size:11px;color:#98a0ac;margin:6px 0 0;text-align:center;">
-          You're receiving this because North Bear Media looks after your website.
-          To change how often you get reports — or to stop them — just reply to this email.
+        <p style="font-family:${SANS};font-size:11px;color:#8a8e94;margin:6px 0 0;">
+          You are receiving this because North Bear Media looks after your website.
+          To change how often you get reports, or to stop them, just reply to this email.
         </p>
       </td></tr>
     </table>
@@ -117,18 +149,27 @@ export function reportEmailHtml(site, data, periodText) {
 // small mailbox is a classic spam-score profile; a text part fixes that and
 // serves text-only mail clients.
 function reportEmailText(site, data, periodText) {
-  const o = data.ga4?.overview, s = data.search?.summary;
+  const trusted = data.ga4?.overview && !data.ga4.unreliable;
+  const o = trusted ? data.ga4.overview : null;
+  const s = data.search && !data.search.empty ? data.search.summary : null;
+  const story = data.story, ins = data.insights;
+  const name = firstName(site);
   const lines = [
-    `Hi${site.contact_name ? ' ' + site.contact_name.split(' ')[0] : ''},`,
+    name ? `Hi ${name},` : 'Hello,',
     '',
-    `Here's the performance report for ${site.domain || site.client_name} covering ${periodText}. The full report is attached as a PDF.`,
+    `Here is the report for ${site.domain || site.client_name} covering ${periodText}. The full report is attached as a PDF.`,
     '',
   ];
-  if (o) lines.push(`Visits: ${nf.format(Math.round(o.sessions))} · Visitors: ${nf.format(Math.round(o.totalUsers))}`);
-  if (s && s.impressions > 0) lines.push(`Google clicks: ${nf.format(Math.round(s.clicks))} · Average Google position: ${s.position ? s.position.toFixed(1) : '—'}`);
+  if (story?.verdict) lines.push(`${story.verdict.label}. ${ins?.headline || story.verdict.line}`, '');
+  if (o) lines.push(`Visits: ${nf.format(Math.round(o.sessions))}`);
+  if (s) lines.push(`Google clicks: ${nf.format(Math.round(s.clicks))} · Times shown on Google: ${nf.format(Math.round(s.impressions))}`);
+  const wins = (ins?.wins?.length ? ins.wins : (story?.wins || [])).slice(0, 3);
+  if (wins.length) lines.push('', 'What went well:', ...wins.map(w => `- ${w.title}. ${w.detail}`));
+  const actions = (ins?.actions || []).slice(0, 2);
+  if (actions.length) lines.push('', 'Where we go from here:', ...actions.map((a, k) => `${k + 1}. ${a.title}. ${a.detail}`));
   lines.push('', `Your live dashboard: ${getAppUrl()}/r/${site.dashboard_token}`, '',
     'North Bear Media · northbearmedia.co.uk · info@northbearmedia.co.uk',
-    'To change how often you get reports — or to stop them — just reply to this email.');
+    'To change how often you get reports, or to stop them, just reply to this email.');
   return lines.join('\n');
 }
 
@@ -144,8 +185,8 @@ export async function sendReportEmail(site, data, pdfBuffer, periodText, filenam
   const live = site.delivery_live === 1;
   const test = !live;
   const to = test ? [getOwnerEmail()] : realTo;
-  const subject = (test ? `[PREVIEW — would send to ${realTo.join(', ')}] ` : '')
-    + `Your website report — ${site.client_name} (${periodText})`;
+  const subject = (test ? `[PREVIEW, would send to ${realTo.join(', ')}] ` : '')
+    + `Your website report: ${site.client_name} (${periodText})`;
   const replyTo = getReplyTo();
   await mailer().sendMail({
     from: getEmailFrom(),

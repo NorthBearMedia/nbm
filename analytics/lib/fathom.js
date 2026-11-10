@@ -186,6 +186,16 @@ export async function gatherFathom(fathomSiteId, start, end) {
   };
 }
 
+// Visits per calendar month, for the report's long-view chart. Returns
+// [{ month: 'YYYY-MM', visits }] oldest first; months with no row are
+// simply absent (the caller decides what a gap means).
+export async function fathomMonthly(fathomSiteId, start, end) {
+  const r = await agg(fathomSiteId, { aggregates: 'visits', date_from: start, date_to: end, date_grouping: 'month' });
+  return r.map(x => ({ month: String(x.date || x.date_formatted || '').slice(0, 7), visits: num(x.visits) }))
+    .filter(x => /^\d{4}-\d{2}$/.test(x.month))
+    .sort((a, b) => a.month.localeCompare(b.month));
+}
+
 // Which hostnames actually produced this Fathom site's pageviews — the
 // ground truth for "is this really <domain>'s data?" A mis-matched site ID
 // would otherwise feed another business's numbers into a client report.

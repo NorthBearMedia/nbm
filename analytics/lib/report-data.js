@@ -4,11 +4,71 @@
 import * as ga4 from './ga4.js';
 import * as gsc from './gsc.js';
 import * as clarity from './clarity.js';
-import { gatherFathom } from './fathom.js';
+import { gatherFathom, fathomMonthly } from './fathom.js';
 import { getFathomToken } from './runtime-config.js';
 import { previousPeriod } from './dates.js';
 import { reportUptime } from './monitor.js';
 import { gaAiTraffic, fathomAiTraffic } from './ai-traffic.js';
+import { buildStory } from './story.js';
+import { getSetting, setSetting } from '../database.js';
+
+// The long view: up to twelve calendar months of visits and Google
+// clicks, ending with the month the report covers. One month of numbers
+// says little on its own; the same month set against the year shows
+// whether the site is building. Visits come from the SAME source as the
+// headline figure (never mixed), search from Search Console. Cached per
+// site for half a day, since a dashboard load must not pay for it twice.
+const HISTORY_TTL_MS = 12 * 3600_000;
+async function gatherHistory(site, end, source, warnings) {
+  const endMonth = end.slice(0, 7);
+  const d = new Date(endMonth + '-01T12:00:00Z');
+  d.setUTCMonth(d.getUTCMonth() - 11);
+  const start = d.toISOString().slice(0, 10);
+  const cacheKey = `history_${site.id}`;
+  const stamp = `${start}|${end}|${source || '-'}|${site.gsc_site_url || '-'}`;
+  try {
+    const c = JSON.parse(getSetting(cacheKey) || 'null');
+    if (c && c.stamp === stamp && Date.now() - c.at < HISTORY_TTL_MS) return c.history;
+  } catch { /* refetch */ }
+
+  const [visitRows, searchRows] = await Promise.all([
+    source === 'fathom' ? attempt('Visit history', warnings, () => fathomMonthly(site.fathom_site_id, start, end))
+      : source === 'ga' ? attempt('Visit history', warnings, () => ga4.fetchMonthly(site.ga4_property_id, start, end))
+      : null,
+    site.gsc_site_url ? attempt('Search history', warnings, () => gsc.fetchMonthly(site.gsc_site_url, start, end)) : null,
+  ]);
+  const v = new Map((visitRows || []).map(r => [r.month, r.visits]));
+  const g = new Map((searchRows || []).map(r => [r.month, r]));
+  const lastDay = new Date(Date.UTC(Number(end.slice(0, 4)), Number(end.slice(5, 7)), 0, 12)).toISOString().slice(0, 10);
+  let months = [];
+  for (let i = 0; i < 12; i++) {
+    const m = new Date(start + 'T12:00:00Z');
+    m.setUTCMonth(m.getUTCMonth() + i);
+    const key = m.toISOString().slice(0, 7);
+    months.push({
+      month: key,
+      label: m.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' }),
+      visits: visitRows ? (v.has(key) ? v.get(key) : 0) : null,
+      clicks: searchRows ? (g.get(key)?.clicks ?? 0) : null,
+      impressions: searchRows ? (g.get(key)?.impressions ?? 0) : null,
+      partial: key === endMonth && end < lastDay,
+    });
+  }
+  // A source that started part-way through the year has no real zeros
+  // before its first month: blank those out rather than chart a false
+  // climb from nothing, then drop leading months with no data at all.
+  const firstWith = f => months.findIndex(m => m[f] > 0);
+  for (const f of ['visits', 'clicks', 'impressions']) {
+    const first = firstWith(f);
+    months.forEach((m, i) => { if (m[f] != null && (first === -1 || i < first)) m[f] = null; });
+  }
+  while (months.length && months[0].visits == null && months[0].clicks == null) months.shift();
+  const history = months.length >= 2
+    ? { months, visitsSource: source === 'fathom' ? 'Fathom Analytics' : source === 'ga' ? 'Google Analytics' : null }
+    : null;
+  try { setSetting(cacheKey, JSON.stringify({ stamp, at: Date.now(), history })); } catch { /* cache is a nicety */ }
+  return history;
+}
 
 async function attempt(name, warnings, fn) {
   try { return await fn(); } catch (err) {
@@ -30,7 +90,7 @@ export async function gatherReportData(site, start, end, opts = {}) {
     // instead of inferring it from URL slugs. Ops bookkeeping notes are not
     // a business description and are filtered out.
     site: { id: site.id, clientName: site.client_name, domain: site.domain,
-      about: /auto-onboarding|added by ops|managed site/i.test(site.notes || '') ? '' : String(site.notes || '').trim().slice(0, 400) },
+      about: /auto-onboarding|added by ops|managed site|imported from hostinger/i.test(site.notes || '') ? '' : String(site.notes || '').trim().slice(0, 400) },
     period: { start, end },
     previousPeriod: prev,
     warnings,
@@ -51,7 +111,6 @@ export async function gatherReportData(site, start, end, opts = {}) {
   // never reach a report, and it self-clears when the data looks right.
   let integrity = {};
   try {
-    const { getSetting } = await import('../database.js');
     integrity = JSON.parse(getSetting('source_integrity') || '{}')[(site.domain || '').toLowerCase().replace(/^www\./, '')] || {};
   } catch { /* no verdicts yet — trust the sources */ }
   const useFathom = Boolean(getFathomToken() && site.fathom_site_id) && integrity.fathom?.status !== 'mismatch';
@@ -256,6 +315,22 @@ export async function gatherReportData(site, start, end, opts = {}) {
       top: aiRaw.cur.top.slice(0, 3),
     };
   }
+
+  // The long view, read from whichever source supplied the headline
+  // visits (skipped when that source is under-counting).
+  const histSource = data.ga4 && !data.ga4.unreliable
+    ? (data.ga4.sourceLabel === 'Fathom Analytics' ? 'fathom' : 'ga') : null;
+  try { data.history = await gatherHistory(site, end, histSource, warnings); } catch { data.history = null; }
+
+  // Visits and visitors are the same count on Fathom (it has no
+  // returning-visitor memory by design), so showing both is one number
+  // twice. Renderers show "Visitors" only when this is false.
+  if (data.ga4?.overview) {
+    data.ga4.visitorsSameAsVisits = Math.round(data.ga4.overview.totalUsers || 0) === Math.round(data.ga4.overview.sessions || 0);
+  }
+
+  // Verdict, wins and things to watch, worked out by rules (story.js).
+  try { data.story = buildStory(data); } catch (err) { warnings.push(`Story: ${err.message}`); data.story = null; }
 
   // AI-written (or rules-based) insights, computed once the data is in.
   try {

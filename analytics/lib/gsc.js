@@ -53,6 +53,22 @@ export async function fetchTopQueries(siteUrl, start, end, limit = 10) {
   }));
 }
 
+// Clicks and impressions per calendar month, for the report's long-view
+// chart. Search Console has no month dimension, so the daily rows (at
+// most about 400 for a year) are summed here.
+export async function fetchMonthly(siteUrl, start, end) {
+  const data = await query(siteUrl, { startDate: start, endDate: end, dimensions: ['date'], rowLimit: 500 });
+  const by = new Map();
+  for (const r of data.rows || []) {
+    const month = String(r.keys[0]).slice(0, 7);
+    const m = by.get(month) || { month, clicks: 0, impressions: 0 };
+    m.clicks += r.clicks || 0;
+    m.impressions += r.impressions || 0;
+    by.set(month, m);
+  }
+  return [...by.values()].sort((a, b) => a.month.localeCompare(b.month));
+}
+
 export async function testConnection(siteUrl) {
   await query(siteUrl, { startDate: '2024-01-01', endDate: '2024-01-02', dimensions: [], rowLimit: 1 });
   return true;

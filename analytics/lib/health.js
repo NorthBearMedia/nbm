@@ -160,7 +160,13 @@ async function siteHealth(site, start, end) {
           if (o.sessions === 0 && otherToolsSeeTraffic) {
             return seenWorking.ga
               ? regressed('ga', `Analytics is recording nothing while ${otherToolsSeeTraffic} still sees real traffic.`)
-              : bad(`recording nothing while ${otherToolsSeeTraffic} sees real traffic on the same pages — the tag is on the site but being stopped from firing. Usual cause: a speed/"delay JavaScript" plugin holding scripts until interaction, or a cookie-consent tool. Exclude googletagmanager.com from that delay list so Analytics loads immediately.`);
+              : gaTagFound
+                ? bad(`recording nothing while ${otherToolsSeeTraffic} sees real traffic on the same pages. The tag is on the site but being stopped from firing. Usual cause: a speed/"delay JavaScript" plugin holding scripts until interaction, or a cookie-consent tool. Exclude googletagmanager.com from that delay list so Analytics loads immediately.`)
+                // The tag is simply not on the page. The old wording blamed
+                // a plugin for every silent property, which sent the owner
+                // hunting for a delay setting on a site (CN Maintenance)
+                // whose Google tag had never been added.
+                : bad(`recording nothing while ${otherToolsSeeTraffic} sees real traffic on the same pages, and the Google tag (${site.ga4_measurement_id || 'no measurement ID saved'}) is not in the live page. It needs adding to the site: paste this site's Tracking code into the page head or the builder's custom code box.`);
           }
           // A collapse against Search Console clicks is the same failure as
           // zero, just less obvious: every click is a real landing, so GA
@@ -237,5 +243,7 @@ export async function connectionsHealth() {
   const results = await Promise.all(sites.map(s => siteHealth(s, start, end).catch(e => ({
     id: s.id, client: s.client_name, domain: s.domain, error: e.message.slice(0, 120),
   }))));
-  return { checkedAt: new Date().toISOString(), period: { start, end }, sites: results };
+  let pagespeed = null;
+  try { const { pagespeedStatus } = await import('./pagespeed.js'); pagespeed = pagespeedStatus(); } catch { /* optional */ }
+  return { checkedAt: new Date().toISOString(), period: { start, end }, sites: results, pagespeed };
 }

@@ -78,6 +78,11 @@ export function getFathomToken() {
 export function getAnthropicKey() {
   return pick('anthropic_api_key', process.env.ANTHROPIC_API_KEY || '');
 }
+// Free Google API key for the PageSpeed (site health) test. Optional:
+// without one Pulse tries its Google robot account instead.
+export function getPagespeedKey() {
+  return pick('pagespeed_api_key', process.env.PAGESPEED_API_KEY || '');
+}
 export function getInsightsModel() {
   return pick('insights_model', 'claude-opus-4-8');
 }
@@ -100,8 +105,8 @@ export function saveGoogleServiceAccount(json) {
   return parsed;
 }
 
-const SETTING_KEYS = ['smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'email_from', 'email_bcc', 'email_reply_to', 'owner_email', 'app_url', 'gsc_reader_email', 'hostinger_api_token', 'fathom_api_token', 'delivery_mode', 'anthropic_api_key', 'insights_model', 'consent_banner', 'injector_enabled'];
-const KEEP_IF_BLANK = new Set(['smtp_pass', 'hostinger_api_token', 'fathom_api_token', 'anthropic_api_key']);
+const SETTING_KEYS = ['smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'email_from', 'email_bcc', 'email_reply_to', 'owner_email', 'app_url', 'gsc_reader_email', 'hostinger_api_token', 'fathom_api_token', 'delivery_mode', 'anthropic_api_key', 'insights_model', 'consent_banner', 'injector_enabled', 'pagespeed_api_key'];
+const KEEP_IF_BLANK = new Set(['smtp_pass', 'hostinger_api_token', 'fathom_api_token', 'anthropic_api_key', 'pagespeed_api_key']);
 
 export function saveSettings(body) {
   for (const key of SETTING_KEYS) {
@@ -139,6 +144,7 @@ export function setupStatus() {
       fathom_token_set: Boolean(getFathomToken()),
       delivery_mode: getDeliveryMode(),
       anthropic_key_set: Boolean(getAnthropicKey()),
+      pagespeed_key_set: Boolean(getPagespeedKey()),
       insights_model: getInsightsModel(),
       consent_banner: getSetting('consent_banner') === 'true',
       injector_enabled: getSetting('injector_enabled') === 'true',

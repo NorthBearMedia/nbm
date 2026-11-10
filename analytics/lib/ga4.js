@@ -64,6 +64,21 @@ export async function fetchTopPages(propertyId, start, end, limit = 10) {
   }));
 }
 
+// Sessions per calendar month, for the report's long-view chart.
+export async function fetchMonthly(propertyId, start, end) {
+  const report = await runReport(propertyId, {
+    dateRanges: [{ startDate: start, endDate: end }],
+    dimensions: [{ name: 'yearMonth' }],
+    metrics: [{ name: 'sessions' }],
+    orderBys: [{ dimension: { dimensionName: 'yearMonth' } }],
+    limit: 24,
+  });
+  return (report.rows || []).map(r => ({
+    month: r.dimensionValues[0].value.replace(/(\d{4})(\d{2})/, '$1-$2'),
+    visits: Number(r.metricValues[0].value),
+  }));
+}
+
 export async function fetchChannels(propertyId, start, end, limit = 8) {
   const report = await runReport(propertyId, {
     dateRanges: [{ startDate: start, endDate: end }],

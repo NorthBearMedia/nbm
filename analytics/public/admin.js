@@ -362,6 +362,10 @@ function showSettingsModal() {
           <input name="anthropic_api_key" type="password" placeholder="${s.anthropic_key_set ? '••••••••••••' : 'console.anthropic.com → API keys'}">
           <div class="help">Writes the plain-English "what this means & what to do next" section of each report.
           ${s.anthropic_key_set ? 'Active ✓' : 'Without it, reports use a strong built-in insights section instead.'}</div></div>
+        <div class="field full"><label>Site health: Google PageSpeed API key ${s.pagespeed_key_set ? '(saved, leave blank to keep)' : ''}</label>
+          <input name="pagespeed_api_key" type="password" placeholder="${s.pagespeed_key_set ? '••••••••••••' : 'Google Cloud console, APIs and services, Credentials, Create API key'}">
+          <div class="help">Lets Pulse run Google's speed and SEO test on every site for the Site health scores. Free.
+          ${s.pagespeed_key_set ? 'Active ✓' : 'Without it Google refuses the test and the Site health section stays empty.'}</div></div>
         <div class="field full"><label>Replace Google service account key (optional)</label>
           <textarea name="google_json" rows="3" placeholder='Paste new key JSON only if you need to replace it${setup.googleServiceAccountEmail ? ' — current: ' + esc(setup.googleServiceAccountEmail) : ''}'></textarea></div>
       </div>
@@ -805,6 +809,8 @@ $('#connectionsBtn').onclick = async (e) => {
         </div>`;
       })()}
       <p class="hint" style="margin:4px 0 12px">Checked ${new Date(h.checkedAt).toLocaleTimeString('en-GB')} · ✅ pulling data · ❌ needs attention (reason shown)</p>
+      ${h.pagespeed && h.pagespeed.ok === false ? `<p class="hint" style="margin:-4px 0 12px;color:var(--red)">❌ Site health scores: Google refused the speed test (${esc(h.pagespeed.error || 'no reason given')}). Add a PageSpeed API key in Settings.</p>` : ''}
+      ${h.pagespeed && h.pagespeed.ok ? `<p class="hint" style="margin:-4px 0 12px">✅ Site health scores: Google speed test working</p>` : ''}
       <div style="overflow:auto;max-height:65vh">
       <table class="data" style="width:100%">
         <thead><tr><th style="text-align:left;padding:6px 10px">Site</th><th style="text-align:left;padding:6px 10px">Google Analytics</th><th style="text-align:left;padding:6px 10px">Search Console</th><th style="text-align:left;padding:6px 10px">Clarity</th><th style="text-align:left;padding:6px 10px">Fathom</th><th style="text-align:left;padding:6px 10px">Reports</th></tr></thead>

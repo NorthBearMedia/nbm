@@ -15,6 +15,7 @@
 // Guarded by a settings flag; unverified domains are retried on later boots.
 import cron from 'node-cron';
 import { injectorEnabled } from './inject.js';
+import { isAutoName } from './story.js';
 import db, { getSetting, setSetting, newDashboardToken } from '../database.js';
 import { config } from '../config.js';
 import { nextRunAt, addDays, todayISO } from './dates.js';
@@ -425,12 +426,35 @@ function ensureManagedSites() {
   }
 }
 
+// Proper business names, as each client writes it on their own website.
+// Sites imported in bulk were named by machine from the domain
+// ("Richfordvehiclesales"), and that name headed their reports and email
+// subjects. Applied only while the stored name is still the machine-made
+// one, so a name typed in the admin console is never overwritten.
+const CLIENT_NAMES = {
+  'richfordvehiclesales.co.uk': 'Richford Motors Sales',
+  'pslimited.uk': 'Personnel Solutions Ltd',
+  'woodlandwalkdaycare.co.uk': 'Woodland Walk Day Care',
+  'greenpathgardencare.co.uk': 'GreenPath Garden Care',
+  'ivyhouseresidentialhome.co.uk': 'Ivy House Residential Home',
+  'swanwickkidsclub.co.uk': 'Swanwick Kids Club',
+  'muskengineering.co.uk': 'Musk Engineering',
+  'maxus-evc.co.uk': 'Maxus EVC',
+  'wowstays.co.uk': 'WOW Stays',
+};
+
 // Runs on every boot: cheap, offline, idempotent.
 export function loadClientContacts() {
   const sites = db.prepare('SELECT id, client_name, domain, contact_emails, clarity_project_id, ga4_measurement_id, ga4_property_id, notes FROM sites WHERE active = 1').all();
   const loaded = [];
   for (const site of sites) {
     const d = (site.domain || '').toLowerCase().replace(/^www\./, '');
+    const proper = CLIENT_NAMES[d];
+    if (proper && site.client_name !== proper && isAutoName(site.client_name, d)) {
+      db.prepare('UPDATE sites SET client_name = ? WHERE id = ?').run(proper, site.id);
+      console.log(`[ops] client name tidied: ${site.client_name} is now ${proper}`);
+      site.client_name = proper;
+    }
     const email = CLIENT_EMAILS[d];
     if (email && !site.contact_emails) {
       db.prepare('UPDATE sites SET contact_emails = ? WHERE id = ?').run(email, site.id);

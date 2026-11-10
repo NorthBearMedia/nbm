@@ -34,6 +34,9 @@ const MASS_FAILURE_SHARE = 0.5;
 // towards the two in a row needed to call a site down.
 const GAP_MS = 3 * 5 * 60_000;
 const MASS_FAILURE_MIN_SITES = 3;
+// Outside pages on two unrelated networks. If either answers (any status
+// at all), Pulse's own connection is working.
+const CONTROL_URLS = ['https://www.google.com/generate_204', 'https://www.cloudflare.com/cdn-cgi/trace'];
 // Last 24 hours of rounds, one character each, kept per site.
 const RECENT_MAX = Math.round((24 * 60) / ROUND_MINUTES);
 const DAY_MS = 24 * 3600_000;
@@ -202,13 +205,13 @@ let rounding = false;
 
 // urlFor and notify are injectable so the whole state machine can be
 // driven against a local server in tests. Live callers pass nothing.
-export async function runRound({ now = new Date(), urlFor = d => `https://${d}/`, notify = sendAlert } = {}) {
+export async function runRound({ now = new Date(), urlFor = d => `https://${d}/`, notify = sendAlert, controlUrls = CONTROL_URLS } = {}) {
   if (rounding) return { skipped: 'round already running' };
   rounding = true;
-  try { return await roundInner({ now, urlFor, notify }); } finally { rounding = false; }
+  try { return await roundInner({ now, urlFor, notify, controlUrls }); } finally { rounding = false; }
 }
 
-async function roundInner({ now, urlFor, notify }) {
+async function roundInner({ now, urlFor, notify, controlUrls }) {
   // Never more often than every five minutes per site, and never two
   // "rounds in a row" seconds apart (a boot round next to a scheduled one
   // would otherwise confirm an outage without the five minute wait).
@@ -222,9 +225,23 @@ async function roundInner({ now, urlFor, notify }) {
   const results = await inBatches(sites, s => checkSite(urlFor(s.d)));
   const failed = results.filter(r => !r.ok).length;
 
-  // Most sites failing at once is Pulse's own connection. Say so once,
-  // mark nothing down, and count nothing against the sites.
-  if (sites.length >= MASS_FAILURE_MIN_SITES && failed / sites.length > MASS_FAILURE_SHARE) {
+  // Most sites failing at once can be Pulse's own connection: say so
+  // once, mark nothing down, and count nothing against the sites. But
+  // only when that is what the evidence shows. On 4 November 2026 the
+  // shared hosting account ran out of processes and twelve sites served
+  // an error page for most of the day; the old rule ("over half failed,
+  // so it must be us") stayed silent and logged an eight hour outage as
+  // 65 minutes. A site that ANSWERS with an error is reachable, so the
+  // connection is fine and the failure is real. Only failures with no
+  // answer at all can be ours, and then only if an outside page that
+  // has nothing to do with the client sites cannot be reached either.
+  const noAnswer = results.filter(r => !r.ok && !r.status).length;
+  let ownConnection = false;
+  if (sites.length >= MASS_FAILURE_MIN_SITES && noAnswer / sites.length > MASS_FAILURE_SHARE) {
+    const controls = await Promise.all(controlUrls.map(u => fetchOnce(u)));
+    ownConnection = controls.every(c => !c.status);
+  }
+  if (ownConnection) {
     setSetting('monitor_last_round', JSON.stringify({ at: nowIso, checked: sites.length, failed, massFailure: true }));
     await notify('pulse-connection', 'PULSE: cannot reach client sites',
       [`In the check at ${ukTime(now)}, ${failed} of ${sites.length} sites failed at the same time.`,

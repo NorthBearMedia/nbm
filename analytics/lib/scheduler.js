@@ -120,6 +120,16 @@ export function startScheduler() {
   ensureFeedToken();
   cron.schedule('*/5 * * * *', () => runRound().catch(e => console.error('[monitor]', e.message)), { timezone: config.timezone, noOverlap: true });
   cron.schedule('10 4 * * *', () => runDailyChecks().catch(e => console.error('[monitor-daily]', e.message)), { timezone: config.timezone, noOverlap: true });
+  // Site health scores: top up any older than six days, once a day, so
+  // dashboards always have one (they only ever read the cache).
+  const psi = async () => {
+    const { refreshStaleScores } = await import('./pagespeed.js');
+    const domains = db.prepare("SELECT domain FROM sites WHERE active = 1 AND domain != ''").all()
+      .map(r => r.domain.toLowerCase().replace(/^www\./, ''));
+    return refreshStaleScores(domains);
+  };
+  cron.schedule('25 5 * * *', () => psi().catch(e => console.error('[psi]', e.message)), { timezone: config.timezone, noOverlap: true });
+  setTimeout(() => psi().catch(e => console.error('[psi]', e.message)), 180_000);
   setTimeout(() => runRound().catch(e => console.error('[monitor]', e.message)), 20_000);
   setTimeout(() => runDailyChecks().catch(e => console.error('[monitor-daily]', e.message)), 90_000);
   console.log(`[scheduler] running (timezone ${config.timezone}) — reports hourly, Clarity 03:40+13:40, DB backup hourly`);
