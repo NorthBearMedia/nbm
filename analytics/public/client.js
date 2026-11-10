@@ -7,12 +7,16 @@
 const token = location.pathname.split('/').pop();
 let currentRange = 30;
 let hasRendered = false;
+let loadSeq = 0;
 const charts = {};
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const nf = new Intl.NumberFormat('en-GB');
 const fmtInt = n => nf.format(Math.round(n || 0));
+// Headline figures: past a million the full number no longer fits its
+// cell on a phone, so it is shortened ("1.23M").
+const fmtBig = n => (Math.abs(n || 0) >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : fmtInt(n));
 const fmtPct = (p, dp = 1) => `${(p || 0).toFixed(dp)}%`;
 function fmtDur(seconds) {
   const s = Math.round(seconds || 0), m = Math.floor(s / 60);
@@ -41,8 +45,10 @@ function countTrend(cur, prev) {
   if (Math.abs(diff) < Math.max(8, prev * 0.12)) return { dir: 'level', pct };
   return { dir: diff > 0 ? 'up' : 'down', pct };
 }
-function rateTrend(cur, prev) {
-  if (cur == null || prev == null || !(prev > 0)) return { dir: 'none', pct: null };
+function rateTrend(cur, prev, sample = Infinity) {
+  // A rate worked out from a handful of visits swings on one person, so
+  // it gets no change note at all until there is enough to go on.
+  if (cur == null || prev == null || !(prev > 0) || !(sample >= 30)) return { dir: 'none', pct: null };
   const pct = ((cur - prev) / prev) * 100;
   if (Math.abs(pct) < 12) return { dir: 'level', pct };
   return { dir: pct > 0 ? 'up' : 'down', pct };
@@ -55,7 +61,7 @@ function noteHtml(t, { goodDown = false } = {}) {
   if (t.dir === 'level') return '<div class="fig-note">Level</div>';
   if (t.pct == null || !isFinite(t.pct)) return '';
   const good = goodDown ? t.dir === 'down' : t.dir === 'up';
-  return `<div class="fig-note${good ? ' good' : ''}">${t.dir === 'up' ? '↑ up' : '↓ down'} ${Math.abs(t.pct).toFixed(0)}%</div>`;
+  return `<div class="fig-note${good ? ' good' : ''}">${t.dir === 'up' ? '\u2191 up' : '\u2193 down'} ${Math.abs(t.pct).toFixed(0)}%</div>`;
 }
 // Ranking movement in places: positive means climbed.
 function placesHtml(places, cls = 'fig-note') {
@@ -64,7 +70,7 @@ function placesHtml(places, cls = 'fig-note') {
   if (Math.abs(places) < 0.75) return `<div class="${cls}">Level</div>`;
   const n = Math.max(1, Math.round(Math.abs(places)));
   const up = places > 0;
-  return `<div class="${cls}${up ? ' good' : ''}">${up ? '↑ up' : '↓ down'} ${n} place${n === 1 ? '' : 's'}</div>`;
+  return `<div class="${cls}${up ? ' good' : ''}">${up ? '\u2191 up' : '\u2193 down'} ${n} place${n === 1 ? '' : 's'}</div>`;
 }
 
 function fig(label, value, note = '', { color = '', help = '' } = {}) {
@@ -87,10 +93,10 @@ const DEVICE = { mobile: 'Phone', phone: 'Phone', desktop: 'Computer', tablet: '
 
 // A page name a person can read: "/recovery-sales" reads "Recovery sales".
 function pageName(path, title) {
-  const clean = String(path || '/').split('?')[0].split('#')[0].replace(/\/+$/, '');
+  const clean = String(path || '/').split('?')[0].split('#')[0].replace(/\/index\.(html?|php)$/i, '').replace(/\/+$/, '');
   if (!clean) return 'Homepage';
   if (title && title !== '(not set)') {
-    const first = String(title).split(/\s+[|–—-]\s+/)[0].trim();
+    const first = String(title).split(/\s+[|\u2013\u2014-]\s+/)[0].trim();
     if (first) return first;
   }
   let last = clean.split('/').pop() || '';
@@ -108,35 +114,36 @@ function heroSection(d, ctx) {
   const standfirst = (d.insights?.source === 'ai' && d.insights.headline) || story?.verdict?.line || d.insights?.headline || '';
 
   const list = [];
-  if (o) list.push(fig('Visits', fmtInt(o.sessions), noteHtml(tr.visits || countTrend(o.sessions, p.sessions)), { color: 'green' }));
+  if (o) list.push(fig('Visits', fmtBig(o.sessions), noteHtml(tr.visits || countTrend(o.sessions, p.sessions)), { color: 'green' }));
   if (s) {
-    list.push(fig('Clicks from Google', fmtInt(s.clicks), noteHtml(tr.clicks || countTrend(s.clicks, sp.clicks)), { color: 'cyan' }));
-    list.push(fig('Times shown on Google', fmtInt(s.impressions), noteHtml(tr.shown || countTrend(s.impressions, sp.impressions)), { color: 'yellow' }));
+    list.push(fig('Clicks from Google', fmtBig(s.clicks), noteHtml(tr.clicks || countTrend(s.clicks, sp.clicks)), { color: 'cyan' }));
+    list.push(fig('Times shown on Google', fmtBig(s.impressions), noteHtml(tr.shown || countTrend(s.impressions, sp.impressions)), { color: 'yellow' }));
   }
-  const ranked = (d.search?.targets || []).filter(t => t.position != null);
-  if (s && ranked.length) {
-    const p1 = ranked.filter(t => t.position <= 10.5).length;
-    list.push(fig('Key searches on page one', `${p1}<small>of ${ranked.length}</small>`, '<div class="fig-note">Google positions 1 to 10</div>', { color: 'white' }));
+  // Counted against every key search, including any Google is not
+  // showing the site for yet, the same way the written summary counts.
+  const targets = d.search?.targets || [];
+  if (s && targets.length) {
+    const p1 = targets.filter(t => t.position != null && t.position <= 10.5).length;
+    list.push(fig('Key searches on page one', `${p1}<small>of ${targets.length}</small>`, '<div class="fig-note">Google positions 1 to 10</div>', { color: 'white' }));
   } else if (s && s.position) {
     list.push(fig('Average Google position', s.position.toFixed(1), placesHtml(sp.position ? sp.position - s.position : null), { color: 'white' }));
   }
-  if (o && list.length < 4) list.push(fig('Pages viewed', fmtInt(o.screenPageViews), noteHtml(countTrend(o.screenPageViews, p.screenPageViews)), { color: 'white' }));
-  if (o && list.length < 4) list.push(fig('Average visit', fmtDur(o.averageSessionDuration), noteHtml(rateTrend(o.averageSessionDuration, p.averageSessionDuration)), { color: 'cyan' }));
+  if (o && list.length < 4) list.push(fig('Pages viewed', fmtBig(o.screenPageViews), noteHtml(countTrend(o.screenPageViews, p.screenPageViews)), { color: 'white' }));
+  if (o && list.length < 4) list.push(fig('Average visit', fmtDur(o.averageSessionDuration), noteHtml(rateTrend(o.averageSessionDuration, p.averageSessionDuration, Math.min(o.sessions || 0, p.sessions || 0))), { color: 'cyan' }));
 
   const notes = [];
   if (list.length) notes.push(`Changes compare with ${esc(story?.period?.prev || 'the period before')}. A movement too small to mean anything shows as level.`);
   if (o) {
-    const firstDay = d.ga4.timeseries?.[0]?.date;
-    const daysIn = firstDay && d.period?.start && firstDay > d.period.start
-      ? Math.round((Date.parse(firstDay) - Date.parse(d.period.start)) / 86400000) : 0;
-    if (daysIn >= 5) notes.push(`Visitor counting was installed on ${esc(fmtDay(firstDay))}, so visit numbers only cover from that date.`);
+    // Set by the server only when tracking genuinely began inside this period.
+    if (d.ga4.trackingFrom) notes.push(`Visitor counting was installed on ${esc(fmtDay(d.ga4.trackingFrom))}, so visit numbers only cover from that date.`);
   } else if (gaBad) {
     notes.push('Your visitor counter is being reconnected, so visit totals are left out for now. The Google figures are complete and accurate.');
   }
 
   const months = (d.history?.months || []);
-  const showHistory = months.length >= 2 && months.some(m => m.visits != null || m.clicks != null);
-  const hasVisits = months.some(m => m.visits != null), hasClicks = months.some(m => m.clicks != null);
+  const showHistory = months.length >= 2 && months.some(m => (!gaBad && m.visits != null) || m.clicks != null);
+  // An under-counting visitor counter never has its history charted either.
+  const hasVisits = !gaBad && months.some(m => m.visits != null), hasClicks = months.some(m => m.clicks != null);
   const part = months.some(m => m.partial);
 
   return `<section class="sec hero" id="summary"><div class="wrap">
@@ -203,16 +210,17 @@ function visitorsSection(d, ctx) {
   } else if (!o) {
     h += notice('Visitor counting is being set up', 'North Bear Media is connecting visitor counting for your site. Your visits, where they came from and your busiest pages will appear here soon.');
   } else {
+    const sample = Math.min(o.sessions || 0, p.sessions || 0);
     const ppv = o.sessions ? o.screenPageViews / o.sessions : 0;
     const prevPpv = p.sessions ? p.screenPageViews / p.sessions : null;
-    const list = [fig('Visits', fmtInt(o.sessions), noteHtml(tr.visits || countTrend(o.sessions, p.sessions)), { color: 'green' })];
-    if (d.ga4.visitorsSameAsVisits === false) list.push(fig('Visitors', fmtInt(o.totalUsers), noteHtml(countTrend(o.totalUsers, p.totalUsers)), { help: 'different people' }));
-    list.push(fig('Pages viewed', fmtInt(o.screenPageViews), noteHtml(countTrend(o.screenPageViews, p.screenPageViews))));
+    const list = [fig('Visits', fmtBig(o.sessions), noteHtml(tr.visits || countTrend(o.sessions, p.sessions)), { color: 'green' })];
+    if (d.ga4.visitorsSameAsVisits === false) list.push(fig('Visitors', fmtBig(o.totalUsers), noteHtml(countTrend(o.totalUsers, p.totalUsers)), { help: 'different people' }));
+    list.push(fig('Pages viewed', fmtBig(o.screenPageViews), noteHtml(countTrend(o.screenPageViews, p.screenPageViews))));
     list.push(o.newUsers != null
-      ? fig('New visitors', fmtInt(o.newUsers), noteHtml(countTrend(o.newUsers, p.newUsers)), { help: 'here for the first time' })
-      : fig('Pages per visit', ppv.toFixed(1), noteHtml(rateTrend(ppv, prevPpv))));
-    list.push(fig('Engaged visits', fmtPct(o.engagementRate * 100, 0), noteHtml(rateTrend(o.engagementRate, p.engagementRate)), { help: 'did more than glance at one page' }));
-    list.push(fig('Average visit', fmtDur(o.averageSessionDuration), noteHtml(rateTrend(o.averageSessionDuration, p.averageSessionDuration))));
+      ? fig('New visitors', fmtBig(o.newUsers), noteHtml(countTrend(o.newUsers, p.newUsers)), { help: 'here for the first time' })
+      : fig('Pages per visit', ppv.toFixed(1), noteHtml(rateTrend(ppv, prevPpv, sample))));
+    list.push(fig('Engaged visits', fmtPct(o.engagementRate * 100, 0), noteHtml(rateTrend(o.engagementRate, p.engagementRate, sample)), { help: 'did more than glance at one page' }));
+    list.push(fig('Average visit', fmtDur(o.averageSessionDuration), noteHtml(rateTrend(o.averageSessionDuration, p.averageSessionDuration, sample))));
     h += figs(list, 'figs--sm');
 
     if (d.ga4.timeseries?.length > 1) {
@@ -296,9 +304,9 @@ function googleSection(d, ctx) {
   } else {
     const where = s.position ? (s.position <= 10.5 ? 'page one, on average' : s.position <= 20.5 ? 'page two, on average' : 'beyond page two, on average') : '';
     h += figs([
-      fig('Clicks from Google', fmtInt(s.clicks), noteHtml(tr.clicks || countTrend(s.clicks, sp.clicks)), { color: 'green' }),
-      fig('Times shown on Google', fmtInt(s.impressions), noteHtml(tr.shown || countTrend(s.impressions, sp.impressions)), { color: 'cyan' }),
-      fig('Click rate', fmtPct(s.ctr * 100), noteHtml(rateTrend(s.ctr, sp.ctr)), { color: 'yellow', help: 'of the people who saw you, how many clicked' }),
+      fig('Clicks from Google', fmtBig(s.clicks), noteHtml(tr.clicks || countTrend(s.clicks, sp.clicks)), { color: 'green' }),
+      fig('Times shown on Google', fmtBig(s.impressions), noteHtml(tr.shown || countTrend(s.impressions, sp.impressions)), { color: 'cyan' }),
+      fig('Click rate', fmtPct(s.ctr * 100), noteHtml(rateTrend(s.ctr, sp.ctr, Math.min(s.impressions || 0, sp.impressions || 0) / 4)), { color: 'yellow', help: 'of the people who saw you, how many clicked' }),
       fig('Average position', s.position ? s.position.toFixed(1) : 'n/a', placesHtml(s.position && sp.position ? sp.position - s.position : null), { color: 'text', help: where }),
     ], 'figs--sm');
 
@@ -319,7 +327,7 @@ function googleSection(d, ctx) {
               return `<div class="rung"><div class="rung-kw">${esc(t.keyword)}</div>
                 <div class="track"><span class="zone"></span><span class="tick" style="left:50%"></span><span class="tick" style="left:75%"></span></div>
                 <div class="rung-pos none">Not showing yet</div>
-                <div class="mv">${t.prevPosition != null ? 'Dropped out' : ''}</div></div>`;
+                <div class="mv hide-s">${t.prevPosition != null ? 'Dropped out' : ''}</div></div>`;
             }
             const x = ladderX(t.position);
             const px = t.prevPosition != null ? ladderX(t.prevPosition) : null;
@@ -378,10 +386,10 @@ function behaviourSection(d) {
     const prevHumans = pc ? (pc.humanSessions != null ? pc.humanSessions : pc.sessions) : null;
     const has = pc && pc.sessions > 0;
     h += figs([
-      fig('Visits watched', fmtInt(humans), has ? noteHtml(countTrend(humans, prevHumans)) : '', { color: 'green', help: 'real people, robots left out' }),
-      fig('How far people scroll', cl.avgScrollDepth != null ? fmtPct(cl.avgScrollDepth, 0) : 'n/a', has ? noteHtml(rateTrend(cl.avgScrollDepth, pc.avgScrollDepth)) : '', { color: 'cyan', help: 'of the page, on average' }),
-      fig('Clicks that did nothing', fmtInt(cl.deadClicks), has ? noteHtml(countTrend(cl.deadClicks, pc.deadClicks), { goodDown: true }) : '', { color: 'yellow', help: 'taps on things that are not links' }),
-      fig('Frustrated clicks', fmtInt(cl.rageClicks), has ? noteHtml(countTrend(cl.rageClicks, pc.rageClicks), { goodDown: true }) : '', { color: 'white', help: 'rapid repeat clicking; low is good' }),
+      fig('Visits watched', fmtBig(humans), has ? noteHtml(countTrend(humans, prevHumans)) : '', { color: 'green', help: 'real people, robots left out' }),
+      fig('How far people scroll', cl.avgScrollDepth != null ? fmtPct(cl.avgScrollDepth, 0) : 'n/a', has ? noteHtml(rateTrend(cl.avgScrollDepth, pc.avgScrollDepth, Math.min(humans || 0, prevHumans || 0))) : '', { color: 'cyan', help: 'of the page, on average' }),
+      fig('Clicks that did nothing', fmtBig(cl.deadClicks), has ? noteHtml(countTrend(cl.deadClicks, pc.deadClicks), { goodDown: true }) : '', { color: 'yellow', help: 'taps on things that are not links' }),
+      fig('Frustrated clicks', fmtBig(cl.rageClicks), has ? noteHtml(countTrend(cl.rageClicks, pc.rageClicks), { goodDown: true }) : '', { color: 'white', help: 'rapid repeat clicking; low is good' }),
     ], 'figs--sm');
     h += `<p class="caption">Based on ${esc(cl.daysCovered)} day${cl.daysCovered === 1 ? '' : 's'} of recordings in this period${cl.quickBacks ? `. ${fmtInt(cl.quickBacks)} visitor${cl.quickBacks === 1 ? '' : 's'} left a page straight after arriving` : ''}.</p>`;
   }
@@ -411,7 +419,7 @@ function behaviourSection(d) {
       <div class="panel-head"><h2 class="sub">Website availability</h2></div>
       <div class="trio">
         <div class="fig" style="--c:var(--green)"><div class="fig-label">Uptime</div><div class="fig-value">${esc(u.uptimePct)}%</div><div class="fig-note${u.uptimePct >= 99.9 ? ' good' : ''}">${grade}</div></div>
-        <div class="fig" style="--c:var(--cyan)"><div class="fig-label">Time offline</div><div class="fig-value">${esc(u.downtimeShort)}</div><div class="fig-note${down ? ' fault' : ''}">${down ? 'In this period' : 'None'}</div></div>
+        <div class="fig" style="--c:var(--cyan)"><div class="fig-label">Time offline</div><div class="fig-value">${esc(u.downtimeShort)}</div><div class="fig-note${down ? ' fault' : ' good'}">${down ? 'In this period' : 'All clear'}</div></div>
         <div class="fig" style="--c:var(--yellow)"><div class="fig-label">Outages</div><div class="fig-value">${esc(u.outages)}</div><div class="fig-note${down ? ' fault' : ' good'}">${down ? 'Confirmed' : 'No interruptions'}</div></div>
       </div>
       <p class="caption">Your homepage is checked every 5 minutes, day and night${u.measuredFrom ? ` (measured from ${esc(new Date(u.measuredFrom).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }))})` : ''}.</p>
@@ -445,7 +453,7 @@ function render(d) {
   $('#app').innerHTML = heroSection(d, ctx) + storySection(d, ctx) + visitorsSection(d, ctx) + googleSection(d, ctx) + behaviourSection(d);
   hasRendered = true;
 
-  if ($('#historyChart')) drawHistory(d.history.months);
+  if ($('#historyChart')) drawHistory(d.history.months, !gaBad);
   if ($('#trafficChart')) drawTraffic(d.ga4.timeseries);
   // The charts take their label font from the page; redraw once the
   // brand fonts have arrived so the labels are not left in a fallback.
@@ -464,6 +472,9 @@ function chartBase() {
   return {
     responsive: true, maintainAspectRatio: false,
     animation: reducedMotion ? false : { duration: 500 },
+    // Only the first draw animates. A chart that is resized, or re-attached
+    // after its box briefly had no size, snaps straight to its new shape.
+    transitions: { resize: { animation: { duration: 0 } }, attach: { animation: { duration: 0 } } },
     interaction: { mode: 'index', intersect: false },
     plugins: {
       legend: { display: false },
@@ -490,10 +501,10 @@ function stripes(ctx) {
   return ctx.createPattern(c, 'repeat');
 }
 
-function drawHistory(months) {
+function drawHistory(months, visitsTrusted = true) {
   if (typeof Chart === 'undefined') return;
   const ctx = $('#historyChart').getContext('2d');
-  const hasVisits = months.some(m => m.visits != null);
+  const hasVisits = visitsTrusted && months.some(m => m.visits != null);
   const hasClicks = months.some(m => m.clicks != null);
   const barField = hasVisits ? 'visits' : 'clicks';
   const pattern = stripes(ctx);
@@ -524,8 +535,25 @@ function drawHistory(months) {
   });
 }
 
-function drawTraffic(points) {
+// One point for every day from the first recorded day to the last. A
+// source that leaves quiet days out would otherwise close the gaps up
+// and bend the shape of the line; a day with nothing recorded is a zero.
+function fillDays(points) {
+  const sorted = points.filter(pt => /^\d{4}-\d{2}-\d{2}$/.test(pt.date)).sort((a, b) => a.date.localeCompare(b.date));
+  if (sorted.length < 2) return sorted;
+  const by = new Map(sorted.map(pt => [pt.date, pt.sessions]));
+  const out = [];
+  const end = Date.parse(sorted[sorted.length - 1].date + 'T12:00:00Z');
+  for (let t = Date.parse(sorted[0].date + 'T12:00:00Z'), guard = 0; t <= end && guard < 400; t += 86400000, guard++) {
+    const date = new Date(t).toISOString().slice(0, 10);
+    out.push({ date, sessions: by.get(date) || 0 });
+  }
+  return out;
+}
+
+function drawTraffic(rawPoints) {
   if (typeof Chart === 'undefined') return;
+  const points = fillDays(rawPoints);
   const ctx = $('#trafficChart').getContext('2d');
   const grad = ctx.createLinearGradient(0, 0, 0, 300);
   grad.addColorStop(0, 'rgba(77,184,140,.30)');
@@ -539,7 +567,7 @@ function drawTraffic(points) {
       labels: points.map(pt => fmtDay(pt.date)),
       datasets: [{
         label: 'Visits', data: points.map(pt => pt.sessions),
-        borderColor: '#4DB88C', backgroundColor: grad, fill: true, borderWidth: 2, tension: 0.25,
+        borderColor: '#4DB88C', backgroundColor: grad, fill: true, borderWidth: 2, cubicInterpolationMode: 'monotone',
         pointStyle: 'rect', pointRadius: points.length > 35 ? 0 : 2.5, pointHoverRadius: 5, pointBackgroundColor: '#4DB88C',
       }],
     },
@@ -550,6 +578,9 @@ function drawTraffic(points) {
 // ---------- loading ----------
 
 async function load() {
+  // Tapping two periods quickly starts two requests; only the latest one
+  // may draw, or the page could settle on the period that was not asked for.
+  const seq = ++loadSeq;
   const app = $('#app');
   if (hasRendered) {
     // Changing the period keeps the page in place and dims it, so the
@@ -578,6 +609,7 @@ async function load() {
   } catch {
     try { res = await fetchOnce(); if (!res.ok) throw new Error('bad status'); }
     catch {
+      if (seq !== loadSeq) return;
       done();
       destroyCharts();
       hasRendered = false;
@@ -589,6 +621,7 @@ async function load() {
     }
   }
   const data = await res.json();
+  if (seq !== loadSeq) return;
   done();
   render(data);
 }
@@ -604,7 +637,7 @@ document.querySelectorAll('#rangeSwitch button').forEach(b => {
 
 $('#requestReportBtn').onclick = async () => {
   const btn = $('#requestReportBtn'), label = $('#requestReportLabel');
-  btn.disabled = true; label.textContent = 'Preparing your report…';
+  btn.disabled = true; label.textContent = 'Preparing your report\u2026';
   // The server builds and emails the report inside this request, which
   // can take a few minutes. A dropped connection or gateway timeout does
   // not mean it failed, so say so and hold the button for a minute.

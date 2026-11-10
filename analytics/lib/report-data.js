@@ -120,6 +120,12 @@ export async function gatherReportData(site, start, end, opts = {}) {
   // the whole period, and it makes healthy sites look broken.
   const periodDays = Math.max(1, Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1);
   const coversPeriod = (block) => {
+    // Traffic in the period before proves tracking was already running.
+    // Without this a quiet site was told its tracking "began" on the day
+    // of its first visit of the month: CN Maintenance, tracked since
+    // August, had no visitor until the 21st and its report said visitor
+    // tracking began on 21 October.
+    if (Number(block?.prevOverview?.sessions) > 0) return true;
     const first = (block?.timeseries || []).map(t => t.date).filter(Boolean).sort()[0];
     if (!first) return false;
     const missedDays = Math.round((Date.parse(first) - Date.parse(start)) / 86400000);
@@ -321,6 +327,14 @@ export async function gatherReportData(site, start, end, opts = {}) {
   const histSource = data.ga4 && !data.ga4.unreliable
     ? (data.ga4.sourceLabel === 'Fathom Analytics' ? 'fathom' : 'ga') : null;
   try { data.history = await gatherHistory(site, end, histSource, warnings); } catch { data.history = null; }
+
+  // The day tracking began, set only when the source genuinely started
+  // inside this period. Renderers show their "figures cover from this
+  // date" note from this field alone.
+  if (data.ga4) {
+    const first = (data.ga4.timeseries || []).map(t => t.date).filter(Boolean).sort()[0];
+    data.ga4.trackingFrom = first && first > start && !coversPeriod(data.ga4) ? first : null;
+  }
 
   // Visits and visitors are the same count on Fathom (it has no
   // returning-visitor memory by design), so showing both is one number

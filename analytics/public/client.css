@@ -189,7 +189,7 @@ h1, h2, h3, p { margin: 0; }
 .ladder-head, .rung { display: grid; grid-template-columns: var(--kw) minmax(0, 1fr) var(--pos) var(--mv); gap: 6px 18px; align-items: center; }
 .ladder-head { font: 500 10px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--mut); padding-bottom: 8px; border-bottom: 2px solid var(--fg); }
 .scale { position: relative; height: 30px; }
-.scale span { position: absolute; bottom: 0; white-space: nowrap; }
+.scale > span { position: absolute; bottom: 0; white-space: nowrap; }
 .scale .z1 { left: 0; width: 50%; text-align: center; color: var(--good); }
 .scale .z2 { left: 50%; width: 25%; text-align: center; }
 .scale .z3 { left: 75%; width: 25%; text-align: center; }
@@ -302,6 +302,7 @@ h1, h2, h3, p { margin: 0; }
   .rung { grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px 14px; padding: 14px 0; }
   .rung .track { grid-column: 1 / -1; grid-row: 2; }
   .rung-pos small { display: none; }
+  .rung-pos.none { max-width: 12ch; text-align: right; grid-column: 2 / -1; }
   .hide-s { display: none !important; }
   .show-s { display: inline; }
   .table, .table tbody { display: block; }

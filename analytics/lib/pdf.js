@@ -94,9 +94,9 @@ const cap = s => (s ? s[0].toUpperCase() + s.slice(1) : s);
 // before it reaches the page, so no empty boxes are ever printed.
 function clean(v) {
   return String(v ?? '')
-    .replace(/\s*[—–]\s*/g, ', ')
-    .replace(/[‐‑]/g, '-')
-    .replace(/[^ -~ -ÿ‘’“”•…€™]/g, '')
+    .replace(/\s*[\u2014\u2013]\s*/g, ', ')
+    .replace(/[\u2010\u2011]/g, '-')
+    .replace(/[^\u0020-\u007E\u00A0-\u00FF\u2018\u2019\u201C\u201D\u2022\u2026\u20AC\u2122]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -116,12 +116,16 @@ function headlineNote(data, key, cur, prev) {
   if (!t || t.dir === 'none') return null;
   if (t.dir === 'level') return { text: 'Level', kind: 'level' };
   if (t.pct == null) return { text: t.dir === 'up' ? 'Up from zero' : 'Down', kind: t.dir };
+  // Under 50 the two numbers say it better than "up 228%".
+  if (prev != null && prev < 50) return { text: `${t.dir === 'up' ? 'Up' : 'Down'} from ${fmtInt(prev)}`, kind: t.dir };
   return { text: `${t.dir === 'up' ? 'Up' : 'Down'} ${Math.abs(t.pct).toFixed(0)}%`, kind: t.dir };
 }
-function change(cur, prev, { lowerIsBetter = false } = {}) {
+// `count` marks a whole-number tally (clicks, visits): small tallies swing
+// wildly in percentage terms, so they must also move by at least 8.
+function change(cur, prev, { lowerIsBetter = false, count = false } = {}) {
   if (cur == null || prev == null || !isFinite(cur) || !isFinite(prev) || prev === 0) return null;
   const pct = ((cur - prev) / prev) * 100;
-  if (Math.abs(pct) < 12) return { text: 'Level', kind: 'level' };
+  if (Math.abs(pct) < 12 || (count && Math.abs(cur - prev) < 8)) return { text: 'Level', kind: 'level' };
   const rose = pct > 0;
   return { text: `${rose ? 'Up' : 'Down'} ${Math.abs(pct).toFixed(0)}%`, kind: (lowerIsBetter ? !rose : rose) ? 'up' : 'down' };
 }
@@ -138,8 +142,8 @@ const noteColor = (th, kind) => (kind === 'up' ? th.up : kind === 'level' ? th.q
 function fit(doc, text, maxW, spacing = 0) {
   if (doc.widthOfString(text, { characterSpacing: spacing }) <= maxW) return text;
   let t = text;
-  while (t.length > 1 && doc.widthOfString(t + '…', { characterSpacing: spacing }) > maxW) t = t.slice(0, -1);
-  return t.replace(/[\s,.;:]+$/, '') + '…';
+  while (t.length > 1 && doc.widthOfString(t + '\u2026', { characterSpacing: spacing }) > maxW) t = t.slice(0, -1);
+  return t.replace(/[\s,.;:]+$/, '') + '\u2026';
 }
 
 // One line of text, cut with an ellipsis if a width is given. Returns
@@ -206,8 +210,11 @@ function blocks(doc, right, y, size = 7, colors = [C.green, C.cyan, C.yellow, C.
 }
 
 // ---------- page furniture ----------
-function newPage(ctx) {
+function newPage(ctx, fromY) {
   const { doc, data } = ctx;
+  // Space left unused above a page break, so the layout passes can be
+  // compared (see generateReportPdf).
+  if (fromY != null) ctx.waste += Math.max(0, LIMIT - fromY);
   doc.addPage();
   doc.rect(0, 0, A4.w, A4.h).fill(C.paper);
   doc.rect(0, 0, A4.w, BAND_H).fill(C.ink);
@@ -220,7 +227,7 @@ function newPage(ctx) {
 
 // Start a new page unless `need` points still fit below y.
 function room(ctx, y, need) {
-  return y + need <= LIMIT ? y : newPage(ctx);
+  return y + need <= LIMIT ? y : newPage(ctx, y);
 }
 
 // Section opener: heavy rule, teletext page number block, condensed
@@ -229,9 +236,10 @@ function room(ctx, y, need) {
 function opener(ctx, y, code, title, standfirst, need = 150) {
   const { doc } = ctx;
   const sfH = standfirst ? paraH(doc, standfirst, { size: 9.5, width: span(9), lineGap: 2.5 }) + 8 : 0;
-  if (y > TOP + 1) y += 26;
+  const from = y;
+  if (y > TOP + 1) y += ctx.d.openerGap;
   ctx.tag = code;
-  if (y + 44 + sfH + need > LIMIT) y = newPage(ctx);
+  if (y + 44 + sfH + need > LIMIT) y = newPage(ctx, from);
   if (y <= TOP + 1) ctx.tags[ctx.tags.length - 1] = code;
   doc.rect(M, y, CW, 2).fill(C.text);
   doc.rect(M, y + 12, 38, 18).fill(C.green);
@@ -312,7 +320,10 @@ function niceMax(v) {
 // period are solid, earlier months are dimmed, a part month is hatched.
 function monthBars(doc, th, x, y, w, h, months, field, color, title, data) {
   label(doc, title, x, y, { color: th.fg, font: 'monoM', width: w });
-  const rows = months.filter(m => m[field] != null || true);
+  // A source that began part-way through the year has nothing before its
+  // first month, so the chart starts there instead of showing a gap.
+  const first = months.findIndex(m => m[field] != null);
+  const rows = months.slice(Math.max(0, first));
   const top = y + 30, base = y + h - 16;
   const areaH = base - top;
   const max = Math.max(...rows.map(m => m[field] || 0), 1);
@@ -339,7 +350,12 @@ function monthBars(doc, th, x, y, w, h, months, field, color, title, data) {
     } else {
       doc.save().fillOpacity(inPeriod(m) ? 1 : 0.42).rect(bx, by, bw, bh).fill(color).restore();
     }
-    label(doc, fmtBig(v), cx - slot / 2, by - 11, { color: inPeriod(m) ? th.fg : th.faint, width: slot, align: 'center', size: small ? 5.5 : 6.5, spacing: small ? 0 : 0.4 });
+    // With many months there is no room for a figure on every bar, so
+    // only the first, the highest and the months being reported get one.
+    if (!small || inPeriod(m) || i === 0 || v === max) {
+      const lw = small ? slot * 2.4 : slot;
+      label(doc, fmtBig(v), cx - lw / 2, by - 11, { color: inPeriod(m) ? th.fg : th.faint, width: lw, align: 'center', size: small ? 6 : 6.5, spacing: small ? 0.2 : 0.4 });
+    }
   });
 }
 
@@ -388,10 +404,10 @@ function dayChart(doc, th, x, y, w, h, points, color, { callout = true } = {}) {
 }
 
 // Horizontal bars: name, bar, figure, share.
-function hBars(doc, th, x, y, w, rows, { labelW = 120, rowH = 19, color = C.greenInk } = {}) {
+function hBars(doc, th, x, y, w, rows, { labelW = 120, rowH = 19, color = C.greenInk, share = true } = {}) {
   const max = Math.max(...rows.map(r => r.value), 1);
   const total = rows.reduce((a, r) => a + r.value, 0) || 1;
-  const figW = 74;
+  const figW = share ? 74 : 42;
   const barW = w - labelW - figW;
   rows.forEach((r, i) => {
     const ry = y + i * rowH;
@@ -399,31 +415,43 @@ function hBars(doc, th, x, y, w, rows, { labelW = 120, rowH = 19, color = C.gree
     doc.rect(x + labelW, ry + 4, barW, 6).fill(th.track);
     doc.rect(x + labelW, ry + 4, Math.max((barW * r.value) / max, 2), 6).fill(color);
     line(doc, fmtInt(r.value), x + labelW + barW, ry + 2, { font: 'semi', size: 9, color: th.fg, width: 42, align: 'right' });
-    label(doc, `${Math.round((r.value / total) * 100)}%`, x + labelW + barW + 42, ry + 3.5, { color: th.faint, width: figW - 42, align: 'right', spacing: 0.3 });
+    if (share) label(doc, `${Math.round((r.value / total) * 100)}%`, x + labelW + barW + 42, ry + 3.5, { color: th.faint, width: figW - 42, align: 'right', spacing: 0.3 });
   });
   return y + rows.length * rowH;
 }
 
 // A simple ruled table. Columns give either a key and format, or a draw
-// function for anything richer than text.
-function table(doc, th, x, y, cols, rows, { rowH = 20 } = {}) {
-  let cx = x;
-  cols.forEach(col => {
-    label(doc, col.label, cx + (col.align === 'right' ? 0 : 0), y, { color: th.faint, width: col.width - 8, align: col.align || 'left' });
-    cx += col.width;
-  });
+// function for anything richer than text. A table that reaches the foot
+// of the page carries on overleaf under a repeated heading row.
+function table(ctx, th, x, y, cols, rows, { rowH = 20 } = {}) {
+  const { doc } = ctx;
   const w = cols.reduce((a, c) => a + c.width, 0);
-  hRule(doc, x, y + 13, w, th.fg, 0.9);
-  let ry = y + 13;
+  const head = top => {
+    let cx = x;
+    cols.forEach(col => {
+      const right = col.align === 'right';
+      label(doc, col.label, cx, top, { color: th.faint, width: col.width - (right ? col.headPad || 0 : 8), align: col.align || 'left' });
+      cx += col.width;
+    });
+    hRule(doc, x, top + 13, w, th.fg, 0.9);
+    return top + 13;
+  };
+  let ry = head(y);
+  // These are "top N" lists, so when only a row or two would spill onto
+  // the next page the list is cut to what fits rather than leaving a
+  // stray row under a repeated heading.
+  const fits = Math.floor((LIMIT - ry) / rowH);
+  if (rows.length - fits > 0 && rows.length - fits <= 2 && fits >= 3) rows = rows.slice(0, fits);
   rows.forEach(row => {
+    if (ry + rowH > LIMIT) ry = head(newPage(ctx, ry));
     let px = x;
     cols.forEach(col => {
       if (col.draw) col.draw(row, px, ry, col.width);
       else {
         const raw = row[col.key];
         const val = col.format ? col.format(raw, row) : String(raw ?? '');
-        line(doc, val, px, ry + 5.5, {
-          font: col.font || 'reg', size: col.size || 9, width: col.width - 8, align: col.align || 'left',
+        line(doc, val, px, ry + (rowH - 9) / 2, {
+          font: col.font || 'reg', size: col.size || 9, width: col.width - (col.align === 'right' ? 0 : 8), align: col.align || 'left',
           color: col.color ? col.color(raw, row) : th.fg,
         });
       }
@@ -469,6 +497,16 @@ function friendlyChannel(ch) {
   };
   return map[ch] || ch;
 }
+// Shop and booking systems often end a page address in a long code. The
+// folder before it is the readable part ("/c/Meat_Boxes/3a9e..." reads
+// as "Meat Boxes").
+function pageName(path, title) {
+  if (title && title !== '(not set)') return title;
+  const parts = String(path || '/').split('?')[0].split('/').filter(Boolean);
+  while (parts.length > 1 && /^[0-9a-f-]{16,}$/i.test(parts[parts.length - 1])) parts.pop();
+  return parts.length ? pageLabel('/' + parts.join('/'), '') : 'Homepage';
+}
+
 function friendlyDevice(d) {
   const s = String(d || '').toLowerCase();
   if (s === 'mobile' || s === 'phone') return 'Phone';
@@ -477,14 +515,12 @@ function friendlyDevice(d) {
   return cap(s) || 'Other';
 }
 
-// The day visitor tracking began, when that is well inside the period: a
-// month-long report may then hold only days of measurement, and a low
-// number would read as a broken site unless the report says so.
+// The day visitor tracking began, when the source genuinely started
+// inside the period (worked out once, in report-data.js): a month-long
+// report may then hold only days of measurement, and a low number would
+// read as a broken site unless the report says so.
 function trackingStart(data) {
-  const first = data.ga4?.timeseries?.[0]?.date;
-  if (!first || first <= data.period.start) return null;
-  const daysIn = Math.round((Date.parse(first) - Date.parse(data.period.start)) / 86400000);
-  return daysIn >= 5 ? first : null;
+  return data.ga4?.trackingFrom || null;
 }
 
 // ================================================================
@@ -522,9 +558,15 @@ function summaryPage(ctx) {
   const name = clean(data.site.clientName).toUpperCase();
   doc.font('disp');
   let nameSize = 30;
-  while (nameSize > 18 && doc.fontSize(nameSize).widthOfString(name) > CW) nameSize -= 1;
-  display(doc, name, M, y, nameSize, th.fg, { width: CW });
-  y += nameSize * CAP_H + 22;
+  while (nameSize > 22 && doc.fontSize(nameSize).widthOfString(name) > CW) nameSize -= 1;
+  if (doc.fontSize(nameSize).widthOfString(name) <= CW) {
+    display(doc, name, M, y, nameSize, th.fg, { width: CW });
+    y += nameSize * CAP_H + 22;
+  } else {
+    // A very long name takes two lines rather than being cut short.
+    const h = para(doc, name, M, y - 22 * CAP_OFF, { font: 'disp', size: 22, width: CW, lineGap: 0.5, color: th.fg, maxLines: 2 });
+    y += h - 22 * CAP_OFF + 12;
+  }
 
   const verdict = clean(story?.verdict?.label || 'Your website report').toUpperCase();
   doc.font('black');
@@ -533,9 +575,9 @@ function summaryPage(ctx) {
   line(doc, verdict, M, y - vSize * CAP_OFF, { font: 'black', size: vSize, color: C.green, width: CW });
   y += vSize * CAP_H + 18;
 
-  const standfirst = ins?.headline || story?.verdict?.line || '';
+  const standfirst = ins?.headline || story?.verdict?.line || 'The figures for this period are set out on the pages that follow.';
   if (standfirst) {
-    y += para(doc, standfirst, M, y, { font: 'reg', size: 12.5, width: span(10), lineGap: 3.5, color: th.sub, maxLines: 4 }) + 4;
+    y += para(doc, standfirst, M, y, { font: 'reg', size: 12.5, width: span(11), lineGap: 3.5, color: th.sub, maxLines: 4 }) + 4;
   }
   const started = trackingStart(data);
   const caveat = data.ga4?.unreliable
@@ -548,19 +590,20 @@ function summaryPage(ctx) {
   y += 12;
 
   // Headline numbers
-  const targets = (data.search?.targets || []).filter(t => t.position != null);
+  // Every key search counts in "5 of 8", including ones not showing yet.
+  const allTargets = data.search?.targets || [];
   const cells = [];
   if (o) cells.push({ label: 'Visits', value: fmtBig(o.sessions), note: headlineNote(data, 'visits', o.sessions, po.sessions) });
   if (s) {
     cells.push({ label: 'Clicks from Google', value: fmtBig(s.clicks), note: headlineNote(data, 'clicks', s.clicks, ps.clicks) });
     cells.push({ label: 'Times shown on Google', value: fmtBig(s.impressions), note: headlineNote(data, 'shown', s.impressions, ps.impressions) });
   }
-  if (targets.length) {
-    const p1 = targets.filter(t => t.position <= 10.5).length;
-    cells.push({ label: 'Key searches on page one', value: String(p1), unit: `of ${targets.length}`, hint: 'Positions 1 to 10' });
+  if (allTargets.length) {
+    const p1 = allTargets.filter(t => t.position != null && t.position <= 10.5).length;
+    cells.push({ label: 'Key searches on page one', value: String(p1), unit: `of ${allTargets.length}`, hint: 'Positions 1 to 10' });
   }
   if (cells.length < 4 && s && s.position) {
-    cells.push({ label: 'Average Google position', value: s.position.toFixed(1), note: moveNote(ps.position ? ps.position - s.position : null), hint: 'Lower is better' });
+    cells.push({ label: 'Average Google position', value: s.position.toFixed(1), note: positionNote(data, s, ps), hint: 'Lower is better' });
   }
   if (cells.length < 4 && data.uptime) {
     cells.push({ label: 'Website uptime', value: `${data.uptime.uptimePct}%`, hint: data.uptime.outages ? `${data.uptime.outages} outage${data.uptime.outages === 1 ? '' : 's'}` : 'No downtime' });
@@ -583,30 +626,54 @@ function summaryPage(ctx) {
   for (let i = 0; i < wins.length; i += 2) rowHs.push(Math.max(winH(wins[i]), wins[i + 1] ? winH(wins[i + 1]) : 0) + 14);
   const winsH = wins.length ? 22 + rowHs.reduce((a, b) => a + b, 0) : 0;
 
-  // The long view (or, without monthly history, the daily trend)
+  // The long view (or, without monthly history, the daily trend). It
+  // takes the space the rest of the page leaves, up to a sensible height,
+  // and any space still spare is shared between the gaps so the page
+  // fills to the foot.
   const months = data.history?.months || [];
-  const hasV = months.some(m => m.visits != null), hasC = months.some(m => m.clicks != null), hasI = months.some(m => m.impressions != null);
+  // No visit history beside an under-counting visitor tag, whatever the
+  // data carries: those are the figures this report is leaving out.
+  const hasV = !data.ga4?.unreliable && months.some(m => m.visits != null);
+  const hasC = months.some(m => m.clicks != null), hasI = months.some(m => m.impressions != null);
   const space = LIMIT - y - winsH - (wins.length ? 20 : 0);
-  if (months.length >= 2 && (hasV || hasC) && space >= 110) {
-    const h = Math.max(110, Math.min(176, space));
+  const showMonths = months.length >= 2 && (hasV || hasC) && space >= 110;
+  const showDays = !showMonths && trusted && (data.ga4.timeseries || []).length > 2 && space >= 100;
+  // With neither a monthly nor a daily series (search-only sites), the
+  // slot shows the searches that brought the most people in.
+  const topQ = (data.search?.topQueries || []).filter(q => q.clicks > 0);
+  const showSearches = !showMonths && !showDays && s && topQ.length >= 2 && space >= 90;
+  const qRows = showSearches ? topQ.slice(0, Math.max(2, Math.min(8, Math.floor((space - 34) / 19)))) : [];
+  const chartH = showMonths ? Math.max(110, Math.min(190, space))
+    : showDays ? Math.max(100, Math.min(170, space))
+    : showSearches ? 30 + qRows.length * 19 : 0;
+  const spare = Math.max(0, Math.min(chartH ? 64 : 0, space - chartH));
+  if (showMonths) {
+    y += spare * 0.4;
     label(doc, 'The long view', M, y, { color: th.fg, font: 'monoM' });
     label(doc, `Month by month${months.some(m => m.partial) ? ' // * part month so far' : ''}`, M + CW / 2, y, { color: th.faint, width: CW / 2, align: 'right' });
     hRule(doc, M, y + 13, CW, th.rule);
     const charts = [];
-    if (hasV) charts.push(['visits', C.green, `Visits${data.history.visitsSource ? '' : ''}`]);
+    if (hasV) charts.push(['visits', C.green, 'Visits']);
     if (hasC) charts.push(['clicks', C.cyan, 'Clicks from Google']);
     if (!hasV && hasI) charts.push(['impressions', C.green, 'Times shown on Google']);
-    const cw = charts.length === 2 ? span(6) - 8 : CW;
+    const cw = charts.length >= 2 ? span(6) - 8 : CW;
     charts.slice(0, 2).forEach(([field, color, title], i) => {
-      monthBars(doc, th, M + i * (span(6) + GUT + 8), y + 24, cw, h - 24, months, field, color, title, data);
+      monthBars(doc, th, M + i * (span(6) + GUT + 8), y + 24, cw, chartH - 24, months, field, color, title, data);
     });
-    y += h + 20;
-  } else if (trusted && (data.ga4.timeseries || []).length > 2 && space >= 100) {
-    const h = Math.max(100, Math.min(160, space));
+    y += chartH + 20 + spare * 0.6;
+  } else if (showDays) {
+    y += spare * 0.4;
     label(doc, 'Visits day by day', M, y, { color: th.fg, font: 'monoM' });
     hRule(doc, M, y + 13, CW, th.rule);
-    dayChart(doc, th, M, y + 18, CW, h - 18, data.ga4.timeseries, C.green);
-    y += h + 20;
+    dayChart(doc, th, M, y + 18, CW, chartH - 18, data.ga4.timeseries, C.green);
+    y += chartH + 20 + spare * 0.6;
+  } else if (showSearches) {
+    y += spare * 0.4;
+    label(doc, 'The searches bringing people in', M, y, { color: th.fg, font: 'monoM' });
+    label(doc, 'Clicks from Google', M + CW / 2, y, { color: th.faint, width: CW / 2, align: 'right' });
+    hRule(doc, M, y + 13, CW, th.rule);
+    hBars(doc, th, M, y + 24, CW, qRows.map(q => ({ label: q.query, value: q.clicks })), { labelW: 200, color: C.cyan, share: false });
+    y += chartH + 20 + spare * 0.6;
   }
 
   if (wins.length) {
@@ -637,20 +704,41 @@ function nextStepsSection(ctx, y) {
   const watch = (story?.watch || []).slice(0, 4);
   if (!actions.length && !watch.length && !ins?.summary) return y;
 
-  y = opener(ctx, y, 'P200', 'Where we go from here', null, 160);
+  // Measure everything first and pick the roomiest spacing that still
+  // lets the whole section sit on one page: this page is the answer to
+  // "what happens next", and it reads best in one piece.
+  const textX = colX(1) + 6, textW = span(8) - 6;
+  const sumH = ins?.summary ? paraH(doc, ins.summary, { size: 11.5, width: span(11), lineGap: 3.5 }) : 0;
+  const actH = actions.map(a => Math.max(34,
+    paraH(doc, a.title, { font: 'semi', size: 12, width: textW, lineGap: 1.5 })
+    + paraH(doc, a.detail, { size: 9.5, width: textW, lineGap: 2.5 }) + 3));
+  const askH = ins?.ask ? paraH(doc, ins.ask, { font: 'med', size: 11.5, width: CW - 48, lineGap: 3 }) : 0;
+  const w2 = span(6) - 18;
+  const itemH = w => paraH(doc, w.title, { font: 'semi', size: 10, width: w2, lineGap: 1.5 })
+    + paraH(doc, w.detail, { size: 9, width: w2, lineGap: 2 }) + 2;
+  const watchRows = [];
+  for (let i = 0; i < watch.length; i += 2) watchRows.push(Math.max(itemH(watch[i]), watch[i + 1] ? itemH(watch[i + 1]) : 0));
+  const PADS = [{ row: 20, sum: 20, ask: 24, watch: 14 }, { row: 15, sum: 15, ask: 18, watch: 11 }, { row: 11, sum: 12, ask: 14, watch: 8 }];
+  const total = pd => 46
+    + (sumH ? sumH + 4 + pd.sum : 0)
+    + (actions.length ? 22 + actH.reduce((a, h) => a + h + pd.row, 0) + 6 : 0)
+    + (askH ? askH + 42 + pd.ask : 0)
+    + (watch.length ? 22 + watchRows.reduce((a, h) => a + h + pd.watch, 0) : 0);
+  const start = y > TOP + 1 ? y + ctx.d.openerGap : y;
+  const pd = PADS.find(c => start + total(c) <= LIMIT) || (TOP + total(PADS[0]) <= LIMIT ? PADS[0] : PADS.find(c => TOP + total(c) <= LIMIT) || PADS[2]);
+
+  y = opener(ctx, y, 'P200', 'Where we go from here', null, Math.min(total(pd) - 46, 300));
   if (ins?.summary) {
-    y += para(doc, ins.summary, M, y + 4, { font: 'reg', size: 12, width: span(10), lineGap: 4, color: th.fg }) + 18;
+    y += para(doc, ins.summary, M, y + 4, { font: 'reg', size: 11.5, width: span(11), lineGap: 3.5, color: th.fg }) + 4 + pd.sum;
   }
 
   if (actions.length) {
-    y = room(ctx, y, 90);
+    y = room(ctx, y, 22 + actH[0] + pd.row);
     y = subhead(doc, th, M, y, CW, 'What we recommend next', 'Who it sits with');
-    const textX = colX(1) + 6, textW = span(8) - 6;
     actions.forEach((a, i) => {
-      const hT = paraH(doc, a.title, { font: 'semi', size: 12, width: textW, lineGap: 1.5 });
-      const hD = paraH(doc, a.detail, { size: 9.5, width: textW, lineGap: 2.5 });
-      const rowH = Math.max(40, hT + hD + 6) + 18;
+      const rowH = actH[i] + pd.row;
       y = room(ctx, y, rowH);
+      const hT = paraH(doc, a.title, { font: 'semi', size: 12, width: textW, lineGap: 1.5 });
       display(doc, String(i + 1).padStart(2, '0'), M, y + 2, 30, C.greenInk);
       para(doc, a.title, textX, y, { font: 'semi', size: 12, width: textW, lineGap: 1.5, color: th.fg });
       para(doc, a.detail, textX, y + hT + 3, { size: 9.5, width: textW, lineGap: 2.5, color: th.sub });
@@ -661,31 +749,26 @@ function nextStepsSection(ctx, y) {
       doc.rect(cx, y + 1, cw, 16).fill(you ? C.yellow : C.ink);
       label(doc, chip, cx, y + 1 + (16 - 6.5 * MONO_H) / 2 - 6.5 * MONO_OFF, { font: 'monoM', color: you ? C.ink : C.white, width: cw, align: 'center', spacing: 0.7 });
       y += rowH;
-      hRule(doc, M, y - 9, CW, th.rule, 0.5);
+      hRule(doc, M, y - pd.row / 2, CW, th.rule, 0.5);
     });
     y += 6;
   }
 
   if (ins?.ask) {
-    const h = paraH(doc, ins.ask, { font: 'med', size: 12, width: CW - 48, lineGap: 3 });
-    y = room(ctx, y, h + 52);
-    doc.rect(M, y, CW, h + 46).fill(C.ink);
-    doc.rect(M + 18, y + 16, 6, 6).fill(C.yellow);
-    label(doc, 'One thing from you', M + 30, y + 15.5, { color: C.yellow, font: 'monoM' });
-    para(doc, ins.ask, M + 18, y + 30, { font: 'med', size: 12, width: CW - 48, lineGap: 3, color: C.white });
-    y += h + 46 + 22;
+    y = room(ctx, y, askH + 42 + pd.ask);
+    doc.rect(M, y, CW, askH + 42).fill(C.ink);
+    doc.rect(M + 18, y + 14, 6, 6).fill(C.yellow);
+    label(doc, 'One thing from you', M + 30, y + 13.5, { color: C.yellow, font: 'monoM' });
+    para(doc, ins.ask, M + 18, y + 28, { font: 'med', size: 11.5, width: CW - 48, lineGap: 3, color: C.white });
+    y += askH + 42 + pd.ask;
   }
 
   if (watch.length) {
-    const w2 = span(6) - 18;
-    const itemH = w => paraH(doc, w.title, { font: 'semi', size: 10, width: w2, lineGap: 1.5 })
-      + paraH(doc, w.detail, { size: 9, width: w2, lineGap: 2 }) + 4;
-    const rowHs = [];
-    for (let i = 0; i < watch.length; i += 2) rowHs.push(Math.max(itemH(watch[i]), watch[i + 1] ? itemH(watch[i + 1]) : 0) + 14);
-    y = room(ctx, y, 24 + rowHs[0]);
+    // Kept together: half a list at the foot of one page and half at the
+    // head of the next reads as a mistake.
+    y = room(ctx, y, 22 + watchRows.reduce((a, h) => a + h + pd.watch, 0));
     y = subhead(doc, th, M, y, CW, 'Worth watching', 'Not problems, just things we are keeping an eye on');
     for (let i = 0, r = 0; i < watch.length; i += 2, r++) {
-      y = room(ctx, y, rowHs[r]);
       [watch[i], watch[i + 1]].forEach((w, k) => {
         if (!w) return;
         const x = k ? colX(6) + 4 : M;
@@ -693,8 +776,9 @@ function nextStepsSection(ctx, y) {
         const h1 = para(doc, w.title, x + 16, y, { font: 'semi', size: 10, width: w2, lineGap: 1.5, color: th.fg });
         para(doc, w.detail, x + 16, y + h1 + 2, { size: 9, width: w2, lineGap: 2, color: th.sub });
       });
-      y += rowHs[r];
+      y += watchRows[r] + pd.watch;
     }
+    y -= pd.watch;
   }
   return y;
 }
@@ -723,27 +807,31 @@ function visitorsSection(ctx, y) {
     `A visit is one trip to your website. Counted by ${ga.sourceLabel || 'your analytics'}; changes are against ${period.prev}.`, 110);
   const ppv = o.sessions ? o.screenPageViews / o.sessions : 0;
   const pppv = p.sessions ? p.screenPageViews / p.sessions : null;
+  // On a handful of visits a rate can halve or double by chance, so the
+  // rates carry no change note until there are enough visits to mean it.
+  const tiny = o.sessions < 60 || (p.sessions ?? 0) < 60;
   const cells = [{ label: 'Visits', value: fmtBig(o.sessions), note: headlineNote(data, 'visits', o.sessions, p.sessions) }];
-  if (ga.visitorsSameAsVisits === false) cells.push({ label: 'Visitors', value: fmtBig(o.totalUsers), note: change(o.totalUsers, p.totalUsers) });
-  cells.push({ label: 'Pages viewed', value: fmtBig(o.screenPageViews), note: change(o.screenPageViews, p.screenPageViews) });
-  if (o.newUsers != null) cells.push({ label: 'New visitors', value: fmtBig(o.newUsers), note: change(o.newUsers, p.newUsers) });
-  else cells.push({ label: 'Pages per visit', value: ppv.toFixed(1), note: change(ppv, pppv) });
-  cells.push({ label: 'Engaged visits', value: fmtPct(o.engagementRate * 100, 0), note: change(o.engagementRate, p.engagementRate) });
-  cells.push({ label: 'Average visit', value: fmtDur(o.averageSessionDuration), note: change(o.averageSessionDuration, p.averageSessionDuration) });
-  y = statRow(doc, th, M, y, CW, cells, { valueSize: cells.length > 5 ? 22 : 26 }) + 22;
+  if (ga.visitorsSameAsVisits === false) cells.push({ label: 'Visitors', value: fmtBig(o.totalUsers), note: change(o.totalUsers, p.totalUsers, { count: true }) });
+  cells.push({ label: 'Pages viewed', value: fmtBig(o.screenPageViews), note: change(o.screenPageViews, p.screenPageViews, { count: true }) });
+  if (o.newUsers != null) cells.push({ label: 'New visitors', value: fmtBig(o.newUsers), note: change(o.newUsers, p.newUsers, { count: true }) });
+  else cells.push({ label: 'Pages per visit', value: ppv.toFixed(1), note: tiny ? null : change(ppv, pppv) });
+  cells.push({ label: 'Engaged visits', value: fmtPct(o.engagementRate * 100, 0), note: tiny ? null : change(o.engagementRate, p.engagementRate), hint: 'Stayed and browsed' });
+  cells.push({ label: 'Average visit', value: fmtDur(o.averageSessionDuration), note: tiny ? null : change(o.averageSessionDuration, p.averageSessionDuration), hint: 'Time on the site' });
+  y = statRow(doc, th, M, y, CW, cells, { valueSize: cells.length > 5 ? 22 : 26 }) + ctx.d.gap;
 
   // Day by day
   if ((ga.timeseries || []).length > 1) {
-    y = room(ctx, y, 172);
+    const ch = ctx.d.chartH;
+    y = room(ctx, y, ch + 46);
     y = subhead(doc, th, M, y, CW, 'Visits day by day', `${fmtInt(o.sessions)} in total`);
-    dayChart(doc, th, M, y, CW, 126, ga.timeseries, C.greenInk);
-    y += 134;
+    dayChart(doc, th, M, y, CW, ch, ga.timeseries, C.greenInk);
+    y += ch + 8;
     const started = trackingStart(data);
     if (started) {
       doc.rect(M, y + 3, 5, 5).fill(C.yellow);
       y += para(doc, `Visitor tracking began on ${formatDate(started)}, so these figures cover from that date. They will build to a full picture over the coming weeks.`, M + 12, y, { size: 8.5, width: CW - 12, color: th.sub }) + 4;
     }
-    y += 14;
+    y += ctx.d.gap - 8;
   }
 
   // Where they came from, and on what
@@ -775,20 +863,21 @@ function visitorsSection(ctx, y) {
         yDev += 17;
       });
     }
-    y = Math.max(yBars, yDev) + 20;
+    y = Math.max(yBars, yDev) + ctx.d.gap - 4;
   }
 
+  y = aiStrip(ctx, y);
+
   // Most viewed pages
-  const pages = (ga.topPages || []).slice(0, 7);
+  const pages = (ga.topPages || []).slice(0, ctx.d.pageRows);
   if (pages.length) {
-    y = room(ctx, y, 40 + pages.length * 20);
+    y = room(ctx, y, 40 + Math.min(pages.length, 3) * 20);
     y = subhead(doc, th, M, y, CW, 'Most viewed pages');
     const maxViews = Math.max(...pages.map(r => r.views), 1);
     const nameW = CW - 250;
-    y = table(doc, th, M, y, [
+    y = table(ctx, th, M, y, [
       { label: 'Page', width: nameW, draw: (r, x, ry, w) => {
-        const title = r.title && r.title !== '(not set)' ? r.title : '';
-        const name = r.path === '/' ? 'Homepage' : pageLabel(r.path, title);
+        const name = r.path === '/' ? 'Homepage' : pageName(r.path, r.title);
         const used = line(doc, name, x, ry + 5.5, { font: 'semi', size: 9, color: th.fg, width: w * 0.62 });
         if (r.path && r.path !== '/') label(doc, r.path, x + used + 8, ry + 7.5, { color: th.quiet, width: w - used - 20, spacing: 0.2, upper: false, size: 6 });
       } },
@@ -798,28 +887,32 @@ function visitorsSection(ctx, y) {
       } },
       { label: 'Views', key: 'views', width: 70, align: 'right', font: 'semi', format: fmtInt },
       { label: 'Visits', key: 'sessions', width: 70, align: 'right', format: fmtInt },
-    ], pages) + 20;
-  }
-
-  // Visits from AI assistants
-  if (data.aiTraffic) {
-    const ai = data.aiTraffic;
-    y = room(ctx, y, 58);
-    hRule(doc, M, y, CW, th.rule);
-    doc.rect(M, y + 15, 6, 6).fill(C.cyan);
-    label(doc, 'Visits from AI assistants', M + 12, y + 14.5, { color: th.fg, font: 'monoM' });
-    label(doc, 'ChatGPT, Perplexity, Gemini, Copilot and others', M + CW / 2 - 40, y + 14.5, { color: th.faint, width: CW / 2 + 40, align: 'right' });
-    const text = ai.visits > 0
-      ? `${fmtInt(ai.visits)} visit${ai.visits === 1 ? '' : 's'}`
-        + (ai.sharePct != null ? ` (${ai.sharePct}% of all visits)` : '')
-        + ((ai.top || []).length ? `, from ${ai.top.map(t => `${t.source} ${fmtInt(t.visits)}`).join(', ')}` : '')
-        + (ai.prevVisits != null && ai.prevVisits !== ai.visits ? `. ${cap(period.prev)}: ${fmtInt(ai.prevVisits)}.` : '.')
-      : 'None recorded in this period, which is normal today. As more people search with AI tools, the visitors they send will show here.';
-    line(doc, text, M, y + 31, { font: 'reg', size: 9.5, color: th.sub, width: CW });
-    hRule(doc, M, y + 50, CW, th.rule);
-    y += 50;
+    ], pages);
   }
   return y;
+}
+
+// Visits from AI assistants, as one ruled strip.
+function aiStrip(ctx, y) {
+  const { doc, data } = ctx;
+  const th = PAPER;
+  const ai = data.aiTraffic;
+  if (!ai) return y;
+  const period = periodNoun(data.period.start, data.period.end);
+  y = room(ctx, y, 52 + ctx.d.gap);
+  hRule(doc, M, y, CW, th.rule);
+  doc.rect(M, y + 12, 6, 6).fill(C.cyan);
+  label(doc, 'Visits from AI assistants', M + 12, y + 11.5, { color: th.fg, font: 'monoM' });
+  label(doc, 'ChatGPT, Perplexity, Gemini, Copilot and others', M + CW / 2 - 40, y + 11.5, { color: th.faint, width: CW / 2 + 40, align: 'right' });
+  const text = ai.visits > 0
+    ? `${fmtInt(ai.visits)} visit${ai.visits === 1 ? '' : 's'}`
+      + (ai.sharePct != null ? ` (${ai.sharePct}% of all visits)` : '')
+      + ((ai.top || []).length ? `, from ${ai.top.map(t => `${t.source} ${fmtInt(t.visits)}`).join(', ')}` : '')
+      + (ai.prevVisits != null && ai.prevVisits !== ai.visits ? `. ${cap(period.prev)}: ${fmtInt(ai.prevVisits)}.` : '.')
+    : 'None recorded in this period, which is normal today. As AI search grows, the visitors it sends will show here.';
+  line(doc, text, M, y + 27, { font: 'reg', size: 9.5, color: th.sub, width: CW });
+  hRule(doc, M, y + 46, CW, th.rule);
+  return y + 46 + ctx.d.gap;
 }
 
 // ================================================================
@@ -837,11 +930,11 @@ function ladder(doc, x, y, w, targets) {
   const pad = 16;
   label(doc, 'Where you rank for the searches that matter', x + pad, y + 14, { color: C.white, font: 'monoM', width: w * 0.62 });
   // legend
-  const lx = x + w - pad - 168;
+  const lx = x + w - pad - 118;
   doc.circle(lx + 3, y + 17.5, 3).fill(C.green);
   label(doc, 'Now', lx + 10, y + 14, { color: th.faint });
   doc.circle(lx + 48, y + 17.5, 2.6).lineWidth(0.9).stroke(th.faint);
-  label(doc, 'Last period', lx + 55, y + 14, { color: th.faint });
+  label(doc, 'Last period', lx + 55, y + 14, { color: th.faint, width: 64 });
 
   const nameW = 150, figW = 104;
   const sx = x + pad + nameW, sw = w - pad * 2 - nameW - figW;
@@ -886,6 +979,17 @@ function ladder(doc, x, y, w, targets) {
   return y + H;
 }
 
+// The average position across every search. When the site starts
+// showing for many more searches, the new ones begin low down and drag
+// the average with them, which is growth, not a slide. Say that rather
+// than print "down 22 places" beside a rising site.
+function positionNote(data, s, p) {
+  const move = s.position && p.position ? p.position - s.position : null;
+  const shown = data.story?.trends?.shown?.dir || trend(s.impressions, p.impressions).dir;
+  if (move != null && move <= -0.5 && shown === 'up') return { text: 'Seen for more searches', kind: 'level' };
+  return moveNote(move);
+}
+
 function googleSection(ctx, y) {
   const { doc, data } = ctx;
   const th = PAPER;
@@ -905,11 +1009,11 @@ function googleSection(ctx, y) {
   y = opener(ctx, y, 'P400', 'Found on Google',
     `How your website showed up in Google searches. Position is where you rank: lower is better, and 1 to 10 is page one. Changes are against ${period.prev}.`, 110);
   y = statRow(doc, th, M, y, CW, [
-    { label: 'Clicks from Google', value: fmtBig(s.clicks), note: headlineNote(data, 'clicks', s.clicks, p.clicks) },
-    { label: 'Times shown on Google', value: fmtBig(s.impressions), note: headlineNote(data, 'shown', s.impressions, p.impressions) },
-    { label: 'Click rate', value: fmtPct(s.ctr * 100), note: change(s.ctr, p.ctr), hint: 'Share who clicked' },
-    { label: 'Average position', value: s.position ? s.position.toFixed(1) : 'n/a', note: moveNote(s.position && p.position ? p.position - s.position : null) },
-  ]) + 22;
+    { label: 'Clicks', value: fmtBig(s.clicks), note: headlineNote(data, 'clicks', s.clicks, p.clicks) },
+    { label: 'Times shown', value: fmtBig(s.impressions), note: headlineNote(data, 'shown', s.impressions, p.impressions) },
+    { label: 'Click rate', value: fmtPct(s.ctr * 100), note: s.impressions < 300 || (p.impressions ?? 0) < 300 ? null : change(s.ctr, p.ctr), hint: 'Share who clicked' },
+    { label: 'Average position', value: s.position ? s.position.toFixed(1) : 'n/a', note: positionNote(data, s, p) },
+  ]) + ctx.d.gap;
 
   const targets = sr.targets || [];
   if (targets.length) {
@@ -919,29 +1023,31 @@ function googleSection(ctx, y) {
     y += para(doc, 'These are the searches you have told us matter most. Position is the average across every search containing the phrase. "Not showing yet" means Google did not show the site for it in this period, which makes it a clear opportunity.', M, y, { size: 8, width: CW, color: th.quiet, lineGap: 1.5 }) + 16;
   }
 
-  const queries = (sr.topQueries || []).slice(0, 8);
+  const queries = (sr.topQueries || []).slice(0, ctx.d.queryRows);
   if (queries.length) {
-    y = room(ctx, y, 42 + queries.length * 20);
+    y = room(ctx, y, 42 + Math.min(queries.length, 3) * 20);
     y = subhead(doc, th, M, y, CW, 'The searches people found you with', 'Top by clicks');
     const mv = r => (r.positionChange == null ? (r.prevPosition == null ? { text: 'New', kind: 'up' } : null) : moveNote(r.positionChange));
-    y = table(doc, th, M, y, [
-      { label: 'Search', key: 'query', width: CW - 300, font: 'semi' },
+    y = table(ctx, th, M, y, [
+      { label: 'Search', key: 'query', width: CW - 316, font: 'semi' },
       { label: 'Clicks', key: 'clicks', width: 56, align: 'right', format: fmtInt },
       { label: 'Times shown', key: 'impressions', width: 78, align: 'right', format: fmtInt },
-      { label: 'Position', width: 82, align: 'right', draw: (r, x, ry, w) => {
+      { label: 'Position', width: 98, align: 'right', headPad: 32, draw: (r, x, ry, w) => {
         const on1 = r.position <= 10.5;
-        line(doc, r.position.toFixed(1), x, ry + 5.5, { font: 'semi', size: 9, color: th.fg, width: w - 8 - (on1 ? 30 : 0), align: 'right' });
+        line(doc, r.position.toFixed(1), x, ry + 5.5, { font: 'semi', size: 9, color: th.fg, width: w - 32, align: 'right' });
         if (on1) {
-          doc.rect(x + w - 34, ry + 5, 26, 10.5).fill(C.green);
-          label(doc, 'PG 1', x + w - 34, ry + 5 + (10.5 - 5.5 * MONO_H) / 2 - 5.5 * MONO_OFF, { font: 'monoM', size: 5.5, color: C.ink, width: 26, align: 'center', spacing: 0.3 });
+          doc.rect(x + w - 26, ry + 5, 26, 10.5).fill(C.green);
+          label(doc, 'PG 1', x + w - 26, ry + 5 + (10.5 - 5.5 * MONO_H) / 2 - 5.5 * MONO_OFF, { font: 'monoM', size: 5.5, color: C.ink, width: 26, align: 'center', spacing: 0.3 });
         }
       } },
       { label: 'Movement', width: 84, align: 'right', draw: (r, x, ry, w) => {
         const m = mv(r);
-        line(doc, m ? m.text : 'No earlier figure', x, ry + 5.5, { font: 'med', size: 8.5, color: m ? noteColor(th, m.kind) : th.quiet, width: w - 2, align: 'right' });
+        line(doc, m ? m.text : 'No earlier figure', x, ry + 5.5, { font: 'med', size: 8.5, color: m ? noteColor(th, m.kind) : th.quiet, width: w, align: 'right' });
       } },
     ], queries) + 8;
-    y += para(doc, 'Movement is places gained or lost on Google against the period before. "PG 1" marks a search where you appear on the first page.', M, y, { size: 8, width: CW, color: th.quiet, lineGap: 1.5 });
+    // The footnote is dropped rather than sent to the next page alone.
+    if (y + 12 <= LIMIT) y += para(doc, 'Movement is places gained or lost on Google against the period before. "PG 1" marks a search where you appear on the first page.', M, y, { size: 8, width: CW, color: th.quiet, lineGap: 1.5 });
+    else y -= 8;
   }
   return y;
 }
@@ -958,20 +1064,20 @@ function healthSection(ctx, y) {
   y = opener(ctx, y, 'P500', 'Behaviour and health', 'How people used the site once they arrived, how Google rates the build, and whether the site stayed up.', 110);
 
   // How people used the site (Microsoft Clarity)
-  if (cl && (cl.sessions > 0 || cl.daysCovered > 0)) {
+  const humans = cl ? (cl.humanSessions != null ? cl.humanSessions : cl.sessions) : 0;
+  if (cl && humans > 0) {
     const pc = data.prevClarity && data.prevClarity.sessions > 0 ? data.prevClarity : null;
-    const humans = cl.humanSessions != null ? cl.humanSessions : cl.sessions;
     const prevHumans = pc ? (pc.humanSessions != null ? pc.humanSessions : pc.sessions) : null;
     y = subhead(doc, th, M, y, CW, 'How people used the site', `Microsoft Clarity // ${cl.daysCovered} day${cl.daysCovered === 1 ? '' : 's'} measured`);
     y = statRow(doc, th, M, y - 9, CW, [
-      { label: 'Visits watched', value: fmtBig(humans), note: pc ? change(humans, prevHumans) : null, hint: 'Real people, bots left out' },
-      { label: 'How far they scrolled', value: cl.avgScrollDepth != null ? fmtPct(cl.avgScrollDepth, 0) : 'n/a', note: pc ? change(cl.avgScrollDepth, pc.avgScrollDepth) : null, hint: 'Average depth of page' },
-      { label: 'Dead clicks', value: fmtBig(cl.deadClicks), note: pc ? change(cl.deadClicks, pc.deadClicks, { lowerIsBetter: true }) : null, hint: 'Lower is better' },
-      { label: 'Frustrated clicks', value: fmtBig(cl.rageClicks), note: pc ? change(cl.rageClicks, pc.rageClicks, { lowerIsBetter: true }) : null, hint: 'Lower is better' },
+      { label: 'Visits watched', value: fmtBig(humans), note: pc ? change(humans, prevHumans, { count: true }) : null, hint: 'Real people, bots left out' },
+      { label: 'Scroll depth', value: cl.avgScrollDepth != null ? fmtPct(cl.avgScrollDepth, 0) : 'n/a', note: pc && humans >= 30 ? change(cl.avgScrollDepth, pc.avgScrollDepth) : null, hint: 'How far down people got' },
+      { label: 'Dead clicks', value: fmtBig(cl.deadClicks), note: pc ? change(cl.deadClicks, pc.deadClicks, { lowerIsBetter: true, count: true }) : null, hint: 'Lower is better' },
+      { label: 'Frustrated clicks', value: fmtBig(cl.rageClicks), note: pc ? change(cl.rageClicks, pc.rageClicks, { lowerIsBetter: true, count: true }) : null, hint: 'Lower is better' },
     ]) + 8;
-    y += para(doc, `A dead click is a click on something that did nothing. A frustrated click is rapid repeated clicking in one spot.${cl.quickBacks ? ` ${fmtInt(cl.quickBacks)} visitor${cl.quickBacks === 1 ? '' : 's'} left a page straight after arriving on it.` : ''}`, M, y, { size: 8, width: CW, color: th.quiet, lineGap: 1.5 }) + 20;
+    y += para(doc, `A dead click is a click on something that did nothing. A frustrated click is rapid repeated clicking in one spot.${cl.quickBacks ? ` ${fmtInt(cl.quickBacks)} visitor${cl.quickBacks === 1 ? '' : 's'} left a page straight after arriving on it.` : ''}`, M, y, { size: 8, width: CW, color: th.quiet, lineGap: 1.5 }) + ctx.d.gap - 2;
   } else if (cl) {
-    y = noteBox(doc, y, 'Behaviour tracking', 'Microsoft Clarity is connected but has not recorded any visits for this period yet. Once it does, you will see how people use your pages here.') + 20;
+    y = noteBox(doc, y, 'Nothing recorded yet', 'Microsoft Clarity is connected but did not record any visits by real people in this period. Once it does, you will see how people use your pages here: scrolling, clicks and signs of frustration.') + 20;
   } else {
     y = noteBox(doc, y, 'Not connected yet', 'Microsoft Clarity is not connected for this site yet. Once it is, you will see how people actually use your pages: scrolling, clicks and signs of frustration.') + 20;
   }
@@ -982,9 +1088,9 @@ function healthSection(ctx, y) {
     y = subhead(doc, th, M, y, CW, 'Site health check', 'Scored out of 100 by Google, tested as a phone');
     const grade = v => (v == null ? 'Not scored' : v >= 90 ? 'Excellent' : v >= 50 ? 'Room to improve' : 'Needs attention');
     const items = [
-      ['Loading speed', sh.performance, 'How quickly pages appear'],
-      ['Google friendliness', sh.seo, 'Built so Google can read it'],
-      ['Built to best practice', sh.bestPractices, 'Modern, safe code'],
+      ['Loading speed', sh.performance, 'How quickly pages appear on a phone'],
+      ['Search friendly', sh.seo, 'Built so Google can read it'],
+      ['Best practice', sh.bestPractices, 'Modern, safe code'],
     ];
     const cw = CW / 3;
     items.forEach(([name, score, hint], i) => {
@@ -992,13 +1098,14 @@ function healthSection(ctx, y) {
       if (i) vRule(doc, x, y + 2, y + 66, th.rule);
       ring(doc, th, x + (i ? 14 : 0) + 30, y + 34, 27, score);
       const tx = x + (i ? 14 : 0) + 72;
-      line(doc, name, tx, y + 14, { font: 'semi', size: 10, color: th.fg, width: cw - 86 - (i ? 14 : 0) });
-      line(doc, grade(score), tx, y + 29, { font: 'med', size: 8.5, color: score != null && score >= 90 ? th.up : th.sub, width: cw - 86 });
-      line(doc, hint, tx, y + 42, { font: 'reg', size: 8, color: th.quiet, width: cw - 86 });
+      const tw = cw - 80 - (i ? 14 : 0);
+      line(doc, name, tx, y + 9, { font: 'semi', size: 10, color: th.fg, width: tw });
+      line(doc, grade(score), tx, y + 24, { font: 'med', size: 8.5, color: score != null && score >= 90 ? th.up : th.sub, width: tw });
+      para(doc, hint, tx, y + 37, { font: 'reg', size: 8, color: th.quiet, width: tw, lineGap: 1, maxLines: 2 });
     });
     y += 72;
     hRule(doc, M, y, CW, th.rule);
-    y += 22;
+    y += ctx.d.gap;
   }
 
   // Website availability
@@ -1036,26 +1143,30 @@ function closing(ctx, y) {
     ['Engaged visit', 'A visit where the person stayed or looked further.'],
   ];
   const gw = span(7) - 8, sw = span(5);
-  const gH = glossary.reduce((a, [, d]) => a + Math.max(15, paraH(doc, d, { size: 8.5, width: gw - 120 }) + 3), 0);
+  const gH = glossary.reduce((a, [, d]) => a + Math.max(15, paraH(doc, d, { size: 8.5, width: gw - 112 }) + 3), 0);
   const blockH = 22 + Math.max(gH, sources.length * 15) + 18;
   const contactH = 64;
   const total = blockH + contactH + 20;
 
-  if (y > TOP + 1) y += 26;
-  if (y + total > LIMIT) y = newPage(ctx);
+  const from = y;
+  if (y > TOP + 1) y += ctx.d.openerGap;
+  if (y + total > LIMIT) { y = newPage(ctx, from); ctx.closingAlone = true; }
   // Sit the closing matter at the foot of the page when there is spare
   // room, so the last page ends on purpose rather than trailing off.
+  // Across a big gap it would leave a hole mid-page, so then it simply
+  // follows the content.
   const anchored = LIMIT - total + 4;
-  if (anchored > y) y = Math.min(anchored, Math.max(y, anchored));
+  if (anchored > y && anchored - y <= 150 && !ctx.closingAlone) y = anchored;
+  else if (anchored > y && y > TOP + 1) y += 10;
 
   const gx = M, sx = colX(7) + 8;
   let gy = subhead(doc, th, gx, y, gw, 'In plain words');
   glossary.forEach(([term, def]) => {
-    line(doc, term, gx, gy, { font: 'semi', size: 8.5, color: th.fg, width: 112 });
-    const h = para(doc, def, gx + 120, gy, { size: 8.5, width: gw - 120, color: th.sub });
+    line(doc, term, gx, gy, { font: 'semi', size: 8.5, color: th.fg, width: 106 });
+    const h = para(doc, def, gx + 112, gy, { size: 8.5, width: gw - 112, color: th.sub });
     gy += Math.max(15, h + 3);
   });
-  let sy = subhead(doc, th, sx, y, sw - 8, 'Where the numbers come from');
+  let sy = sources.length ? subhead(doc, th, sx, y, sw - 8, 'Where the numbers come from') : y;
   sources.forEach(([what, where]) => {
     line(doc, what, sx, sy, { font: 'semi', size: 8.5, color: th.fg, width: 84 });
     line(doc, where, sx + 88, sy, { font: 'reg', size: 8.5, color: th.sub, width: sw - 8 - 88 });
@@ -1084,26 +1195,27 @@ function footers(ctx) {
   }
 }
 
-export async function generateReportPdf(data) {
+// How tightly a pass sets the flowing pages. The report is laid out at
+// each density and the one with the fewest pages wins (roomiest on a
+// tie, unless that strands the closing matter alone on a final page), so
+// a report never runs to an extra near-empty sheet for a few lines.
+const DENSITY = [
+  { gap: 22, openerGap: 26, chartH: 124, pageRows: 7, queryRows: 8 },
+  { gap: 17, openerGap: 20, chartH: 108, pageRows: 6, queryRows: 7 },
+  { gap: 13, openerGap: 16, chartH: 94, pageRows: 5, queryRows: 6 },
+];
+
+function build(data, d) {
   const doc = new PDFDocument({ size: 'A4', layout: 'portrait', margin: 0, bufferPages: true, info: {
     Title: `Website report: ${clean(data.site.clientName)}`,
     Author: 'North Bear Media',
   } });
-  // The font files are all cut from one variable font and still carry its
-  // internal name. PDFKit files each loaded font under that name as well
-  // as ours, so every weight would quietly resolve to whichever loaded
-  // first. Loading each once and dropping the shared-name entry keeps
-  // them distinct.
-  for (const [name, file] of Object.entries(FONTS)) {
-    doc.registerFont(name, join(FONT_DIR, file));
-    doc.font(name);
-    if (doc._font?.name && doc._fontFamilies) delete doc._fontFamilies[doc._font.name];
-  }
+  for (const [name, file] of Object.entries(FONTS)) doc.registerFont(name, join(FONT_DIR, file));
   const chunks = [];
   doc.on('data', c => chunks.push(c));
   const done = new Promise(resolve => doc.on('end', () => resolve(Buffer.concat(chunks))));
 
-  const ctx = { doc, data, tags: [], tag: 'P100' };
+  const ctx = { doc, data, d, tags: [], tag: 'P100', waste: 0, closingAlone: false };
   summaryPage(ctx);
 
   ctx.tag = 'P200';
@@ -1112,9 +1224,23 @@ export async function generateReportPdf(data) {
   y = visitorsSection(ctx, y);
   y = googleSection(ctx, y);
   y = healthSection(ctx, y);
-  closing(ctx, y);
+  const endY = closing(ctx, y);
 
   footers(ctx);
+  const pages = doc.bufferedPageRange().count;
   doc.end();
-  return done;
+  return { done, pages, alone: ctx.closingAlone, waste: ctx.waste, lastFill: (endY - TOP) / (LIMIT - TOP) };
+}
+
+export async function generateReportPdf(data) {
+  let best = null;
+  for (const d of DENSITY) {
+    const pass = build(data, d);
+    const buffer = await pass.done;
+    if (!best || pass.pages < best.pages || (pass.pages === best.pages && best.alone && !pass.alone)) best = { ...pass, buffer };
+    // A last page that is already half full cannot be saved by setting
+    // the rest tighter, so there is nothing to gain from another pass.
+    if (!pass.alone && pass.lastFill >= 0.5) break;
+  }
+  return best.buffer;
 }
