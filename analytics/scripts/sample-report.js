@@ -70,6 +70,33 @@ const data = {
   },
 };
 
+// The parts the live pipeline adds after gathering: target searches,
+// site health, uptime, the long view, then the story and the analysis.
+data.search.targets = [
+  { keyword: 'fire risk assessment', position: 3.4, prevPosition: 5.1, movement: 1.7, clicks: 96, impressions: 2540 },
+  { keyword: 'fire extinguisher servicing', position: 4.8, prevPosition: 4.9, movement: 0.1, clicks: 58, impressions: 1990 },
+  { keyword: 'fire alarm maintenance', position: 9.8, prevPosition: 12.4, movement: 2.6, clicks: 28, impressions: 2960 },
+  { keyword: 'fire safety certificate', position: 11.2, prevPosition: 11.9, movement: 0.7, clicks: 18, impressions: 2400 },
+  { keyword: 'emergency lighting testing', position: null, prevPosition: null, movement: null, clicks: 0, impressions: 0 },
+];
+data.siteHealth = { performance: 84, seo: 100, bestPractices: 96, fetchedAt: '2026-05-30T05:25:00.000Z' };
+data.uptime = { uptimePct: 100, downtimeMinutes: 0, outages: 0, daysMeasured: 31, measuredFrom: null, downtimeText: 'none', downtimeShort: 'None' };
+data.aiTraffic = { visits: 14, prevVisits: 6, sharePct: 0.5, top: [{ source: 'ChatGPT', visits: 11 }, { source: 'Perplexity', visits: 3 }] };
+data.history = {
+  visitsSource: 'Google Analytics',
+  months: [['2025-06', 'Jun', 1480, 212, 9800], ['2025-07', 'Jul', 1620, 240, 10900], ['2025-08', 'Aug', 1555, 236, 11200],
+    ['2025-09', 'Sep', 1790, 268, 12600], ['2025-10', 'Oct', 1930, 301, 13900], ['2025-11', 'Nov', 2010, 322, 14800],
+    ['2025-12', 'Dec', 1640, 259, 12100], ['2026-01', 'Jan', 2120, 344, 15900], ['2026-02', 'Feb', 2230, 362, 16700],
+    ['2026-03', 'Mar', 2390, 388, 17600], ['2026-04', 'Apr', 2453, 401, 18230], ['2026-05', 'May', 2847, 489, 21480]]
+    .map(([month, label, visits, clicks, impressions]) => ({ month, label, visits, clicks, impressions, partial: false })),
+};
+data.ga4.sourceLabel = 'Google Analytics';
+data.ga4.visitorsSameAsVisits = false;
+const { buildStory } = await import('../lib/story.js');
+data.story = buildStory(data);
+const { generateInsights } = await import('../lib/insights.js');
+data.insights = await generateInsights(data, { rulesOnly: true });
+
 const pdf = await generateReportPdf(data);
 const out = join(config.dataDir, 'sample-report.pdf');
 writeFileSync(out, pdf);

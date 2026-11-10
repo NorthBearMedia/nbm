@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>North Bear Pulse — Login</title>
   <link rel="icon" href="/assets/favicon.svg">
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles.css?v=3">
 </head>
 <body>
   <div class="login-wrap">
@@ -20,18 +20,6 @@
       </form>
     </div>
   </div>
-  <script>
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: document.getElementById('password').value }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) location.href = '/';
-      else document.getElementById('error').textContent = data.error || 'Login failed';
-    });
-  </script>
+  <script src="/login.js"></script>
 </body>
 </html>

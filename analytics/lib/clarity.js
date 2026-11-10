@@ -8,9 +8,16 @@ import { addDays, todayISO } from './dates.js';
 const API_URL = 'https://www.clarity.ms/export-data/api/v1/project-live-insights';
 
 export async function fetchLiveInsights(apiToken, numOfDays = 1) {
-  const res = await fetch(`${API_URL}?numOfDays=${numOfDays}`, {
-    headers: { Authorization: `Bearer ${apiToken}` },
-  });
+  let res;
+  try {
+    res = await fetch(`${API_URL}?numOfDays=${numOfDays}`, {
+      headers: { Authorization: `Bearer ${apiToken}` },
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch (err) {
+    if (err?.name === 'TimeoutError') throw new Error('Clarity API did not answer within 30 seconds');
+    throw err;
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new Error(`Clarity API ${res.status}: ${text.slice(0, 200)}`);

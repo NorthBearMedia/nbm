@@ -1,41 +1,68 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-GB">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Your Website Dashboard — North Bear Media</title>
+  <title>Your Website Dashboard | North Bear Media</title>
   <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#0F1012">
   <link rel="icon" href="/assets/favicon.svg">
   <link rel="apple-touch-icon" href="/assets/favicon.svg">
-  <link rel="stylesheet" href="/styles.css?v=2">
-  <script src="/vendor/chart.umd.js"></script>
+  <link rel="preload" href="/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/martian-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/client.css?v=1">
 </head>
 <body>
-  <div class="container">
-    <div class="topbar">
-      <img class="logo" src="/assets/nbm-logo-light-trimmed.png" alt="North Bear Media">
-      <div>
-        <div class="title">Your Website <span>Dashboard</span></div>
-        <div class="subtitle">Live analytics by North Bear Media</div>
-      </div>
-      <div class="spacer"></div>
-      <button class="btn primary" id="requestReportBtn">✉ Email me a fresh report</button>
-    </div>
+  <a class="skip" href="#app">Skip to your numbers</a>
 
-    <div id="app">
-      <div class="loading-overlay"><div class="spinner"></div>Fetching your latest numbers…</div>
-    </div>
-
-    <div class="footer-note">
-      Dashboard &amp; reports by <a href="https://northbearmedia.co.uk" target="_blank" rel="noopener">North Bear Media</a>
-      · Questions? <a href="mailto:info@northbearmedia.co.uk">info@northbearmedia.co.uk</a>
-      <div style="margin-top:8px;font-size:11px;opacity:0.75">
-        This is your private dashboard — the link is unique to you. Figures come from Google Analytics, Google Search Console and Microsoft Clarity for your website only.
-        Please keep the link to your team.
+  <header class="head">
+    <div class="wrap">
+      <div class="head-top">
+        <a class="logo-link" href="https://northbearmedia.co.uk" target="_blank" rel="noopener" aria-label="North Bear Media website">
+          <img class="logo" src="/assets/nbm-logo-light-trimmed.png" alt="North Bear Media" width="2349" height="1095">
+        </a>
+        <div class="head-tag" aria-hidden="true"><span class="blk"></span>North Bear Pulse<span class="extra"> <span class="sl">//</span> Live dashboard</span></div>
+      </div>
+      <div class="head-main">
+        <div class="client">
+          <h1 id="clientName">Your website</h1>
+          <a id="clientDomain" class="client-domain" target="_blank" rel="noopener" hidden></a>
+        </div>
+        <div class="range" id="rangeSwitch" role="group" aria-label="Period shown">
+          <button type="button" data-range="7" aria-pressed="false">7 days</button>
+          <button type="button" data-range="30" aria-pressed="true">30 days</button>
+          <button type="button" data-range="90" aria-pressed="false">90 days</button>
+        </div>
+        <button type="button" class="btn" id="requestReportBtn">
+          <svg viewBox="0 0 20 16" width="18" height="14" aria-hidden="true" focusable="false"><path d="M1 1h18v14H1z M1 1l9 8 9-8" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+          <span id="requestReportLabel">Email me a fresh report</span>
+        </button>
       </div>
     </div>
-  </div>
-  <div id="toast"></div>
-  <script src="/client.js?v=8"></script>
+    <div class="progress" id="progress" hidden></div>
+  </header>
+
+  <main id="app">
+    <div class="loading"><div class="blocks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>Fetching your latest numbers</div>
+  </main>
+
+  <footer class="foot">
+    <div class="wrap">
+      <div class="foot-grid">
+        <div>
+          <div class="foot-tag"><span class="blk"></span>P900 <span class="sl">//</span> About this page</div>
+          <p>This is your private dashboard and the link is unique to you, so please keep it within your team. Every figure is for your website only and comes from your visitor analytics, Google Search Console and Microsoft Clarity.</p>
+        </div>
+        <div class="foot-contact">
+          <p>Dashboard and reports by <a href="https://northbearmedia.co.uk" target="_blank" rel="noopener">North Bear Media</a>.</p>
+          <p>Questions? <a href="mailto:info@northbearmedia.co.uk">info@northbearmedia.co.uk</a></p>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="/vendor/chart.umd.js"></script>
+  <script src="/client.js?v=10"></script>
 </body>
 </html>

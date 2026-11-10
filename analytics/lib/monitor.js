@@ -14,6 +14,7 @@ import db, { getSetting, setSetting } from '../database.js';
 import { config } from '../config.js';
 import { mailer } from './email.js';
 import { getEmailFrom, getOwnerEmail, getAppUrl, getHostingerToken } from './runtime-config.js';
+import { readBodyCapped } from './fetch-body.js';
 
 export const ROUND_MINUTES = 5;
 const TIMEOUT_MS = 15_000;
@@ -33,6 +34,9 @@ const MASS_FAILURE_SHARE = 0.5;
 // towards the two in a row needed to call a site down.
 const GAP_MS = 3 * 5 * 60_000;
 const MASS_FAILURE_MIN_SITES = 3;
+// Outside pages on two unrelated networks. If either answers (any status
+// at all), Pulse's own connection is working.
+const CONTROL_URLS = ['https://www.google.com/generate_204', 'https://www.cloudflare.com/cdn-cgi/trace'];
 // Last 24 hours of rounds, one character each, kept per site.
 const RECENT_MAX = Math.round((24 * 60) / ROUND_MINUTES);
 const DAY_MS = 24 * 3600_000;
@@ -96,6 +100,12 @@ export function ensureFeedToken() {
   return t;
 }
 
+export function rotateFeedToken() {
+  const t = randomBytes(24).toString('hex');
+  setSetting('monitor_feed_token', t);
+  return t;
+}
+
 export function feedTokenMatches(given) {
   const real = Buffer.from(ensureFeedToken());
   const g = Buffer.from(String(given || ''));
@@ -133,7 +143,7 @@ export async function fetchOnce(url) {
       method: 'GET', redirect: 'follow', signal: AbortSignal.timeout(TIMEOUT_MS),
       headers: { 'User-Agent': USER_AGENT, 'Accept': 'text/html,*/*;q=0.8', 'Cache-Control': 'no-cache' },
     });
-    const body = (await res.text().catch(() => '')).slice(0, BODY_CAP);
+    const body = await readBodyCapped(res, BODY_CAP).catch(() => '');
     return {
       ok: res.status >= 200 && res.status < 300, status: res.status, ms: Date.now() - started,
       body, robotsHeader: res.headers.get('x-robots-tag') || '', finalUrl: res.url || url, error: '',
@@ -195,13 +205,13 @@ let rounding = false;
 
 // urlFor and notify are injectable so the whole state machine can be
 // driven against a local server in tests. Live callers pass nothing.
-export async function runRound({ now = new Date(), urlFor = d => `https://${d}/`, notify = sendAlert } = {}) {
+export async function runRound({ now = new Date(), urlFor = d => `https://${d}/`, notify = sendAlert, controlUrls = CONTROL_URLS } = {}) {
   if (rounding) return { skipped: 'round already running' };
   rounding = true;
-  try { return await roundInner({ now, urlFor, notify }); } finally { rounding = false; }
+  try { return await roundInner({ now, urlFor, notify, controlUrls }); } finally { rounding = false; }
 }
 
-async function roundInner({ now, urlFor, notify }) {
+async function roundInner({ now, urlFor, notify, controlUrls }) {
   // Never more often than every five minutes per site, and never two
   // "rounds in a row" seconds apart (a boot round next to a scheduled one
   // would otherwise confirm an outage without the five minute wait).
@@ -215,9 +225,23 @@ async function roundInner({ now, urlFor, notify }) {
   const results = await inBatches(sites, s => checkSite(urlFor(s.d)));
   const failed = results.filter(r => !r.ok).length;
 
-  // Most sites failing at once is Pulse's own connection. Say so once,
-  // mark nothing down, and count nothing against the sites.
-  if (sites.length >= MASS_FAILURE_MIN_SITES && failed / sites.length > MASS_FAILURE_SHARE) {
+  // Most sites failing at once can be Pulse's own connection: say so
+  // once, mark nothing down, and count nothing against the sites. But
+  // only when that is what the evidence shows. On 4 November 2026 the
+  // shared hosting account ran out of processes and twelve sites served
+  // an error page for most of the day; the old rule ("over half failed,
+  // so it must be us") stayed silent and logged an eight hour outage as
+  // 65 minutes. A site that ANSWERS with an error is reachable, so the
+  // connection is fine and the failure is real. Only failures with no
+  // answer at all can be ours, and then only if an outside page that
+  // has nothing to do with the client sites cannot be reached either.
+  const noAnswer = results.filter(r => !r.ok && !r.status).length;
+  let ownConnection = false;
+  if (sites.length >= MASS_FAILURE_MIN_SITES && noAnswer / sites.length > MASS_FAILURE_SHARE) {
+    const controls = await Promise.all(controlUrls.map(u => fetchOnce(u)));
+    ownConnection = controls.every(c => !c.status);
+  }
+  if (ownConnection) {
     setSetting('monitor_last_round', JSON.stringify({ at: nowIso, checked: sites.length, failed, massFailure: true }));
     await notify('pulse-connection', 'PULSE: cannot reach client sites',
       [`In the check at ${ukTime(now)}, ${failed} of ${sites.length} sites failed at the same time.`,
@@ -232,6 +256,10 @@ async function roundInner({ now, urlFor, notify }) {
   const events = [];
   for (let i = 0; i < sites.length; i++) {
     const s = sites[i], r = results[i];
+    // "429 Too Many Requests" is the host telling the MONITOR to slow
+    // down, not a fault a visitor would see. It proves nothing either
+    // way, so the site is left exactly as it was this round.
+    if (r.status === 429) continue;
     const st = state[s.d] = state[s.d] || {};
     if (st.lastChecked && new Date(now).getTime() - Date.parse(st.lastChecked) > GAP_MS) {
       st.fails = 0; st.firstFailAt = null;

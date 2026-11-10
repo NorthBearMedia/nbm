@@ -12,8 +12,25 @@
 // This edits live website files, so callers should test on a demo site and
 // verify before rolling out to client sites.
 import { getHostingerToken } from './runtime-config.js';
+import { getSetting } from '../database.js';
+import { readBodyCapped } from './fetch-body.js';
 
 const HB = 'https://developers.hostinger.com';
+
+// Master switch for every cron job Pulse creates on the hosting account.
+// OFF unless the owner sets injector_enabled to true. On 4 Nov 2026 the
+// injector's every-minute jobs piled up on the shared account until it
+// hit its process limit and every client site served 403. Hostinger's
+// cron list API also failed to show entries that were still running, so
+// nothing that reads that list can be trusted to stop a runaway. While
+// this is off no job is ever created, and /ix serves a script that does
+// nothing, so any job still firing on the server is harmless.
+export function injectorEnabled() {
+  return getSetting('injector_enabled') === 'true';
+}
+function assertInjectorEnabled() {
+  if (!injectorEnabled()) throw new Error('injector switched off (injector_enabled is not true), no cron job created');
+}
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // Every North Bear site lives under this Hostinger account; public_html
@@ -28,6 +45,7 @@ async function hg(path, method = 'GET', body) {
     method,
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}) },
     body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(20_000),
   });
   if (!res.ok) throw new Error(`Hostinger ${method} ${path} → ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
   return res.status === 204 ? {} : res.json();
@@ -69,7 +87,25 @@ async function hg(path, method = 'GET', body) {
 // block can't duplicate anyway — the injector replaces it by marker.
 export const SNIPPET_VERSION = 3;
 
+// What a well-formed tracking ID looks like. These values are written into
+// client pages (and pass through awk, where & and \ are special), so the
+// admin save route rejects anything else and buildSnippet strips it anyway.
+export const ID_RULES = {
+  ga4_measurement_id: /^G-[A-Z0-9]{4,14}$/i,
+  clarity_project_id: /^[a-z0-9]{6,16}$/i,
+  fathom_site_id: /^[A-Z0-9]{5,12}$/i,
+  ga4_property_id: /^\d{1,16}$/,
+};
+export const ID_HINTS = {
+  ga4_measurement_id: 'The GA4 measurement ID should look like G-XXXXXXXXXX (just the ID, not the whole script tag).',
+  clarity_project_id: 'The Clarity project ID should be the short code of letters and numbers from the Clarity tag.',
+  fathom_site_id: 'The Fathom site ID should be the short code of capital letters and numbers (usually 8 characters).',
+  ga4_property_id: 'The GA4 property ID should be digits only.',
+};
+const safeId = v => String(v || '').replace(/[^A-Za-z0-9_-]/g, '');
+
 export function buildSnippet(measurementId, clarityId, { consentBanner = false, fathomId = '' } = {}) {
+  measurementId = safeId(measurementId); clarityId = safeId(clarityId); fathomId = safeId(fathomId);
   const gaStatic = measurementId
     ? `<script async src="https://www.googletagmanager.com/gtag/js?id=${measurementId}"></script>`
       + `<script>window.dataLayer=window.dataLayer||[];function gtag(){window.dataLayer.push(arguments);}`
@@ -180,7 +216,10 @@ export const stagePathFor = domain => `/home/${HOSTINGER_USER}/nbm-ix-${domain}.
 // download lands; both crons are deleted once the tag verifies.
 export function buildCronCommands(scriptUrl, domain) {
   const stage = stagePathFor(domain);
-  return [`curl -fsS -o ${stage} ${scriptUrl}`, `sh ${stage}`];
+  // Fail fast: a download that cannot connect must give up in seconds,
+  // never sit in the process table (a hung curl per site per minute is
+  // what filled the account on 4 Nov).
+  return [`curl -fsS --connect-timeout 10 --max-time 30 -o ${stage} ${scriptUrl}`, `sh ${stage}`];
 }
 
 export async function listCrons(username) {
@@ -190,6 +229,7 @@ export async function listCrons(username) {
 
 // Generic cron helpers (used by diagnostics like the docroot survey).
 export async function ensureCron(username, command) {
+  assertInjectorEnabled();
   const existing = (await listCrons(username).catch(() => [])).find(j => (j.command || '').trim() === command);
   if (existing) return { uid: existing.uid || existing.id, created: false };
   const created = await hg(`/api/hosting/v1/accounts/${username}/cron-jobs`, 'POST', { time: '* * * * *', command });
@@ -245,6 +285,7 @@ export async function deleteInjectCrons(username, domain = null) {
 // A background pass (verifyPendingInjections) confirms via the live page and
 // then removes the crons. Returns immediately after ensuring they exist.
 export async function ensureInjectCron({ username, domain, scriptUrl }) {
+  assertInjectorEnabled();
   const existing = await listCrons(username).catch(() => []);
   let created = 0;
   for (const command of buildCronCommands(scriptUrl, domain)) {
@@ -292,9 +333,9 @@ export async function verifyTag(domain, measurementId) {
   const bust = `?nbmv=${Date.now()}`;
   for (const url of [`https://${domain}/${bust}`, `https://www.${domain}/${bust}`]) {
     try {
-      const res = await fetch(url, { headers: { 'User-Agent': 'NorthBearPulse/1.0', 'Cache-Control': 'no-cache' }, redirect: 'follow' });
+      const res = await fetch(url, { headers: { 'User-Agent': 'NorthBearPulse/1.0', 'Cache-Control': 'no-cache' }, redirect: 'follow', signal: AbortSignal.timeout(15_000) });
       if (!res.ok) continue;
-      const html = (await res.text()).slice(0, 2_000_000);
+      const html = await readBodyCapped(res, 2_000_000);
       const hasGa = measurementId ? html.includes(measurementId) : /gtag\/js\?id=/.test(html);
       const hasMarker = html.includes('NBM-GA-TAG');
       if (hasGa || hasMarker) return { verified: true, url };

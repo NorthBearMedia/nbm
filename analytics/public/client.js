@@ -1,21 +1,30 @@
-// North Bear Pulse — client-facing live dashboard
+// North Bear Pulse: the client-facing live dashboard.
+//
+// Leads with the story (how the period went, what went well, what comes
+// next) and only then the detail, section by section. Every block copes
+// with its data being absent: a section either shows a tidy note or
+// steps aside. Nothing from the payload reaches the page unescaped.
 const token = location.pathname.split('/').pop();
 let currentRange = 30;
-let chart = null;
+let hasRendered = false;
+let loadSeq = 0;
+const charts = {};
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const nf = new Intl.NumberFormat('en-GB');
 const fmtInt = n => nf.format(Math.round(n || 0));
+// Headline figures: past a million the full number no longer fits its
+// cell on a phone, so it is shortened ("1.23M").
+const fmtBig = n => (Math.abs(n || 0) >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : fmtInt(n));
 const fmtPct = (p, dp = 1) => `${(p || 0).toFixed(dp)}%`;
 function fmtDur(seconds) {
   const s = Math.round(seconds || 0), m = Math.floor(s / 60);
   return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
 }
-function pctChange(cur, prev) {
-  if (prev == null || cur == null || prev === 0) return null;
-  return ((cur - prev) / prev) * 100;
-}
+const fmtDay = (iso, withYear = false) => new Date(iso + 'T12:00:00Z').toLocaleDateString('en-GB',
+  { day: 'numeric', month: 'short', ...(withYear ? { year: 'numeric' } : {}), timeZone: 'UTC' });
+const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function toast(msg, type = 'ok', ms = 6000) {
   const t = $('#toast');
@@ -25,281 +34,566 @@ function toast(msg, type = 'ok', ms = 6000) {
   t._timer = setTimeout(() => t.className = '', ms);
 }
 
-function deltaHtml(pct, invert = false) {
-  if (pct == null || !isFinite(pct)) return '<div class="delta flat">—</div>';
-  const good = invert ? pct <= 0 : pct >= 0;
-  const cls = pct === 0 ? 'flat' : good ? 'up' : 'down';
-  const arrow = pct >= 0 ? '▲' : '▼';
-  return `<div class="delta ${cls}">${arrow} ${Math.abs(pct).toFixed(1)}% <span class="vs">vs previous</span></div>`;
+// ---------- is a change worth mentioning? ----------
+// Counts use the same test as the server's story layer: a move has to
+// clear a relative bar and an absolute one, so 8 visits becoming 13 is
+// not announced as "up 63%". Rates only need the relative bar.
+function countTrend(cur, prev) {
+  if (cur == null || prev == null) return { dir: 'none', pct: null };
+  const diff = cur - prev;
+  const pct = prev > 0 ? (diff / prev) * 100 : null;
+  if (Math.abs(diff) < Math.max(8, prev * 0.12)) return { dir: 'level', pct };
+  return { dir: diff > 0 ? 'up' : 'down', pct };
+}
+function rateTrend(cur, prev, sample = Infinity) {
+  // A rate worked out from a handful of visits swings on one person, so
+  // it gets no change note at all until there is enough to go on.
+  if (cur == null || prev == null || !(prev > 0) || !(sample >= 30)) return { dir: 'none', pct: null };
+  const pct = ((cur - prev) / prev) * 100;
+  if (Math.abs(pct) < 12) return { dir: 'level', pct };
+  return { dir: pct > 0 ? 'up' : 'down', pct };
+}
+// Up is green, level is quiet, down is a calm note. Never red: red is
+// kept for things that are actually broken. goodDown flips the sense for
+// figures where less is better (frustrated clicks).
+function noteHtml(t, { goodDown = false } = {}) {
+  if (!t || t.dir === 'none' || t.dir == null) return '';
+  if (t.dir === 'level') return '<div class="fig-note">Level</div>';
+  if (t.pct == null || !isFinite(t.pct)) return '';
+  const good = goodDown ? t.dir === 'down' : t.dir === 'up';
+  return `<div class="fig-note${good ? ' good' : ''}">${t.dir === 'up' ? '\u2191 up' : '\u2193 down'} ${Math.abs(t.pct).toFixed(0)}%</div>`;
+}
+// Ranking movement in places: positive means climbed.
+function placesHtml(places, cls = 'fig-note') {
+  if (places == null || !isFinite(places)) return '';
+  // Under three quarters of a place is drift, not a move.
+  if (Math.abs(places) < 0.75) return `<div class="${cls}">Level</div>`;
+  const n = Math.max(1, Math.round(Math.abs(places)));
+  const up = places > 0;
+  return `<div class="${cls}${up ? ' good' : ''}">${up ? '\u2191 up' : '\u2193 down'} ${n} place${n === 1 ? '' : 's'}</div>`;
 }
 
-// Rank movement in plain English ("up 2.3 places") — a % of a ranking
-// position means nothing to a business owner.
-function moveHtml(places) {
-  if (places == null || !isFinite(places)) return '<div class="delta flat">—</div>';
-  if (Math.abs(places) < 0.05) return '<div class="delta flat">no change <span class="vs">vs previous</span></div>';
-  const up = places > 0; // positive = climbed the rankings
-  return `<div class="delta ${up ? 'up' : 'down'}">${up ? '▲' : '▼'} ${up ? 'up' : 'down'} ${Math.abs(places).toFixed(1)} places <span class="vs">vs previous</span></div>`;
+function fig(label, value, note = '', { color = '', help = '' } = {}) {
+  return `<div class="fig"${color ? ` style="--c:var(--${color})"` : ''}>
+    <div class="fig-label">${esc(label)}</div>
+    <div class="fig-value">${value}</div>
+    ${note}${help ? `<div class="fig-help">${esc(help)}</div>` : ''}
+  </div>`;
 }
-
-function kpi(label, value, delta, invert = false) {
-  return `<div class="kpi"><div class="label">${label}</div><div class="value">${value}</div>${deltaHtml(delta, invert)}</div>`;
-}
-
-function section(title, hint = '') {
-  return `<div class="section-head"><h2>${title}</h2><div class="accent"></div>${hint ? `<span class="hint">${hint}</span>` : ''}</div>`;
-}
+const figs = (list, cls = '') => `<div class="figs ${cls}" style="--n:${Math.min(list.length, 6)}">${list.join('')}</div>`;
+const band = (no, title, meta = '') => `<div class="band"><span class="band-no">${no}</span><span class="band-title">${esc(title)}</span>${meta ? `<span class="band-meta">${esc(meta)}</span>` : ''}</div>`;
+const notice = (title, body) => `<div class="notice"><h3>${esc(title)}</h3><p>${body}</p></div>`;
 
 const FRIENDLY_CHANNEL = {
-  'Organic Search': 'Google search', 'Direct': 'Direct visits', 'Organic Social': 'Social media',
+  'Organic Search': 'Google search', 'Direct': 'Came straight to you', 'Organic Social': 'Social media',
   'Paid Social': 'Social media ads', 'Paid Search': 'Google ads', 'Referral': 'Other websites',
   'Email': 'Email', 'Unassigned': 'Other',
 };
+const DEVICE = { mobile: 'Phone', phone: 'Phone', desktop: 'Computer', tablet: 'Tablet' };
 
-function render(d) {
-  // Traffic tag under-counting (proven wrong by Search Console/Clarity) →
-  // don't render its numbers; lead with the true search + behaviour story.
-  const gaBad = Boolean(d.ga4?.unreliable);
-  const o = gaBad ? null : d.ga4?.overview, p = d.ga4?.prevOverview || {};
-  const s = d.search?.summary, sp = d.search?.prevSummary || {};
-  let html = `
-    <div class="client-hero">
-      <div class="who">
-        <h1>${esc(d.clientName)}</h1>
-        ${d.domain ? `<a href="https://${esc(d.domain)}" target="_blank" rel="noopener">${esc(d.domain)}</a>` : ''}
-      </div>
-      <div class="range-switch">
-        ${[7, 30, 90].map(r => `<button data-range="${r}" class="${r === currentRange ? 'active' : ''}">Last ${r} days</button>`).join('')}
-      </div>
-    </div>`;
+// A page name a person can read: "/recovery-sales" reads "Recovery sales".
+function pageName(path, title) {
+  const clean = String(path || '/').split('?')[0].split('#')[0].replace(/\/index\.(html?|php)$/i, '').replace(/\/+$/, '');
+  if (!clean) return 'Homepage';
+  if (title && title !== '(not set)') {
+    const first = String(title).split(/\s+[|\u2013\u2014-]\s+/)[0].trim();
+    if (first) return first;
+  }
+  let last = clean.split('/').pop() || '';
+  try { last = decodeURIComponent(last); } catch { /* keep as is */ }
+  last = last.replace(/\.(html?|php)$/i, '').replace(/[-_]+/g, ' ').trim();
+  return last ? last.charAt(0).toUpperCase() + last.slice(1) : 'Homepage';
+}
 
+// ---------- sections ----------
+
+function heroSection(d, ctx) {
+  const { o, p, s, sp, gaBad, story, tr } = ctx;
+  const tone = story?.verdict?.tone || 'steady';
+  const label = story?.verdict?.label || `The last ${d.rangeDays} days`;
+  const standfirst = (d.insights?.source === 'ai' && d.insights.headline) || story?.verdict?.line || d.insights?.headline || '';
+
+  const list = [];
+  if (o) list.push(fig('Visits', fmtBig(o.sessions), noteHtml(tr.visits || countTrend(o.sessions, p.sessions)), { color: 'green' }));
+  if (s) {
+    list.push(fig('Clicks from Google', fmtBig(s.clicks), noteHtml(tr.clicks || countTrend(s.clicks, sp.clicks)), { color: 'cyan' }));
+    list.push(fig('Times shown on Google', fmtBig(s.impressions), noteHtml(tr.shown || countTrend(s.impressions, sp.impressions)), { color: 'yellow' }));
+  }
+  // Counted against every key search, including any Google is not
+  // showing the site for yet, the same way the written summary counts.
+  const targets = d.search?.targets || [];
+  if (s && targets.length) {
+    const p1 = targets.filter(t => t.position != null && t.position <= 10.5).length;
+    list.push(fig('Key searches on page one', `${p1}<small>of ${targets.length}</small>`, '<div class="fig-note">Google positions 1 to 10</div>', { color: 'white' }));
+  } else if (s && s.position) {
+    list.push(fig('Average Google position', s.position.toFixed(1), placesHtml(sp.position ? sp.position - s.position : null), { color: 'white' }));
+  }
+  if (o && list.length < 4) list.push(fig('Pages viewed', fmtBig(o.screenPageViews), noteHtml(countTrend(o.screenPageViews, p.screenPageViews)), { color: 'white' }));
+  if (o && list.length < 4) list.push(fig('Average visit', fmtDur(o.averageSessionDuration), noteHtml(rateTrend(o.averageSessionDuration, p.averageSessionDuration, Math.min(o.sessions || 0, p.sessions || 0))), { color: 'cyan' }));
+
+  const notes = [];
+  if (list.length) notes.push(`Changes compare with ${esc(story?.period?.prev || 'the period before')}. A movement too small to mean anything shows as level.`);
   if (o) {
-    const delta = pctChange(o.sessions, p.sessions);
-    const firstDay = d.ga4.timeseries?.[0]?.date;
-    const daysIn = firstDay && d.period?.start && firstDay > d.period.start
-      ? Math.round((Date.parse(firstDay) - Date.parse(d.period.start)) / 86400000) : 0;
-    const freshNote = daysIn >= 5
-      ? ` <span class="hint">(Visitor tracking was installed on ${new Date(firstDay + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}, so traffic numbers only cover from that date.)</span>` : '';
-    html += `<div class="plain-english"><span class="tag">IN PLAIN ENGLISH</span>
-      Your website was visited <strong>${fmtInt(o.sessions)}</strong> times by <strong>${fmtInt(o.totalUsers)}</strong> people in the last ${d.rangeDays} days${delta != null && isFinite(delta) ? ` — <strong>${delta >= 0 ? 'up' : 'down'} ${Math.abs(delta).toFixed(1)}%</strong> on the period before` : ''}.${s && s.impressions > 0 ? ` It showed up in Google searches <strong>${fmtInt(s.impressions)}</strong> times.` : ''}${freshNote}
-    </div>`;
-
-    html += section('At a glance');
-    const thirdKpi = o.newUsers != null
-      ? kpi('New visitors', fmtInt(o.newUsers), pctChange(o.newUsers, p.newUsers))
-      : kpi('Pages per visit', (o.sessions ? o.screenPageViews / o.sessions : 0).toFixed(1), pctChange(o.sessions ? o.screenPageViews / o.sessions : 0, p.sessions ? p.screenPageViews / p.sessions : null));
-    html += `<div class="kpi-grid">
-      ${kpi('Visits', fmtInt(o.sessions), pctChange(o.sessions, p.sessions))}
-      ${kpi('Visitors', fmtInt(o.totalUsers), pctChange(o.totalUsers, p.totalUsers))}
-      ${kpi('Page views', fmtInt(o.screenPageViews), pctChange(o.screenPageViews, p.screenPageViews))}
-      ${thirdKpi}
-      ${kpi('Engagement rate', fmtPct(o.engagementRate * 100), pctChange(o.engagementRate, p.engagementRate))}
-      ${kpi('Avg. visit length', fmtDur(o.averageSessionDuration), pctChange(o.averageSessionDuration, p.averageSessionDuration))}
-    </div>`;
-    if (d.ga4.sourceLabel) html += `<div class="hint" style="margin-top:6px">Source: ${esc(d.ga4.sourceLabel)}</div>`;
+    // Set by the server only when tracking genuinely began inside this period.
+    if (d.ga4.trackingFrom) notes.push(`Visitor counting was installed on ${esc(fmtDay(d.ga4.trackingFrom))}, so visit numbers only cover from that date.`);
   } else if (gaBad) {
-    html += `<div class="panel"><h2>Visitor tracking is being reconnected</h2>
-      <p class="hint">The visitor-count tag is being reinstalled on your site, so the visit total isn't complete yet — but your Google search performance and behaviour insights below are fully live and accurate${s && s.impressions > 0 ? `. Google showed your site <strong>${fmtInt(s.impressions)}</strong> times this period` : ''}.</p></div>`;
+    notes.push('Your visitor counter is being reconnected, so visit totals are left out for now. The Google figures are complete and accurate.');
+  }
+
+  const months = (d.history?.months || []);
+  const showHistory = months.length >= 2 && months.some(m => (!gaBad && m.visits != null) || m.clicks != null);
+  // An under-counting visitor counter never has its history charted either.
+  const hasVisits = !gaBad && months.some(m => m.visits != null), hasClicks = months.some(m => m.clicks != null);
+  const part = months.some(m => m.partial);
+
+  return `<section class="sec hero" id="summary"><div class="wrap">
+    ${band('P100', 'Summary', d.period ? `${fmtDay(d.period.start)} to ${fmtDay(d.period.end, true)}` : '')}
+    <p class="verdict t-${esc(tone)}">${esc(label)}</p>
+    ${standfirst ? `<p class="standfirst">${esc(standfirst)}</p>` : ''}
+    ${list.length ? `<div class="gap-lg">${figs(list)}</div>` : ''}
+    ${notes.map(n => `<p class="caption">${n}</p>`).join('')}
+    ${showHistory ? `<div class="panel gap-lg">
+      <div class="panel-head">
+        <h2 class="sub">The long view</h2>
+        <div class="legend">
+          ${hasVisits ? '<span class="key"><i></i>Visits</span>' : ''}
+          ${hasClicks ? `<span class="key"><i class="${hasVisits ? 'k-line' : ''}"></i>Clicks from Google</span>` : ''}
+          ${part ? '<span class="key"><i class="k-part"></i>Month so far</span>' : ''}
+        </div>
+      </div>
+      <div class="chart"><canvas id="historyChart" role="img" aria-label="Month by month chart of ${hasVisits ? 'visits' : 'clicks from Google'}"></canvas></div>
+      <p class="caption">Month by month, so one quiet or busy spell can be seen against the bigger picture.</p>
+    </div>` : ''}
+  </div></section>`;
+}
+
+function storySection(d, ctx) {
+  const wins = (d.insights?.wins?.length ? d.insights.wins : ctx.story?.wins) || [];
+  const actions = d.insights?.actions || [];
+  const watch = ctx.story?.watch || [];
+  const ask = d.insights?.ask || '';
+  if (!wins.length && !actions.length && !watch.length) return '';
+  const two = wins.length && actions.length;
+  const no = i => String(i + 1).padStart(2, '0');
+  const winsHtml = wins.length ? `<div>
+      <h2 class="col-title">What went well</h2>
+      <ol class="items">${wins.map((w, i) => `<li class="item">
+        <span class="item-no">${no(i)}</span><span class="item-title">${esc(w.title)}</span>
+        <span class="item-detail">${esc(w.detail)}</span></li>`).join('')}</ol>
+    </div>` : '';
+  const actionsHtml = actions.length ? `<div>
+      <h2 class="col-title">Where we go from here</h2>
+      <ol class="items">${actions.map((a, i) => `<li class="item">
+        <span class="item-no" style="grid-row:span 2">${no(i)}</span>
+        <span class="item-top"><span class="chip chip--${a.owner === 'you' ? 'you' : 'us'}">${a.owner === 'you' ? 'You' : 'North Bear'}</span></span>
+        <span class="item-title" style="grid-column:2">${esc(a.title)}</span>
+        <span class="item-detail">${esc(a.detail)}</span></li>`).join('')}</ol>
+    </div>` : '';
+  const watchHtml = watch.length ? `<div>
+      <div class="kicker"><span class="blk"></span>Worth watching</div>
+      <ul class="watch">${watch.map(w => `<li><b>${esc(w.title)}</b>${esc(w.detail)}</li>`).join('')}</ul>
+    </div>` : '';
+  const askHtml = ask ? `<div class="ask"><div class="kicker"><span class="blk"></span>One thing from you</div><p>${esc(ask)}</p></div>` : '';
+  return `<section class="sec sec--paper" id="story"><div class="wrap">
+    ${band('P150', 'What it means')}
+    <div class="story"${two ? '' : ' style="grid-template-columns:1fr"'}>${winsHtml}${actionsHtml}</div>
+    ${watchHtml || askHtml ? `<div class="aside${watchHtml && askHtml ? '' : ' aside--one'}">${watchHtml}${askHtml}</div>` : ''}
+  </div></section>`;
+}
+
+function visitorsSection(d, ctx) {
+  const { o, p, gaBad, tr } = ctx;
+  let h = `<section class="sec sec--char sec--cyan" id="visitors"><div class="wrap">
+    ${band('P200', 'Visitors', o && d.ga4.sourceLabel ? `Source: ${d.ga4.sourceLabel}` : '')}`;
+  if (gaBad) {
+    h += notice('Visitor counting is being reconnected', 'The counter on your site is being put back in place, so visit totals are not complete yet. Your Google search results and behaviour figures below are live and accurate.');
+  } else if (!o) {
+    h += notice('Visitor counting is being set up', 'North Bear Media is connecting visitor counting for your site. Your visits, where they came from and your busiest pages will appear here soon.');
   } else {
-    html += `<div class="panel"><h2>Analytics warming up</h2>
-      <p class="hint">Google Analytics isn't connected for your site yet — North Bear Media is on it. Your visits and visitors will appear here soon.</p></div>`;
-  }
+    const sample = Math.min(o.sessions || 0, p.sessions || 0);
+    const ppv = o.sessions ? o.screenPageViews / o.sessions : 0;
+    const prevPpv = p.sessions ? p.screenPageViews / p.sessions : null;
+    const list = [fig('Visits', fmtBig(o.sessions), noteHtml(tr.visits || countTrend(o.sessions, p.sessions)), { color: 'green' })];
+    if (d.ga4.visitorsSameAsVisits === false) list.push(fig('Visitors', fmtBig(o.totalUsers), noteHtml(countTrend(o.totalUsers, p.totalUsers)), { help: 'different people' }));
+    list.push(fig('Pages viewed', fmtBig(o.screenPageViews), noteHtml(countTrend(o.screenPageViews, p.screenPageViews))));
+    list.push(o.newUsers != null
+      ? fig('New visitors', fmtBig(o.newUsers), noteHtml(countTrend(o.newUsers, p.newUsers)), { help: 'here for the first time' })
+      : fig('Pages per visit', ppv.toFixed(1), noteHtml(rateTrend(ppv, prevPpv, sample))));
+    list.push(fig('Engaged visits', fmtPct(o.engagementRate * 100, 0), noteHtml(rateTrend(o.engagementRate, p.engagementRate, sample)), { help: 'did more than glance at one page' }));
+    list.push(fig('Average visit', fmtDur(o.averageSessionDuration), noteHtml(rateTrend(o.averageSessionDuration, p.averageSessionDuration, sample))));
+    h += figs(list, 'figs--sm');
 
-  if (!gaBad && d.ga4?.timeseries?.length > 1) {
-    html += section('Daily visits');
-    html += `<div class="panel"><div class="chart-wrap"><canvas id="trafficChart"></canvas></div></div>`;
-  }
-
-  if (!gaBad && (d.ga4?.channels?.length || d.ga4?.devices?.length)) {
-    html += section('Where your visits came from');
-    html += `<div class="two-col">`;
-    if (d.ga4.channels?.length) {
-      const max = Math.max(...d.ga4.channels.map(c => c.sessions), 1);
-      html += `<div class="panel">${d.ga4.channels.slice(0, 7).map(c => `
-        <div class="bar-row">
-          <div class="bar-label">${esc(FRIENDLY_CHANNEL[c.channel] || c.channel)}</div>
-          <div class="bar-track"><div class="bar-fill" style="width:${Math.max((c.sessions / max) * 100, 1.5)}%"></div></div>
-          <div class="bar-value">${fmtInt(c.sessions)}</div>
-        </div>`).join('')}</div>`;
-    }
-    if (d.ga4.devices?.length) {
-      const total = d.ga4.devices.reduce((a, x) => a + x.sessions, 0) || 1;
-      html += `<div class="panel"><h2 style="margin-bottom:12px">By device</h2>${d.ga4.devices.map(x => `
-        <div class="bar-row">
-          <div class="bar-label">${esc(x.device[0].toUpperCase() + x.device.slice(1))}</div>
-          <div class="bar-track"><div class="bar-fill" style="width:${(x.sessions / total) * 100}%"></div></div>
-          <div class="bar-value">${((x.sessions / total) * 100).toFixed(0)}%</div>
-        </div>`).join('')}</div>`;
-    }
-    html += `</div>`;
-  }
-
-  if (!gaBad && d.aiTraffic) {
-    const ai = d.aiTraffic;
-    html += `<div class="panel" style="margin-top:12px"><strong>Visits from AI assistants</strong> <span class="hint">ChatGPT, Perplexity, Gemini, Copilot and co</span>
-      <div style="margin-top:6px">${ai.visits > 0
-        ? `<strong style="font-size:18px">${fmtInt(ai.visits)}</strong>${ai.sharePct != null ? ` <span class="hint">(${esc(ai.sharePct)}% of visits)</span>` : ''}${ai.top?.length ? ` <span class="hint">· ${ai.top.map(t => esc(t.source) + ' ' + fmtInt(t.visits)).join(', ')}</span>` : ''}`
-        : `<span class="hint">None recorded this period. As more people search with AI tools, visitors they send will show here.</span>`}</div></div>`;
-  }
-
-  if (s && d.search.empty) {
-    html += section('Google search performance', 'Average position = where you rank in Google. 1–10 is page one.');
-    html += `<div class="panel"><p class="hint">Your site is connected to Google Search Console, but Google hasn't recorded any searches leading to it in this period yet. As your site builds authority, the terms people find you with will appear here.</p></div>`;
-  } else if (s) {
-    html += section('Google search performance', 'Average position = where you rank in Google. 1–10 is page one.');
-    const posMove = (s.position && sp.position) ? sp.position - s.position : null;
-    html += `<div class="kpi-grid">
-      ${kpi('Clicks from Google', fmtInt(s.clicks), pctChange(s.clicks, sp.clicks))}
-      ${kpi('Times shown', fmtInt(s.impressions), pctChange(s.impressions, sp.impressions))}
-      ${kpi('Click-through rate', fmtPct(s.ctr * 100), pctChange(s.ctr, sp.ctr))}
-      <div class="kpi"><div class="label">Avg. position</div><div class="value">${s.position ? s.position.toFixed(1) : '—'}</div>${moveHtml(posMove)}</div>
-    </div>`;
-    if (d.search.topQueries?.length) {
-      const moveCell = q => {
-        if (q.positionChange == null) return q.prevPosition == null ? '<span class="delta up" style="display:inline">new</span>' : '<span class="delta flat" style="display:inline">—</span>';
-        if (Math.abs(q.positionChange) < 0.05) return '<span class="delta flat" style="display:inline">no change</span>';
-        const up = q.positionChange > 0;
-        return `<span class="delta ${up ? 'up' : 'down'}" style="display:inline">${up ? '▲ up' : '▼ down'} ${Math.abs(q.positionChange).toFixed(1)}</span>`;
-      };
-      html += `<div class="panel" style="margin-top:16px">
-        <h2 style="margin-bottom:10px">Top search terms people found you with</h2>
-        <table class="data">
-          <thead><tr><th>Search term</th><th class="num">Clicks</th><th class="num">Times shown</th><th class="num">Position</th><th class="num">Movement</th></tr></thead>
-          <tbody>${d.search.topQueries.slice(0, 10).map(q => `
-            <tr><td class="trunc" title="${esc(q.query)}"><strong>${esc(q.query)}</strong></td>
-            <td class="num">${fmtInt(q.clicks)}</td><td class="num">${fmtInt(q.impressions)}</td>
-            <td class="num">${q.position.toFixed(1)}${q.position <= 10 ? ' <span class="hint">pg 1</span>' : ''}</td>
-            <td class="num">${moveCell(q)}</td></tr>`).join('')}
-          </tbody></table>
-        <div class="hint" style="margin-top:8px">"Movement" is places gained or lost on Google vs the previous period · "pg 1" means the first page of results.</div>
+    if (d.ga4.timeseries?.length > 1) {
+      h += `<div class="panel gap">
+        <div class="panel-head"><h2 class="sub">Visits day by day</h2></div>
+        <div class="chart"><canvas id="trafficChart" role="img" aria-label="Line chart of visits each day"></canvas></div>
       </div>`;
     }
-    if (d.search.targets?.length) {
-      const tMove = t => {
-        if (t.position == null) return t.prevPosition != null ? '<span class="delta down" style="display:inline">dropped off</span>' : '<span class="delta flat" style="display:inline">—</span>';
-        if (t.movement == null) return t.prevPosition == null ? '<span class="delta up" style="display:inline">new</span>' : '<span class="delta flat" style="display:inline">—</span>';
-        if (Math.abs(t.movement) < 0.05) return '<span class="delta flat" style="display:inline">no change</span>';
-        const up = t.movement > 0;
-        return `<span class="delta ${up ? 'up' : 'down'}" style="display:inline">${up ? '▲ up' : '▼ down'} ${Math.abs(t.movement).toFixed(1)}</span>`;
-      };
-      html += `<div class="panel" style="margin-top:16px">
-        <h2 style="margin-bottom:10px">Where you rank for your target searches</h2>
-        <table class="data">
-          <thead><tr><th>Target search</th><th class="num">Position</th><th class="num">Times shown</th><th class="num">Movement</th></tr></thead>
-          <tbody>${d.search.targets.map(t => `
-            <tr><td class="trunc" title="${esc(t.keyword)}"><strong>${esc(t.keyword)}</strong></td>
-            <td class="num">${t.position != null ? t.position.toFixed(1) + (t.position <= 10 ? ' <span class="hint">pg 1</span>' : '') : '<span class="hint">not appearing yet</span>'}</td>
-            <td class="num">${fmtInt(t.impressions)}</td>
-            <td class="num">${tMove(t)}</td></tr>`).join('')}
-          </tbody></table>
-        <div class="hint" style="margin-top:8px">"Not appearing yet" means Google didn't show the site for that search this period — a clear opportunity to build content around it.</div>
+
+    const channels = (d.ga4.channels || []).slice(0, 7);
+    const devices = d.ga4.devices || [];
+    let left = '', right = '';
+    if (channels.length) {
+      const max = Math.max(...channels.map(c => c.sessions), 1);
+      const total = (d.ga4.channels || []).reduce((a, c) => a + c.sessions, 0) || 1;
+      left = `<div class="panel">
+        <div class="panel-head"><h2 class="sub">Where visitors came from</h2></div>
+        <div class="bars">${channels.map(c => `<div class="bar">
+          <div class="bar-label" title="${esc(FRIENDLY_CHANNEL[c.channel] || c.channel)}">${esc(FRIENDLY_CHANNEL[c.channel] || c.channel)}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${((c.sessions / max) * 100).toFixed(1)}%"></div></div>
+          <div class="bar-val">${fmtInt(c.sessions)}<span>${Math.round((c.sessions / total) * 100)}%</span></div>
+        </div>`).join('')}</div>
       </div>`;
     }
+    if (devices.length) {
+      const total = devices.reduce((a, x) => a + x.sessions, 0) || 1;
+      const name = x => DEVICE[String(x.device).toLowerCase()] || (String(x.device).charAt(0).toUpperCase() + String(x.device).slice(1));
+      right += `<div class="panel">
+        <div class="panel-head"><h2 class="sub">What they browsed on</h2></div>
+        <div class="split" role="img" aria-label="Share of visits by device">${devices.map(x => `<span style="flex:${Math.max(x.sessions, total * 0.004)}"></span>`).join('')}</div>
+        <div class="split-keys">${devices.map(x => `<div class="split-key"><b>${Math.round((x.sessions / total) * 100)}%</b><i></i>${esc(name(x))}</div>`).join('')}</div>
+      </div>`;
+    }
+    if (d.aiTraffic) {
+      const ai = d.aiTraffic;
+      right += `<div class="panel">
+        <div class="panel-head"><h2 class="sub">Visits from AI assistants</h2></div>
+        ${ai.visits > 0
+          ? `<div class="ai"><b>${fmtInt(ai.visits)}</b><span>${ai.sharePct != null ? `${esc(ai.sharePct)}% of visits` : ''}${ai.top?.length ? `${ai.sharePct != null ? '. ' : ''}${ai.top.map(t => `${esc(t.source)} ${fmtInt(t.visits)}`).join(', ')}` : ''}</span></div>
+             <p class="caption">People who found you through ChatGPT, Perplexity, Gemini, Copilot and similar tools.</p>`
+          : '<p class="ai-none">None recorded in this period, which is normal today. As more people search with tools like ChatGPT, the visitors they send will show here.</p>'}
+      </div>`;
+    }
+    if (left || right) {
+      h += left && right ? `<div class="cols gap">${left}<div class="stack">${right}</div></div>` : `<div class="stack gap">${left || right}</div>`;
+    }
+
+    const pages = (d.ga4.topPages || []).slice(0, 8);
+    if (pages.length) {
+      const max = Math.max(...pages.map(pg => pg.views), 1);
+      h += `<div class="panel gap">
+        <div class="panel-head"><h2 class="sub">Most viewed pages</h2><div class="legend"><span class="key">Views</span></div></div>
+        <ol class="pages">${pages.map((pg, i) => `<li class="page">
+          <span class="page-no">${String(i + 1).padStart(2, '0')}</span>
+          <span class="page-name" title="${esc(pg.path)}">${esc(pageName(pg.path, pg.title))}<span class="page-path">${esc(pg.path)}</span></span>
+          <span class="bar-track"><span class="bar-fill" style="display:block;width:${((pg.views / max) * 100).toFixed(1)}%"></span></span>
+          <span class="page-val">${fmtInt(pg.views)}</span>
+        </li>`).join('')}</ol>
+      </div>`;
+    }
+  }
+  return h + '</div></section>';
+}
+
+// Where a Google position sits on the ladder: page one takes the left
+// half, pages two and three share the right, and anything past 30 sits
+// at the end.
+function ladderX(pos) {
+  const p = Math.max(1, Math.min(30, pos));
+  return p <= 10 ? ((p - 1) / 9) * 50 : 50 + ((p - 10) / 20) * 50;
+}
+
+function googleSection(d, ctx) {
+  const { s, sp, tr } = ctx;
+  let h = `<section class="sec sec--paper sec--yellow" id="google"><div class="wrap">
+    ${band('P300', 'Google', d.search ? 'Source: Google Search Console' : '')}`;
+  if (!d.search) {
+    h += notice('Google search data is being connected', 'Search Console is being linked for your site. Your Google rankings and the searches people find you with will appear here soon.');
+  } else if (d.search.empty) {
+    h += notice('No Google searches recorded yet', 'Your site is connected to Google Search Console, but Google has not recorded any searches leading to it in this period. As the site builds authority, the searches people find you with will appear here.');
   } else {
-    html += section('Google search performance');
-    html += `<div class="panel"><p class="hint">Google Search Console is being connected for your site — your Google rankings and search clicks will appear here soon.</p></div>`;
-  }
+    const where = s.position ? (s.position <= 10.5 ? 'page one, on average' : s.position <= 20.5 ? 'page two, on average' : 'beyond page two, on average') : '';
+    h += figs([
+      fig('Clicks from Google', fmtBig(s.clicks), noteHtml(tr.clicks || countTrend(s.clicks, sp.clicks)), { color: 'green' }),
+      fig('Times shown on Google', fmtBig(s.impressions), noteHtml(tr.shown || countTrend(s.impressions, sp.impressions)), { color: 'cyan' }),
+      fig('Click rate', fmtPct(s.ctr * 100), noteHtml(rateTrend(s.ctr, sp.ctr, Math.min(s.impressions || 0, sp.impressions || 0) / 4)), { color: 'yellow', help: 'of the people who saw you, how many clicked' }),
+      fig('Average position', s.position ? s.position.toFixed(1) : 'n/a', placesHtml(s.position && sp.position ? sp.position - s.position : null), { color: 'text', help: where }),
+    ], 'figs--sm');
 
-  if (!gaBad && d.ga4?.topPages?.length) {
-    html += section('Most viewed pages');
-    html += `<div class="panel"><table class="data">
-      <thead><tr><th>Page</th><th class="num">Views</th><th class="num">Visits</th></tr></thead>
-      <tbody>${d.ga4.topPages.slice(0, 8).map(pg => `
-        <tr><td class="trunc" title="${esc(pg.path)}"><strong>${esc(pg.title && pg.title !== '(not set)' ? pg.title : pg.path)}</strong> <span class="hint">${esc(pg.path)}</span></td>
-        <td class="num">${fmtInt(pg.views)}</td><td class="num">${fmtInt(pg.sessions)}</td></tr>`).join('')}
-      </tbody></table></div>`;
-  }
+    const targets = (d.search.targets || []).slice().sort((a, b) => (a.position ?? 1e9) - (b.position ?? 1e9));
+    if (targets.length) {
+      h += `<div class="panel gap">
+        <div class="panel-head"><h2 class="sub">Your key searches</h2>
+          <div class="legend"><span class="key"><i style="background:var(--fg)"></i>Now</span><span class="key"><i style="background:transparent;border:1.5px solid var(--mut)"></i>Before</span></div></div>
+        <div class="ladder">
+          <div class="ladder-head">
+            <span>Search</span>
+            <span class="scale" aria-hidden="true"><span class="n" style="left:0">1</span><span class="n" style="left:50%">10</span><span class="n" style="left:75%">20</span><span class="n end" style="left:100%">30+</span>
+              <span class="z1">Page one</span><span class="z2"><span class="hide-s">Page </span>two</span><span class="z3"><span class="hide-s">Page </span>three</span></span>
+            <span>Position</span><span class="h-mv">Movement</span>
+          </div>
+          ${targets.map(t => {
+            if (t.position == null) {
+              return `<div class="rung"><div class="rung-kw">${esc(t.keyword)}</div>
+                <div class="track"><span class="zone"></span><span class="tick" style="left:50%"></span><span class="tick" style="left:75%"></span></div>
+                <div class="rung-pos none">Not showing yet</div>
+                <div class="mv hide-s">${t.prevPosition != null ? 'Dropped out' : ''}</div></div>`;
+            }
+            const x = ladderX(t.position);
+            const px = t.prevPosition != null ? ladderX(t.prevPosition) : null;
+            // The "before" marker only earns its place when the move is
+            // real and far enough along the track not to sit under the square.
+            const moved = px != null && t.movement != null && Math.abs(t.movement) >= 0.75 && Math.abs(px - x) > 3.5;
+            return `<div class="rung"><div class="rung-kw">${esc(t.keyword)}</div>
+              <div class="track"><span class="zone"></span><span class="tick" style="left:50%"></span><span class="tick" style="left:75%"></span>
+                ${moved ? `<span class="link" style="left:${Math.min(x, px).toFixed(1)}%;width:${Math.abs(px - x).toFixed(1)}%"></span><span class="ghost" style="left:${px.toFixed(1)}%"></span>` : ''}
+                <span class="dot${t.position <= 10.5 ? ' p1' : ''}" style="left:${x.toFixed(1)}%"></span></div>
+              <div class="rung-pos">${Math.max(1, Math.round(t.position))}<small>${t.position <= 10.5 ? 'page one' : t.position <= 20.5 ? 'page two' : 'page three+'}</small></div>
+              ${t.movement == null ? `<div class="mv">${t.prevPosition == null ? 'New' : ''}</div>` : placesHtml(t.movement, 'mv')}</div>`;
+          }).join('')}
+        </div>
+        <p class="caption">Where you sit on Google for the searches that matter most to the business. The shaded half is the first page of results. "Not showing yet" means Google did not show the site for that search in this period, which makes it a clear opportunity.</p>
+      </div>`;
+    }
 
-  if (d.clarity) {
-    const cl = d.clarity, pc = d.prevClarity;
+    const queries = (d.search.topQueries || []).slice(0, 10);
+    if (queries.length) {
+      const mv = q => {
+        if (q.positionChange == null) return `<span class="mv${q.prevPosition == null ? ' good' : ''}">${q.prevPosition == null ? 'New' : ''}</span>`;
+        return placesHtml(q.positionChange, 'mv').replace(/^<div/, '<span').replace(/div>$/, 'span>');
+      };
+      h += `<div class="panel gap">
+        <div class="panel-head"><h2 class="sub">Searches that brought people in</h2></div>
+        <div class="table-wrap"><table class="table">
+          <thead><tr><th>Search</th><th class="num">Clicks</th><th class="num hide-s">Times shown</th><th class="num">Position</th><th class="num">Movement</th></tr></thead>
+          <tbody>${queries.map(q => `<tr>
+            <td class="term">${esc(q.query)}</td>
+            <td class="num" data-l="${Math.round(q.clicks) === 1 ? 'click' : 'clicks'}">${fmtInt(q.clicks)}</td>
+            <td class="num hide-s">${fmtInt(q.impressions)}</td>
+            <td class="num"><span class="show-s">Position </span>${q.position.toFixed(1)}${q.position <= 10.5 ? '<span class="pg1 hide-s">Page one</span>' : ''}</td>
+            <td class="num">${mv(q)}</td></tr>`).join('')}
+          </tbody></table></div>
+        <p class="caption">Movement is places gained or lost on Google against ${esc(ctx.story?.period?.prev || 'the period before')}.</p>
+      </div>`;
+    }
+  }
+  return h + '</div></section>';
+}
+
+function behaviourSection(d) {
+  const cl = d.clarity, pc = d.prevClarity;
+  const sh = d.siteHealth && (d.siteHealth.performance != null || d.siteHealth.seo != null) ? d.siteHealth : null;
+  const u = d.uptime;
+  let h = `<section class="sec sec--white" id="health"><div class="wrap">
+    ${band('P400', 'Behaviour and health', cl && cl.sessions > 0 ? 'Behaviour: Microsoft Clarity' : '')}`;
+
+  if (!cl) {
+    h += notice('Behaviour tracking is being connected', 'Soon you will see how far visitors scroll, what they click and where they get stuck.');
+  } else if (!(cl.sessions > 0)) {
+    h += notice('No visits recorded for behaviour yet', 'Behaviour tracking is connected, but it did not capture any visits in this period. Scroll depth and click figures will show here once it does.');
+  } else {
     const humans = cl.humanSessions != null ? cl.humanSessions : cl.sessions;
     const prevHumans = pc ? (pc.humanSessions != null ? pc.humanSessions : pc.sessions) : null;
-    html += section('How people use your site', 'Measured by Microsoft Clarity — low frustration numbers are good.');
-    html += `<div class="kpi-grid">
-      <div class="kpi"><div class="label">Sessions analysed</div><div class="value">${fmtInt(humans)}</div>${pc ? deltaHtml(pctChange(humans, prevHumans)) : '<div class="delta flat">real people, bots excluded</div>'}</div>
-      <div class="kpi"><div class="label">Avg. scroll depth</div><div class="value">${cl.avgScrollDepth != null ? fmtPct(cl.avgScrollDepth, 0) : '—'}</div>${pc ? deltaHtml(pctChange(cl.avgScrollDepth, pc.avgScrollDepth)) : '<div class="delta flat">how far people scroll</div>'}</div>
-      <div class="kpi"><div class="label">Dead clicks</div><div class="value">${fmtInt(cl.deadClicks)}</div>${pc ? deltaHtml(pctChange(cl.deadClicks, pc.deadClicks), true) : '<div class="delta flat">clicks that did nothing</div>'}</div>
-      <div class="kpi"><div class="label">Rage clicks</div><div class="value">${fmtInt(cl.rageClicks)}</div>${pc ? deltaHtml(pctChange(cl.rageClicks, pc.rageClicks), true) : '<div class="delta flat">frustrated clicking</div>'}</div>
-    </div>
-    <div class="hint" style="margin-top:6px">Based on ${cl.daysCovered} day${cl.daysCovered === 1 ? '' : 's'} of Clarity measurement in this period${cl.quickBacks ? ` · ${fmtInt(cl.quickBacks)} quick-backs (visitors who left a page straight away)` : ''}.</div>`;
-  } else {
-    html += section('How people use your site');
-    html += `<div class="panel"><p class="hint">Microsoft Clarity is being connected for your site — you'll soon see how visitors scroll, click and where they get stuck.</p></div>`;
+    const has = pc && pc.sessions > 0;
+    h += figs([
+      fig('Visits watched', fmtBig(humans), has ? noteHtml(countTrend(humans, prevHumans)) : '', { color: 'green', help: 'real people, robots left out' }),
+      fig('How far people scroll', cl.avgScrollDepth != null ? fmtPct(cl.avgScrollDepth, 0) : 'n/a', has ? noteHtml(rateTrend(cl.avgScrollDepth, pc.avgScrollDepth, Math.min(humans || 0, prevHumans || 0))) : '', { color: 'cyan', help: 'of the page, on average' }),
+      fig('Clicks that did nothing', fmtBig(cl.deadClicks), has ? noteHtml(countTrend(cl.deadClicks, pc.deadClicks), { goodDown: true }) : '', { color: 'yellow', help: 'taps on things that are not links' }),
+      fig('Frustrated clicks', fmtBig(cl.rageClicks), has ? noteHtml(countTrend(cl.rageClicks, pc.rageClicks), { goodDown: true }) : '', { color: 'white', help: 'rapid repeat clicking; low is good' }),
+    ], 'figs--sm');
+    h += `<p class="caption">Based on ${esc(cl.daysCovered)} day${cl.daysCovered === 1 ? '' : 's'} of recordings in this period${cl.quickBacks ? `. ${fmtInt(cl.quickBacks)} visitor${cl.quickBacks === 1 ? '' : 's'} left a page straight after arriving` : ''}.</p>`;
   }
 
-  if (d.siteHealth && (d.siteHealth.performance != null || d.siteHealth.seo != null)) {
-    const sh = d.siteHealth;
-    const grade = v => v == null ? '—' : v >= 90 ? 'excellent' : v >= 50 ? 'room to improve' : 'needs attention';
-    html += section('Site health check', 'Scored out of 100 by Google PageSpeed (mobile). 90+ is excellent.');
-    html += `<div class="kpi-grid">
-      <div class="kpi"><div class="label">Speed score</div><div class="value">${sh.performance ?? '—'}</div><div class="delta flat">${grade(sh.performance)}</div></div>
-      <div class="kpi"><div class="label">Google-friendliness (SEO)</div><div class="value">${sh.seo ?? '—'}</div><div class="delta flat">${grade(sh.seo)}</div></div>
-      <div class="kpi"><div class="label">Built to best practice</div><div class="value">${sh.bestPractices ?? '—'}</div><div class="delta flat">${grade(sh.bestPractices)}</div></div>
+  let panels = '';
+  if (sh) {
+    const meter = (label, v) => {
+      if (v == null) return '';
+      const on = Math.max(0, Math.min(20, Math.round(v / 5)));
+      const grade = v >= 90 ? 'Excellent' : v >= 50 ? 'Room to improve' : 'Needs work';
+      return `<div class="meter-row">
+        <div class="meter-label">${esc(label)}<span class="${v >= 90 ? 'good' : ''}">${grade}</span></div>
+        <div class="meter-score">${esc(v)}<small>/100</small></div>
+        <div class="meter${v >= 90 ? '' : ' mid'}" role="img" aria-label="${esc(v)} out of 100">${Array.from({ length: 20 }, (_, i) => `<i${i < on ? ' class="on"' : ''}></i>`).join('')}</div>
+      </div>`;
+    };
+    panels += `<div class="panel">
+      <div class="panel-head"><h2 class="sub">Site health</h2></div>
+      <div class="meters">${meter('Speed on a phone', sh.performance)}${meter('Easy for Google to read', sh.seo)}${meter('Built to best practice', sh.bestPractices)}</div>
+      <p class="caption">Scored out of 100 by Google's own test, run as a phone. 90 or more is excellent.</p>
     </div>`;
   }
-
-  if (d.uptime) {
-    const u = d.uptime;
-    html += section('Website availability', `Your homepage is checked every 5 minutes, day and night${u.measuredFrom ? ` (measured from ${esc(new Date(u.measuredFrom).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }))})` : ''}.`);
-    html += `<div class="kpi-grid">
-      <div class="kpi"><div class="label">Uptime</div><div class="value">${esc(u.uptimePct)}%</div><div class="delta flat">${u.uptimePct >= 99.9 ? 'excellent' : u.uptimePct >= 99 ? 'good' : 'needs attention'}</div></div>
-      <div class="kpi"><div class="label">Time offline</div><div class="value">${esc(u.downtimeShort)}</div><div class="delta flat">this period</div></div>
-      <div class="kpi"><div class="label">Outages</div><div class="value">${esc(u.outages)}</div><div class="delta flat">${u.outages ? 'confirmed interruptions' : 'no interruptions'}</div></div>
+  if (u) {
+    const down = Number(u.outages) > 0;
+    const grade = u.uptimePct >= 99.9 ? 'Excellent' : u.uptimePct >= 99 ? 'Good' : 'Needs attention';
+    panels += `<div class="panel">
+      <div class="panel-head"><h2 class="sub">Website availability</h2></div>
+      <div class="trio">
+        <div class="fig" style="--c:var(--green)"><div class="fig-label">Uptime</div><div class="fig-value">${esc(u.uptimePct)}%</div><div class="fig-note${u.uptimePct >= 99.9 ? ' good' : ''}">${grade}</div></div>
+        <div class="fig" style="--c:var(--cyan)"><div class="fig-label">Time offline</div><div class="fig-value">${esc(u.downtimeShort)}</div><div class="fig-note${down ? ' fault' : ' good'}">${down ? 'In this period' : 'All clear'}</div></div>
+        <div class="fig" style="--c:var(--yellow)"><div class="fig-label">Outages</div><div class="fig-value">${esc(u.outages)}</div><div class="fig-note${down ? ' fault' : ' good'}">${down ? 'Confirmed' : 'No interruptions'}</div></div>
+      </div>
+      <p class="caption">Your homepage is checked every 5 minutes, day and night${u.measuredFrom ? ` (measured from ${esc(new Date(u.measuredFrom).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }))})` : ''}.</p>
     </div>`;
   }
-
-  if (d.insights?.recommendations?.length) {
-    html += section('What this means & what to do next');
-    html += `<div class="panel">`;
-    if (d.insights.headline) html += `<p style="font-size:15px;margin-bottom:14px">${esc(d.insights.headline)}</p>`;
-    html += d.insights.recommendations.map(r => `
-      <div style="display:flex;gap:10px;margin-bottom:12px">
-        <div style="color:var(--green-light);font-weight:700">▸</div>
-        <div><strong>${esc(r.title)}</strong><br><span style="color:var(--text-secondary)">${esc(r.detail)}</span></div>
-      </div>`).join('');
-    html += `</div>`;
-  }
-
-  $('#app').innerHTML = html;
-
-  document.querySelectorAll('.range-switch button').forEach(b => {
-    b.onclick = () => { currentRange = Number(b.dataset.range); load(); };
-  });
-
-  if (!gaBad && d.ga4?.timeseries?.length > 1) drawChart(d.ga4.timeseries);
+  if (panels) h += `<div class="${sh && u ? 'cols' : 'stack'} gap-lg" style="${sh && u ? 'grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))' : ''}">${panels}</div>`;
+  return h + '</div></section>';
 }
 
-function drawChart(points) {
-  const ctx = $('#trafficChart').getContext('2d');
-  const grad = ctx.createLinearGradient(0, 0, 0, 260);
-  grad.addColorStop(0, 'rgba(46,170,123,0.35)');
-  grad.addColorStop(1, 'rgba(46,170,123,0)');
-  if (chart) chart.destroy();
-  chart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: points.map(pt => new Date(pt.date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })),
-      datasets: [{
-        label: 'Visits', data: points.map(pt => pt.sessions),
-        borderColor: '#2EAA7B', backgroundColor: grad, fill: true,
-        borderWidth: 2, pointRadius: points.length > 35 ? 0 : 2.5, pointBackgroundColor: '#3CC98F', tension: 0.35,
-      }],
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { display: false }, ticks: { color: '#6b6f82', maxTicksLimit: 10, font: { size: 11 } } },
-        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b6f82', precision: 0, font: { size: 11 } } },
+function render(d) {
+  // A visitor counter that is proven to be under-counting (Search Console
+  // saw far more clicks than it saw visits) never has its numbers shown;
+  // the page leads on the search and behaviour figures, which are right.
+  const gaBad = Boolean(d.ga4?.unreliable);
+  const ctx = {
+    gaBad,
+    o: gaBad ? null : (d.ga4?.overview || null),
+    p: d.ga4?.prevOverview || {},
+    s: d.search && !d.search.empty ? d.search.summary : null,
+    sp: d.search?.prevSummary || {},
+    story: d.story || null,
+    tr: d.story?.trends || {},
+  };
+
+  $('#clientName').textContent = d.clientName || 'Your website';
+  document.title = `${d.clientName || 'Your website'} | Website dashboard`;
+  const dom = $('#clientDomain');
+  if (d.domain) { dom.textContent = d.domain; dom.href = `https://${d.domain}`; dom.hidden = false; } else dom.hidden = true;
+
+  destroyCharts();
+  $('#app').innerHTML = heroSection(d, ctx) + storySection(d, ctx) + visitorsSection(d, ctx) + googleSection(d, ctx) + behaviourSection(d);
+  hasRendered = true;
+
+  if ($('#historyChart')) drawHistory(d.history.months, !gaBad);
+  if ($('#trafficChart')) drawTraffic(d.ga4.timeseries);
+  // The charts take their label font from the page; redraw once the
+  // brand fonts have arrived so the labels are not left in a fallback.
+  if (document.fonts?.ready) document.fonts.ready.then(() => Object.values(charts).forEach(c => c.update('none')));
+}
+
+// ---------- charts ----------
+
+function destroyCharts() {
+  for (const k of Object.keys(charts)) { charts[k].destroy(); delete charts[k]; }
+}
+
+const MONO = "'Martian Mono', ui-monospace, Menlo, Consolas, monospace";
+function chartBase() {
+  const tick = { color: '#A6ABB1', font: { family: MONO, size: 10 } };
+  return {
+    responsive: true, maintainAspectRatio: false,
+    animation: reducedMotion ? false : { duration: 500 },
+    // Only the first draw animates. A chart that is resized, or re-attached
+    // after its box briefly had no size, snaps straight to its new shape.
+    transitions: { resize: { animation: { duration: 0 } }, attach: { animation: { duration: 0 } } },
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#F1EEE7', titleColor: '#0F1012', bodyColor: '#0F1012', cornerRadius: 2, padding: 10,
+        titleFont: { family: MONO, size: 10, weight: '500' }, bodyFont: { family: MONO, size: 11 },
+        boxWidth: 8, boxHeight: 8, boxPadding: 5, usePointStyle: false,
       },
     },
+    scales: {
+      x: { grid: { display: false }, border: { color: 'rgba(255,255,255,.15)' }, ticks: { ...tick, maxRotation: 0, autoSkipPadding: 14 } },
+      y: { beginAtZero: true, border: { display: false }, grid: { color: 'rgba(255,255,255,.07)' }, ticks: { ...tick, precision: 0, maxTicksLimit: 6 } },
+    },
+  };
+}
+
+// Diagonal stripes for a month that is not over yet.
+function stripes(ctx) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 8;
+  const g = c.getContext('2d');
+  g.strokeStyle = '#4DB88C'; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(-2, 10); g.lineTo(10, -2); g.moveTo(-2, 2); g.lineTo(2, -2); g.moveTo(6, 10); g.lineTo(10, 6); g.stroke();
+  return ctx.createPattern(c, 'repeat');
+}
+
+function drawHistory(months, visitsTrusted = true) {
+  if (typeof Chart === 'undefined') return;
+  const ctx = $('#historyChart').getContext('2d');
+  const hasVisits = visitsTrusted && months.some(m => m.visits != null);
+  const hasClicks = months.some(m => m.clicks != null);
+  const barField = hasVisits ? 'visits' : 'clicks';
+  const pattern = stripes(ctx);
+  const datasets = [{
+    type: 'bar', label: hasVisits ? 'Visits' : 'Clicks from Google', order: 2,
+    data: months.map(m => m[barField]),
+    backgroundColor: months.map(m => (m.partial ? pattern : '#4DB88C')),
+    borderColor: '#4DB88C', borderWidth: months.map(m => (m.partial ? 1 : 0)),
+    maxBarThickness: 64, categoryPercentage: 0.72, barPercentage: 0.9,
+  }];
+  if (hasVisits && hasClicks) {
+    datasets.push({
+      type: 'line', label: 'Clicks from Google', order: 1,
+      data: months.map(m => m.clicks),
+      borderColor: '#58C3DA', backgroundColor: '#58C3DA', borderWidth: 2, tension: 0,
+      pointStyle: 'rect', pointRadius: 4, pointHoverRadius: 6, spanGaps: false,
+      segment: { borderDash: c => (months[c.p1DataIndex]?.partial ? [4, 4] : undefined) },
+    });
+  }
+  const opts = chartBase();
+  opts.plugins.tooltip.callbacks = {
+    title: items => { const m = months[items[0].dataIndex]; return m.partial ? `${m.label} so far` : m.label; },
+    label: item => ` ${item.dataset.label}: ${fmtInt(item.parsed.y)}`,
+  };
+  charts.history = new Chart(ctx, {
+    data: { labels: months.map(m => (m.partial ? [m.label, 'so far'] : m.label)), datasets },
+    options: opts,
   });
 }
 
+// One point for every day from the first recorded day to the last. A
+// source that leaves quiet days out would otherwise close the gaps up
+// and bend the shape of the line; a day with nothing recorded is a zero.
+function fillDays(points) {
+  const sorted = points.filter(pt => /^\d{4}-\d{2}-\d{2}$/.test(pt.date)).sort((a, b) => a.date.localeCompare(b.date));
+  if (sorted.length < 2) return sorted;
+  const by = new Map(sorted.map(pt => [pt.date, pt.sessions]));
+  const out = [];
+  const end = Date.parse(sorted[sorted.length - 1].date + 'T12:00:00Z');
+  for (let t = Date.parse(sorted[0].date + 'T12:00:00Z'), guard = 0; t <= end && guard < 400; t += 86400000, guard++) {
+    const date = new Date(t).toISOString().slice(0, 10);
+    out.push({ date, sessions: by.get(date) || 0 });
+  }
+  return out;
+}
+
+function drawTraffic(rawPoints) {
+  if (typeof Chart === 'undefined') return;
+  const points = fillDays(rawPoints);
+  const ctx = $('#trafficChart').getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 0, 300);
+  grad.addColorStop(0, 'rgba(77,184,140,.30)');
+  grad.addColorStop(1, 'rgba(77,184,140,0)');
+  const opts = chartBase();
+  opts.scales.x.ticks.maxTicksLimit = window.innerWidth < 640 ? 5 : 10;
+  opts.plugins.tooltip.callbacks = { label: item => ` Visits: ${fmtInt(item.parsed.y)}` };
+  charts.traffic = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: points.map(pt => fmtDay(pt.date)),
+      datasets: [{
+        label: 'Visits', data: points.map(pt => pt.sessions),
+        borderColor: '#4DB88C', backgroundColor: grad, fill: true, borderWidth: 2, cubicInterpolationMode: 'monotone',
+        pointStyle: 'rect', pointRadius: points.length > 35 ? 0 : 2.5, pointHoverRadius: 5, pointBackgroundColor: '#4DB88C',
+      }],
+    },
+    options: opts,
+  });
+}
+
+// ---------- loading ----------
+
 async function load() {
-  $('#app').innerHTML = `<div class="loading-overlay"><div class="spinner"></div>Fetching your latest numbers…</div>`;
-  // A flaky mobile connection or a server restart mid-request shouldn't
-  // leave the spinner turning forever: time each attempt out, retry once,
+  // Tapping two periods quickly starts two requests; only the latest one
+  // may draw, or the page could settle on the period that was not asked for.
+  const seq = ++loadSeq;
+  const app = $('#app');
+  if (hasRendered) {
+    // Changing the period keeps the page in place and dims it, so the
+    // screen does not jump back to a blank loader.
+    app.classList.add('is-loading');
+    $('#progress').hidden = false;
+  } else {
+    app.innerHTML = '<div class="loading"><div class="blocks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>Fetching your latest numbers</div>';
+  }
+  document.querySelectorAll('#rangeSwitch button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.range) === currentRange)));
+
+  // A flaky mobile connection or a server restart mid-request should not
+  // leave the loader running forever: time each attempt out, retry once,
   // then show a friendly retry button.
   const fetchOnce = async () => {
     const ctrl = new AbortController();
@@ -307,6 +601,7 @@ async function load() {
     try { return await fetch(`/api/client/${token}/data?range=${currentRange}`, { signal: ctrl.signal }); }
     finally { clearTimeout(timer); }
   };
+  const done = () => { app.classList.remove('is-loading'); $('#progress').hidden = true; };
   let res;
   try {
     res = await fetchOnce();
@@ -314,26 +609,57 @@ async function load() {
   } catch {
     try { res = await fetchOnce(); if (!res.ok) throw new Error('bad status'); }
     catch {
-      $('#app').innerHTML = `<div class="panel" style="text-align:center"><h2>Hmm, that didn't load</h2>
-        <p class="hint" style="margin:8px 0 16px">Your connection may have dropped. Please try again.</p>
-        <button class="btn primary" id="retryBtn">Try again</button></div>`;
+      if (seq !== loadSeq) return;
+      done();
+      destroyCharts();
+      hasRendered = false;
+      app.innerHTML = `<div class="failed"><h2>That did not load</h2>
+        <p>Your connection may have dropped. Please try again.</p>
+        <button type="button" class="btn" id="retryBtn">Try again</button></div>`;
       const rb = $('#retryBtn'); if (rb) rb.onclick = load;
       return;
     }
   }
-  render(await res.json());
+  const data = await res.json();
+  if (seq !== loadSeq) return;
+  done();
+  render(data);
 }
 
-$('#requestReportBtn').onclick = async (e) => {
-  const btn = e.target;
-  btn.disabled = true; btn.textContent = 'Preparing your report…';
+document.querySelectorAll('#rangeSwitch button').forEach(b => {
+  b.onclick = () => {
+    const r = Number(b.dataset.range);
+    if (r === currentRange && hasRendered) return;
+    currentRange = r;
+    load();
+  };
+});
+
+$('#requestReportBtn').onclick = async () => {
+  const btn = $('#requestReportBtn'), label = $('#requestReportLabel');
+  btn.disabled = true; label.textContent = 'Preparing your report\u2026';
+  // The server builds and emails the report inside this request, which
+  // can take a few minutes. A dropped connection or gateway timeout does
+  // not mean it failed, so say so and hold the button for a minute.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 150000);
+  const stillGoing = () => { toast('Your report is being prepared and will arrive by email shortly.', 'ok', 8000); return 60000; };
+  let holdMs = 0;
+  const started = Date.now();
   try {
-    const res = await fetch(`/api/client/${token}/request-report`, { method: 'POST' });
+    const res = await fetch(`/api/client/${token}/request-report`, { method: 'POST', signal: ctrl.signal });
     const data = await res.json().catch(() => ({}));
-    if (res.ok) toast(data.message || 'Report sent — check your inbox!', 'ok', 8000);
+    if (res.ok) toast(data.message || 'Report sent. Check your inbox!', 'ok', 8000);
+    // A gateway timeout after a long wait means the server is still working;
+    // a fast 502 means the app was not reachable and nothing was started.
+    else if ((res.status === 502 || res.status === 504) && Date.now() - started > 20000) holdMs = stillGoing();
+    else if (res.status === 409) { toast(data.error || 'Your report is already being prepared. Give it a minute and check your inbox.', 'ok', 8000); holdMs = 60000; }
     else toast(data.error || 'Could not send the report just now.', 'err', 8000);
-  } catch { toast('Could not send the report just now.', 'err'); }
-  btn.disabled = false; btn.textContent = '✉ Email me a fresh report';
+  } catch (err) {
+    if (err && err.name === 'AbortError') holdMs = stillGoing();
+    else toast('Could not send the report just now.', 'err');
+  } finally { clearTimeout(timer); }
+  setTimeout(() => { btn.disabled = false; label.textContent = 'Email me a fresh report'; }, holdMs);
 };
 
 load();

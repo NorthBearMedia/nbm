@@ -14,6 +14,8 @@
 //
 // Guarded by a settings flag; unverified domains are retried on later boots.
 import cron from 'node-cron';
+import { injectorEnabled } from './inject.js';
+import { isAutoName } from './story.js';
 import db, { getSetting, setSetting, newDashboardToken } from '../database.js';
 import { config } from '../config.js';
 import { nextRunAt, addDays, todayISO } from './dates.js';
@@ -21,7 +23,8 @@ import { googleClient } from './google.js';
 import { getGscReaderEmail, getHostingerToken, getFathomToken, getEmailBcc, getSmtp, getEmailFrom, getAppUrl } from './runtime-config.js';
 import { mailer } from './email.js';
 import { randomBytes } from 'crypto';
-import { ensureInjectCron, deleteInjectCrons, injectCronOutput, verifyTag, ensureCron, cronOutputMatching, deleteCronsMatching, HOSTINGER_USER, rootDirFor, SNIPPET_VERSION } from './inject.js';
+import { ensureInjectCron, deleteInjectCrons, injectCronOutput, verifyTag, ensureCron, cronOutputMatching, deleteCronsMatching, HOSTINGER_USER, rootDirFor, SNIPPET_VERSION, listCrons } from './inject.js';
+import { readBodyCapped } from './fetch-body.js';
 
 // Per-install secret guarding the injector-script endpoint. Created once.
 function injectToken() {
@@ -30,6 +33,91 @@ function injectToken() {
   return t;
 }
 const scriptUrlFor = domain => `${getAppUrl()}/ix/${injectToken()}/${domain}`;
+
+// ── Injector cron guard. Every placement goes through placeInjector().
+// The injector crons run every minute on the SHARED Hostinger account that
+// serves every client site, and its process limit is 120. On 4 Nov 2026 the
+// hourly retrofit kept re-placing the pair for steadplan.co.uk (WordPress:
+// its pages are PHP, so editing .html files can never put the tag on the
+// live page and the check never passes). They ran all day, the account hit
+// its process limit and Hostinger served 403s on a dozen client sites.
+// So: only plain file sites get a cron, a pair lives 30 minutes at most
+// (one run is enough; if the tag isn't live by then it won't be), a domain
+// gets a fresh pair at most every 6 hours, and no more than 2 sites have
+// crons at once (a snippet version bump must not fan out to the fleet).
+const INJECT_LIFETIME_MS = 30 * 60_000;
+const INJECT_COOLDOWN_MS = 6 * 3600_000;
+const INJECT_MAX_SITES = 2;
+const placedState = () => { try { return JSON.parse(getSetting('inject_placed') || '{}'); } catch { return {}; } };
+const savePlaced = s => setSetting('inject_placed', JSON.stringify(s));
+
+// Hostinger's own classification, cached for a day. Only website_type
+// 'other' (a plain docroot of files) can take the file injector: WordPress
+// serves PHP, builder/Horizons sites have no files, Node apps are built.
+async function injectorPlatform(domain) {
+  let cache = {};
+  try { cache = JSON.parse(getSetting('inject_platforms') || '{}'); } catch { /* fresh */ }
+  if (!cache.at || Date.now() - cache.at > 24 * 3600_000) {
+    const inv = await hostingerWebsiteInventory();
+    cache = { at: Date.now(), types: {} };
+    for (const w of inv || []) cache.types[(w.domain || '').toLowerCase().replace(/^www\./, '')] = w.website_type || w.type || 'unknown';
+    setSetting('inject_platforms', JSON.stringify(cache));
+  }
+  return cache.types[domain] || 'not-on-hostinger';
+}
+
+async function placeInjector(domain) {
+  const platform = await injectorPlatform(domain);
+  if (platform !== 'other') throw new Error(`not a plain file site (Hostinger type: ${platform}), add the tag by hand`);
+  const placed = placedState();
+  const last = placed[domain];
+  if (last && Date.now() - last < INJECT_COOLDOWN_MS) throw new Error('injector already ran in the last 6 hours');
+  const crons = await listCrons(HOSTINGER_USER).catch(() => []);
+  const busy = new Set(crons.map(j => ((j.command || '').match(/nbm-ix-([^ ]+?)\.sh/) || [])[1]).filter(Boolean));
+  busy.delete(domain);
+  if (busy.size >= INJECT_MAX_SITES) throw new Error(`injector busy on ${[...busy].join(', ')}, will try a later pass`);
+  await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
+  placed[domain] = Date.now();
+  savePlaced(placed);
+}
+
+// Runs every 10 minutes: removes any injector pair older than 30 minutes,
+// including ones placed before this guard existed (first seen = start of
+// their 30 minutes).
+export async function expireInjectorCrons() {
+  const crons = await listCrons(HOSTINGER_USER);
+  const placed = placedState();
+  const removed = [];
+  for (const domain of new Set(crons.map(j => ((j.command || '').match(/nbm-ix-([^ ]+?)\.sh/) || [])[1]).filter(Boolean))) {
+    if (!placed[domain]) { placed[domain] = Date.now(); continue; }
+    if (Date.now() - placed[domain] > INJECT_LIFETIME_MS) {
+      await deleteInjectCrons(HOSTINGER_USER, domain);
+      removed.push(domain);
+    }
+  }
+  savePlaced(placed);
+  if (removed.length) console.log('[inject] expired injector crons:', removed.join(', '));
+  return { removed };
+}
+
+// Owner-triggered: a new injector secret. Crons carrying the old URL are
+// removed, and any domain still mid-install is re-placed with the new URL
+// (ensureInjectCron swaps stale command text), so nothing is stranded.
+export async function rotateInjectToken() {
+  setSetting('inject_script_token', randomBytes(18).toString('hex'));
+  await deleteInjectCrons(HOSTINGER_USER);
+  const s = injectState();
+  let replaced = 0;
+  for (const [domain, rec] of Object.entries(s)) {
+    if (rec.status !== 'pending' || rec.watchOnly) continue;
+    try {
+      await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
+      rec.tries = 0; rec.at = Date.now(); replaced++;
+    } catch (e) { console.error('[inject] rotate re-place', domain, e.message); }
+  }
+  saveInjectState(s);
+  return { ok: true, replaced };
+}
 
 // Injection progress lives in a settings JSON: { domain: {status, tries} }.
 // status: 'pending' (cron placed, awaiting first run) | 'verified' | 'failed'.
@@ -40,7 +128,7 @@ const MEASUREMENT_FOR_DEMO = { 'nbmdemosite2.co.uk': 'G-MS3V4KS3PB' };
 // Place the injector cron for a domain and mark it pending. Doesn't wait —
 // verifyPendingInjections confirms later (cron activation can lag minutes).
 async function beginInjection(domain, measurementId) {
-  await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
+  await placeInjector(domain);
   const s = injectState();
   // Fresh attempt: tries resets to 0; spread keeps failure history
   // (lastFailSig) so repeat identical failures stay email-suppressed.
@@ -50,7 +138,15 @@ async function beginInjection(domain, measurementId) {
 
 // Background pass: for every pending domain, check the live page; when the
 // tag appears, delete its cron and mark verified. Gives up after ~2h.
+let verifyingInjections = false;
 export async function verifyPendingInjections() {
+  // One pass at a time: the 10 minute cron must not start a second pass
+  // over the same state while a slow site is still being checked.
+  if (verifyingInjections) return [];
+  verifyingInjections = true;
+  try { return await verifyPendingInner(); } finally { verifyingInjections = false; }
+}
+async function verifyPendingInner() {
   const s = injectState();
   const transitions = [];
   for (const [domain, rec] of Object.entries(s)) {
@@ -330,17 +426,40 @@ function ensureManagedSites() {
   }
 }
 
+// Proper business names, as each client writes it on their own website.
+// Sites imported in bulk were named by machine from the domain
+// ("Richfordvehiclesales"), and that name headed their reports and email
+// subjects. Applied only while the stored name is still the machine-made
+// one, so a name typed in the admin console is never overwritten.
+const CLIENT_NAMES = {
+  'richfordvehiclesales.co.uk': 'Richford Motors Sales',
+  'pslimited.uk': 'Personnel Solutions Ltd',
+  'woodlandwalkdaycare.co.uk': 'Woodland Walk Day Care',
+  'greenpathgardencare.co.uk': 'GreenPath Garden Care',
+  'ivyhouseresidentialhome.co.uk': 'Ivy House Residential Home',
+  'swanwickkidsclub.co.uk': 'Swanwick Kids Club',
+  'muskengineering.co.uk': 'Musk Engineering',
+  'maxus-evc.co.uk': 'Maxus EVC',
+  'wowstays.co.uk': 'WOW Stays',
+};
+
 // Runs on every boot: cheap, offline, idempotent.
 export function loadClientContacts() {
   const sites = db.prepare('SELECT id, client_name, domain, contact_emails, clarity_project_id, ga4_measurement_id, ga4_property_id, notes FROM sites WHERE active = 1').all();
   const loaded = [];
   for (const site of sites) {
     const d = (site.domain || '').toLowerCase().replace(/^www\./, '');
+    const proper = CLIENT_NAMES[d];
+    if (proper && site.client_name !== proper && isAutoName(site.client_name, d)) {
+      db.prepare('UPDATE sites SET client_name = ? WHERE id = ?').run(proper, site.id);
+      console.log(`[ops] client name tidied: ${site.client_name} is now ${proper}`);
+      site.client_name = proper;
+    }
     const email = CLIENT_EMAILS[d];
     if (email && !site.contact_emails) {
       db.prepare('UPDATE sites SET contact_emails = ? WHERE id = ?').run(email, site.id);
       loaded.push(`${site.client_name} → ${email}`);
-      console.log(`[ops] contact loaded: ${site.client_name} → ${email}`);
+      console.log(`[ops] contact loaded: ${site.client_name} (contact set)`);
     }
     const clarity = CLARITY_PROJECTS[d];
     if (clarity && !site.clarity_project_id) {
@@ -465,6 +584,7 @@ async function hostingerAddTxt(domain, content) {
       overwrite: false,
       zone: [{ name: '@', type: 'TXT', ttl: 300, records: [{ content }] }],
     }),
+    signal: AbortSignal.timeout(20_000),
   });
   if (!res.ok) throw new Error(`Hostinger DNS ${res.status}: ${(await res.text().catch(() => '')).slice(0, 160)}`);
 }
@@ -474,8 +594,9 @@ async function hostingerAddTxt(domain, content) {
 export async function hostingerWebsiteInventory() {
   const token = getHostingerToken();
   if (!token) throw new Error('no Hostinger token in settings');
-  const res = await fetch('https://developers.hostinger.com/api/hosting/v1/websites', {
+  const res = await fetch('https://developers.hostinger.com/api/hosting/v1/websites?per_page=100', {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    signal: AbortSignal.timeout(20_000),
   });
   if (!res.ok) throw new Error(`Hostinger websites ${res.status}: ${(await res.text().catch(() => '')).slice(0, 160)}`);
   const data = await res.json();
@@ -665,9 +786,13 @@ export async function runInjectionRollout({ onlyDomain = null } = {}) {
       if (site.ga4_measurement_id) continue;
       const m = matchForDomain(site.domain, scan);
       if (m.ga4?.measurementId) {
-        db.prepare('UPDATE sites SET ga4_measurement_id = ?, ga4_property_id = CASE WHEN ga4_property_id = "" THEN ? ELSE ga4_property_id END WHERE id = ?')
-          .run(m.ga4.measurementId, m.ga4.propertyId || '', site.id);
-        site.ga4_measurement_id = m.ga4.measurementId;
+        // Single-quoted SQL literal: a double-quoted "" is read as a column
+        // name by SQLite and threw, which aborted the whole rollout.
+        try {
+          db.prepare("UPDATE sites SET ga4_measurement_id = ?, ga4_property_id = COALESCE(NULLIF(ga4_property_id, ''), ?) WHERE id = ?")
+            .run(m.ga4.measurementId, m.ga4.propertyId || '', site.id);
+          site.ga4_measurement_id = m.ga4.measurementId;
+        } catch (e) { console.error('[inject] id fill failed for', site.domain, e.message); }
       }
     }
   }
@@ -730,6 +855,7 @@ function isAutoTaggable(domain) {
 // window (whatever failed it may since be fixed — it was), so no site is
 // ever permanently stranded. Emits one summary the first time it places.
 export async function reconcileRolloutCrons() {
+  if (!injectorEnabled()) return { skipped: 'injector switched off' };
   if (injectState()['nbmdemosite2.co.uk']?.status !== 'verified') return { skipped: 'demo not verified' };
   const sites = db.prepare("SELECT * FROM sites WHERE active = 1 AND domain != ''").all();
   const state = injectState();
@@ -742,7 +868,7 @@ export async function reconcileRolloutCrons() {
     if (!site.ga4_measurement_id) { noId.push(domain); continue; }
     if (isAutoTaggable(domain)) {
       try {
-        await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
+        await placeInjector(domain);
         state[domain] = { ...(state[domain] || {}), status: 'pending', tries: 0, measurementId: site.ga4_measurement_id, at: Date.now() };
         placed.push(domain);
       } catch (e) { console.error('[reconcile]', domain, e.message); }
@@ -782,13 +908,14 @@ async function fetchLivePage(domain) {
   for (const url of [`https://${domain}/?nbmv=${Date.now()}`, `https://www.${domain}/?nbmv=${Date.now()}`]) {
     try {
       const res = await fetch(url, { headers: { 'User-Agent': 'NorthBearPulse/1.0', 'Cache-Control': 'no-cache' }, redirect: 'follow', signal: AbortSignal.timeout(15000) });
-      if (res.ok) return (await res.text()).slice(0, 2_000_000);
+      if (res.ok) return await readBodyCapped(res, 2_000_000);
     } catch { /* try next */ }
   }
   return null;
 }
 
 export async function retrofitTags() {
+  if (!injectorEnabled()) return { skipped: 'injector switched off' };
   if (!getHostingerToken()) return { skipped: 'no Hostinger token' };
   if (injectState()['nbmdemosite2.co.uk']?.status !== 'verified') return { skipped: 'demo not verified' };
   const banner = getSetting('consent_banner') === 'true';
@@ -858,7 +985,7 @@ export async function retrofitTags() {
         !fathomOk ? 'Fathom' : null,
       ].filter(Boolean);
       try {
-        await ensureInjectCron({ username: HOSTINGER_USER, domain, scriptUrl: scriptUrlFor(domain) });
+        await placeInjector(domain);
         cur.tries++;
         placed++;
         console.log('[retrofit]', domain, `mismatch — injector placed (try ${cur.tries})`, cur.missing.join('+'));
@@ -899,9 +1026,12 @@ async function onboardNewSites() {
       const extra = new Set(JSON.parse(getSetting('file_hosted_extra') || '[]'));
       for (const s of unknown) {
         const row = (inv || []).find(w => (w.domain || '').toLowerCase().replace(/^www\./, '') === s.d);
-        const builder = row && /builder|horizons/i.test(String(row.type || row.platform || ''));
+        // Hostinger calls the field website_type (wordpress, builder, horizons,
+        // nodejs, other); reading .type made every site look file-hosted.
+        const platform = row ? String(row.website_type || row.type || row.platform || 'unknown') : 'not-on-hostinger';
+        const builder = platform !== 'other';
         if (row && !builder) extra.add(s.d);
-        state[s.d] = { ...(state[s.d] || {}), classified: true, platform: row ? String(row.type || row.platform || 'unknown') : 'not-on-hostinger' };
+        state[s.d] = { ...(state[s.d] || {}), classified: true, platform };
         console.log('[onboard]', s.d, 'platform:', state[s.d].platform, builder ? '(builder — tag via paste)' : '(file injector eligible)');
       }
       setSetting('file_hosted_extra', JSON.stringify([...extra]));
@@ -909,38 +1039,57 @@ async function onboardNewSites() {
     } catch (e) { console.log('[onboard] inventory failed:', e.message.slice(0, 80)); }
   }
 
-  // GA4 — adopt or create.
-  for (const s of needy.filter(x => !x.ga4_property_id || !x.ga4_measurement_id)) {
+  // GA4, adopt or create. The agency's properties and their web streams
+  // are listed ONCE per pass (five stream lookups in flight at a time) and
+  // every needy site is matched against that list, instead of re-listing
+  // every property for every site each hour.
+  const ga4Needy = needy.filter(x => !x.ga4_property_id || !x.ga4_measurement_id);
+  const editAuth = { scopes: ['https://www.googleapis.com/auth/analytics.edit'], subject };
+  let summaries = [];
+  const index = []; // [{ property, webStreams }]
+  if (ga4Needy.length) {
     try {
-      const summaries = (await gReq({ url: 'https://analyticsadmin.googleapis.com/v1beta/accountSummaries?pageSize=200', method: 'GET' },
-        { scopes: ['https://www.googleapis.com/auth/analytics.edit'], subject })).accountSummaries || [];
+      summaries = (await gReq({ url: 'https://analyticsadmin.googleapis.com/v1beta/accountSummaries?pageSize=200', method: 'GET' }, editAuth)).accountSummaries || [];
+      const props = summaries.flatMap(acc => acc.propertySummaries || []);
+      for (let i = 0; i < props.length; i += 5) {
+        await Promise.all(props.slice(i, i + 5).map(async p => {
+          const streams = (await gReq({ url: `https://analyticsadmin.googleapis.com/v1beta/${p.property}/dataStreams`, method: 'GET' }, editAuth).catch(() => ({}))).dataStreams || [];
+          index.push({ property: p.property, webStreams: streams.filter(st => st.type === 'WEB_DATA_STREAM') });
+        }));
+      }
+    } catch (e) { console.log('[onboard] GA4 listing failed:', String(e.message || e).slice(0, 100)); }
+  }
+  for (const s of ga4Needy) {
+    try {
       // Adopt: an existing property whose web stream URI matches the domain.
       let adopted = false;
-      outer: for (const acc of summaries) {
-        for (const p of (acc.propertySummaries || [])) {
-          const streams = (await gReq({ url: `https://analyticsadmin.googleapis.com/v1beta/${p.property}/dataStreams`, method: 'GET' },
-            { scopes: ['https://www.googleapis.com/auth/analytics.edit'], subject }).catch(() => ({}))).dataStreams || [];
-          const web = streams.find(st => st.type === 'WEB_DATA_STREAM' && (st.webStreamData?.defaultUri || '').toLowerCase().includes(s.d));
-          if (web) {
-            db.prepare('UPDATE sites SET ga4_property_id = ?, ga4_measurement_id = ? WHERE id = ?')
-              .run(p.property.replace('properties/', ''), web.webStreamData.measurementId || '', s.id);
-            console.log('[onboard]', s.d, 'adopted existing GA4 property', p.property);
-            adopted = true; break outer;
-          }
+      for (const { property, webStreams } of index) {
+        const web = webStreams.find(st => (st.webStreamData?.defaultUri || '').toLowerCase().includes(s.d));
+        if (web) {
+          db.prepare('UPDATE sites SET ga4_property_id = ?, ga4_measurement_id = ? WHERE id = ?')
+            .run(property.replace('properties/', ''), web.webStreamData.measurementId || '', s.id);
+          console.log('[onboard]', s.d, 'adopted existing GA4 property', property);
+          adopted = true; break;
         }
       }
       if (adopted) continue;
+      if (!summaries.length) { console.log('[onboard]', s.d, 'GA4 listing unavailable, skipping create this pass'); continue; }
       // Create: in the account that owns the agency's own property.
       const home = summaries.find(a => (a.propertySummaries || []).some(p => p.property === 'properties/526994009')) || summaries[0];
       if (!home) { console.log('[onboard]', s.d, 'no GA account visible — cannot create property'); continue; }
+      // Creates are not idempotent: never let the shared retry policy
+      // re-send one after a timeout or 5xx (that made duplicate properties).
       const prop = await gReq({
         url: 'https://analyticsadmin.googleapis.com/v1beta/properties', method: 'POST',
         data: { parent: home.account, displayName: s.client_name || s.d, timeZone: 'Europe/London', currencyCode: 'GBP' },
-      }, { scopes: ['https://www.googleapis.com/auth/analytics.edit'], subject });
+        retryConfig: { retry: 0 },
+      }, editAuth);
       const stream = await gReq({
         url: `https://analyticsadmin.googleapis.com/v1beta/${prop.name}/dataStreams`, method: 'POST',
         data: { type: 'WEB_DATA_STREAM', displayName: s.client_name || s.d, webStreamData: { defaultUri: 'https://' + s.d } },
-      }, { scopes: ['https://www.googleapis.com/auth/analytics.edit'], subject });
+        retryConfig: { retry: 0 },
+      }, editAuth);
+      index.push({ property: prop.name, webStreams: [stream] });
       db.prepare('UPDATE sites SET ga4_property_id = ?, ga4_measurement_id = ? WHERE id = ?')
         .run(prop.name.replace('properties/', ''), stream.webStreamData?.measurementId || '', s.id);
       console.log('[onboard]', s.d, 'created GA4 property', prop.name, 'stream', stream.webStreamData?.measurementId);
@@ -1030,7 +1179,7 @@ async function ensureFathomSites() {
   for (const site of missing) {
     const d = (site.domain || '').toLowerCase().replace(/^www\./, '');
     try {
-      const match = existing.find(f => !taken.has(String(f.id)) && (norm(f.name) === norm(site.client_name) || norm(f.name) === norm(d)));
+      const match = existing.find(f => !taken.has(String(f.id)) && (norm(f.name) === norm(site.client_name) || norm(f.name) === norm(d) || norm(f.name) === norm(d.split('.')[0])));
       const id = String(match ? match.id : await createSite(site.client_name || d));
       if (taken.has(id)) { console.log('[fathom-ensure]', d, 'skipped — id', id, 'already belongs to another site'); continue; }
       db.prepare('UPDATE sites SET fathom_site_id = ? WHERE id = ?').run(id, site.id);
@@ -1064,7 +1213,8 @@ export async function fixDuplicateFathomIds() {
     const sites = db.prepare('SELECT * FROM sites WHERE fathom_site_id = ? AND active = 1 ORDER BY id').all(dupe.id);
     const fathomName = names.find(f => String(f.id) === String(dupe.id))?.name;
     const keeper = (fathomName && sites.find(s => norm(s.client_name) === norm(fathomName)
-      || norm((s.domain || '').replace(/^www\./, '')) === norm(fathomName))) || sites[0];
+      || norm((s.domain || '').replace(/^www\./, '')) === norm(fathomName)
+      || norm((s.domain || '').replace(/^www\./, '').split('.')[0]) === norm(fathomName))) || sites[0];
     for (const s of sites) {
       if (s.id === keeper.id) continue;
       db.prepare("UPDATE sites SET fathom_site_id = '' WHERE id = ?").run(s.id);
@@ -1378,10 +1528,23 @@ export async function deriveTargetKeywords() {
 // "Can this Search Console property actually be READ?" — the only proof
 // that matters. Injectable so the selection logic is directly testable
 // (it has caused three separate live incidents, so it earns real tests).
+// Three answers: true (reads), false (Google definitely denies this
+// property: 400, 403, 404 or the "insufficient permission" text) and null
+// (a passing failure such as a quota 429, a 5xx or a dropped socket, which
+// says nothing about the property and must never be acted on).
 async function defaultGscReader() {
   const { fetchSummary } = await import('./gsc.js');
   const end = addDays(todayISO(), -3), start = addDays(end, -6);
-  return async url => { try { await fetchSummary(url, start, end); return true; } catch { return false; } };
+  return async url => {
+    try { await fetchSummary(url, start, end); return true; }
+    catch (e) {
+      const status = Number(e?.response?.status ?? e?.status ?? e?.code ?? 0);
+      if (status === 400 || status === 403 || status === 404) return false;
+      if (/sufficient permission|forbidden|not found/i.test(String(e?.message || ''))) return false;
+      console.log('[gsc] read failed for a passing reason:', url, String(e?.message || e).slice(0, 80));
+      return null;
+    }
+  };
 }
 
 // Store a Search Console property ONLY if it can actually be read.
@@ -1425,14 +1588,18 @@ export async function healGscProperties({ reads: readsFn = null } = {}) {
   }
   let fixed = 0;
   for (const site of sites) {
-    if (await reads(site.gsc_site_url)) continue; // current property is fine
+    const current = await reads(site.gsc_site_url);
+    if (current) continue; // current property is fine
     const d = (site.domain || '').toLowerCase().replace(/^www\./, '');
     if (!d) continue;
+    if (current === null) { console.log('[gsc-heal]', d, 'read failed for a passing reason, leaving the property alone this pass'); continue; }
     const candidates = [`https://${d}/`, `https://www.${d}/`, `sc-domain:${d}`, `http://${d}/`, `http://www.${d}/`]
       .filter(c => c !== site.gsc_site_url);
-    let switched = false;
+    let switched = false, unknown = false;
     for (const c of candidates) {
-      if (await reads(c)) {
+      const readable = await reads(c);
+      if (readable === null) { unknown = true; continue; }
+      if (readable) {
         db.prepare('UPDATE sites SET gsc_site_url = ? WHERE id = ?').run(c, site.id);
         setSetting('managed_gsc_last_' + d, '');
         console.log('[gsc-heal]', d, 'unreadable property', site.gsc_site_url, '→ switched to working', c);
@@ -1446,7 +1613,9 @@ export async function healGscProperties({ reads: readsFn = null } = {}) {
     // property is skipped by the very job that could fix it (live: CN
     // Maintenance and Enso HR sat unreadable for a day). Clear it so the
     // verification path picks the site up on its next pass.
-    if (!switched) {
+    if (!switched && unknown) {
+      console.log('[gsc-heal]', d, 'some probes failed for a passing reason, not clearing this pass');
+    } else if (!switched) {
       db.prepare("UPDATE sites SET gsc_site_url = '' WHERE id = ?").run(site.id);
       console.log('[gsc-heal]', d, 'no readable property — cleared', site.gsc_site_url, 'so verification retries');
     }
@@ -1502,7 +1671,7 @@ export async function managedGscDiagnosis() {
     for (const url of [`https://${m.domain}/?nbmv=${Date.now()}`, `https://www.${m.domain}/?nbmv=${Date.now()}`]) {
       try {
         const res = await fetch(url, { headers: { 'User-Agent': 'NorthBearPulse/1.0', 'Cache-Control': 'no-cache' }, redirect: 'follow', signal: AbortSignal.timeout(15000) });
-        if (res.ok) { html = (await res.text()).slice(0, 2_000_000); finalHost = new URL(res.url).host; break; }
+        if (res.ok) { html = await readBodyCapped(res, 2_000_000); finalHost = new URL(res.url).host; break; }
       } catch { /* try next */ }
     }
     const apexToken = client ? await metaTokenFor(client, `https://${m.domain}/`) : '';
@@ -1550,7 +1719,7 @@ async function probeHostingerAnalytics() {
   const lines = [];
   const tryGet = async (label, path) => {
     try {
-      const r = await fetch('https://developers.hostinger.com' + path, { headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } });
+      const r = await fetch('https://developers.hostinger.com' + path, { headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' }, signal: AbortSignal.timeout(20_000) });
       const body = (await r.text()).slice(0, 300).replace(/\s+/g, ' ');
       lines.push(`${r.status}  ${label}  ${path}\n      ${body}`);
     } catch (e) { lines.push(`ERR  ${label}  ${path} — ${e.message.slice(0, 80)}`); }
@@ -1880,7 +2049,7 @@ export function scheduleOpsSweep() {
         + `Demo live-page check right now: ${live.verified ? 'TAG VISIBLE ✅ (' + live.url + ')' : 'tag not visible yet'}\n`
         + `Self-fetch of the injector URL via public edge: ${selfCheck}\n`
         + `Last recorded crash: ${getSetting('last_crash') || '(none recorded)'}\n`
-        + `Injector script URL in use: ${scriptUrlFor('nbmdemosite2.co.uk')}\n`
+        + `Injector script URL in use: ${getAppUrl()}/ix/<token>/nbmdemosite2.co.uk\n`
         + `Railway domain for this container: ${process.env.RAILWAY_PUBLIC_DOMAIN || process.env.RAILWAY_STATIC_URL || '(not set)'}\n\n`
         + `Pulse re-checks pending installs every 10 minutes and emails on every change. If you ever stop hearing from Pulse entirely, the app or its email is down — check Railway.\n\n— North Bear Pulse`,
     }).catch(e => console.error('[ops] boot status email failed:', e.message));
@@ -1895,7 +2064,7 @@ export function scheduleOpsSweep() {
   setTimeout(() => probeHostingerAnalytics().catch(e => console.error('[probe]', e.message)), 240_000);
   setTimeout(() => fathomCheck().catch(e => console.error('[fathom-check]', e.message)), 180_000);
   try {
-    cron.schedule('11 * * * *', () => fathomCheck().catch(e => console.error('[fathom-check]', e.message)), { timezone: config.timezone });
+    cron.schedule('11 * * * *', () => fathomCheck().catch(e => console.error('[fathom-check]', e.message)), { timezone: config.timezone, noOverlap: true });
   } catch (e) { console.error('[fathom-check] schedule failed:', e.message); }
   setTimeout(() => runDocrootSurvey().catch(e => console.error('[ops] docroot survey:', e.message)), 300_000);
   setTimeout(() => runStagedFilePeek().catch(e => console.error('[ops] staged peek:', e.message)), 330_000);
@@ -1904,36 +2073,44 @@ export function scheduleOpsSweep() {
   setTimeout(() => finalizeSearchConsole().catch(e => console.error('[gsc]', e.message)), 150_000);
   setTimeout(() => verifyManagedSitesGsc().catch(e => console.error('[gsc-managed]', e.message)), 165_000);
   try {
-    cron.schedule('7 * * * *', () => { finalizeSearchConsole().catch(e => console.error('[gsc]', e.message)); verifyManagedSitesGsc().catch(e => console.error('[gsc-managed]', e.message)); healGscProperties().catch(e => console.error('[gsc-heal]', e.message)); }, { timezone: config.timezone });
+    // Return the combined promise so noOverlap knows how long the pass runs.
+    cron.schedule('7 * * * *', () => Promise.allSettled([
+      finalizeSearchConsole().catch(e => console.error('[gsc]', e.message)),
+      verifyManagedSitesGsc().catch(e => console.error('[gsc-managed]', e.message)),
+      healGscProperties().catch(e => console.error('[gsc-heal]', e.message)),
+    ]), { timezone: config.timezone, noOverlap: true });
   } catch (e) { console.error('[gsc] schedule failed:', e.message); }
   setTimeout(() => healGscProperties().catch(e => console.error('[gsc-heal]', e.message)), 120_000);
   // Keep live pages matching their intended tag set (Clarity added later,
   // consent banner toggled) — hourly, offset from the GSC pass.
   try {
-    cron.schedule('23 * * * *', () => retrofitTags().catch(e => console.error('[retrofit]', e.message)), { timezone: config.timezone });
+    cron.schedule('23 * * * *', () => retrofitTags().catch(e => console.error('[retrofit]', e.message)), { timezone: config.timezone, noOverlap: true });
   } catch (e) { console.error('[retrofit] schedule failed:', e.message); }
   setTimeout(() => retrofitTags().catch(e => console.error('[retrofit]', e.message)), 480_000);
   // Complete the wiring for any site added to the fleet (GA4 adopt/create,
   // Search Console DNS-or-tag, platform classification) — hourly.
   try {
-    cron.schedule('37 * * * *', () => onboardNewSites().catch(e => console.error('[onboard]', e.message)), { timezone: config.timezone });
+    cron.schedule('37 * * * *', () => onboardNewSites().catch(e => console.error('[onboard]', e.message)), { timezone: config.timezone, noOverlap: true });
   } catch (e) { console.error('[onboard] schedule failed:', e.message); }
   setTimeout(() => onboardNewSites().catch(e => console.error('[onboard]', e.message)), 240_000);
   // Prove each source carries the right domain's traffic — hourly.
   try {
-    cron.schedule('43 * * * *', () => verifySourceIntegrity().catch(e => console.error('[integrity]', e.message)), { timezone: config.timezone });
+    cron.schedule('43 * * * *', () => verifySourceIntegrity().catch(e => console.error('[integrity]', e.message)), { timezone: config.timezone, noOverlap: true });
   } catch (e) { console.error('[integrity] schedule failed:', e.message); }
   setTimeout(() => verifySourceIntegrity().catch(e => console.error('[integrity]', e.message)), 300_000);
   // Fathom on every site: create/match Fathom sites and store IDs — the
   // retrofit then serves the script on file-hosted sites automatically.
   try {
-    cron.schedule('53 * * * *', () => ensureFathomSites().catch(e => console.error('[fathom-ensure]', e.message)), { timezone: config.timezone });
+    cron.schedule('53 * * * *', () => ensureFathomSites().catch(e => console.error('[fathom-ensure]', e.message)), { timezone: config.timezone, noOverlap: true });
   } catch (e) { console.error('[fathom-ensure] schedule failed:', e.message); }
   setTimeout(() => ensureFathomSites().catch(e => console.error('[fathom-ensure]', e.message)), 270_000);
   // Repair shared Fathom IDs (one client seeing another's numbers) and GA
   // properties that report nothing because the tag feeds a different one.
   try {
-    cron.schedule('47 * * * *', () => { fixDuplicateFathomIds().catch(e => console.error('[fathom-dupe]', e.message)); healGa4MeasurementIds().catch(e => console.error('[ga-mid]', e.message)).then(() => healGa4Properties().catch(e => console.error('[ga-heal]', e.message))); }, { timezone: config.timezone });
+    cron.schedule('47 * * * *', () => Promise.allSettled([
+      fixDuplicateFathomIds().catch(e => console.error('[fathom-dupe]', e.message)),
+      healGa4MeasurementIds().catch(e => console.error('[ga-mid]', e.message)).then(() => healGa4Properties().catch(e => console.error('[ga-heal]', e.message))),
+    ]), { timezone: config.timezone, noOverlap: true });
   } catch (e) { console.error('[heal] schedule failed:', e.message); }
   setTimeout(() => fixDuplicateFathomIds().catch(e => console.error('[fathom-dupe]', e.message)), 90_000);
   setTimeout(() => healGa4MeasurementIds().catch(e => console.error('[ga-mid]', e.message))
@@ -1941,14 +2118,16 @@ export function scheduleOpsSweep() {
   // Learn each site's real target keywords from its own Search Console
   // queries — daily (the data moves slowly) plus once after boot.
   try {
-    cron.schedule('20 6 * * *', () => deriveTargetKeywords().catch(e => console.error('[keywords]', e.message)), { timezone: config.timezone });
+    cron.schedule('20 6 * * *', () => deriveTargetKeywords().catch(e => console.error('[keywords]', e.message)), { timezone: config.timezone, noOverlap: true });
   } catch (e) { console.error('[keywords] schedule failed:', e.message); }
   setTimeout(() => deriveTargetKeywords().catch(e => console.error('[keywords]', e.message)), 420_000);
   try {
-    cron.schedule('*/10 * * * *', () => verifyPendingInjections().catch(e => console.error('[inject]', e.message)), { timezone: config.timezone });
+    cron.schedule('*/10 * * * *', () => verifyPendingInjections().catch(e => console.error('[inject]', e.message)), { timezone: config.timezone, noOverlap: true });
     // Self-heal a stalled rollout: place crons for any unverified client
     // site. Runs shortly after boot and every 10 min thereafter.
-    cron.schedule('*/10 * * * *', () => reconcileRolloutCrons().catch(e => console.error('[reconcile]', e.message)), { timezone: config.timezone });
+    cron.schedule('*/10 * * * *', () => reconcileRolloutCrons().catch(e => console.error('[reconcile]', e.message)), { timezone: config.timezone, noOverlap: true });
+    // Injector crons never outlive 30 minutes (see placeInjector).
+    cron.schedule('*/10 * * * *', () => expireInjectorCrons().catch(e => console.error('[inject-expire]', e.message)), { timezone: config.timezone, noOverlap: true });
   } catch (e) { console.error('[inject] schedule failed:', e.message); }
   setTimeout(() => reconcileRolloutCrons().catch(e => console.error('[reconcile]', e.message)), 360_000);
   // The network sweep retries on boots until fully done (v2 adds the

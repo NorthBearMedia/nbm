@@ -7,6 +7,7 @@ import { gatherReportData } from './report-data.js';
 import { generateReportPdf } from './pdf.js';
 import { sendReportEmail } from './email.js';
 import { periodFor, formatDate } from './dates.js';
+import { senseCheck, checkSummary } from './sensecheck.js';
 
 function slug(s) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'site';
@@ -24,17 +25,35 @@ export async function runReport(site, { trigger = 'scheduled', period } = {}) {
     if (!data.ga4 && !data.clarity && searchMeaningless) {
       throw new Error(`No meaningful data for this period. ${data.warnings.join(' | ') || 'No sources configured or nothing recorded yet.'}`);
     }
+    // Read the report before anyone else does (sensecheck.js). A report
+    // that does not make sense is held: it goes to the owner only, with
+    // the reason, until he releases it. His own "send" from the admin
+    // console is that release, so a manual send is never held.
+    const check = await senseCheck(data);
+    const held = check.outcome === 'hold' && trigger !== 'manual';
     const pdf = await generateReportPdf(data);
     const filename = `${slug(site.client_name)}-report-${p.start}-to-${p.end}.pdf`;
-    const storedName = `${site.id}-${Date.now()}-${filename}`;
-    writeFileSync(join(config.reportsDir, storedName), pdf);
-
-    const sentTo = await sendReportEmail(site, data, pdf, periodText, filename);
-    db.prepare(`INSERT INTO reports (site_id, period_start, period_end, period_label, pdf_path, sent_to, trigger_type, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'sent')`)
-      .run(site.id, p.start, p.end, periodText, storedName, sentTo.join(', '), trigger);
-    console.log(`[report] sent ${site.client_name} (${periodText}) → ${sentTo.join(', ')}`);
-    return { ok: true, sentTo, periodText, warnings: data.warnings };
+    const sentTo = await sendReportEmail(site, data, pdf, periodText, filename, { check, held });
+    // Store the PDF for the admin download button only once the email has
+    // gone: a failed send used to leave an orphaned file on the volume, and
+    // a full disk must never turn a sent email into a 'failed' row (which
+    // would make the scheduler send it again tomorrow).
+    let storedName = `${site.id}-${Date.now()}-${filename}`;
+    try {
+      writeFileSync(join(config.reportsDir, storedName), pdf);
+    } catch (e) {
+      console.error(`[report] sent but could not store the PDF: ${e.message}`);
+      storedName = '';
+    }
+    // The status column only allows 'sent' or 'failed' (and the table
+    // must never be rebuilt), so a held report is a 'sent' row whose
+    // recipients start with HELD and whose reason sits in the error text.
+    db.prepare(`INSERT INTO reports (site_id, period_start, period_end, period_label, pdf_path, sent_to, trigger_type, status, error)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'sent', ?)`)
+      .run(site.id, p.start, p.end, periodText, storedName, sentTo.join(', '), trigger, checkSummary(check, held));
+    const previewed = sentTo.some(t => t.startsWith('TEST→'));
+    console.log(`[report] ${held ? 'HELD' : 'sent'} ${site.client_name} (${periodText}) → ${sentTo.length} recipient(s)${previewed ? ' [preview to owner, site not live]' : ''}${held ? ` [${check.holds.length} reason(s)]` : ''}${check.swapped ? ' [analysis swapped to standard]' : ''}`);
+    return { ok: true, sentTo, periodText, warnings: data.warnings, held, check };
   } catch (err) {
     db.prepare(`INSERT INTO reports (site_id, period_start, period_end, period_label, sent_to, trigger_type, status, error)
                 VALUES (?, ?, ?, ?, ?, ?, 'failed', ?)`)

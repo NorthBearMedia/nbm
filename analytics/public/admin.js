@@ -362,6 +362,10 @@ function showSettingsModal() {
           <input name="anthropic_api_key" type="password" placeholder="${s.anthropic_key_set ? '••••••••••••' : 'console.anthropic.com → API keys'}">
           <div class="help">Writes the plain-English "what this means & what to do next" section of each report.
           ${s.anthropic_key_set ? 'Active ✓' : 'Without it, reports use a strong built-in insights section instead.'}</div></div>
+        <div class="field full"><label>Site health: Google PageSpeed API key ${s.pagespeed_key_set ? '(saved, leave blank to keep)' : ''}</label>
+          <input name="pagespeed_api_key" type="password" placeholder="${s.pagespeed_key_set ? '••••••••••••' : 'Google Cloud console, APIs and services, Credentials, Create API key'}">
+          <div class="help">Lets Pulse run Google's speed and SEO test on every site for the Site health scores. Free.
+          ${s.pagespeed_key_set ? 'Active ✓' : 'Without it Google refuses the test and the Site health section stays empty.'}</div></div>
         <div class="field full"><label>Replace Google service account key (optional)</label>
           <textarea name="google_json" rows="3" placeholder='Paste new key JSON only if you need to replace it${setup.googleServiceAccountEmail ? ' — current: ' + esc(setup.googleServiceAccountEmail) : ''}'></textarea></div>
       </div>
@@ -433,7 +437,7 @@ function renderSites() {
       <div class="meta">
         ${esc(FREQ_LABEL[s.report_frequency] || s.report_frequency)}${s.next_report_at && s.report_frequency !== 'none' ? ` · next: ${esc(s.next_report_at)}` : ''}<br>
         ${s.lastReport
-          ? `Last report: ${esc(s.lastReport.created_at.slice(0, 16))} ${s.lastReport.status === 'sent' ? '<span style="color:var(--green-light)">✓ sent</span>' : '<span style="color:var(--red)">✗ failed</span>'}`
+          ? `Last report: ${esc(s.lastReport.created_at.slice(0, 16))} ${s.lastReport.held ? '<span style="color:var(--amber)">⏸ held for you, see History</span>' : s.lastReport.status === 'sent' ? '<span style="color:var(--green-light)">✓ sent</span>' : '<span style="color:var(--red)">✗ failed</span>'}`
           : 'No reports sent yet'}
       </div>
       <div class="actions">
@@ -499,7 +503,7 @@ $('#sitesGrid').addEventListener('click', async (e) => {
     btn.disabled = true; btn.textContent = 'Sending…';
     try {
       const r = await api(`/api/sites/${site.id}/send-report`, { method: 'POST' });
-      if (r.ok) toast(`Report sent to ${r.sentTo.join(', ')}${r.warnings?.length ? ` (warnings: ${r.warnings.length})` : ''}`);
+      if (r.ok) toast(`Report sent to ${r.sentTo.join(', ')}${r.warnings?.length ? ` (warnings: ${r.warnings.length})` : ''}${r.check?.holds?.length ? `. Sense check flagged: ${r.check.holds[0]}` : ''}`, r.check?.holds?.length ? 'err' : 'ok', r.check?.holds?.length ? 12000 : undefined);
       else toast(`Failed: ${r.error}`, 'err', 8000);
       await loadSites();
     } catch (err) { toast(err.message, 'err', 8000); }
@@ -718,15 +722,31 @@ async function showHistoryModal(site) {
             <td>${esc(r.period_label || `${r.period_start} – ${r.period_end}`)}</td>
             <td class="trunc" title="${esc(r.sent_to)}">${esc(r.sent_to)}</td>
             <td>${esc(r.trigger_type)}</td>
-            <td>${r.status === 'sent' ? '<span style="color:var(--green-light)">✓ sent</span>' : `<span style="color:var(--red)" title="${esc(r.error)}">✗ failed</span>`}</td>
-            <td>${r.status === 'sent' && r.pdf_path ? `<a class="btn small" href="/api/reports/${r.id}/download">PDF</a>` : ''}</td>
-          </tr>`).join('')}
+            <td>${String(r.sent_to || '').startsWith('HELD') ? '<span style="color:var(--amber)">⏸ held</span>'
+              : String(r.sent_to || '').startsWith('RELEASED') ? '<span style="color:var(--text-muted)">released by you</span>'
+              : r.status === 'sent' ? `<span style="color:var(--green-light)"${r.error ? ` title="${esc(r.error)}"` : ''}>✓ sent${r.error ? ' (notes)' : ''}</span>`
+              : `<span style="color:var(--red)" title="${esc(r.error)}">✗ failed</span>`}</td>
+            <td>${r.status === 'sent' && r.pdf_path ? `<a class="btn small" href="/api/reports/${r.id}/download">PDF</a>` : ''}
+              ${String(r.sent_to || '').startsWith('HELD') ? `<button class="btn small primary" data-release="${r.id}">Send to client</button>` : ''}</td>
+          </tr>${r.error && (String(r.sent_to || '').startsWith('HELD') || r.status === 'sent') ? `
+          <tr><td colspan="6" class="hint" style="white-space:normal;padding-top:0">${esc(r.error)}</td></tr>` : ''}`).join('')}
         </tbody></table>` : '<p class="hint">No reports yet for this site.</p>'}
       <div class="modal-actions"><button class="btn" id="cancelBtn">Close</button></div>
     </div>
   </div>`;
   $('#cancelBtn').onclick = closeModal;
   $('#backdrop').onclick = e => { if (e.target.id === 'backdrop') closeModal(); };
+  document.querySelectorAll('[data-release]').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm('Send this report to the client as it is?')) return;
+      btn.disabled = true; btn.textContent = 'Sending…';
+      try {
+        const r = await api(`/api/reports/${btn.dataset.release}/release`, { method: 'POST' });
+        if (r.ok) toast(`Report sent to ${r.sentTo.join(', ')}`); else toast(`Failed: ${r.error}`, 'err', 8000);
+        await loadSites(); showHistoryModal(site);
+      } catch (err) { toast(err.message, 'err', 8000); btn.disabled = false; btn.textContent = 'Send to client'; }
+    };
+  });
 }
 
 function closeModal() { $('#modalRoot').innerHTML = ''; }
@@ -755,10 +775,11 @@ $('#siteAuditBtn').onclick = async (e) => {
         <tbody>${rows}</tbody></table></div>
       <div class="modal-actions" style="margin-top:14px;display:flex;gap:8px">
         ${missing.length ? '<button class="btn primary" id="auditImportBtn">Import ticked sites</button>' : ''}
-        <button class="btn" onclick="document.getElementById('modalRoot').innerHTML=''">Close</button>
+        <button class="btn" id="closeBtn">Close</button>
       </div>
     </div></div>`;
     $('#backdrop').onclick = ev => { if (ev.target.id === 'backdrop') closeModal(); };
+    $('#closeBtn').onclick = closeModal;
     $('#auditImportBtn')?.addEventListener('click', async (ev) => {
       const domains = [...document.querySelectorAll('.audit-import:checked')].map(c => c.value);
       if (!domains.length) return toast('Tick at least one site to import', 'err');
@@ -804,6 +825,8 @@ $('#connectionsBtn').onclick = async (e) => {
         </div>`;
       })()}
       <p class="hint" style="margin:4px 0 12px">Checked ${new Date(h.checkedAt).toLocaleTimeString('en-GB')} · ✅ pulling data · ❌ needs attention (reason shown)</p>
+      ${h.pagespeed && h.pagespeed.ok === false ? `<p class="hint" style="margin:-4px 0 12px;color:var(--red)">❌ Site health scores: Google refused the speed test (${esc(h.pagespeed.error || 'no reason given')}). Add a PageSpeed API key in Settings.</p>` : ''}
+      ${h.pagespeed && h.pagespeed.ok ? `<p class="hint" style="margin:-4px 0 12px">✅ Site health scores: Google speed test working</p>` : ''}
       <div style="overflow:auto;max-height:65vh">
       <table class="data" style="width:100%">
         <thead><tr><th style="text-align:left;padding:6px 10px">Site</th><th style="text-align:left;padding:6px 10px">Google Analytics</th><th style="text-align:left;padding:6px 10px">Search Console</th><th style="text-align:left;padding:6px 10px">Clarity</th><th style="text-align:left;padding:6px 10px">Fathom</th><th style="text-align:left;padding:6px 10px">Reports</th></tr></thead>
@@ -817,9 +840,10 @@ $('#connectionsBtn').onclick = async (e) => {
           <code style="user-select:all;display:inline-block;margin-top:6px;word-break:break-all">${esc(r.gscDiag.tag)}</code>` : ''}</div>
         </td></tr>` : ''}`).join('')}</tbody>
       </table></div>
-      <div class="modal-actions" style="margin-top:14px"><button class="btn" onclick="document.getElementById('modalRoot').innerHTML=''">Close</button></div>
+      <div class="modal-actions" style="margin-top:14px"><button class="btn" id="closeBtn">Close</button></div>
     </div></div>`;
     $('#backdrop').onclick = ev => { if (ev.target.id === 'backdrop') closeModal(); };
+    $('#closeBtn').onclick = closeModal;
   } catch (err) { toast(err.message, 'err'); }
   e.target.disabled = false; e.target.textContent = 'Connections';
 };
@@ -913,16 +937,23 @@ async function showUptime() {
         <div class="hint" style="margin:4px 0 6px">Read only. Gives the time of the last check and every site's state. Keep this link private.</div>
         <code id="uptimeFeedUrl" style="user-select:all;word-break:break-all">${esc(u.feedUrl)}</code>
         <button class="btn" id="uptimeFeedCopy" style="margin-left:8px">Copy</button>
+        <button class="btn" id="uptimeFeedRotate" style="margin-left:4px">New link</button>
       </div>
       <div class="modal-actions" style="margin-top:14px">
         <button class="btn" id="uptimeRefresh">Refresh</button>
-        <button class="btn" onclick="document.getElementById('modalRoot').innerHTML=''">Close</button>
+        <button class="btn" id="closeBtn">Close</button>
       </div>
     </div></div>`;
   $('#backdrop').onclick = ev => { if (ev.target.id === 'backdrop') closeModal(); };
+  $('#closeBtn').onclick = closeModal;
   $('#uptimeRefresh').onclick = () => showUptime().catch(err => toast(err.message, 'err'));
   $('#uptimeFeedCopy').onclick = async () => {
     try { await navigator.clipboard.writeText(u.feedUrl); toast('Feed link copied'); } catch { toast('Select the link and copy it', 'err'); }
+  };
+  $('#uptimeFeedRotate').onclick = async () => {
+    if (!confirm('Generate a new status feed link? The current one stops working immediately, so paste the new one into your assistant.')) return;
+    try { await api('/api/uptime/rotate-feed-token', { method: 'POST' }); toast('New feed link generated'); await showUptime(); }
+    catch (err) { toast(err.message, 'err'); }
   };
   document.querySelectorAll('[data-mon-pause]').forEach(el => el.onchange = async () => {
     try {
@@ -970,10 +1001,11 @@ $('#diagnosticBtn').onclick = async (e) => {
       <textarea id="diagText" rows="18" style="width:100%;font-family:ui-monospace,Menlo,monospace;font-size:11.5px">${esc(text)}</textarea>
       <div class="modal-actions" style="margin-top:12px">
         <button class="btn primary" id="diagCopy">Copy again</button>
-        <button class="btn" onclick="document.getElementById('modalRoot').innerHTML=''">Close</button>
+        <button class="btn" id="closeBtn">Close</button>
       </div>
     </div></div>`;
     $('#backdrop').onclick = ev => { if (ev.target.id === 'backdrop') closeModal(); };
+    $('#closeBtn').onclick = closeModal;
     $('#diagCopy').onclick = async () => {
       const ta = $('#diagText'); ta.select();
       try { await navigator.clipboard.writeText(ta.value); toast('Copied'); }

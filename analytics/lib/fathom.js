@@ -155,13 +155,16 @@ function mergeChannels(list) {
 // a sourceLabel so the report can say where the numbers came from.
 export async function gatherFathom(fathomSiteId, start, end) {
   const prev = previousPeriod(start, end);
-  const [cur, prv, ts, pages, refs, devices] = await Promise.all([
+  const [cur, prv, ts, pages, refs, devices, prvDays] = await Promise.all([
     agg(fathomSiteId, { aggregates: AGG, date_from: start, date_to: end }),
     agg(fathomSiteId, { aggregates: AGG, date_from: prev.start, date_to: prev.end }),
     agg(fathomSiteId, { aggregates: 'visits,uniques', date_from: start, date_to: end, date_grouping: 'day' }),
     agg(fathomSiteId, { aggregates: 'pageviews,visits', date_from: start, date_to: end, field_grouping: 'pathname', sort_by: 'pageviews:desc', limit: 10 }),
     agg(fathomSiteId, { aggregates: 'visits', date_from: start, date_to: end, field_grouping: 'referrer_hostname', sort_by: 'visits:desc', limit: 30 }),
     agg(fathomSiteId, { aggregates: 'visits', date_from: start, date_to: end, field_grouping: 'device_type', sort_by: 'visits:desc' }),
+    // Only to learn the first recorded day of the period before (see
+    // the partly-tracked check in report-data.js). Never fatal.
+    agg(fathomSiteId, { aggregates: 'visits', date_from: prev.start, date_to: prev.end, date_grouping: 'day' }).catch(() => []),
   ]);
 
   // All-zero Fathom (quiet period or stale site ID) returns null so the
@@ -170,20 +173,50 @@ export async function gatherFathom(fathomSiteId, start, end) {
   const overview = overviewFrom(cur[0]);
   if (!overview || overview.sessions === 0) return null;
 
+  // Fathom leaves out days with no visits. Put them back as zeros from
+  // the first recorded day onwards, so a quiet site's chart shows its
+  // quiet days instead of a line drawn straight between three busy ones.
+  const byDay = new Map(ts.map(r => [String(r.date || r.date_formatted || '').slice(0, 10), r]).filter(([d]) => /^\d{4}-\d{2}-\d{2}$/.test(d)));
+  const days = [...byDay.keys()].sort();
+  const timeseries = [];
+  if (days.length) {
+    for (let t = Date.parse(days[0] + 'T12:00:00Z'); t <= Date.parse(end + 'T12:00:00Z'); t += 86400000) {
+      const date = new Date(t).toISOString().slice(0, 10);
+      const r = byDay.get(date);
+      timeseries.push({ date, sessions: r ? num(r.visits) : 0, users: r ? num(r.uniques) : 0 });
+    }
+  }
+
   return {
     sourceLabel: 'Fathom Analytics',
     overview,
     prevOverview: overviewFrom(prv[0]),
-    // Fathom returns the day groups in no particular order. Unsorted, the
-    // chart ran backwards and the report took a mid-period day as the
-    // first day of tracking ("installed on 26 Oct" on a site tracked for
-    // months).
-    timeseries: ts.map(r => ({ date: String(r.date || r.date_formatted || '').slice(0, 10), sessions: num(r.visits), users: num(r.uniques) })).filter(r => r.date)
-      .sort((a, b) => a.date.localeCompare(b.date)),
+    prevFirstDay: prvDays.map(r => String(r.date || r.date_formatted || '').slice(0, 10)).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort()[0] || null,
+    timeseries,
     topPages: pages.map(r => ({ path: r.pathname || '/', title: '', views: num(r.pageviews), sessions: num(r.visits) })),
     channels: mergeChannels(refs.map(r => ({ channel: friendlyRef(r.referrer_hostname), sessions: num(r.visits) }))),
     devices: devices.map(r => ({ device: r.device_type || 'unknown', sessions: num(r.visits) })),
   };
+}
+
+// Visits per calendar month, for the report's long-view chart. Returns
+// [{ month: 'YYYY-MM', visits }] oldest first; months with no row are
+// simply absent (the caller decides what a gap means).
+export async function fathomMonthly(fathomSiteId, start, end) {
+  const byMonth = rows => {
+    const m = new Map();
+    for (const x of rows) {
+      const month = String(x.date || x.date_formatted || '').slice(0, 7);
+      if (/^\d{4}-\d{2}$/.test(month)) m.set(month, (m.get(month) || 0) + num(x.visits));
+    }
+    return [...m].map(([month, visits]) => ({ month, visits })).sort((a, b) => a.month.localeCompare(b.month));
+  };
+  const monthly = byMonth(await agg(fathomSiteId, { aggregates: 'visits', date_from: start, date_to: end, date_grouping: 'month' }));
+  if (monthly.length) return monthly;
+  // Fathom does not document what a month row's date looks like. If it
+  // is not one this can read, add up the daily rows instead: their
+  // format is the one the daily chart already relies on.
+  return byMonth(await agg(fathomSiteId, { aggregates: 'visits', date_from: start, date_to: end, date_grouping: 'day', limit: 400 }));
 }
 
 // Which hostnames actually produced this Fathom site's pageviews — the

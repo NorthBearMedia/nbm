@@ -8,9 +8,14 @@ import { syncSite } from './clarity.js';
 import { gatherFathom } from './fathom.js';
 import { getFathomToken } from './runtime-config.js';
 import { addDays, todayISO } from './dates.js';
+import { readBodyCapped } from './fetch-body.js';
 
 const ok = detail => ({ ok: true, detail });
 const bad = detail => ({ ok: false, detail });
+// Twenty sites are checked at once, each holding its own copy of these
+// JSON blobs across several awaits. Decisions use the early copy, but every
+// write re-reads the stored blob first so sites cannot overwrite each other.
+const readJson = key => { try { return JSON.parse(getSetting(key) || '{}'); } catch { return {}; } };
 
 // The live homepage (cache-busted), for tag-presence checks: a saved API
 // token or property ID says nothing about whether the tracking code is
@@ -22,7 +27,7 @@ async function fetchHomepage(domain) {
       headers: { 'User-Agent': 'Mozilla/5.0 (NBM Pulse health check)' },
     });
     if (!res.ok) return null;
-    return await res.text();
+    return await readBodyCapped(res, 2_000_000);
   } catch { return null; }
 }
 
@@ -85,7 +90,7 @@ async function siteHealth(site, start, end) {
     // doesn't exist. Name the real possibilities instead.
     if (!fathomTagOn) return bad('not on the live page yet — sites Pulse can edit get it automatically within the hour. Otherwise add this site\'s Tracking code wherever its pages get their <head>: the site builder\'s custom-code box, the CMS theme header, or a header include/template — and if the code is already in a repo, check the deployed copy is up to date.');
     const since = pending[domain] || Date.now();
-    if (pending[domain] !== since) { pending[domain] = since; setSetting('fathom_pending', JSON.stringify(pending)); }
+    if (!pending[domain]) { const cur = readJson('fathom_pending'); cur[domain] = since; setSetting('fathom_pending', JSON.stringify(cur)); }
     const waited = Date.now() - since;
     return waited < GRACE_MS
       ? ok('script installed ✓ — waiting on the first visitor for data')
@@ -98,7 +103,7 @@ async function siteHealth(site, start, end) {
     : await gatherFathom(site.fathom_site_id, start, end)
         .then(m => {
           if (m?.overview) {
-            if (pending[domain]) { delete pending[domain]; setSetting('fathom_pending', JSON.stringify(pending)); }
+            if (pending[domain]) { const cur = readJson('fathom_pending'); delete cur[domain]; setSetting('fathom_pending', JSON.stringify(cur)); }
             return ok(`${Math.round(m.overview.sessions)} visits (7d)${integ.fathom?.status === 'verified' ? ' · traffic verified from this domain ✓' : ''}`);
           }
           return noData();
@@ -155,7 +160,13 @@ async function siteHealth(site, start, end) {
           if (o.sessions === 0 && otherToolsSeeTraffic) {
             return seenWorking.ga
               ? regressed('ga', `Analytics is recording nothing while ${otherToolsSeeTraffic} still sees real traffic.`)
-              : bad(`recording nothing while ${otherToolsSeeTraffic} sees real traffic on the same pages — the tag is on the site but being stopped from firing. Usual cause: a speed/"delay JavaScript" plugin holding scripts until interaction, or a cookie-consent tool. Exclude googletagmanager.com from that delay list so Analytics loads immediately.`);
+              : gaTagFound
+                ? bad(`recording nothing while ${otherToolsSeeTraffic} sees real traffic on the same pages. The tag is on the site but being stopped from firing. Usual cause: a speed/"delay JavaScript" plugin holding scripts until interaction, or a cookie-consent tool. Exclude googletagmanager.com from that delay list so Analytics loads immediately.`)
+                // The tag is simply not on the page. The old wording blamed
+                // a plugin for every silent property, which sent the owner
+                // hunting for a delay setting on a site (CN Maintenance)
+                // whose Google tag had never been added.
+                : bad(`recording nothing while ${otherToolsSeeTraffic} sees real traffic on the same pages, and the Google tag (${site.ga4_measurement_id || 'no measurement ID saved'}) is not in the live page. It needs adding to the site: paste this site's Tracking code into the page head or the builder's custom code box.`);
           }
           // A collapse against Search Console clicks is the same failure as
           // zero, just less obvious: every click is a real landing, so GA
@@ -212,7 +223,7 @@ async function siteHealth(site, start, end) {
     if (key === 'fathom' && /waiting on the first visitor/.test(v.detail || '')) continue;
     if (seenWorking[key] !== today) { seenWorking[key] = today; recorded = true; }
   }
-  if (recorded) { lastOk[domain] = seenWorking; setSetting('source_last_ok', JSON.stringify(lastOk)); }
+  if (recorded) { const cur = readJson('source_last_ok'); cur[domain] = seenWorking; setSetting('source_last_ok', JSON.stringify(cur)); }
 
   out.delivery = !last ? bad('no reports generated yet')
     : last.status === 'sent' ? ok(`last report sent ${String(last.created_at).slice(0, 10)} (${last.period_label})`)
@@ -232,5 +243,7 @@ export async function connectionsHealth() {
   const results = await Promise.all(sites.map(s => siteHealth(s, start, end).catch(e => ({
     id: s.id, client: s.client_name, domain: s.domain, error: e.message.slice(0, 120),
   }))));
-  return { checkedAt: new Date().toISOString(), period: { start, end }, sites: results };
+  let pagespeed = null;
+  try { const { pagespeedStatus } = await import('./pagespeed.js'); pagespeed = pagespeedStatus(); } catch { /* optional */ }
+  return { checkedAt: new Date().toISOString(), period: { start, end }, sites: results, pagespeed };
 }
