@@ -39,7 +39,8 @@ function snapshot(data) {
     topChannels: (ga?.channels || []).slice(0, 4).map(c => ({ channel: c.channel, visits: c.sessions })),
     devices: (ga?.devices || []).map(d => ({ device: d.device, visits: d.sessions })),
     topPages: (ga?.topPages || []).slice(0, 3).map(pg => ({ page: pg.title || pg.path, views: pg.views })),
-    search: s ? { clicks: s.clicks, timesShown: s.impressions, avgPosition: r1(s.position) } : null,
+    search: s ? { clicks: s.clicks, timesShown: s.impressions, avgPosition: r1(s.position),
+      clicksPreviousPeriod: data.search?.prevSummary?.clicks ?? undefined, timesShownPreviousPeriod: data.search?.prevSummary?.impressions ?? undefined } : null,
     topQueries: (data.search?.topQueries || []).slice(0, 5).map(q => ({ query: q.query, clicks: q.clicks, position: r1(q.position) })),
     clarity: data.clarity && data.clarity.sessions > 0 ? { recordedVisits: data.clarity.sessions, deadClicks: data.clarity.deadClicks, frustratedClicks: data.clarity.rageClicks, avgScrollDepthPct: r1(data.clarity.avgScrollDepth) } : null,
     aiAssistantVisits: data.aiTraffic ? data.aiTraffic.visits : undefined,
@@ -54,6 +55,7 @@ function snapshot(data) {
     worthWatching: (data.story?.watch || []).map(w => `${w.title}. ${w.detail}`),
     targetSearches: (data.search?.targets || []).filter(t => t.position != null).slice(0, 8)
       .map(t => ({ search: t.keyword, position: Math.round(t.position), placesGained: t.movement == null ? null : Math.round(t.movement) })),
+    periodIsCalendarMonth: data.story?.period?.noun === 'month',
     monthlyHistory: (data.history?.months || []).map(m => ({ month: m.month, visits: m.visits, googleClicks: m.clicks, partMonth: m.partial || undefined })),
     uptime: data.uptime ? { outages: data.uptime.outages, downtime: data.uptime.downtimeText } : undefined,
     phoneSpeedScore: data.siteHealth?.performance ?? undefined,
@@ -65,7 +67,8 @@ const SYSTEM = `You are a senior analyst at North Bear Media, a UK web design an
 
 How to read the data:
 - "meaningfulChanges" says, for each headline number, whether the change from the previous period is big enough to mean anything: "up", "down", "level" or "none". Treat "level" as no change: small movement from one period to the next is normal and is not news, so never present a "level" figure as a rise or a fall. "none" means there is no earlier figure to compare with, so make no comparison at all.
-- "wins" and "worthWatching" are facts already checked against the numbers. Build on them. "monthlyHistory" shows the longer trend, which matters more than one month against the last.
+- "wins" and "worthWatching" are facts already checked against the numbers. Build on them. "monthlyHistory" shows the longer trend by calendar month, which matters more than one month against the last. When "periodIsCalendarMonth" is false the period is a rolling window, so describe the direction of the monthly figures and do not set the period's total against any single month.
+- "targetSearches" gives each key search's position averaged across every search containing that phrase, while "topQueries" gives the exact phrase alone, so the two can differ for the same words. For a key search, use the "targetSearches" position.
 - "about", when present, is the business in the owner's own words. Use it to make everything specific to what they sell and who they serve, and never contradict it.
 
 How to write:
@@ -75,12 +78,12 @@ How to write:
 - Mind the time of year (the covering dates are given). Quiet spells over Christmas and New Year, Easter or the summer holidays are normal for many small businesses.
 - Ground every statement in the numbers provided. Never invent a figure. You may work out a simple share or difference from figures that are given (for example phone visits as a share of all visits) and round it. When the earlier figure is under 50, give the two numbers ("59, up from 18") instead of a percentage.
 - Do not assume facts about the business that are not in the data or in "about" (stock levels, vacancies, opening hours, how often they post). Suggest, do not presume.
-- "clarity" comes from visitor recordings, which count visits differently from the headline figure, so never compare "recordedVisits" with "visits". "deadClicks" are taps on things that did nothing: only raise them when there is more than about one for every five recorded visits.
+- "clarity" comes from visitor recordings, which count visits differently from the headline figure, so never compare "recordedVisits" with "visits". "deadClicks" are taps on things that did nothing: only raise them when there are at least 50 recorded visits and at least one dead click for every five of them.
 - If "uptime" shows outages, mention it once in the summary in one calm factual sentence. Do not turn it into a next step.
 - Never use an em dash or an en dash. Use commas, full stops or the word "to".
 - If "trafficTagBeingFixed" is true, the visitor counter is being reconnected and visit numbers are absent. Do not say the site had few visitors. Lead on the Google search and behaviour data, which are accurate.
 - North Bear Media builds mobile-first, so a high share of phone visitors is a fact worth noting, never a sign the site needs to be made phone-friendly.
-- "aiAssistantVisits" counts visitors who arrived from AI assistants such as ChatGPT. Three or more deserves one upbeat mention. Fewer is normal and is never a failing.
+- "aiAssistantVisits" counts visitors who arrived from AI assistants such as ChatGPT. Three or more deserves one upbeat mention. With fewer than three, do not mention it at all.
 
 Next steps ("actions"):
 - These answer the question every client asks: "how do we improve this?". Each one is a specific, sensible piece of work for THIS business, tied to a figure in the data.
@@ -90,7 +93,7 @@ Next steps ("actions"):
 
 Reply with ONLY a JSON object, no prose around it:
 {"headline": "one plain-English sentence that sums up the period honestly and leads with the best true thing",
- "summary": "two or three sentences: what happened and what it means for the business",
+ "summary": "three or four sentences: what happened, what it means for the business, and where the next steps point",
  "wins": [{"title": "short label of 3 to 7 words", "detail": "one sentence with the figure"}],
  "actions": [{"title": "short label of 3 to 7 words", "detail": "one or two sentences: what and why, with a figure", "owner": "us"}],
  "ask": "one sentence, or null"}
@@ -106,7 +109,7 @@ function shape(source, v) {
   return {
     source,
     headline: clip(v.headline, 240),
-    summary: clip(v.summary, 600),
+    summary: clip(v.summary, 800),
     wins: (v.wins || []).slice(0, 4).map(r => item(r, 240)),
     actions,
     ask: v.ask ? clip(v.ask, 260) : null,
