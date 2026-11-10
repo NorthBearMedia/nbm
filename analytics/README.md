@@ -106,6 +106,16 @@ is kept for real faults such as downtime. The PDF, the email and the client
 dashboard share one look (Archivo and Martian Mono, in `assets/fonts` and
 `public/fonts`).
 
+**Sense check.** Every report is read before it can reach a client
+(`lib/sensecheck.js`), so nobody has to approve each one. Rules catch what
+code can be sure of (a visit count that has collapsed the way a broken tag
+does, a counter known to be under-counting, placeholder text). A second AI
+reader then checks the written analysis against the numbers. Bad writing is
+swapped for the standard rules-based analysis and the report still goes.
+Data that looks broken HOLDS the report: it goes to the owner only, with
+the reason at the top, and **Send to client** in the site's History
+releases it. A report sent by hand from the admin console is never held.
+
 Every email has the PDF attached, headline numbers, and a button to the
 client's live dashboard (their private `/r/<secret>` link — the **Copy
 dashboard link** button gives you the exact URL to send them). Sites

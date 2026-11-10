@@ -437,7 +437,7 @@ function renderSites() {
       <div class="meta">
         ${esc(FREQ_LABEL[s.report_frequency] || s.report_frequency)}${s.next_report_at && s.report_frequency !== 'none' ? ` · next: ${esc(s.next_report_at)}` : ''}<br>
         ${s.lastReport
-          ? `Last report: ${esc(s.lastReport.created_at.slice(0, 16))} ${s.lastReport.status === 'sent' ? '<span style="color:var(--green-light)">✓ sent</span>' : '<span style="color:var(--red)">✗ failed</span>'}`
+          ? `Last report: ${esc(s.lastReport.created_at.slice(0, 16))} ${s.lastReport.held ? '<span style="color:var(--amber)">⏸ held for you, see History</span>' : s.lastReport.status === 'sent' ? '<span style="color:var(--green-light)">✓ sent</span>' : '<span style="color:var(--red)">✗ failed</span>'}`
           : 'No reports sent yet'}
       </div>
       <div class="actions">
@@ -503,7 +503,7 @@ $('#sitesGrid').addEventListener('click', async (e) => {
     btn.disabled = true; btn.textContent = 'Sending…';
     try {
       const r = await api(`/api/sites/${site.id}/send-report`, { method: 'POST' });
-      if (r.ok) toast(`Report sent to ${r.sentTo.join(', ')}${r.warnings?.length ? ` (warnings: ${r.warnings.length})` : ''}`);
+      if (r.ok) toast(`Report sent to ${r.sentTo.join(', ')}${r.warnings?.length ? ` (warnings: ${r.warnings.length})` : ''}${r.check?.holds?.length ? `. Sense check flagged: ${r.check.holds[0]}` : ''}`, r.check?.holds?.length ? 'err' : 'ok', r.check?.holds?.length ? 12000 : undefined);
       else toast(`Failed: ${r.error}`, 'err', 8000);
       await loadSites();
     } catch (err) { toast(err.message, 'err', 8000); }
@@ -722,15 +722,31 @@ async function showHistoryModal(site) {
             <td>${esc(r.period_label || `${r.period_start} – ${r.period_end}`)}</td>
             <td class="trunc" title="${esc(r.sent_to)}">${esc(r.sent_to)}</td>
             <td>${esc(r.trigger_type)}</td>
-            <td>${r.status === 'sent' ? '<span style="color:var(--green-light)">✓ sent</span>' : `<span style="color:var(--red)" title="${esc(r.error)}">✗ failed</span>`}</td>
-            <td>${r.status === 'sent' && r.pdf_path ? `<a class="btn small" href="/api/reports/${r.id}/download">PDF</a>` : ''}</td>
-          </tr>`).join('')}
+            <td>${String(r.sent_to || '').startsWith('HELD') ? '<span style="color:var(--amber)">⏸ held</span>'
+              : String(r.sent_to || '').startsWith('RELEASED') ? '<span style="color:var(--text-muted)">released by you</span>'
+              : r.status === 'sent' ? `<span style="color:var(--green-light)"${r.error ? ` title="${esc(r.error)}"` : ''}>✓ sent${r.error ? ' (notes)' : ''}</span>`
+              : `<span style="color:var(--red)" title="${esc(r.error)}">✗ failed</span>`}</td>
+            <td>${r.status === 'sent' && r.pdf_path ? `<a class="btn small" href="/api/reports/${r.id}/download">PDF</a>` : ''}
+              ${String(r.sent_to || '').startsWith('HELD') ? `<button class="btn small primary" data-release="${r.id}">Send to client</button>` : ''}</td>
+          </tr>${r.error && (String(r.sent_to || '').startsWith('HELD') || r.status === 'sent') ? `
+          <tr><td colspan="6" class="hint" style="white-space:normal;padding-top:0">${esc(r.error)}</td></tr>` : ''}`).join('')}
         </tbody></table>` : '<p class="hint">No reports yet for this site.</p>'}
       <div class="modal-actions"><button class="btn" id="cancelBtn">Close</button></div>
     </div>
   </div>`;
   $('#cancelBtn').onclick = closeModal;
   $('#backdrop').onclick = e => { if (e.target.id === 'backdrop') closeModal(); };
+  document.querySelectorAll('[data-release]').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm('Send this report to the client as it is?')) return;
+      btn.disabled = true; btn.textContent = 'Sending…';
+      try {
+        const r = await api(`/api/reports/${btn.dataset.release}/release`, { method: 'POST' });
+        if (r.ok) toast(`Report sent to ${r.sentTo.join(', ')}`); else toast(`Failed: ${r.error}`, 'err', 8000);
+        await loadSites(); showHistoryModal(site);
+      } catch (err) { toast(err.message, 'err', 8000); btn.disabled = false; btn.textContent = 'Send to client'; }
+    };
+  });
 }
 
 function closeModal() { $('#modalRoot').innerHTML = ''; }

@@ -321,7 +321,8 @@ app.post('/api/google/import-sites', requireAdmin, async (req, res) => {
 });
 
 function siteSummary(site) {
-  const lastReport = db.prepare('SELECT created_at, status, period_label, trigger_type FROM reports WHERE site_id = ? ORDER BY id DESC LIMIT 1').get(site.id);
+  const lastReport = db.prepare('SELECT created_at, status, period_label, trigger_type, sent_to FROM reports WHERE site_id = ? ORDER BY id DESC LIMIT 1').get(site.id);
+  if (lastReport) { lastReport.held = String(lastReport.sent_to || '').startsWith('HELD→'); delete lastReport.sent_to; }
   const claritySnapshots = db.prepare('SELECT COUNT(*) AS n FROM clarity_snapshots WHERE site_id = ?').get(site.id).n;
   const { clarity_api_token, ...safe } = site;
   return {
@@ -494,6 +495,19 @@ app.post('/api/sites/:id/send-report', requireAdmin, async (req, res) => {
   const site = db.prepare('SELECT * FROM sites WHERE id = ?').get(req.params.id);
   if (!site) return res.status(404).json({ error: 'Site not found' });
   const result = await runReport(site, { trigger: 'manual' });
+  res.json(result);
+});
+
+// Release a report the sense check held: the same period, sent as the
+// owner's own decision (a manual send is never held).
+app.post('/api/reports/:id/release', requireAdmin, async (req, res) => {
+  const report = db.prepare('SELECT * FROM reports WHERE id = ?').get(req.params.id);
+  if (!report || !String(report.sent_to || '').startsWith('HELD→')) return res.status(404).json({ error: 'No held report with that number' });
+  const site = db.prepare('SELECT * FROM sites WHERE id = ?').get(report.site_id);
+  if (!site) return res.status(404).json({ error: 'Site not found' });
+  const result = await runReport(site, { trigger: 'manual', period: { start: report.period_start, end: report.period_end, label: report.period_label } });
+  // Mark the held row as dealt with so it cannot be released twice.
+  if (result.ok) db.prepare("UPDATE reports SET sent_to = REPLACE(sent_to, 'HELD→', 'RELEASED→') WHERE id = ?").run(report.id);
   res.json(result);
 });
 
@@ -830,7 +844,7 @@ app.post('/api/client/:token/request-report', async (req, res) => {
   // mode the PDF goes to North Bear, not the client — don't tell them
   // it's on its way to their inbox.
   if (!result.ok) return res.status(500).json({ error: 'Sorry — we couldn’t generate your report just now. Email info@northbearmedia.co.uk and we’ll send it over.' });
-  if (String(result.sentTo?.[0] || '').startsWith('TEST→')) {
+  if (/^(TEST|HELD)→/.test(String(result.sentTo?.[0] || ''))) {
     return res.json({ ok: true, message: `Thanks — your report request has been received. North Bear Media will email your report (${result.periodText}) over shortly.` });
   }
   // Never echo recipient addresses, even masked: a forwarded dashboard

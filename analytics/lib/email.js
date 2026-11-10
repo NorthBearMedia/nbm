@@ -75,7 +75,22 @@ function listRows(items, marker) {
 
 const firstName = site => String(site.contact_name || '').trim().split(/\s+/)[0] || '';
 
-export function reportEmailHtml(site, data, periodText) {
+// Shown only on copies that go to the owner (previews and held reports):
+// what the sense check found. Never part of an email a client receives.
+function ownerBanner(check, held, realTo) {
+  if (!check || (!held && !check.holds.length && !check.notes.length)) return '';
+  const li = items => items.map(t => `<li style="margin:0 0 6px;">${esc(t)}</li>`).join('');
+  const title = held ? 'Held back: this report has NOT gone to the client'
+    : check.holds.length ? 'Sense check: this would be held if the site were live' : 'Sense check: passed, with notes';
+  return `<tr><td style="background:#fff7dc;border-bottom:3px solid #f2c230;padding:18px 32px;font-family:${SANS};font-size:13px;line-height:1.5;color:#16181b;">
+    <strong style="font-size:14px;">${title}</strong>
+    ${check.holds.length ? `<div style="margin:10px 0 4px;font-weight:bold;">Why:</div><ul style="margin:0;padding-left:18px;">${li(check.holds)}</ul>` : ''}
+    ${check.notes.length ? `<div style="margin:10px 0 4px;font-weight:bold;">Notes:</div><ul style="margin:0;padding-left:18px;">${li(check.notes)}</ul>` : ''}
+    ${held ? `<div style="margin-top:10px;">It would have gone to ${esc(realTo.join(', '))}. To send it as it is, open Pulse, find the site, open History and press <strong>Send to client</strong>. Nothing else will be sent for this period until you do.</div>` : ''}
+  </td></tr>`;
+}
+
+export function reportEmailHtml(site, data, periodText, banner = '') {
   const trusted = data.ga4?.overview && !data.ga4.unreliable;
   const o = trusted ? data.ga4.overview : null;
   const s = data.search && !data.search.empty ? data.search.summary : null;
@@ -98,6 +113,7 @@ export function reportEmailHtml(site, data, periodText) {
   return `<!doctype html><html><body style="margin:0;padding:0;background:${PAPER};">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:${PAPER};padding:24px 0;"><tr><td align="center">
     <table width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;background:#ffffff;">
+      ${banner}
       <tr><td style="background:${INK};padding:26px 32px 0;">
         <table width="100%" cellpadding="0" cellspacing="0"><tr>
           <td><img src="cid:nbmlogo" alt="North Bear Media" height="40" style="display:block;"></td>
@@ -173,7 +189,7 @@ function reportEmailText(site, data, periodText) {
   return lines.join('\n');
 }
 
-export async function sendReportEmail(site, data, pdfBuffer, periodText, filename) {
+export async function sendReportEmail(site, data, pdfBuffer, periodText, filename, { check = null, held = false } = {}) {
   const realTo = site.contact_emails.split(',').map(e => e.trim()).filter(Boolean);
   if (!realTo.length) throw new Error('No contact email set for this client');
   // A site reaches its actual CLIENT only when the owner has switched THAT
@@ -183,10 +199,14 @@ export async function sendReportEmail(site, data, pdfBuffer, periodText, filenam
   // without a deliberate, per-site, authenticated click. No global switch
   // can release the whole fleet at once.
   const live = site.delivery_live === 1;
-  const test = !live;
+  // A report the sense check held goes to the owner only, whatever the
+  // site's live switch says.
+  const test = !live || held;
   const to = test ? [getOwnerEmail()] : realTo;
-  const subject = (test ? `[PREVIEW, would send to ${realTo.join(', ')}] ` : '')
+  const subject = (held ? `[HELD, needs a look before it goes to ${realTo.join(', ')}] `
+    : test ? `[PREVIEW, would send to ${realTo.join(', ')}] ` : '')
     + `Your website report: ${site.client_name} (${periodText})`;
+  const banner = test ? ownerBanner(check, held, realTo) : '';
   const replyTo = getReplyTo();
   await mailer().sendMail({
     from: getEmailFrom(),
@@ -194,7 +214,7 @@ export async function sendReportEmail(site, data, pdfBuffer, periodText, filenam
     bcc: test ? undefined : (getEmailBcc() || undefined),
     replyTo: replyTo || undefined,
     subject,
-    html: reportEmailHtml(site, data, periodText),
+    html: reportEmailHtml(site, data, periodText, banner),
     text: reportEmailText(site, data, periodText),
     headers: replyTo ? { 'List-Unsubscribe': `<mailto:${replyTo}?subject=Unsubscribe%20${encodeURIComponent(site.domain || site.client_name)}>` } : undefined,
     attachments: [
@@ -202,7 +222,7 @@ export async function sendReportEmail(site, data, pdfBuffer, periodText, filenam
       { filename: 'nbm-logo.png', path: LOGO, cid: 'nbmlogo' },
     ],
   });
-  return test ? realTo.map(e => `TEST→${e}`) : realTo;
+  return held ? realTo.map(e => `HELD→${e}`) : test ? realTo.map(e => `TEST→${e}`) : realTo;
 }
 
 export async function testSmtp() {

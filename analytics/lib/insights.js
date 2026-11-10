@@ -148,7 +148,7 @@ async function aiInsights(data) {
 }
 
 // Deterministic, always-available version built from the story layer.
-function rulesInsights(data) {
+export function rulesInsights(data) {
   const s = snapshot(data);
   const story = data.story;
   const the = story?.period?.the || 'this period';
