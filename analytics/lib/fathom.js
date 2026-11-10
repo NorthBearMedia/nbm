@@ -203,10 +203,20 @@ export async function gatherFathom(fathomSiteId, start, end) {
 // [{ month: 'YYYY-MM', visits }] oldest first; months with no row are
 // simply absent (the caller decides what a gap means).
 export async function fathomMonthly(fathomSiteId, start, end) {
-  const r = await agg(fathomSiteId, { aggregates: 'visits', date_from: start, date_to: end, date_grouping: 'month' });
-  return r.map(x => ({ month: String(x.date || x.date_formatted || '').slice(0, 7), visits: num(x.visits) }))
-    .filter(x => /^\d{4}-\d{2}$/.test(x.month))
-    .sort((a, b) => a.month.localeCompare(b.month));
+  const byMonth = rows => {
+    const m = new Map();
+    for (const x of rows) {
+      const month = String(x.date || x.date_formatted || '').slice(0, 7);
+      if (/^\d{4}-\d{2}$/.test(month)) m.set(month, (m.get(month) || 0) + num(x.visits));
+    }
+    return [...m].map(([month, visits]) => ({ month, visits })).sort((a, b) => a.month.localeCompare(b.month));
+  };
+  const monthly = byMonth(await agg(fathomSiteId, { aggregates: 'visits', date_from: start, date_to: end, date_grouping: 'month' }));
+  if (monthly.length) return monthly;
+  // Fathom does not document what a month row's date looks like. If it
+  // is not one this can read, add up the daily rows instead: their
+  // format is the one the daily chart already relies on.
+  return byMonth(await agg(fathomSiteId, { aggregates: 'visits', date_from: start, date_to: end, date_grouping: 'day', limit: 400 }));
 }
 
 // Which hostnames actually produced this Fathom site's pageviews — the
