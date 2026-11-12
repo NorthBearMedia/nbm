@@ -23,7 +23,7 @@ import { googleClient } from './google.js';
 import { getGscReaderEmail, getHostingerToken, getFathomToken, getEmailBcc, getSmtp, getEmailFrom, getAppUrl } from './runtime-config.js';
 import { mailer } from './email.js';
 import { randomBytes } from 'crypto';
-import { ensureInjectCron, deleteInjectCrons, injectCronOutput, verifyTag, ensureCron, cronOutputMatching, deleteCronsMatching, HOSTINGER_USER, rootDirFor, SNIPPET_VERSION, listCrons } from './inject.js';
+import { buildSnippet, ensureInjectCron, deleteInjectCrons, injectCronOutput, verifyTag, ensureCron, cronOutputMatching, deleteCronsMatching, HOSTINGER_USER, rootDirFor, SNIPPET_VERSION, listCrons } from './inject.js';
 import { readBodyCapped } from './fetch-body.js';
 
 // Per-install secret guarding the injector-script endpoint. Created once.
@@ -436,6 +436,9 @@ function ensureManagedSites() {
       let waiting = [];
       try { waiting = JSON.parse(getSetting('monitor_wait_for_tag') || '[]'); } catch { /* start a fresh list */ }
       if (!waiting.includes(m.domain)) setSetting('monitor_wait_for_tag', JSON.stringify([...waiting, m.domain]));
+      let wanted = [];
+      try { wanted = JSON.parse(getSetting('tracking_code_wanted') || '[]'); } catch { /* start a fresh list */ }
+      if (!wanted.includes(m.domain)) setSetting('tracking_code_wanted', JSON.stringify([...wanted, m.domain]));
     }
     console.log('[ops] site created (delivery held):', m.domain, m.waitForTag ? '(uptime monitor paused until its tracking code is live)' : '');
   }
@@ -1048,6 +1051,45 @@ export async function startMonitoringWhenLive() {
   }
   setSetting('monitor_wait_for_tag', JSON.stringify(still));
   return { waiting: still.length, started };
+}
+
+// A site added before its website is live needs its tracking code handed
+// to whoever is building it. As soon as Pulse has made the site's own
+// Google tag and Fathom site, it emails the owner the exact block (the
+// same one the Tracking code window shows), once. Nobody has to open
+// Pulse and copy it out.
+export async function sendTrackingCodeWhenReady() {
+  let wanted = [];
+  try { wanted = JSON.parse(getSetting('tracking_code_wanted') || '[]'); } catch { return { waiting: 0 }; }
+  if (!wanted.length) return { waiting: 0 };
+  const still = [];
+  const sent = [];
+  for (const domain of wanted) {
+    const site = db.prepare("SELECT * FROM sites WHERE lower(replace(domain,'www.','')) = ?").get(domain);
+    if (!site) continue;
+    // Wait for both tags, so the block is sent once and complete.
+    if (!site.ga4_measurement_id || (getFathomToken() && !site.fathom_site_id)) { still.push(domain); continue; }
+    const block = buildSnippet(site.ga4_measurement_id, site.clarity_project_id || '',
+      { consentBanner: getSetting('consent_banner') === 'true', fathomId: site.fathom_site_id || '' });
+    try {
+      const { sendAlert } = await import('./monitor.js');
+      await sendAlert(`tracking-code:${domain}`, `TRACKING CODE: ${domain}`,
+        [`The tracking code for ${site.client_name} (${domain}) is ready.`, '',
+          'Paste this block, whole and unchanged, immediately before </head> on every page:', '',
+          block, '',
+          `Google tag: ${site.ga4_measurement_id}`,
+          `Fathom site: ${site.fathom_site_id || 'not set up'}`,
+          `Clarity: ${site.clarity_project_id || 'not set up (add the project ID in Pulse, then copy the block again from the Tracking code window)'}`,
+          '', 'Pulse starts monitoring the site by itself the first time it sees this code on the live homepage.'].join('\n'), { once: true });
+      sent.push(domain);
+      console.log('[ops] tracking code emailed to the owner for', domain);
+    } catch (e) {
+      still.push(domain); // email not working yet: try again next pass
+      console.error('[ops] could not email the tracking code:', e.message);
+    }
+  }
+  setSetting('tracking_code_wanted', JSON.stringify(still));
+  return { waiting: still.length, sent };
 }
 
 // Search Console wiring gets completed hands-off, hourly, idempotently.
@@ -2145,6 +2187,10 @@ export function scheduleOpsSweep() {
   try {
     cron.schedule('37 * * * *', () => onboardNewSites().catch(e => console.error('[onboard]', e.message)), { timezone: config.timezone, noOverlap: true });
     cron.schedule('47 * * * *', () => startMonitoringWhenLive().catch(e => console.error('[ops] wait for tag:', e.message)), { timezone: config.timezone, noOverlap: true });
+    // The Google tag and Fathom site are made about four and a half
+    // minutes after boot, so look soon after that, then again, then hourly.
+    for (const ms of [330_000, 480_000, 780_000]) setTimeout(() => sendTrackingCodeWhenReady().catch(e => console.error('[ops] tracking code:', e.message)), ms);
+    cron.schedule('57 * * * *', () => sendTrackingCodeWhenReady().catch(e => console.error('[ops] tracking code:', e.message)), { timezone: config.timezone, noOverlap: true });
   } catch (e) { console.error('[onboard] schedule failed:', e.message); }
   setTimeout(() => onboardNewSites().catch(e => console.error('[onboard]', e.message)), 240_000);
   // Prove each source carries the right domain's traffic — hourly.
