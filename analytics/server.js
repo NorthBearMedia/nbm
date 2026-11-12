@@ -498,6 +498,34 @@ app.post('/api/sites/:id/send-report', requireAdmin, async (req, res) => {
   res.json(result);
 });
 
+// "What we did this month": the owner logs work done for a client and it
+// appears in that client's report and dashboard beside the results.
+app.get('/api/sites/:id/work', requireAdmin, (req, res) => {
+  res.json(db.prepare('SELECT id, done_on, title, detail FROM work_log WHERE site_id = ? ORDER BY done_on DESC, id DESC LIMIT 200').all(req.params.id));
+});
+app.post('/api/sites/:id/work', requireAdmin, (req, res) => {
+  const site = db.prepare('SELECT id FROM sites WHERE id = ?').get(req.params.id);
+  if (!site) return res.status(404).json({ error: 'Site not found' });
+  const done_on = String(req.body?.done_on || '').trim();
+  const title = String(req.body?.title || '').trim().slice(0, 140);
+  const detail = String(req.body?.detail || '').trim().slice(0, 400);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(done_on) || Number.isNaN(Date.parse(done_on))) return res.status(400).json({ error: 'Pick the date the work was done' });
+  if (!title) return res.status(400).json({ error: 'Say what was done' });
+  const info = db.prepare('INSERT INTO work_log (site_id, done_on, title, detail) VALUES (?, ?, ?, ?)').run(site.id, done_on, title, detail);
+  forgetDashboard(site.id);
+  res.json({ ok: true, id: Number(info.lastInsertRowid) });
+});
+app.delete('/api/work/:id', requireAdmin, (req, res) => {
+  const row = db.prepare('SELECT site_id FROM work_log WHERE id = ?').get(req.params.id);
+  const info = db.prepare('DELETE FROM work_log WHERE id = ?').run(req.params.id);
+  if (row) forgetDashboard(row.site_id);
+  res.json({ ok: true, removed: info.changes });
+});
+// Drop a site's cached dashboard so a change shows on the next load.
+function forgetDashboard(siteId) {
+  for (const key of dataCache.keys()) if (key.startsWith(`${siteId}:`)) dataCache.delete(key);
+}
+
 // Release a report the sense check held: the same period, sent as the
 // owner's own decision (a manual send is never held).
 app.post('/api/reports/:id/release', requireAdmin, async (req, res) => {

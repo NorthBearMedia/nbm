@@ -107,6 +107,7 @@ export function reportEmailHtml(site, data, periodText, banner = '') {
 
   const wins = (ins?.wins?.length ? ins.wins : (story?.wins || [])).slice(0, 3);
   const actions = (ins?.actions || []).slice(0, 2);
+  const work = (data.workDone || []).slice(0, 4);
   const verdict = story?.verdict?.label || 'Your website report';
   const standfirst = ins?.headline || story?.verdict?.line || '';
 
@@ -135,6 +136,12 @@ export function reportEmailHtml(site, data, periodText, banner = '') {
       ${wins.length ? `<tr><td style="padding:18px 32px 4px;">
         ${label('What went well', GREEN_INK)}
         <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px;">${listRows(wins, () => '&#9632;')}</table>
+      </td></tr>` : ''}
+      ${work.length ? `<tr><td style="padding:10px 32px 4px;">
+        ${label('What we did for you', GREEN_INK)}
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px;">${work.map(w => `<tr>
+          <td valign="top" width="26" style="padding:0 0 10px;font-family:${SANS};font-size:12px;font-weight:bold;color:${GREEN_INK};">&#10003;</td>
+          <td valign="top" style="padding:0 0 10px;font-family:${SANS};font-size:14px;line-height:1.5;color:#16181b;">${esc(w.title)}</td></tr>`).join('')}</table>
       </td></tr>` : ''}
       ${actions.length ? `<tr><td style="padding:10px 32px 4px;">
         ${label('Where we go from here', GREEN_INK)}
@@ -182,6 +189,7 @@ function reportEmailText(site, data, periodText) {
   const wins = (ins?.wins?.length ? ins.wins : (story?.wins || [])).slice(0, 3);
   if (wins.length) lines.push('', 'What went well:', ...wins.map(w => `- ${w.title}. ${w.detail}`));
   const actions = (ins?.actions || []).slice(0, 2);
+  if ((data.workDone || []).length) lines.push('', 'What we did for you:', ...data.workDone.slice(0, 4).map(w => `- ${w.title}`));
   if (actions.length) lines.push('', 'Where we go from here:', ...actions.map((a, k) => `${k + 1}. ${a.title}. ${a.detail}`));
   lines.push('', `Your live dashboard: ${getAppUrl()}/r/${site.dashboard_token}`, '',
     'North Bear Media · northbearmedia.co.uk · info@northbearmedia.co.uk',

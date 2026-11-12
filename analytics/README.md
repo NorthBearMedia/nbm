@@ -106,6 +106,17 @@ is kept for real faults such as downtime. The PDF, the email and the client
 dashboard share one look (Archivo and Martian Mono, in `assets/fonts` and
 `public/fonts`).
 
+**What we did for you.** Each site card has a **Work log**. Log a piece of
+work with its date and it appears in that client's report, email and
+dashboard for the period the date falls in. The report writer is told
+about it and may say a result came after the work, never because of it.
+
+**Google detail.** Reports also list the searches a site started
+appearing for (only when both periods' lists came back whole), the pages
+Google sent people to with the change in clicks, and, on calendar-month
+reports, a comparison with the same month a year ago once that month has
+data.
+
 **Sense check.** Every report is read before it can reach a client
 (`lib/sensecheck.js`), so nobody has to approve each one. Rules catch what
 code can be sure of (a visit count that has collapsed the way a broken tag
