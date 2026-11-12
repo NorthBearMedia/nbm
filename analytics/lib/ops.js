@@ -348,7 +348,8 @@ const TARGET_KEYWORDS = {
   'ensohr.co.uk': 'enso hr, hr consultant',
   'cn-maintenance.com': 'cn maintenance, property maintenance',
   'reynoldslogisticservices.com': 'haulage nottingham, pallet distribution nottingham, warehousing nottingham, reynolds logistics',
-  'harrisleycabins.com': 'harrisley cabins',
+  // Starter list drawn from the site's own homepage wording.
+  'arrasleacabins.com': 'arraslea cabins, holiday cabins belper, cabins with hot tub peak district, hot tub cabins derbyshire, shepherds hut peak district',
 };
 
 // Sites the owner manages but whose DOMAINS he doesn't control (so no
@@ -369,10 +370,14 @@ const NEW_SITES = [
   { name: 'Enso HR', domain: 'ensohr.co.uk' },
   { name: 'CN Maintenance', domain: 'cn-maintenance.com' },
   { name: 'Reynolds Logistics', domain: 'reynoldslogisticservices.com' },
-  // Added before the website exists: the domain is being moved over and
-  // the site built. waitForTag keeps the uptime monitor paused until the
-  // tracking code is seen on the live homepage (see startMonitoringWhenLive).
-  { name: 'Harrisley Cabins', domain: 'harrisleycabins.com', waitForTag: true },
+  // Added before the new website exists: the domain is being moved over
+  // from its old website builder and the site rebuilt. waitForTag keeps the
+  // uptime monitor paused until OUR tracking code is seen on the live
+  // homepage (see startMonitoringWhenLive), so the old site and the move
+  // itself are never counted. "about" is the business in its own words,
+  // from its current homepage, for the report writer.
+  { name: 'Arraslea Cabins', domain: 'arrasleacabins.com', waitForTag: true,
+    about: 'Four hand-crafted holiday cabins in Belper, on the edge of the Peak District, each private with its own hot tub: Rosewood, Bramble, Brock and the Shepherd\'s Cabin (The Hideaway). Guests check availability on Airbnb and can book direct.' },
 ];
 
 // Keyword lists agreed with a client, rather than derived from their search
@@ -426,7 +431,7 @@ function ensureManagedSites() {
     if (existing) continue;
     db.prepare(`INSERT INTO sites (client_name, domain, report_frequency, notes, dashboard_token, next_report_at, delivery_hold, monitor_paused)
                 VALUES (?, ?, 'monthly', ?, ?, ?, 1, ?)`)
-      .run(m.name, m.domain, m.note, newDashboardToken(), nextRunAt('monthly'), m.waitForTag ? 1 : 0);
+      .run(m.name, m.domain, m.about || m.note, newDashboardToken(), nextRunAt('monthly'), m.waitForTag ? 1 : 0);
     if (m.waitForTag) {
       let waiting = [];
       try { waiting = JSON.parse(getSetting('monitor_wait_for_tag') || '[]'); } catch { /* start a fresh list */ }
