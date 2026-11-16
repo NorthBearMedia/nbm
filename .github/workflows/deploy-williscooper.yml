@@ -1,5 +1,21 @@
 name: Deploy Willis Cooper (LIVE)
 
+# ############################################################################
+# DISABLED 2026-11-16 — DO NOT RE-ENABLE UNTIL THE REPO MIRRORS THE LIVE SITE.
+#
+# This workflow FTP-syncs sites/williscooper over the live docroot WITH DELETE.
+# The site has since been edited directly on the server, and the repo is now a
+# subset of it. Running this today would permanently delete, among other files:
+#   - assets/video/*.mp4          ~72 MB of Pedal for a Purpose films
+#   - assets/data/pedal-donations.php + its cache (live JustGiving tracker)
+#   - pedal-for-a-purpose.html, autumn-budget-2026-what-it-means.html,
+#     self-assessment-register-by-5-october.html
+#   - ~60 images added on the server (pedal, bake-off, K2, testimonials)
+#
+# The blocking step below fails the run on purpose. Remove it only once a
+# `git status` against a full download of the live docroot is clean.
+# ############################################################################
+
 # Manual-only. Builds the PRODUCTION copy of sites/williscooper (verbatim
 # clone: analytics on, indexable, robots.txt/sitemap kept) and uploads it
 # over FTPS to the williscooper.com document root on Hostinger.
@@ -35,6 +51,14 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: BLOCKED — repo does not mirror the live site
+        run: |
+          echo "::error::Deploy blocked. sites/williscooper is a SUBSET of the live site."
+          echo "::error::This job syncs with delete and would destroy ~72MB of video,"
+          echo "::error::the pedal-donations.php tracker and three live articles."
+          echo "::error::See the banner at the top of this file before re-enabling."
+          exit 1
+
       - name: Guard — confirmation phrase + secrets sanity
         env:
           CONFIRM: ${{ github.event.inputs.confirm }}
