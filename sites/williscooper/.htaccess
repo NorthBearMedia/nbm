@@ -74,10 +74,10 @@ ErrorDocument 404 /404.html
   Require all denied
 </FilesMatch>
 
-# Empty debug leftovers in assets/data from working out the .json rule above
-# (probe.txt / probe.js / probe.json). They serve nothing and .txt / .js are not
-# covered by the rule above. Delete them in hPanel File Manager when convenient;
-# this keeps them unreachable meanwhile.
+# probe.txt / probe.js / probe.json were empty debug leftovers in assets/data
+# from working out the .json rule above. Deleted from the server 2026-11-16;
+# this rule stays as a guard so they are never served if recreated (.txt and
+# .js are not covered by the extension rule above).
 <FilesMatch "^probe\.">
   Require all denied
 </FilesMatch>

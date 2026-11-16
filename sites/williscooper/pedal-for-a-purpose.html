@@ -254,39 +254,12 @@
   <div class="wc-pp-rail"><div class="wc-pp-fill" id="wc-pp-fill"></div></div>
   <div class="wc-pp-pins" id="wc-pp-pins"></div>
   <div class="wc-pp-upd" id="wc-pp-upd"></div>
-  <div class="wc-pp-raised" id="wc-pp-raised" hidden>
-    <div class="wc-pp-lab">Raised so far</div>
-    <div class="wc-pp-num"><span id="wc-pp-raised-total"></span> <small id="wc-pp-raised-target"></small></div>
-    <div class="wc-pp-rail" id="wc-pp-raised-rail"><div class="wc-pp-fill" id="wc-pp-raised-fill"></div></div>
-    <div class="wc-pp-upd" id="wc-pp-raised-note"></div>
+  <div class="wc-pp-raised" id="wc-pp-raised">
+    <div class="wc-pp-lab">Total raised</div>
+    <div class="wc-pp-num"><span id="wc-pp-raised-total">£2,486</span> <small id="wc-pp-raised-target">raised, past our £1,600 target</small></div>
+    <div class="wc-pp-rail" id="wc-pp-raised-rail"><div class="wc-pp-fill" id="wc-pp-raised-fill" style="width:100%"></div></div>
+    <div class="wc-pp-upd" id="wc-pp-raised-note">Plus £609 Gift Aid, from 54 donations. Final total from JustGiving.</div>
   </div>
-  <script>
-  (function(){
-    var box=document.getElementById('wc-pp-raised');
-    function money(n){return '\u00a3'+Number(n).toLocaleString('en-GB',{minimumFractionDigits:n%1?2:0,maximumFractionDigits:2});}
-    function show(d){
-      if(!d||!(d.total>0)) return;
-      document.getElementById('wc-pp-raised-total').textContent=money(d.total);
-      var rail=document.getElementById('wc-pp-raised-rail'),small=document.getElementById('wc-pp-raised-target');
-      if(d.target>0){
-        small.textContent=d.total>=d.target?('raised, past our '+money(d.target)+' target'):('of '+money(d.target)+' target');
-        document.getElementById('wc-pp-raised-fill').style.width=Math.min(100,d.total/d.target*100)+'%';
-        rail.hidden=false;
-      } else { small.textContent='raised'; rail.hidden=true; }
-      var bits=[];
-      if(d.giftAid>0) bits.push('Plus '+money(d.giftAid)+' Gift Aid');
-      if(d.donations>0) bits.push((bits.length?'from ':'From ')+d.donations+' donation'+(d.donations===1?'':'s'));
-      document.getElementById('wc-pp-raised-note').textContent=(bits.length?bits.join(', ')+'. ':'')+'Live from JustGiving.';
-      box.hidden=false;
-    }
-    function load(){
-      fetch('assets/data/pedal-donations.php?t='+Date.now(),{cache:'no-store'})
-        .then(function(r){return r.ok?r.json():null;}).then(show).catch(function(){});
-    }
-    load();
-    setInterval(load,300000);
-  })();
-  </script>
 </div></div>
 
 <!-- WC-PP-VIDEOS:START -->
