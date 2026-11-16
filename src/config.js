@@ -22,6 +22,9 @@ const required = (name) => {
  * Default is "{text}" (no change to the post body).
  */
 function parseFacebookPages() {
+  // With a system user token the bot fetches each page's token itself, so the
+  // per-page token variables become optional.
+  const hasSystemToken = Boolean(process.env.FACEBOOK_SYSTEM_USER_TOKEN);
   // Railway env vars can't hold real newlines — a typed "\n" arrives as two
   // literal characters. Convert so multi-line post templates work.
   const cleanTemplate = (t) => (t ? t.replaceAll("\\n", "\n") : t);
@@ -35,7 +38,7 @@ function parseFacebookPages() {
         throw new Error("FACEBOOK_PAGES must be a non-empty JSON array");
       }
       for (const p of pages) {
-        if (!p.id || !p.token) {
+        if (!p.id || (!p.token && !hasSystemToken)) {
           throw new Error(
             'Each entry in FACEBOOK_PAGES must have "id" and "token" fields'
           );
@@ -56,7 +59,7 @@ function parseFacebookPages() {
   const pages = [];
 
   // First page (no suffix)
-  if (process.env.FACEBOOK_PAGE_ID && process.env.FACEBOOK_PAGE_ACCESS_TOKEN) {
+  if (process.env.FACEBOOK_PAGE_ID && (process.env.FACEBOOK_PAGE_ACCESS_TOKEN || hasSystemToken)) {
     pages.push({
       id: process.env.FACEBOOK_PAGE_ID,
       token: process.env.FACEBOOK_PAGE_ACCESS_TOKEN,
@@ -69,7 +72,7 @@ function parseFacebookPages() {
   for (let i = 2; i <= 10; i++) {
     const id = process.env[`FACEBOOK_PAGE_ID_${i}`];
     const token = process.env[`FACEBOOK_PAGE_ACCESS_TOKEN_${i}`];
-    if (id && token) {
+    if (id && (token || hasSystemToken)) {
       pages.push({
         id,
         token,
@@ -112,6 +115,9 @@ export const config = {
   facebook: {
     pages: parseFacebookPages(),
     graphApiBase: "https://graph.facebook.com/v21.0",
+    // A Business Manager system user token (set to never expire). When set,
+    // page tokens are fetched from it at boot, replacing the per-page ones.
+    systemUserToken: process.env.FACEBOOK_SYSTEM_USER_TOKEN || "",
     // Mark each handled conversation as "Seen" in the Page inbox (there is no
     // API for the "Done" folder). Set MARK_SEEN=false to disable.
     markSeen: process.env.MARK_SEEN !== "false",

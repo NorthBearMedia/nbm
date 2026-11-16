@@ -25,6 +25,7 @@ import {
   getCategoryStats,
 } from "./services/postlog.js";
 import { postApprovedMessage } from "./facebook/poster.js";
+import { resolvePageTokens } from "./facebook/tokens.js";
 import { verifyAction } from "./utils/sign.js";
 import { escapeHtml } from "./utils/text.js";
 import { buildAdsReport, formatAdsReportHtml, scheduleAdsReport } from "./services/adsreport.js";
@@ -398,7 +399,11 @@ app.listen(config.server.port, () => {
   }
 
   // Start polling for new messages
-  startPolling();
+  // If a system user token is configured, swap in fresh page tokens from it
+  // before the pollers are created (they capture the token at creation).
+  resolvePageTokens()
+    .catch((err) => console.error(`[TOKENS] Page token lookup failed: ${err.message}`))
+    .finally(() => startPolling());
 
   console.log("[SERVER] All systems ready.");
 });
