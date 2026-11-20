@@ -152,7 +152,8 @@ router.post('/api/reports/:id/send', ...ownerOnly, async (req, res) => {
     const gmail = google.gmail({ version: 'v1', auth });
     await gmail.users.messages.send({ userId: 'me', requestBody: { raw: Buffer.from(raw).toString('base64url') } });
     db.prepare(`UPDATE client_reports SET sent_at = datetime('now'), sent_to = ? WHERE id = ?`).run(to.join(', '), r.row.id);
-    logActivity('client', r.row.client_id, 'updated', req.user.display_name, `Sent the ${r.content.label} report to ${to.join(', ')}`);
+    // Recipients stay on the owner-only report row; the activity log is visible to staff.
+    logActivity('client', r.row.client_id, 'updated', req.user.display_name, `Sent the ${r.content.label} report to the client`);
     res.json({ ok: true, sent_to: to.join(', ') });
   } catch (err) {
     const msg = /invalid_grant|unauthorized|401/i.test(String(err?.message)) ? 'Gmail needs reconnecting (More → Email)' : err.message;

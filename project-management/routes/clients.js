@@ -66,7 +66,7 @@ function computeControl(client, tasks, today) {
 
 // Client financials, the robot's "latest" line (drawn from the owner's own
 // messages) and report settings are owner-only.
-function hideOwnerFields(client) {
+export function hideOwnerFields(client) {
   client.monthly_value = 0;
   client.agreement_summary = '';
   client.last_touch_summary = '';
@@ -293,7 +293,10 @@ router.get('/:id/history', requireAuth, (req, res) => {
   if (!client) return res.status(404).json({ error: 'Client not found' });
   if (client.is_private && req.user.role !== 'owner') return res.status(403).json({ error: 'Access denied' });
   const limit = Math.min(parseInt(req.query.limit) || 100, 500);
-  const tids = db.prepare('SELECT id FROM tasks WHERE client_id = ?').all(cid).map(t => t.id);
+  // Staff see the history of their own tasks only (same rule as the task lists).
+  const mine = req.user.role === 'owner' ? '' : 'AND (assignee = ? OR secondary_assignee = ?)';
+  const tids = db.prepare(`SELECT id FROM tasks WHERE client_id = ? ${mine}`)
+    .all(...(mine ? [cid, req.user.display_name, req.user.display_name] : [cid])).map(t => t.id);
   const conds = ["(entity_type='client' AND entity_id=?)"];
   const params = [cid];
   if (tids.length) { conds.push(`(entity_type='task' AND entity_id IN (${tids.map(() => '?').join(',')}))`); params.push(...tids); }

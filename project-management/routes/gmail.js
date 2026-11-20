@@ -15,6 +15,9 @@ function getRedirectUri(req) {
   return `${proto}://${host}/auth/gmail/callback`;
 }
 
+// The robot reads for the first owner account only (see routes/intake.js).
+const robotOwnerId = () => db.prepare("SELECT id FROM users WHERE role = 'owner' ORDER BY id LIMIT 1").get()?.id;
+
 function makeOAuth2(req) {
   return new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, getRedirectUri(req));
 }
@@ -79,7 +82,7 @@ router.get('/auth/gmail/connect', requireAuth, (req, res) => {
   // (owner only, read-only scope). It shares this flow and the one registered
   // callback URL; the purpose rides in the state nonce.
   const forIntake = req.query.purpose === 'intake';
-  if (forIntake && req.user.role !== 'owner') return res.status(403).send('Owner only');
+  if (forIntake && req.user.id !== robotOwnerId()) return res.status(403).send('Owner only');
   const state = randomBytes(16).toString('hex') + (forIntake ? '.intake' : '');
   res.cookie('gmail_oauth_state', state, { httpOnly: true, sameSite: 'lax', maxAge: 10 * 60 * 1000, secure: !!(process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV === 'production') });
   const oauth2 = makeOAuth2(req);
@@ -111,7 +114,7 @@ router.get('/auth/gmail/callback', requireAuth, async (req, res) => {
     const email = profile.data.emailAddress || '';
 
     if (state.endsWith('.intake')) {
-      if (req.user.role !== 'owner') return res.status(403).send('Owner only');
+      if (req.user.id !== robotOwnerId()) return res.status(403).send('Owner only');
       const main = db.prepare('SELECT email FROM gmail_tokens WHERE user_id = ?').get(req.user.id);
       if (main && main.email && main.email.toLowerCase() === email.toLowerCase()) {
         return res.redirect('/#robot-same-mailbox');

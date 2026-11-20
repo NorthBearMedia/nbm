@@ -83,6 +83,48 @@ function sameJob(a, b) {
   for (const w of A) if (B.has(w)) shared++;
   return shared / (A.size + B.size - shared) >= 0.7;
 }
+
+// ─── Who's who ───────────────────────────────────────────────────────────────
+// A message only counts as coming FROM a client when we already know the
+// sender belongs to them: learned when Norton accepted one of their
+// suggestions (contact_map), listed in the client's Important contacts /
+// Notes, or a colleague on the same company email domain. Norton's own
+// sent mail and meeting notes count too. Anything else — however the model
+// labelled it — can't change a client record and is never "confident".
+const FREE_MAIL = /@(gmail|googlemail|hotmail|outlook|live|msn|yahoo|ymail|icloud|me|mac|aol|btinternet|btopenworld|sky|talktalk|virginmedia|ntlworld|protonmail|proton|gmx)\./i;
+const isEmail = s => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(s) && !/@(g|c)\.us$|whatsapp\.net$/i.test(s);
+const phoneTail = s => { const d = digits(s); return d.length >= 9 ? d.slice(-9) : ''; };
+
+function loadKnownContacts() {
+  const known = new Map();
+  const kn = cid => { if (!known.has(cid)) known.set(cid, { ids: new Set(), domains: new Set(), phones: new Set() }); return known.get(cid); };
+  const learn = (k, raw) => {
+    const id = String(raw || '').trim().toLowerCase();
+    if (!id) return;
+    k.ids.add(id);
+    if (isEmail(id) && !FREE_MAIL.test(id)) k.domains.add(id.split('@')[1]);
+    if (!id.includes('@') && phoneTail(id)) k.phones.add(phoneTail(id));
+  };
+  for (const r of db.prepare('SELECT identifier, client_id FROM contact_map').all()) learn(kn(r.client_id), r.identifier);
+  for (const c of db.prepare('SELECT id, important_contacts, notes FROM clients WHERE is_system = 0').all()) {
+    const text = `${c.important_contacts || ''}\n${c.notes || ''}`;
+    const k = kn(c.id);
+    for (const e of text.match(/[^\s@<>(),;:"']+@[^\s@<>(),;:"']+\.[a-z]{2,}/gi) || []) learn(k, e);
+    for (const p of text.match(/\+?\d[\d\s().-]{7,}\d/g) || []) { const t = phoneTail(p); if (t) k.phones.add(t); }
+  }
+  return known;
+}
+
+function senderKnown(clientId, item, known) {
+  if (item.direction === 'sent' || item.source === 'granola' || item.source === 'capture') return true;   // Norton's own words
+  if (!clientId) return false;
+  const k = known.get(clientId);
+  const c = String(item.contact || '').trim().toLowerCase();
+  if (!k || !c) return false;
+  if (k.ids.has(c)) return true;
+  if (!c.includes('@') && phoneTail(c) && k.phones.has(phoneTail(c))) return true;
+  return isEmail(c) && !FREE_MAIL.test(c) && k.domains.has(c.split('@')[1]);
+}
 const digits = s => String(s || '').replace(/\D/g, '');
 
 function isSeen(source, ref) {
@@ -587,7 +629,7 @@ function loadValidationContext() {
   }
   for (const r of db.prepare(`SELECT client_id, title FROM suggestions WHERE status = 'dismissed'
     AND decided_at >= datetime('now', '-21 days')`).all()) push(rejectedTitles, r.client_id, r.title);
-  return { clientIds, openTasks, openTitles, pendingTitles, rejectedTitles, pendingKeys };
+  return { clientIds, openTasks, openTitles, pendingTitles, rejectedTitles, pendingKeys, known: loadKnownContacts() };
 }
 
 export function applyFindings(input, items, runId, ctx = loadValidationContext()) {
@@ -633,7 +675,10 @@ export function applyFindings(input, items, runId, ctx = loadValidationContext()
         ctx.pendingKeys.add(k);
       }
     }
-    ins.run(kind, clientId, taskId, title, notes, deadline, newStatus, confidence, evidence,
+    // From someone we can't place with this client? Still shown, but never
+    // "confident" — so it can't ride along on "Accept all confident ones".
+    const conf = confidence === 'high' && !senderKnown(clientId, item, ctx.known) ? 'medium' : confidence;
+    ins.run(kind, clientId, taskId, title, notes, deadline, newStatus, conf, evidence,
       item.source, item.label, item.url || '', item.ref, item.contact || '', runId);
     created++;
   }
@@ -643,6 +688,7 @@ export function applyFindings(input, items, runId, ctx = loadValidationContext()
   for (const t of (Array.isArray(input?.client_touches) ? input.client_touches : []).slice(0, 60)) {
     const item = items[(parseInt(t?.item, 10) || 0) - 1];
     if (!item || !ctx.clientIds.has(t.client_id) || item.source === 'capture') continue;  // a note to self isn't contact
+    if (!senderKnown(t.client_id, item, ctx.known)) continue;   // a stranger can't rewrite a client's card
     const k = `${t.client_id}|${t.item}`;
     if (seenTouch.has(k)) continue;
     seenTouch.add(k);

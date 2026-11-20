@@ -5,6 +5,7 @@ import Database from 'better-sqlite3';
 import XLSX from 'xlsx';
 import db, { dbPath } from '../database.js';
 import { requireAuth } from '../middleware.js';
+import { hideOwnerFields } from './clients.js';
 
 const router = Router();
 
@@ -75,7 +76,8 @@ router.get('/api/history', requireAuth, (req, res) => {
 router.get('/api/archived/clients', requireAuth, (req, res) => {
   const isOwner = req.user.role === 'owner';
   const priv = isOwner ? '' : 'AND is_private = 0';
-  res.json(db.prepare(`SELECT * FROM clients WHERE archived = 1 ${priv} ORDER BY name`).all());
+  const rows = db.prepare(`SELECT * FROM clients WHERE archived = 1 ${priv} ORDER BY name`).all();
+  res.json(isOwner ? rows : rows.map(hideOwnerFields));
 });
 
 // ─── Team ─────────────────────────────────────────────
@@ -126,7 +128,10 @@ router.get('/api/clients/:id/timeline', requireAuth, (req, res) => {
   if (client.is_private && req.user.role !== 'owner') return res.status(403).json({ error: 'Access denied' });
 
   const limit = Math.min(parseInt(req.query.limit) || 50, 200);
-  const tids = db.prepare('SELECT id FROM tasks WHERE client_id = ?').all(cid).map(t => t.id);
+  // Staff see the history of their own tasks only (same rule as the task lists).
+  const mine = req.user.role === 'owner' ? '' : 'AND (assignee = ? OR secondary_assignee = ?)';
+  const tids = db.prepare(`SELECT id FROM tasks WHERE client_id = ? ${mine}`)
+    .all(...(mine ? [cid, req.user.display_name, req.user.display_name] : [cid])).map(t => t.id);
 
   const conds = [];
   const params = [];

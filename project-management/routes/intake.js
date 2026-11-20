@@ -6,19 +6,24 @@
 // whatever it produces still waits in the tray for the owner.
 
 import express, { Router } from 'express';
-import { randomBytes, timingSafeEqual } from 'crypto';
+import { randomBytes, timingSafeEqual, createHash } from 'crypto';
 import db from '../database.js';
 import { requireAuth, requireRole } from '../middleware.js';
 import { logActivity } from '../lib/activity.js';
 import { createTaskCore, updateTaskCore } from './tasks.js';
 import {
-  runIntake, intakeBusy, getMeta, setMeta, getSecret, scheduleCaptureRun, inOfficeHours, ukToday,
+  runIntake, intakeBusy, getMeta, setMeta, getSecret, scheduleCaptureRun, inOfficeHours, ukToday, ownerUser,
 } from '../lib/intake.js';
 import { getClaude, currentModel } from '../lib/claude.js';
 import { metricoolBrands } from '../lib/report.js';
 
 const router = Router();
-const ownerOnly = [requireAuth, requireRole('owner')];
+// The robot reads ONE person's messages (the first owner account — whose
+// Gmail, WhatsApp and meetings it was connected to), so its tray, quotes and
+// settings are theirs alone, even if another account is later made owner.
+const robotOwner = (req, res, next) =>
+  (req.user.id === ownerUser()?.id ? next() : res.status(403).json({ error: 'Only the account the robot reads for can see this' }));
+const ownerOnly = [requireAuth, requireRole('owner'), robotOwner];
 
 const originOf = req => `${req.headers['x-forwarded-proto'] || req.protocol}://${req.headers['x-forwarded-host'] || req.headers.host}`;
 
@@ -87,14 +92,19 @@ export function acceptSuggestion(id, overrides, user, origin) {
       return { status: 400, json: { error: 'Unknown client' } };
     }
     const deadline = o.deadline !== undefined ? String(o.deadline || '') : s.deadline;
-    const provenance = [s.notes, `— Suggested by the robot from ${s.source_label}${s.evidence ? `:\n“${s.evidence}”` : ''}`]
-      .filter(Boolean).join('\n\n');
+    // Tasks can be handed to staff: a quote from a work email / chat / meeting
+    // helps whoever does it, but nothing from personal WhatsApp or a personal
+    // mailbox travels into the task (it stays on the owner-only suggestion).
+    const mainMailbox = (db.prepare('SELECT email FROM gmail_tokens WHERE user_id = ?').get(user.id)?.email || '').toLowerCase();
+    const personal = s.source === 'periskope' || (s.source === 'gmail' && String(s.source_ref).split(':')[0] !== mainMailbox);
+    const provenance = [s.notes, personal ? '— Suggested by the robot from your messages'
+      : `— Suggested by the robot from ${s.source_label}${s.evidence ? `:\n“${s.evidence}”` : ''}`].filter(Boolean).join('\n\n');
     result = createTaskCore({
       title, client_id: clientId, deadline,
       task_status: deadline ? 'scheduled' : 'inbox', task_band: bandFor(deadline),
       assignee: o.assignee || '',
       notes: o.notes !== undefined ? String(o.notes) : provenance,
-      references_text: s.source_url || '',
+      references_text: personal ? '' : (s.source_url || ''),
     }, user);
   } else if (s.kind === 'complete') {
     result = updateTaskCore(s.task_id, { task_status: 'done' }, user, origin);
@@ -109,8 +119,8 @@ export function acceptSuggestion(id, overrides, user, origin) {
   db.prepare(`UPDATE suggestions SET status = 'accepted', decided_at = datetime('now'), decided_by = ?, result_task_id = ?
     WHERE id = ?`).run(user.display_name, task.id, s.id);
   learnContact(s.contact, task.client_id);
-  logActivity('task', task.id, 'updated', user.display_name,
-    `Accepted the robot's suggestion (${s.kind.replace('_', ' ')}) — from ${s.source_label}`.slice(0, 300));
+  // Who/what it came from stays off the activity log, which staff can see.
+  logActivity('task', task.id, 'updated', user.display_name, `Accepted the robot's suggestion (${s.kind.replace('_', ' ')})`);
   return { status: 200, json: { ok: true, task } };
 }
 
@@ -283,8 +293,9 @@ function captureLimited(ip) {
 }
 function tokenOk(given) {
   const t = getMeta('capture_token', '');
-  if (!t || typeof given !== 'string' || given.length !== t.length) return false;
-  return timingSafeEqual(Buffer.from(given), Buffer.from(t));
+  if (!t || typeof given !== 'string') return false;
+  const h = v => createHash('sha256').update(v).digest();
+  return timingSafeEqual(h(given), h(t));
 }
 const capturePage = (msg = '') => `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">

@@ -39,13 +39,13 @@ const firstStr = (o, keys) => {
 };
 const clip = (v, n) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 
-async function fetchJSON(url, headers = {}, timeoutMs = 30000) {
+async function fetchJSON(url, headers = {}, timeoutMs = 30000, { quiet = false } = {}) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const r = await fetch(url, { headers: { Accept: 'application/json', ...headers }, signal: ctrl.signal });
+    const r = await fetch(url, { headers: { Accept: 'application/json', ...headers }, signal: ctrl.signal, redirect: 'error' });
     const text = await r.text();
-    if (!r.ok) throw Object.assign(new Error(`${r.status} ${text.replace(/\s+/g, ' ').slice(0, 140)}`), { status: r.status });
+    if (!r.ok) throw Object.assign(new Error(quiet ? `HTTP ${r.status}` : `${r.status} ${text.replace(/\s+/g, ' ').slice(0, 140)}`), { status: r.status });
     try { return JSON.parse(text); } catch { throw new Error('the reply was not JSON'); }
   } catch (err) {
     if (err.name === 'AbortError') throw new Error('timed out');
@@ -102,17 +102,29 @@ function gatherTasks(clientId, b) {
 // The client's own dashboard link (https://…/r/<token>) is enough: Pulse's
 // client data endpoint serves the same figures the dashboard shows — the
 // last 30 days up to yesterday, with the 30 days before for comparison.
+// Only a public https Pulse address is fetched — never this server's own
+// network (localhost, private ranges, *.internal), and redirects are refused.
+// Plain http to localhost is allowed outside production, for local testing.
 export function parsePulseLink(link) {
-  const m = String(link || '').trim().match(/^(https?:\/\/[^/\s]+)\/r\/([A-Za-z0-9_-]{8,})/);
-  return m ? { origin: m[1], token: m[2] } : null;
+  let u;
+  try { u = new URL(String(link || '').trim()); } catch { return null; }
+  const m = u.pathname.match(/^\/r\/([A-Za-z0-9_-]{8,})\/?$/);
+  if (!m || u.username || u.password) return null;
+  const host = u.hostname.toLowerCase();
+  const local = host === 'localhost' || host === '127.0.0.1';
+  if (u.protocol === 'http:' && !(local && process.env.NODE_ENV !== 'production')) return null;
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+  if (!local && (/^[\d.]+$/.test(host) || host.includes(':') || /(^|\.)(internal|local|localhost)$/.test(host))) return null;
+  if (local && process.env.NODE_ENV === 'production') return null;
+  return { origin: u.origin, token: m[1] };
 }
 
 async function gatherWebsite(client) {
   if (!client.pulse_link) return { status: 'missing' };
   const p = parsePulseLink(client.pulse_link);
-  if (!p) return { status: 'error', message: 'The Pulse link should look like https://…/r/…' };
+  if (!p) return { status: 'error', message: 'The Pulse link should be the client’s dashboard address: https://…/r/…' };
   try {
-    const d = await fetchJSON(`${p.origin}/api/client/${p.token}/data?range=30`, {}, 60000);
+    const d = await fetchJSON(`${p.origin}/api/client/${p.token}/data?range=30`, {}, 60000, { quiet: true });
     const g = d.ga4 || null, s = d.search || null;
     if (!g && !s) return { status: 'error', message: 'Pulse has no figures for this site yet' };
     const o = (g && !g.unreliable && g.overview) || {}, po = (g && !g.unreliable && g.prevOverview) || {};

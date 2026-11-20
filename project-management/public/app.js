@@ -1322,13 +1322,13 @@ async function quickAddInbox() {
 // Owner only. It reads email / WhatsApp / meeting notes / captures and
 // proposes new tasks, tick-offs and status changes. Nothing touches the task
 // list until it's accepted here — one click, or edit first.
-let robot = { pending: 0, list: [], status: null, editing: null, running: false };
+let robot = { pending: 0, list: [], status: null, editing: null, running: false, denied: false };
 const isOwner = () => currentUser?.role === 'owner';
 const safeUrl = u => /^https?:\/\//i.test(u || '') ? u : '';
 const fmtShort = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : '';
 
 async function fetchRobotCount() {
-  if (!isOwner()) return;
+  if (!isOwner() || robot.denied) return;
   try {
     const r = await api('/api/suggestions/count');
     if (r.pending === robot.pending) return;
@@ -1351,6 +1351,8 @@ async function loadRobotTray() {
     updateInboxCount();
     renderRobotTray();
   } catch (e) {
+    // A second owner account: the robot reads someone else's messages — no tray.
+    if (/Only the account/.test(e.message)) { robot.denied = true; tray.style.display = 'none'; return; }
     document.getElementById('robotStatus').textContent = 'Couldn’t load suggestions — ' + e.message;
   }
 }
@@ -1584,7 +1586,7 @@ function agoAny(ds) {
 
 async function loadWhiteboardView() {
   renderWhiteboard();
-  if (!isOwner()) return;
+  if (!isOwner() || robot.denied) return;
   try {
     robot.list = await api('/api/suggestions');
     robot.pending = robot.list.length;
@@ -1999,6 +2001,7 @@ function renderRobotSettings() {
 
     <section class="rs-sec">
       <h4>What it reads</h4>
+      <div class="rs-sub rs-block-sub">It only links a message to a client when it knows the sender: add client contacts’ emails and numbers to <b>Important contacts</b> in Edit client — and every suggestion you accept teaches it more.</div>
       <div class="rs-src">
         ${dot(!!src.gmail)}
         <div class="rs-src-main"><strong>Work email</strong><div class="rs-sub">${src.gmail ? esc(src.gmail) + ' — inbox and sent' : (s.gmailOAuthConfigured ? 'Not connected' : 'Gmail isn’t set up on the server')}</div></div>
