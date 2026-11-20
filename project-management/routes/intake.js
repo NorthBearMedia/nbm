@@ -15,6 +15,7 @@ import {
   runIntake, intakeBusy, getMeta, setMeta, getSecret, scheduleCaptureRun, inOfficeHours, ukToday,
 } from '../lib/intake.js';
 import { getClaude, currentModel } from '../lib/claude.js';
+import { metricoolBrands } from '../lib/report.js';
 
 const router = Router();
 const ownerOnly = [requireAuth, requireRole('owner')];
@@ -248,6 +249,14 @@ router.post('/api/intake/test/:service', ...ownerOnly, async (req, res) => {
       const phone = getSecret('periskope_phone', 'PERISKOPE_PHONE').replace(/\D/g, '');
       const r = await get('https://api.periskope.app/v1/chats?limit=1', { Authorization: `Bearer ${key}`, ...(phone ? { 'x-phone': phone } : {}) });
       return res.json({ ok: r.ok, detail: r.ok ? 'Connected — chats are readable' : `Periskope said ${r.status}: ${r.text.slice(0, 160)}` });
+    }
+    if (req.params.service === 'metricool') {
+      try {
+        const brands = await metricoolBrands();
+        return res.json({ ok: true, detail: `Connected — ${brands.length} brand${brands.length === 1 ? '' : 's'} on the account` });
+      } catch (err) {
+        return res.json({ ok: false, detail: /^401|^403/.test(err.message) ? 'Metricool turned the key down — check the API token and user ID' : err.message });
+      }
     }
     if (req.params.service === 'granola') {
       const key = getSecret('granola_api_key', 'GRANOLA_API_KEY');

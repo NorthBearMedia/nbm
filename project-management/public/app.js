@@ -982,6 +982,7 @@ function openClientDetail(id) {
       <span class="cd-type">${typeLabelClient(c.client_type)}</span>
       ${c.monthly_value ? `<span class="cd-value">${fmtMoney(c.monthly_value)}/mo</span>` : ''}
       <span style="flex:1"></span>
+      ${isOwner() ? `<button class="btn btn-ghost btn-sm" onclick="closeModal('clientDetailModal');openReport(${c.id})">&#128202; Monthly report</button>` : ''}
       <button class="btn btn-ghost btn-sm" onclick="closeModal('clientDetailModal');editClient(${c.id})">Edit client</button>
       <button class="btn btn-primary btn-sm" onclick="newTaskFromClient(${c.id})">+ Task</button>
     </div>
@@ -1725,6 +1726,228 @@ async function wbAdd(cid, input) {
   finally { input.disabled = false; }
 }
 
+// ─── Monthly client report: draft → edit → PDF → email (owner only) ───────
+// What we did (ticked-off tasks) + website (Pulse) + social (Metricool),
+// worded for the client by The Bear's model; every figure comes from a source.
+let rep = { clientId: null, period: '', list: [], cur: null, busy: false };
+let metricoolBrandCache = null;
+
+async function loadMetricoolOptions(selected) {
+  const sel = document.getElementById('clientMetricool');
+  if (!sel) return;
+  const fill = (list, note) => {
+    const opts = ['<option value="">Not linked</option>'].concat(list.map(b =>
+      `<option value="${esc(b.id)}" ${String(selected) === b.id ? 'selected' : ''}>${esc(b.label)}${b.networks?.length ? ' — ' + esc(b.networks.join(', ')) : ''}</option>`));
+    if (selected && !list.some(b => b.id === String(selected))) opts.push(`<option value="${esc(selected)}" selected>Brand #${esc(selected)}</option>`);
+    sel.innerHTML = opts.join('');
+    sel.title = note || '';
+  };
+  if (metricoolBrandCache) return fill(metricoolBrandCache);
+  fill([], 'Loading Metricool brands…');
+  try { metricoolBrandCache = await api('/api/metricool/brands'); fill(metricoolBrandCache); }
+  catch (e) { fill([], e.message); }
+}
+
+function repMonths() {
+  const now = new Date(), out = [];
+  for (let i = 0; i < 13; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    out.push({ value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+      label: d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) });
+  }
+  return out;
+}
+
+async function openReport(clientId, period) {
+  if (!isOwner()) return;
+  const c = clients.find(x => x.id === clientId);
+  rep = { clientId, period: period || repMonths()[1].value, list: [], cur: null, busy: false };
+  document.getElementById('reportTitle').textContent = `📊 ${c ? c.name : 'Client'} — monthly report`;
+  document.getElementById('reportBody').innerHTML = '<div class="rs-loading">Loading…</div>';
+  openModal('reportModal');
+  await repLoad();
+}
+
+async function repLoad() {
+  try {
+    rep.list = await api(`/api/reports?client_id=${rep.clientId}`);
+    const hit = rep.list.find(r => r.period === rep.period);
+    rep.cur = hit ? await api(`/api/reports/${hit.id}`) : null;
+  } catch (e) { toast('Couldn’t load reports — ' + e.message); }
+  repRender();
+}
+
+function repSetPeriod(v) { rep.period = v; repLoad(); }
+
+function repSourceLine(facts) {
+  const c = clients.find(x => x.id === rep.clientId) || {};
+  const ok = t => `<span class="rep-ok">✓ ${t}</span>`, warn = t => `<span class="rep-warn">⚠ ${t}</span>`;
+  const parts = [];
+  if (facts) parts.push(facts.tasks.done.length ? ok(`${facts.tasks.done.length} jobs ticked off`) : warn('No jobs ticked off that month'));
+  const w = facts?.website, s = facts?.social;
+  if (!facts) parts.push(c.pulse_link ? ok('Website linked (Pulse)') : warn('Website not linked'));
+  else if (w.status === 'ok') parts.push(ok(`Website: ${w.visitors ?? w.googleClicks ?? '—'} ${w.visitors !== null ? 'visitors' : 'Google clicks'}`));
+  else parts.push(warn(w.status === 'missing' ? 'Website not linked' : `Website: ${esc(w.message)}`));
+  if (!facts) parts.push(c.metricool_blog_id ? ok('Social linked (Metricool)') : warn('Social not linked'));
+  else if (s.status === 'ok') parts.push(ok(`Social: ${s.networks.map(n => `${n.network} ${n.posts}`).join(', ')} posts`));
+  else parts.push(warn(s.status === 'missing' ? 'Social not linked' : `Social: ${esc(s.message)}`));
+  const needsLink = (!facts && (!c.pulse_link || !c.metricool_blog_id)) || (facts && (w.status === 'missing' || s.status === 'missing'));
+  return parts.join(' · ') + (needsLink ? ` — <a href="#" onclick="closeModal('reportModal');editClient(${rep.clientId});return false">link them in Edit client</a>` : '');
+}
+
+function repRender() {
+  const body = document.getElementById('reportBody');
+  const months = repMonths().map(m => `<option value="${m.value}" ${m.value === rep.period ? 'selected' : ''}>${m.label}</option>`).join('');
+  const r = rep.cur, content = r?.content, d = content?.draft;
+  const history = rep.list.length ? `<div class="rep-history">${rep.list.map(x => {
+      const lbl = new Date(x.period + '-01T00:00:00').toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+      return `<button class="${x.period === rep.period ? 'on' : ''}" onclick="repSetPeriod('${x.period}')">${lbl} · ${x.sent_at ? 'sent ' + timeAgo(x.sent_at) : 'draft'}</button>`;
+    }).join('')}</div>` : '';
+  let html = `<div class="rep-top">
+      <select id="repMonth" class="filter-select" onchange="repSetPeriod(this.value)">${months}</select>
+      <button class="btn ${r ? 'btn-ghost' : 'btn-primary'} btn-sm" id="repDraftBtn" onclick="repDraft()">${r ? '↻ Redraft from scratch' : '✨ Draft the report'}</button>
+      <span class="rep-sources">${repSourceLine(content?.facts)}</span>
+    </div>${history}`;
+  if (!r) {
+    html += `<div class="rep-empty">Pulls together what you ticked off for this client in the month, their website figures from Pulse and their social media from Metricool, then writes it up for the client. You check it, tweak it, and send it as a branded PDF.</div>`;
+    body.innerHTML = html;
+    return;
+  }
+  const f = content.facts;
+  const hl = (d.highlights.length ? d.highlights : [{ title: '', detail: '' }]).map((h, i) => `<div class="rep-hl">
+      <input type="text" class="rep-hl-t" value="${esc(h.title)}" placeholder="Highlight" maxlength="90">
+      <input type="text" class="rep-hl-d" value="${esc(h.detail)}" placeholder="One line of detail" maxlength="320">
+      <button class="btn-icon" onclick="this.closest('.rep-hl').remove()" title="Remove">&times;</button>
+    </div>`).join('');
+  html += `${content.note ? `<div class="rep-note">${esc(content.note)}</div>` : ''}
+    ${r.sent_at ? `<div class="rep-sent">✓ Sent to ${esc(r.sent_to)} ${timeAgo(r.sent_at)} — editing now changes your copy only.</div>` : ''}
+    <div class="rep-form">
+      <label>Headline</label><input type="text" id="repHeadline" value="${esc(d.headline)}" maxlength="200">
+      <label>Intro</label><textarea id="repIntro" rows="3" maxlength="900">${esc(d.intro)}</textarea>
+      <label>What we did in ${esc(content.month)} <span class="rep-hint">${f.tasks.done.length} jobs ticked off — grouped into highlights</span></label>
+      <div id="repHighlights">${hl}</div>
+      <button class="btn btn-ghost btn-sm rep-add" onclick="repAddHighlight()">+ Add highlight</button>
+      ${f.website.status === 'ok' ? `<label>Website <span class="rep-hint">${esc(repWebLine(f.website))}</span></label>${repWindowWarning(content)}
+        <textarea id="repWeb" rows="3" maxlength="700">${esc(d.website_summary)}</textarea>` : ''}
+      ${f.social.status === 'ok' ? `<label>Social media <span class="rep-hint">${esc(f.social.networks.map(n => `${n.network}: ${n.posts} posts${n.reach !== null ? ', reach ' + n.reach.toLocaleString('en-GB') : ''}`).join(' · '))}</span></label>
+        <textarea id="repSocial" rows="3" maxlength="700">${esc(d.social_summary)}</textarea>` : ''}
+      <label>Coming up in ${esc(content.nextMonth)} <span class="rep-hint">one per line</span></label>
+      <textarea id="repNext" rows="3">${esc(d.next_month.join('\n'))}</textarea>
+    </div>
+    <div class="rep-actions">
+      <button class="btn btn-ghost btn-sm" onclick="repSave(true)">Save changes</button>
+      <button class="btn btn-ghost btn-sm" onclick="repPreview()">Preview PDF &#8599;</button>
+      <button class="btn btn-primary btn-sm" onclick="repShowSend()">&#9993; Email it to the client…</button>
+    </div>
+    <div class="rep-send" id="repSend" style="display:none"></div>`;
+  body.innerHTML = html;
+}
+
+// Pulse serves the last 30 days to yesterday. Drafted well after the month
+// ends, those figures don't match it — say so before it reaches a client.
+function repWindowWarning(content) {
+  const w = content.facts.website.window;
+  if (!w) return '';
+  const [y, m] = content.period.split('-').map(Number);
+  const monthEnd = localDateStr(new Date(y, m, 0));
+  const late = (new Date(w.end + 'T00:00:00') - new Date(monthEnd + 'T00:00:00')) / 864e5;
+  if (late <= 5) return '';
+  return `<div class="rep-note">The website figures cover ${fmtDateShort(w.start)} – ${fmtDateShort(w.end)} (Pulse gives the last 30 days). For figures that match ${esc(content.month)}, draft the report in the first few days of ${esc(content.nextMonth)}.</div>`;
+}
+
+function repWebLine(w) {
+  const bits = [];
+  if (w.visitors !== null) bits.push(`${w.visitors.toLocaleString('en-GB')} visitors`);
+  if (w.googleClicks !== null) bits.push(`${w.googleClicks.toLocaleString('en-GB')} Google clicks`);
+  if (w.window) bits.push(`${fmtDateShort(w.window.start)} – ${fmtDateShort(w.window.end)}`);
+  return bits.join(' · ');
+}
+
+function repAddHighlight() {
+  const wrap = document.getElementById('repHighlights');
+  wrap.insertAdjacentHTML('beforeend', `<div class="rep-hl">
+    <input type="text" class="rep-hl-t" placeholder="Highlight" maxlength="90">
+    <input type="text" class="rep-hl-d" placeholder="One line of detail" maxlength="320">
+    <button class="btn-icon" onclick="this.closest('.rep-hl').remove()" title="Remove">&times;</button></div>`);
+  wrap.lastElementChild.querySelector('input').focus();
+}
+
+function repCollect() {
+  const val = id => document.getElementById(id)?.value ?? '';
+  return {
+    headline: val('repHeadline'), intro: val('repIntro'),
+    highlights: [...document.querySelectorAll('#repHighlights .rep-hl')].map(row => ({
+      title: row.querySelector('.rep-hl-t').value, detail: row.querySelector('.rep-hl-d').value })).filter(h => h.title.trim()),
+    website_summary: val('repWeb'), social_summary: val('repSocial'),
+    next_month: val('repNext').split('\n').map(x => x.trim()).filter(Boolean),
+  };
+}
+
+async function repSave(announce) {
+  if (!rep.cur) return false;
+  try {
+    const r = await api(`/api/reports/${rep.cur.id}`, { method: 'PUT', body: { draft: repCollect() } });
+    rep.cur.content.draft = r.draft;
+    if (announce) toast('Saved', true);
+    return true;
+  } catch (e) { toast('Not saved — ' + e.message); return false; }
+}
+
+async function repDraft() {
+  if (rep.busy) return;
+  if (rep.cur && !confirm('Start again from fresh figures? Your edits to this draft will be replaced.')) return;
+  rep.busy = true;
+  const btn = document.getElementById('repDraftBtn');
+  btn.disabled = true;
+  btn.textContent = 'Gathering figures and writing it up…';
+  try {
+    rep.cur = await api('/api/reports/draft', { method: 'POST', body: { client_id: rep.clientId, period: rep.period } });
+    rep.list = await api(`/api/reports?client_id=${rep.clientId}`);
+  } catch (e) { toast('Couldn’t draft it — ' + e.message); }
+  rep.busy = false;
+  repRender();
+}
+
+async function repPreview() {
+  // Open the tab inside the click (pop-up blockers), then point it at the PDF once saved.
+  const w = window.open('', '_blank');
+  if (!(await repSave(false))) { w?.close(); return; }
+  const url = `/api/reports/${rep.cur.id}/pdf?t=${Date.now()}`;
+  if (w) w.location = url; else window.location = url;
+}
+
+function repShowSend() {
+  const box = document.getElementById('repSend');
+  const c = clients.find(x => x.id === rep.clientId) || {};
+  const content = rep.cur.content;
+  const me = currentUser?.display_name || '';
+  box.style.display = '';
+  box.innerHTML = `<label>To</label><input type="text" id="repTo" value="${esc(c.report_email || '')}" placeholder="name@client.co.uk">
+    <label>Subject</label><input type="text" id="repSubject" value="${esc(`Your ${content.label} report — North Bear Media`)}">
+    <label>Message</label><textarea id="repMsg" rows="7">${esc(`Hi there,\n\nHere’s your report for ${content.month}: what we’ve done for you, how your website and social media performed, and what’s coming up next.\n\nAny questions, just reply to this email.\n\nThanks,\n${me}\nNorth Bear Media`)}</textarea>
+    <div class="rep-actions"><button class="btn btn-primary btn-sm" id="repSendBtn" onclick="repSend()">Send with the PDF attached</button>
+    <span class="rep-hint">Sent from your Gmail; it lands in your Sent folder.</span></div>`;
+  document.getElementById('repTo').focus();
+}
+
+async function repSend() {
+  const to = document.getElementById('repTo').value.trim();
+  if (!to) return toast('Who should it go to?');
+  if (!confirm(`Send the ${rep.cur.content.label} report to ${to}?`)) return;
+  if (!(await repSave(false))) return;
+  const btn = document.getElementById('repSendBtn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try {
+    const r = await api(`/api/reports/${rep.cur.id}/send`, { method: 'POST', body: {
+      to, subject: document.getElementById('repSubject').value, message: document.getElementById('repMsg').value } });
+    toast(`Sent to ${r.sent_to}`, true);
+    await repLoad();
+  } catch (e) {
+    toast(e.message);
+    btn.disabled = false; btn.textContent = 'Send with the PDF attached';
+  }
+}
+
 // ─── Robot & sources settings (☰ menu, owner only) ─────────────────────────
 async function openRobotSettings() {
   document.getElementById('navDropdown')?.classList.remove('open');
@@ -1817,6 +2040,23 @@ function renderRobotSettings() {
     </section>
 
     <section class="rs-sec">
+      <h4>Monthly reports</h4>
+      <div class="rs-src rs-src-form">
+        ${dot(s.metricool.configured && !!s.metricool.userId)}
+        <div class="rs-src-main"><strong>Social media figures</strong> <span class="rs-sub-inline">via Metricool</span>
+          <div class="rs-sub">Metricool → Account settings → API: copy the token and your user ID. Then link each client to its brand in Edit client.</div>
+          <div class="rs-fields">
+            ${rsKeyInput('rsMcToken', s.metricool.configured, s.metricool.fromEnv, 'Metricool API token')}
+            <input type="text" id="rsMcUser" value="${esc(s.metricool.userId || '')}" placeholder="User ID, e.g. 3883072" inputmode="numeric">
+            <button class="btn btn-ghost btn-sm" onclick="robotSaveSource('metricool')">Save &amp; test</button>
+          </div>
+          <div class="rs-test" id="rsTest-metricool"></div>
+        </div>
+      </div>
+      <div class="rs-sub">Website figures come from each client’s Pulse dashboard link — paste it in Edit client.</div>
+    </section>
+
+    <section class="rs-sec">
       <h4>Send to Console — for your phone, Grok, Claude and anything else</h4>
       <div class="rs-capture">
         <input type="text" readonly value="${esc(s.captureUrl)}" onclick="this.select()" id="rsCaptureUrl">
@@ -1854,6 +2094,11 @@ async function robotSaveSource(svc) {
     const k = document.getElementById('rsPeriKey');
     if (k && !k.disabled && k.value.trim()) body.periskope_api_key = k.value.trim();
     body.periskope_phone = document.getElementById('rsPeriPhone').value;
+  } else if (svc === 'metricool') {
+    const k = document.getElementById('rsMcToken');
+    if (k && !k.disabled && k.value.trim()) body.metricool_token = k.value.trim();
+    body.metricool_user_id = document.getElementById('rsMcUser').value;
+    metricoolBrandCache = null;   // new key → fetch the brand list again
   } else {
     const k = document.getElementById('rsGranolaKey');
     if (k && !k.disabled && k.value.trim()) body.granola_api_key = k.value.trim();
@@ -3393,7 +3638,8 @@ async function showArchiveModal(){
 document.getElementById('addClientBtn').addEventListener('click',()=>{
   document.getElementById('clientModalTitle').textContent='New Client';
   document.getElementById('clientFormError').style.display='none';
-  ['clientId','clientName','clientCode','clientNotes','clientGmail','clientDrive','clientMonthlyValue','clientAgreementSummary','clientRecurringDeliverables','clientLastContact','clientNextScheduled','clientContacts'].forEach(id=>document.getElementById(id).value='');
+  ['clientId','clientName','clientCode','clientNotes','clientGmail','clientDrive','clientMonthlyValue','clientAgreementSummary','clientRecurringDeliverables','clientLastContact','clientNextScheduled','clientContacts','clientPulseLink','clientReportEmail'].forEach(id=>document.getElementById(id).value='');
+  if (isOwner()) loadMetricoolOptions('');
   document.getElementById('clientType').value='recurring';
   document.getElementById('clientTypeBand').value='retainer';
   document.getElementById('clientControlStatus').value='';
@@ -3425,6 +3671,9 @@ function editClient(id){
   document.getElementById('clientNotes').value=c.notes||'';
   document.getElementById('clientGmail').value=c.gmail_link||'';
   document.getElementById('clientDrive').value=c.drive_link||'';
+  document.getElementById('clientPulseLink').value=c.pulse_link||'';
+  document.getElementById('clientReportEmail').value=c.report_email||'';
+  if (isOwner()) loadMetricoolOptions(c.metricool_blog_id||'');
   document.getElementById('clientLogo').value='';
   document.getElementById('clientPrivate').checked=!!c.is_private;
   document.getElementById('privateClientGroup').style.display=currentUser?.role==='owner'?'':'none';
@@ -3446,6 +3695,11 @@ document.getElementById('clientForm').addEventListener('submit',async e=>{
     control_status:document.getElementById('clientControlStatus').value,
     risk_level:document.getElementById('clientRiskLevel').value,
     important_contacts:document.getElementById('clientContacts').value};
+  if (isOwner()) {
+    data.pulse_link = document.getElementById('clientPulseLink').value.trim();
+    data.metricool_blog_id = document.getElementById('clientMetricool').value;
+    data.report_email = document.getElementById('clientReportEmail').value.trim();
+  }
   if (!data.name.trim()) { errEl.textContent='Client name is required.'; errEl.style.display='block'; return; }
   if (!data.code || data.code.length !== 3) { errEl.textContent='Client code must be exactly 3 letters.'; errEl.style.display='block'; return; }
   data.code = data.code.toUpperCase();

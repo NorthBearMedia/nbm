@@ -2565,6 +2565,40 @@ select { color-scheme:dark; }
 .rs-run-st.rs-partial, .rs-run-st.rs-error { color:var(--warning); }
 .rs-run-st.rs-running { color:var(--blue); }
 .rs-notes { margin:8px 0 0 18px; padding:0; font-size:12px; color:var(--text-muted); }
+/* ─── MONTHLY CLIENT REPORT ─────────────────────────── */
+.form-section-title { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-secondary); margin:6px 0 8px; padding-top:10px; border-top:1px solid var(--border); }
+.report-body { padding:6px 28px 24px; max-height:76vh; overflow-y:auto; }
+.rep-top { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:10px 0 12px; border-bottom:1px solid var(--border); }
+.rep-sources { flex:1 1 100%; font-size:12px; color:var(--text-secondary); line-height:1.6; }
+.rep-sources a { color:var(--primary); }
+.rep-ok { color:var(--success); }
+.rep-warn { color:var(--warning); }
+.rep-history { display:flex; gap:6px; flex-wrap:wrap; padding:10px 0 0; }
+.rep-history button { font-size:11px; color:var(--text-secondary); background:var(--bg-glass); border:1px solid var(--border); border-radius:10px; padding:2px 9px; cursor:pointer; font-family:inherit; }
+.rep-history button.on { color:var(--text); border-color:var(--primary); }
+.rep-empty { color:var(--text-secondary); font-size:13px; line-height:1.6; padding:18px 0 4px; }
+.rep-note { margin-top:12px; font-size:12px; color:var(--warning); background:var(--warning-bg); border-radius:var(--radius); padding:8px 12px; }
+.rep-sent { margin-top:12px; font-size:12px; color:var(--success); background:var(--success-bg); border-radius:var(--radius); padding:8px 12px; }
+.rep-form, .rep-send { display:flex; flex-direction:column; gap:6px; padding-top:12px; }
+.rep-form label, .rep-send label { font-size:12px; font-weight:600; color:var(--text-secondary); margin-top:8px; }
+.rep-hint { font-weight:400; color:var(--text-muted); margin-left:6px; }
+.rep-form input, .rep-form textarea, .rep-send input, .rep-send textarea {
+  background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); padding:8px 11px; color:var(--text); font-size:13px; font-family:inherit; outline:none; resize:vertical;
+}
+.rep-form input:focus, .rep-form textarea:focus, .rep-send input:focus, .rep-send textarea:focus { border-color:var(--border-glow); }
+#repHeadline { font-weight:600; font-size:14px; }
+.rep-hl { display:flex; gap:6px; align-items:center; }
+.rep-hl .rep-hl-t { flex:0 0 32%; font-weight:600; }
+.rep-hl .rep-hl-d { flex:1; min-width:0; }
+.rep-add { align-self:flex-start; }
+.rep-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding-top:14px; }
+.rep-send { margin-top:12px; border-top:1px solid var(--border); }
+@media (max-width:600px) {
+  .report-body { padding:4px 16px 20px; }
+  .rep-hl { flex-wrap:wrap; }
+  .rep-hl .rep-hl-t { flex:1 1 100%; }
+}
+
 /* ─── WHITEBOARD (every client at a glance) ─────────── */
 /* A physical-object surface like the Notebook's paper: its own marker palette. */
 .wb-wrap {

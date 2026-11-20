@@ -69,6 +69,20 @@ export function ownerUser() {
 }
 
 const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+// Near-duplicate titles: "Christmas opening-hours post" vs "Christmas
+// opening-hours post for socials" is the same job.
+const titleWords = s => new Set(norm(s).split(' ').filter(w => w.length > 2));
+function sameJob(a, b) {
+  const na = norm(a), nb = norm(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  if (Math.min(na.length, nb.length) >= 12 && (na.includes(nb) || nb.includes(na))) return true;
+  const A = titleWords(a), B = titleWords(b);
+  if (A.size < 2 || B.size < 2) return false;
+  let shared = 0;
+  for (const w of A) if (B.has(w)) shared++;
+  return shared / (A.size + B.size - shared) >= 0.7;
+}
 const digits = s => String(s || '').replace(/\D/g, '');
 
 function isSeen(source, ref) {
@@ -559,16 +573,21 @@ function loadValidationContext() {
   const clientIds = new Set(db.prepare('SELECT id FROM clients WHERE archived = 0 AND is_system = 0').all().map(r => r.id));
   const openTasks = new Map(db.prepare(`SELECT id, client_id, title, task_status, deadline FROM tasks
     WHERE archived = 0 AND task_status NOT IN ('done', 'cancelled')`).all().map(t => [t.id, t]));
-  const openKeys = new Set([...openTasks.values()].map(t => `${t.client_id}|${norm(t.title)}`));
+  // Titles per client (key = client id, or 'none') to catch the same job worded differently.
+  const titles = () => new Map();
+  const push = (m, cid, t) => { const k = cid || 'none'; if (!m.has(k)) m.set(k, []); m.get(k).push(t); };
+  const openTitles = titles(), pendingTitles = titles(), rejectedTitles = titles();
+  const sysId = db.prepare('SELECT id FROM clients WHERE is_system = 1').get()?.id;
+  for (const t of openTasks.values()) push(openTitles, t.client_id === sysId ? null : t.client_id, t.title);
   const pendingKeys = new Set();
   for (const s of db.prepare("SELECT kind, client_id, task_id, title, new_status, deadline FROM suggestions WHERE status = 'pending'").all()) {
-    if (s.kind === 'new_task') pendingKeys.add(`n|${s.client_id}|${norm(s.title)}`);
+    if (s.kind === 'new_task') push(pendingTitles, s.client_id, s.title);
     else if (s.kind === 'complete') pendingKeys.add(`c|${s.task_id}`);
     else pendingKeys.add(`u|${s.task_id}|${s.new_status}|${s.deadline}`);
   }
-  const rejectedKeys = new Set(db.prepare(`SELECT client_id, title FROM suggestions WHERE status = 'dismissed'
-    AND decided_at >= datetime('now', '-21 days')`).all().map(r => `${r.client_id}|${norm(r.title)}`));
-  return { clientIds, openTasks, openKeys, pendingKeys, rejectedKeys };
+  for (const r of db.prepare(`SELECT client_id, title FROM suggestions WHERE status = 'dismissed'
+    AND decided_at >= datetime('now', '-21 days')`).all()) push(rejectedTitles, r.client_id, r.title);
+  return { clientIds, openTasks, openTitles, pendingTitles, rejectedTitles, pendingKeys };
 }
 
 export function applyFindings(input, items, runId, ctx = loadValidationContext()) {
@@ -592,9 +611,11 @@ export function applyFindings(input, items, runId, ctx = loadValidationContext()
 
     if (kind === 'new_task') {
       if (title.length < 3) continue;
-      const n = norm(title);
-      if (ctx.openKeys.has(`${clientId}|${n}`) || ctx.pendingKeys.has(`n|${clientId}|${n}`) || ctx.rejectedKeys.has(`${clientId}|${n}`)) continue;
-      ctx.pendingKeys.add(`n|${clientId}|${n}`);
+      const k = clientId || 'none';
+      const clash = m => (m.get(k) || []).some(t => sameJob(t, title));
+      if (clash(ctx.openTitles) || clash(ctx.pendingTitles) || clash(ctx.rejectedTitles)) continue;
+      if (!ctx.pendingTitles.has(k)) ctx.pendingTitles.set(k, []);
+      ctx.pendingTitles.get(k).push(title);
     } else {
       taskId = parseTaskRef(s.task_ref);
       const task = taskId ? ctx.openTasks.get(taskId) : null;

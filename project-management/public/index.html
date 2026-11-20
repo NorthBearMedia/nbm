@@ -12,7 +12,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=91">
+  <link rel="stylesheet" href="styles.css?v=92">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -558,6 +558,12 @@
       <div class="form-group"><label>Agreement Type (legacy)</label><select id="clientType"><option value="recurring">Recurring</option><option value="ad-hoc">Ad Hoc / One-off</option></select></div>
       <div class="form-group"><label>Notes</label><textarea id="clientNotes" rows="2"></textarea></div>
       <div class="form-row"><div class="form-group"><label>Gmail Link</label><input type="url" id="clientGmail" placeholder="https://mail.google.com/..."></div><div class="form-group"><label>Google Drive Link</label><input type="url" id="clientDrive" placeholder="https://drive.google.com/..."></div></div>
+      <div class="form-section-title money-owner-only">Monthly report</div>
+      <div class="form-row money-owner-only">
+        <div class="form-group"><label>Pulse dashboard link</label><input type="url" id="clientPulseLink" placeholder="https://…/r/…"></div>
+        <div class="form-group"><label>Metricool brand</label><select id="clientMetricool"><option value="">Not linked</option></select></div>
+      </div>
+      <div class="form-group money-owner-only"><label>Send reports to</label><input type="text" id="clientReportEmail" placeholder="name@client.co.uk, accounts@client.co.uk"></div>
       <div class="form-group"><label>Logo</label><input type="file" id="clientLogo" accept="image/*"></div>
       <div class="form-group" id="privateClientGroup" style="display:none"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="clientPrivate"> <span>Private Client</span> <span style="font-size:11px;color:var(--text-secondary)">(only visible to you)</span></label></div>
       <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="closeModal('clientModal')">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
@@ -715,6 +721,12 @@
     <div class="robot-settings" id="robotSettingsBody"></div>
   </div>
 
+  <!-- Monthly client report (owner only): draft → edit → PDF → email -->
+  <div class="modal modal-lg" id="reportModal" style="max-width:860px">
+    <div class="modal-header"><h2 id="reportTitle">Monthly report</h2><button class="modal-close" onclick="closeModal('reportModal')">&times;</button></div>
+    <div class="report-body" id="reportBody"></div>
+  </div>
+
   <footer class="app-footer">
     <img src="/NBM%20Logo%20No%20NG%20Light%20Lines.png" alt="" style="width:28px;opacity:0.4">
     <span>&copy; 2026 North Bear Media. All rights reserved.</span>
@@ -780,6 +792,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=90"></script>
+  <script src="app.js?v=92"></script>
 </body>
 </html>

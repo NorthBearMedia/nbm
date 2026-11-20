@@ -21,6 +21,7 @@ import gmailRoutes from './routes/gmail.js';
 import xeroRoutes from './routes/xero.js';
 import whatsappRoutes from './routes/whatsapp.js';
 import intakeRoutes from './routes/intake.js';
+import reportRoutes from './routes/reports.js';
 import { startIntakeScheduler } from './lib/intake.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -175,6 +176,7 @@ app.use(gmailRoutes);
 app.use(xeroRoutes);
 app.use(whatsappRoutes);
 app.use(intakeRoutes);
+app.use(reportRoutes);
 
 // ─── Seed Users ─────────────────────────────────────────
 // Creates default users ONLY when the users table is empty.
