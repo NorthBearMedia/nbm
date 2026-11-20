@@ -113,6 +113,19 @@ export function fixClientsNov2026(db, { dry = false } = {}) {
   return report;
 }
 
+// v2 (same day): the Claude session for this client is titled "Sascha
+// Lundgran" — likely the real spelling — so add it as another name.
+export function amendClientsNov2026v2(db) {
+  const c = db.prepare("SELECT * FROM clients WHERE is_system = 0 AND (name LIKE '%keto%clarity%' OR aliases LIKE '%Lonsgren%') ORDER BY archived, id LIMIT 1").get();
+  if (!c) return { updated: [] };
+  const aliases = mergeAliases(c.aliases, ['Sascha Lundgran']);
+  if (aliases === (c.aliases || '')) return { updated: [] };
+  db.prepare('UPDATE clients SET aliases = ? WHERE id = ?').run(aliases, c.id);
+  const owner = db.prepare("SELECT display_name FROM users WHERE role = 'owner' ORDER BY id LIMIT 1").get();
+  log(db, c.id, `also known as: ${aliases} (spelling from the Claude session)`, owner?.display_name || 'Norton');
+  return { updated: [c.name] };
+}
+
 // CLI
 if (import.meta.url === `file://${process.argv[1]}`) {
   const { default: db } = await import('../database.js');
