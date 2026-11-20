@@ -386,6 +386,33 @@ router.post('/relay/items', (req, res) => {
   }
 });
 
+// Monthly: last month's social figures per Metricool brand, read through
+// Norton's Metricool connection in Claude, kept for the monthly report.
+router.post('/relay/social', (req, res) => {
+  if (!relayKeyOk(req)) return res.status(401).json({ error: 'Key needed' });
+  const period = String(req.body?.period || '');
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) return res.status(400).json({ error: 'period must be YYYY-MM' });
+  const brands = Array.isArray(req.body?.brands) ? req.body.brands.slice(0, 100) : [];
+  const n = v => (Number.isFinite(Number(v)) && v !== null && v !== '' ? Math.round(Number(v)) : null);
+  const s = (v, max) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+  const up = db.prepare(`INSERT INTO report_social (client_id, period, data) VALUES (?, ?, ?)
+    ON CONFLICT(client_id, period) DO UPDATE SET data = excluded.data, created_at = datetime('now')`);
+  let saved = 0;
+  for (const b of brands) {
+    const blog = String(b?.blog_id || '').replace(/\D/g, '');
+    if (!blog) continue;
+    const networks = (Array.isArray(b.networks) ? b.networks : []).slice(0, 12).map(x => ({
+      network: s(x?.network, 40), posts: n(x?.posts) ?? 0, reach: n(x?.reach), views: n(x?.views), interactions: n(x?.interactions),
+      top: x?.top && s(x.top.text, 160) ? { text: s(x.top.text, 160), interactions: n(x.top.interactions), views: n(x.top.views),
+        url: /^https:\/\//i.test(String(x.top.url || '')) ? String(x.top.url).slice(0, 500) : '' } : null,
+    })).filter(x => x.network);
+    if (!networks.length) continue;
+    const data = JSON.stringify({ brand: s(b.brand, 100), networks, via: 'Metricool (relayed by Claude)' });
+    for (const c of db.prepare("SELECT id FROM clients WHERE metricool_blog_id = ? AND is_system = 0").all(blog)) { up.run(c.id, period, data); saved++; }
+  }
+  res.json({ ok: true, saved });
+});
+
 // ─── Claude connector (MCP) ──────────────────────────────────────────────────
 // Claude can't share chat history with other apps, so Console plugs into
 // Claude instead: added as a custom connector (claude.ai → Settings →

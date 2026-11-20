@@ -376,6 +376,15 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     processed_at TEXT DEFAULT ''
   );
+  -- A client's social figures for a month, relayed in by Claude from Norton's
+  -- Metricool connection (the monthly report uses them when there's no API key).
+  CREATE TABLE IF NOT EXISTS report_social (
+    client_id INTEGER NOT NULL,
+    period TEXT NOT NULL,                     -- YYYY-MM
+    data TEXT NOT NULL,                       -- JSON {brand, networks:[...]}
+    created_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (client_id, period)
+  );
   -- Messages relayed in by Claude (an hourly Claude task reading Norton's
   -- connected Gmail / WhatsApp / Granola / Claude sessions), waiting for the robot.
   CREATE TABLE IF NOT EXISTS intake_relay (
