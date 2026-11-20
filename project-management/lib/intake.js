@@ -548,11 +548,21 @@ export function relayStatus() {
     const until = Date.parse(getMeta(`relay_until_${src}`, '')) || (Date.now() - 24 * 3600 * 1000);
     since[src] = new Date(Math.max(until - 10 * 60 * 1000, Date.now() - FIRST_RUN_LOOKBACK_MS)).toISOString();
   }
+  // Counts only (no content): lets the relay — and whoever checks on it — see
+  // that relayed messages are being read and turned into suggestions.
+  const last = db.prepare('SELECT status, started_at, items, suggestions FROM intake_runs ORDER BY id DESC LIMIT 1').get();
+  const robot = {
+    hasApiKey: !!getClaude(), enabled: getMeta('intake_enabled', '1') === '1',
+    lastRun: last ? { status: last.status, at: last.started_at, items: last.items, suggestions: last.suggestions } : null,
+    relayWaiting: db.prepare("SELECT COUNT(*) AS n FROM intake_relay WHERE processed_at = ''").get().n,
+    relayRead24h: db.prepare("SELECT COUNT(*) AS n FROM intake_relay WHERE processed_at >= datetime('now', '-1 day')").get().n,
+    pendingSuggestions: db.prepare("SELECT COUNT(*) AS n FROM suggestions WHERE status = 'pending'").get().n,
+  };
   const skip = [];
   if (mailbox) skip.push('gmail');
   if (getSecret('periskope_api_key', 'PERISKOPE_API_KEY')) skip.push('periskope');
   if (getSecret('granola_api_key', 'GRANOLA_API_KEY')) skip.push('granola');
-  return { since, skip, mailbox };
+  return { since, skip, mailbox, robot };
 }
 
 function relaySource() {
