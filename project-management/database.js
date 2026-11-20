@@ -311,6 +311,9 @@ try { db.exec("ALTER TABLE clients ADD COLUMN metricool_blog_id TEXT DEFAULT ''"
 try { db.exec("ALTER TABLE clients ADD COLUMN report_email TEXT DEFAULT ''"); } catch {}
 // The Xero contact a client is billed under — when set, the monthly value follows Xero's repeating invoices.
 try { db.exec("ALTER TABLE clients ADD COLUMN xero_contact_id TEXT DEFAULT ''"); } catch {}
+// Other names a client goes by (a contact person, a trading or company name), comma-separated —
+// read by the robot and by the Xero match ("Keto & Clarity" = "Sasha Lonsgren" = "Uni Nutrition").
+try { db.exec("ALTER TABLE clients ADD COLUMN aliases TEXT DEFAULT ''"); } catch {}
 db.exec(`
   CREATE TABLE IF NOT EXISTS suggestions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -254,6 +254,22 @@ try {
   console.error('[Seed] Richford v2 amend error:', err.message);
 }
 
+// ─── One-time fix: Norton's client corrections, 20 Nov 2026 ───
+// Keto & Clarity (= Sasha Lonsgren / Uni Nutrition, £1,850 in Xero), add the
+// missing Ginger Butchers + Isis Rescue (linked to Xero), archive Caring
+// Places. Additive / archive only; logged; never re-runs once flagged.
+try {
+  const fixDone = db.prepare("SELECT value FROM app_meta WHERE key='clients_fix_2026_11_v1'").get();
+  if (!fixDone) {
+    const { fixClientsNov2026 } = await import('./scripts/fix-clients-2026-11.js');
+    const r = fixClientsNov2026(db);
+    db.prepare("INSERT INTO app_meta (key, value) VALUES ('clients_fix_2026_11_v1', ?)").run(new Date().toISOString());
+    console.log(`[Seed] Client fix Nov 2026: ${r.created.length} created (${r.created.join(', ')}), ${r.updated.length} updated, ${r.restored.length} restored, ${r.archived.length} archived (${r.archived.join(', ')}).`);
+  }
+} catch (err) {
+  console.error('[Seed] Client fix Nov 2026 error:', err.message);
+}
+
 // ─── Error Handler ──────────────────────────────────────
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err.message);
