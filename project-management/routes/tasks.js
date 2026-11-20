@@ -16,8 +16,11 @@ const router = Router();
 // (primary or secondary). Owners see everything. Applied to every task-scoped
 // write and every task-listing query in this file.
 function canAccessTask(req, task) {
-  if (req.user.role === 'owner') return true;
-  const me = req.user.display_name;
+  return canAccessTaskUser(req.user, task);
+}
+function canAccessTaskUser(user, task) {
+  if (user.role === 'owner') return true;
+  const me = user.display_name;
   return task.assignee === me || task.secondary_assignee === me;
 }
 // Combined non-owner listing filter: private clients hidden AND only tasks
@@ -26,6 +29,13 @@ function canAccessTask(req, task) {
 function privScope(req) {
   const me = req.user.display_name.replace(/'/g, "''");
   return `AND c.is_private = 0 AND (t.assignee = '${me}' OR t.secondary_assignee = '${me}')`;
+}
+
+// Non-owners may not touch a private client's tasks: an error result or null.
+// (checkPrivateClient below is the req/res flavour the other routes use.)
+function privateDenied(user, clientId) {
+  const row = db.prepare('SELECT is_private FROM clients WHERE id = ?').get(clientId);
+  return row?.is_private && user.role !== 'owner' ? { status: 403, json: { error: 'Access denied' } } : null;
 }
 
 function checkPrivateClient(req, res, clientId) {
@@ -62,17 +72,22 @@ function getUnassignedClientId() {
   return u.id;
 }
 
-router.post('/', requireAuth, requireWrite, (req, res) => {
+// Core task writes, shared by the HTTP routes below and by the intake robot:
+// accepting a robot suggestion must behave exactly like doing it by hand —
+// same validation, shadows, notifications, recurring spawn and activity log.
+// Each returns { status, json } for the caller to send.
+export function createTaskCore(input, user) {
   let { client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours,
     task_status, task_band, task_type, suggested_block, priority, references_text, notes,
-    is_recurring, recur_interval, recur_unit } = req.body;
-  if (!title) return res.status(400).json({ error: 'title required' });
+    is_recurring, recur_interval, recur_unit } = input || {};
+  if (!title) return { status: 400, json: { error: 'title required' } };
 
   // client_id is optional — clientless quick-captures land in the system "Unassigned" client
   if (!client_id) client_id = getUnassignedClientId();
   // Staff visibility rule: what a non-owner creates must stay visible to them.
-  if (req.user.role !== 'owner' && !assignee) assignee = req.user.display_name;
-  if (!checkPrivateClient(req, res, client_id)) return;
+  if (user.role !== 'owner' && !assignee) assignee = user.display_name;
+  const denied = privateDenied(user, client_id);
+  if (denied) return denied;
 
   deadline = cleanDate(deadline);
   planned_date = cleanDate(planned_date);
@@ -94,10 +109,15 @@ router.post('/', requireAuth, requireWrite, (req, res) => {
     'INSERT INTO tasks (project_id, client_id, title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, progress, priority, task_status, task_band, task_type, suggested_block, references_text, notes, is_recurring, recur_interval, recur_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
   ).run(proj.id, client_id, title, assignee || '', secondary_assignee || '', deadline || '', planned_date || '', estimated_hours || 0, progress, priorityShadow, task_status, task_band, task_type, suggested_block || '', references_text || '', notes || '', is_recurring ? 1 : 0, recur_interval || 0, recur_unit || '');
 
-  logActivity('task', result.lastInsertRowid, 'created', req.user.display_name, `Created task "${title}"`);
+  logActivity('task', result.lastInsertRowid, 'created', user.display_name, `Created task "${title}"`);
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid);
   task.comments = []; task.attachments = [];
-  res.json(task);
+  return { status: 200, json: task };
+}
+
+router.post('/', requireAuth, requireWrite, (req, res) => {
+  const r = createTaskCore(req.body, req.user);
+  res.status(r.status).json(r.json);
 });
 
 // ─── Manual reorder (notebook drag & drop) ───────────
@@ -121,14 +141,15 @@ router.put('/reorder', requireAuth, requireWrite, (req, res) => {
   res.json({ success: true });
 });
 
-router.put('/:id', requireAuth, requireWrite, (req, res) => {
+export function updateTaskCore(id, input, user, origin = '') {
   let { title, assignee, secondary_assignee, deadline, planned_date, estimated_hours,
     task_status, task_band, task_type, suggested_block, progress, priority,
-    references_text, notes, is_recurring, recur_interval, recur_unit, client_id } = req.body;
-  const old = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
-  if (!old) return res.status(404).json({ error: 'Task not found' });
-  if (!checkPrivateClient(req, res, old.client_id)) return;
-  if (!canAccessTask(req, old)) return res.status(403).json({ error: 'This task isn\'t assigned to you' });
+    references_text, notes, is_recurring, recur_interval, recur_unit, client_id } = input || {};
+  const old = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+  if (!old) return { status: 404, json: { error: 'Task not found' } };
+  let denied = privateDenied(user, old.client_id);
+  if (denied) return denied;
+  if (!canAccessTaskUser(user, old)) return { status: 403, json: { error: 'This task isn\'t assigned to you' } };
 
   deadline = cleanDate(deadline);
   planned_date = cleanDate(planned_date);
@@ -136,30 +157,31 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
 
   // Reassign client (e.g. triaging an Inbox task to a client)
   if (client_id !== undefined && client_id !== null && +client_id !== old.client_id) {
-    if (!checkPrivateClient(req, res, +client_id)) return;
+    denied = privateDenied(user, +client_id);
+    if (denied) return denied;
     let proj = db.prepare('SELECT id FROM projects WHERE client_id = ? ORDER BY id LIMIT 1').get(+client_id);
     if (!proj) {
       const pr = db.prepare('INSERT INTO projects (client_id, name, status) VALUES (?, ?, ?)').run(+client_id, 'General', 'active');
       proj = { id: pr.lastInsertRowid };
     }
-    db.prepare('UPDATE tasks SET client_id = ?, project_id = ? WHERE id = ?').run(+client_id, proj.id, req.params.id);
+    db.prepare('UPDATE tasks SET client_id = ?, project_id = ? WHERE id = ?').run(+client_id, proj.id, id);
   }
 
   // Reconcile canonical (task_status/task_band) with legacy shadow (progress/priority).
   // Whichever the caller sends, keep both columns consistent.
   if (task_status !== undefined) {
-    if (!isValidStatus(task_status)) return res.status(400).json({ error: 'Invalid task_status' });
+    if (!isValidStatus(task_status)) return { status: 400, json: { error: 'Invalid task_status' } };
     progress = statusToProgress(task_status);
   } else if (progress !== undefined) {
     task_status = progressToStatus(progress);
   }
   if (task_band !== undefined) {
-    if (!isValidBand(task_band)) return res.status(400).json({ error: 'Invalid task_band' });
+    if (!isValidBand(task_band)) return { status: 400, json: { error: 'Invalid task_band' } };
     priority = bandToPriority(task_band);
   } else if (priority !== undefined) {
     task_band = priorityToBand(priority);
   }
-  if (task_type !== undefined && !isValidType(task_type)) return res.status(400).json({ error: 'Invalid task_type' });
+  if (task_type !== undefined && !isValidType(task_type)) return { status: 400, json: { error: 'Invalid task_type' } };
 
   // Sending a task for review tags the owner as secondary so it lands in
   // their sign-off queue (and their notebook Review tab).
@@ -179,16 +201,15 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
 
   db.prepare(
     'UPDATE tasks SET title=COALESCE(?,title), assignee=COALESCE(?,assignee), secondary_assignee=COALESCE(?,secondary_assignee), deadline=COALESCE(?,deadline), planned_date=COALESCE(?,planned_date), estimated_hours=COALESCE(?,estimated_hours), progress=COALESCE(?,progress), priority=COALESCE(?,priority), task_status=COALESCE(?,task_status), task_band=COALESCE(?,task_band), task_type=COALESCE(?,task_type), suggested_block=COALESCE(?,suggested_block), references_text=COALESCE(?,references_text), notes=COALESCE(?,notes), is_recurring=COALESCE(?,is_recurring), recur_interval=COALESCE(?,recur_interval), recur_unit=COALESCE(?,recur_unit), completed_at=COALESCE(?,completed_at) WHERE id=?'
-  ).run(title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, progress, priority, task_status, task_band, task_type, suggested_block, references_text, notes, is_recurring !== undefined ? (is_recurring ? 1 : 0) : null, recur_interval, recur_unit, completedAt, req.params.id);
+  ).run(title, assignee, secondary_assignee, deadline, planned_date, estimated_hours, progress, priority, task_status, task_band, task_type, suggested_block, references_text, notes, is_recurring !== undefined ? (is_recurring ? 1 : 0) : null, recur_interval, recur_unit, completedAt, id);
 
   // Review-flow notifications (in-app + best-effort email)
   if (task_status !== undefined && task_status !== old.task_status) {
-    const nt = { id: +req.params.id, title: title || old.title, assignee: assignee !== undefined ? assignee : old.assignee };
-    const origin = `${req.headers['x-forwarded-proto'] || req.protocol}://${req.headers['x-forwarded-host'] || req.headers.host}`;
+    const nt = { id: +id, title: title || old.title, assignee: assignee !== undefined ? assignee : old.assignee };
     try {
-      if (task_status === 'review') notifyReview(db, req.user, nt, 'requested', origin);
-      else if (old.task_status === 'review' && task_status === 'done') notifyReview(db, req.user, nt, 'approved', origin);
-      else if (old.task_status === 'review') notifyReview(db, req.user, nt, 'returned', origin);
+      if (task_status === 'review') notifyReview(db, user, nt, 'requested', origin);
+      else if (old.task_status === 'review' && task_status === 'done') notifyReview(db, user, nt, 'approved', origin);
+      else if (old.task_status === 'review') notifyReview(db, user, nt, 'returned', origin);
     } catch (e) { console.error('[Notify]', e.message); }
   }
 
@@ -200,7 +221,7 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   if (task_band && task_band !== old.task_band) changes.push(`band: ${old.task_band || 'none'} → ${task_band}`);
   if (deadline !== undefined && deadline !== old.deadline) changes.push('deadline changed');
   if (planned_date !== undefined && planned_date !== old.planned_date) changes.push('planned date changed');
-  if (changes.length) logActivity('task', req.params.id, 'updated', req.user.display_name, changes.join(', '));
+  if (changes.length) logActivity('task', id, 'updated', user.display_name, changes.join(', '));
 
   // Recurring auto-create fires on the canonical "done" transition.
   if (nowDone && !wasDone && old.is_recurring && old.recur_interval > 0) {
@@ -212,10 +233,16 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
     logActivity('task', newTask.lastInsertRowid, 'created', 'System', `Auto-created recurring task "${old.title}" (next: ${nextDate})`);
   }
 
-  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
   task.comments = db.prepare('SELECT * FROM comments WHERE task_id = ? ORDER BY created_at DESC').all(task.id);
   task.attachments = db.prepare('SELECT * FROM task_attachments WHERE task_id = ? ORDER BY created_at DESC').all(task.id);
-  res.json(task);
+  return { status: 200, json: task };
+}
+
+router.put('/:id', requireAuth, requireWrite, (req, res) => {
+  const origin = `${req.headers['x-forwarded-proto'] || req.protocol}://${req.headers['x-forwarded-host'] || req.headers.host}`;
+  const r = updateTaskCore(req.params.id, req.body, req.user, origin);
+  res.status(r.status).json(r.json);
 });
 
 // ─── Batch Move Tasks ────────────────────────────────

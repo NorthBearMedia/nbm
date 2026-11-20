@@ -20,6 +20,8 @@ import aiRoutes from './routes/ai.js';
 import gmailRoutes from './routes/gmail.js';
 import xeroRoutes from './routes/xero.js';
 import whatsappRoutes from './routes/whatsapp.js';
+import intakeRoutes from './routes/intake.js';
+import { startIntakeScheduler } from './lib/intake.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -172,6 +174,7 @@ app.use(aiRoutes);
 app.use(gmailRoutes);
 app.use(xeroRoutes);
 app.use(whatsappRoutes);
+app.use(intakeRoutes);
 
 // ─── Seed Users ─────────────────────────────────────────
 // Creates default users ONLY when the users table is empty.
@@ -260,6 +263,9 @@ app.use((err, req, res, next) => {
 });
 
 // ─── Start ──────────────────────────────────────────────
+// The intake robot: hourly in office hours (see lib/intake.js).
+startIntakeScheduler();
+
 app.listen(PORT, () => {
   console.log(`North Bear Console running at http://localhost:${PORT}`);
   if (!process.env.ANTHROPIC_API_KEY) {

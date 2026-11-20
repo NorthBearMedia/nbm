@@ -300,6 +300,95 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read);
 `);
 
+// ─── Intake robot + client reports (Nov 2026) — additive only ──────────────
+// The robot reads email/WhatsApp/meetings hourly and files SUGGESTIONS; nothing
+// becomes a task until the owner accepts it. No foreign keys anywhere here, so
+// nothing in these tables can ever cascade into (or out of) real data.
+try { db.exec("ALTER TABLE clients ADD COLUMN last_touch_summary TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE clients ADD COLUMN last_touch_at TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE clients ADD COLUMN pulse_link TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE clients ADD COLUMN metricool_blog_id TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE clients ADD COLUMN report_email TEXT DEFAULT ''"); } catch {}
+db.exec(`
+  CREATE TABLE IF NOT EXISTS suggestions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL,                       -- new_task | complete | update
+    status TEXT NOT NULL DEFAULT 'pending',   -- pending | accepted | dismissed
+    client_id INTEGER,
+    task_id INTEGER,                          -- the existing task, for complete/update
+    title TEXT DEFAULT '',
+    notes TEXT DEFAULT '',
+    deadline TEXT DEFAULT '',
+    new_status TEXT DEFAULT '',
+    confidence TEXT DEFAULT 'medium',         -- high | medium | low
+    evidence TEXT DEFAULT '',                 -- short quote from the source
+    source TEXT DEFAULT '',                   -- gmail | whatsapp | periskope | granola | capture
+    source_label TEXT DEFAULT '',
+    source_url TEXT DEFAULT '',
+    source_ref TEXT DEFAULT '',
+    contact TEXT DEFAULT '',                  -- sender email / phone, for learning who's who
+    run_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    decided_at TEXT DEFAULT '',
+    decided_by TEXT DEFAULT '',
+    result_task_id INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_suggestions_status ON suggestions(status, client_id);
+  CREATE TABLE IF NOT EXISTS intake_seen (
+    source TEXT NOT NULL,
+    ref TEXT NOT NULL,
+    seen_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (source, ref)
+  );
+  CREATE TABLE IF NOT EXISTS intake_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    trigger_type TEXT DEFAULT '',
+    started_at TEXT DEFAULT (datetime('now')),
+    finished_at TEXT DEFAULT '',
+    status TEXT DEFAULT 'running',            -- running | ok | partial | error | idle
+    items INTEGER DEFAULT 0,
+    skipped INTEGER DEFAULT 0,
+    suggestions INTEGER DEFAULT 0,
+    touches INTEGER DEFAULT 0,
+    input_tokens INTEGER DEFAULT 0,
+    output_tokens INTEGER DEFAULT 0,
+    detail TEXT DEFAULT ''
+  );
+  CREATE TABLE IF NOT EXISTS intake_mailboxes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT NOT NULL,
+    expiry_date INTEGER NOT NULL,
+    status TEXT DEFAULT 'ok',                 -- ok | needs_reconnect
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS intake_captures (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    text TEXT NOT NULL,
+    label TEXT DEFAULT '',
+    created_at TEXT DEFAULT (datetime('now')),
+    processed_at TEXT DEFAULT ''
+  );
+  CREATE TABLE IF NOT EXISTS contact_map (
+    identifier TEXT PRIMARY KEY,              -- lowercased email, or phone digits
+    client_id INTEGER NOT NULL,
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS client_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id INTEGER NOT NULL,
+    period TEXT NOT NULL,                     -- YYYY-MM
+    content TEXT DEFAULT '',                  -- JSON: the edited report
+    pdf_file TEXT DEFAULT '',
+    created_by TEXT DEFAULT '',
+    created_at TEXT DEFAULT (datetime('now')),
+    sent_at TEXT DEFAULT '',
+    sent_to TEXT DEFAULT ''
+  );
+`);
+
 // Indexes for the hot query paths (additive, idempotent — explicitly allowed
 // by the migration rules). tasks.client_id is hit for every client on every
 // /api/clients request; comments/attachments/activity_log are joined per task.
