@@ -110,9 +110,20 @@ export function buildSnippet(measurementId, clarityId, { consentBanner = false, 
     ? `<script async src="https://www.googletagmanager.com/gtag/js?id=${measurementId}"></script>`
       + `<script>window.dataLayer=window.dataLayer||[];function gtag(){window.dataLayer.push(arguments);}`
       + `if(!window.__nbmGA){window.__nbmGA=1;gtag('js',new Date());gtag('config','${measurementId}');}</script>` : '';
-  // Clarity's tag URL loads directly as a script src, so it needs no
-  // inline injector of its own.
-  const clarityStatic = clarityId ? `<script async src="https://www.clarity.ms/tag/${clarityId}"></script>` : '';
+  // Clarity's tag expects window.clarity to exist already: a small queue
+  // that its own install code sets up first. Loaded bare, the tag throws
+  // on its first line ("Cannot read properties of undefined (reading
+  // 'v')") and never starts, so nothing is recorded and nothing looks
+  // wrong: the ID is in the page source and the tag request succeeds.
+  // This block went out bare from the day it became static, and a browser
+  // test on 20 Nov 2026 found Clarity dead on all four sites carrying it.
+  // The queue is plain static HTML like the rest, so React leaves it be.
+  // SNIPPET_VERSION is deliberately NOT raised for this: raising it would
+  // make the injector re-deploy to every file-hosted site if it were ever
+  // switched back on.
+  const clarityStatic = clarityId
+    ? `<script>window.clarity=window.clarity||function(){(window.clarity.q=window.clarity.q||[]).push(arguments);};</script>`
+      + `<script async src="https://www.clarity.ms/tag/${clarityId}"></script>` : '';
   const fathomStatic = fathomId ? `<script src="https://cdn.usefathom.com/script.js" data-site="${fathomId}" defer></script>` : '';
   const staticTags = gaStatic + clarityStatic + fathomStatic;
   if (!staticTags) return '<!-- NBM-GA-TAG --><!-- /NBM-GA-TAG -->';
