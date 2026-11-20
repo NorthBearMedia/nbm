@@ -17,6 +17,11 @@ Live at: deployed on **Railway** (not Render — the `render.yaml` is leftover b
 │   ├── database.js            SQLite schema + safe migrations + pre-migration backup
 │   ├── middleware.js          Auth, security headers, file uploads, dataDir resolution
 │   ├── lib/activity.js        Activity log helper (server-derived author)
+│   ├── lib/claude.js          Shared Anthropic client: retry on 429/5xx, model fallback, friendly errors
+│   ├── lib/intake.js          The intake robot: sources, Claude extraction, validation, scheduler
+│   ├── lib/report.js          Monthly client report: gather (tasks/Pulse/Metricool), write, PDF
+│   ├── lib/taskmap.js         Canonical ↔ shadow task field mapping
+│   ├── assets/                Report PDF fonts (Archivo, Martian Mono — OFL) + light NBM logo
 │   ├── routes/
 │   │   ├── auth.js            Login / logout / session
 │   │   ├── clients.js         Client CRUD + logo + history
@@ -26,10 +31,13 @@ Live at: deployed on **Railway** (not Render — the `render.yaml` is leftover b
 │   │   ├── users.js           User mgmt, avatars, passwords
 │   │   ├── system.js          Health, global history, team, archived, Excel export,
 │   │   │                       backups (list/create/download/restore)
-│   │   └── ai.js              The Bear — Claude Opus 4.6 + tool-use loop
+│   │   ├── ai.js              The Bear — tool-use loop (model via lib/claude.js)
+│   │   ├── intake.js          Robot: suggestion tray API, run/paste, settings, /capture/:token link
+│   │   ├── reports.js         Monthly report: draft / edit / PDF / email, Metricool brand list
+│   │   └── gmail.js, xero.js, whatsapp.js   Integrations (gmail.js also connects robot-only mailboxes)
 │   ├── public/
 │   │   ├── index.html         Entire UI in one file (all modals)
-│   │   ├── app.js             ~2100 lines, all client logic, vanilla JS
+│   │   ├── app.js             ~5000 lines, all client logic, vanilla JS
 │   │   ├── styles.css         Dark theme, North Bear green (#3eaf84) accents
 │   │   └── login.html         (auth screen)
 │   ├── package.json           ESM (`"type": "module"`)
@@ -47,7 +55,10 @@ Live at: deployed on **Railway** (not Render — the `render.yaml` is leftover b
 
 - **Backend:** Node.js + Express (ESM), `better-sqlite3` (synchronous SQLite)
 - **Frontend:** Vanilla JS, no framework, no build step. Cropper.js for image crop.
-- **AI:** `@anthropic-ai/sdk` — model `claude-opus-4-6`, adaptive thinking, manual tool-use loop
+- **AI:** `@anthropic-ai/sdk` via `lib/claude.js` — model `CLAUDE_MODEL` env or `claude-opus-5-5`, falling
+  back to `claude-opus-4-6` automatically if the API rejects the model. The Bear: manual tool-use loop.
+  The robot and the report writer: one forced tool call each (`record_findings`, `write_report`).
+- **PDF:** `pdfkit` (monthly client report), same visual language as Pulse's reports.
 - **Excel export:** `xlsx` (SheetJS)
 - **Auth:** scrypt-hashed passwords, httpOnly session cookies, 24h expiry
 - **Deploy:** Railway. Persistent volume at `/data` (`RAILWAY_VOLUME_MOUNT_PATH=/data`). Hourly backups in `<dataDir>/backups/`.
@@ -97,7 +108,24 @@ tasks           id, client_id, project_id (legacy), title, assignee, secondary_a
                 is_pinned, sort_order, archived, created_at
 
 comments, task_attachments, checklist_items, team_members, pinned_items, activity_log,
-gmail_tokens, xero_tokens, whatsapp_config, whatsapp_messages, analytics_config, app_meta
+gmail_tokens, xero_tokens, whatsapp_config, whatsapp_messages, analytics_config, app_meta,
+notifications
+
+-- The intake robot + monthly reports (Nov 2026). No foreign keys anywhere here — nothing cascades.
+clients (+)       last_touch_summary, last_touch_at   the robot's one-line "latest" per client
+                  pulse_link, metricool_blog_id, report_email   monthly report settings (owner-only)
+suggestions       kind (new_task|complete|update), status (pending|accepted|dismissed|expired),
+                  client_id, task_id, title, notes, deadline, new_status, confidence, evidence,
+                  source, source_label, source_url, source_ref, contact, run_id, decided_*, result_task_id
+intake_runs       one row per robot run: trigger_type, status, items, suggestions, tokens, detail JSON
+intake_seen       (source, ref) of every message already read — never sent to Claude twice
+intake_mailboxes  extra read-only Gmail accounts for the robot (OAuth tokens)
+intake_captures   text sent to the capture link / pasted in the Inbox, until processed
+contact_map       email/phone/chat id → client, learned when a suggestion is accepted
+client_reports    client_id, period (YYYY-MM), content JSON {facts, draft}, sent_at, sent_to
+app_meta keys     intake_enabled, intake_cursor_*, intake_last_*, capture_token, and the write-only
+                  keys periskope_api_key / periskope_phone / granola_api_key / metricool_token /
+                  metricool_user_id (env vars of the same name in caps win)
 ```
 
 Tasks display as `NB###` (zero-padded id). Search supports `NB123` lookups.
@@ -126,6 +154,9 @@ everywhere in the UI. `progress` / `priority` are kept as **synced shadow values
 - Clients can be `is_private = 1` — only `role = 'owner'` sees them.
 - Every list/read endpoint that returns clients/projects/tasks must add `AND c.is_private = 0` for non-owners. Pattern is everywhere; copy it.
 - Owners get full access; editors can write but not delete; viewers are read-only.
+- Staff (non-owners) only get tasks assigned to them (primary or secondary) — enforced in `GET /api/clients`.
+- Owner-only: client money, the robot (suggestions, settings, `last_touch_summary`), monthly reports and
+  report settings — `routes/clients.js#hideOwnerFields` strips them for staff.
 
 ## Existing features (post-Apr 2026)
 
@@ -154,6 +185,23 @@ everywhere in the UI. `progress` / `priority` are kept as **synced shadow values
 - **The Bear (AI assistant):** Floating chat panel in bottom-right. Tools: list_clients, list_team_members, create_task, update_task, search_tasks, get_workload_summary, list_tasks_for_user. create/update speak the new status/band/type vocabulary (mapped to shadows). All actions log activity with "(via AI assistant)". Hidden when `ANTHROPIC_API_KEY` unset.
 - **Integrations:** Gmail (`routes/gmail.js`), Xero (`routes/xero.js`), WhatsApp Cloud API
   (`routes/whatsapp.js`) — env-gated; surfaced in the dashboard Workspace strip.
+- **The intake robot (Nov 2026, owner-only):** Mon–Fri 08:00–18:00 UK, hourly, it reads new messages from
+  the owner's work Gmail (inbox + sent), extra read-only Gmail accounts, WhatsApp Business
+  (`whatsapp_messages`), personal WhatsApp via the Periskope API, Granola meeting notes, and anything sent to
+  the no-login capture link (`/capture/<token>` — phone home-screen page / Shortcut / pasted AI answers).
+  Claude proposes new tasks, "looks done" tick-offs and status changes, each with a quoted line of evidence;
+  they wait in the **Suggested tray at the top of the Inbox** (✨ count beside the Inbox badge) — nothing
+  touches the task list until accepted. Validation in `lib/intake.js#applyFindings`: ids checked against the DB,
+  near-duplicates of open/pending/rejected titles dropped (`sameJob`), message text fenced as untrusted, source
+  label/link copied from the message not the model. Accepting goes through `createTaskCore`/`updateTaskCore`
+  in `routes/tasks.js` (same path as manual edits). Settings: ☰ → Robot & sources.
+- **Whiteboard view (Nov 2026):** one zone per client — status colour, last spoke, the robot's latest line, its
+  suggestions with yes/no, To do (tick / +1 day), Waiting on them, Done this month, quick add. Quiet clients
+  collapse to one row. Same tasks and code paths as the Notebook (`nbTick`, `nbPush1`).
+- **Monthly client report (Nov 2026, owner-only):** client detail → 📊 Monthly report. Gathers jobs ticked off
+  that month + Pulse website figures (client's dashboard link → `/api/client/<token>/data?range=30`, a rolling
+  30 days to yesterday, so draft early in the following month) + Metricool posts per network (brand id), Claude
+  words it, owner edits, PDF preview, email from the owner's Gmail with the PDF attached.
 
 ## Conventions
 
@@ -174,7 +222,21 @@ everywhere in the UI. `progress` / `priority` are kept as **synced shadow values
 | `RAILWAY_VOLUME_MOUNT_PATH` | Yes | — | Persistent volume mount, usually `/data` |
 | `NODE_ENV` | Recommended | — | Set to `production` for secure cookies + HSTS |
 | `SEED_ADMIN` | First deploy only | — | `1` to create default admin |
-| `ANTHROPIC_API_KEY` | No | — | Enables The Bear AI assistant |
+| `ANTHROPIC_API_KEY` | No | — | Enables The Bear, the intake robot and the report writer |
+| `CLAUDE_MODEL` | No | `claude-opus-5-5` | Model for all three; falls back to `claude-opus-4-6` if rejected |
+| `GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET` | No | — | Google OAuth app for Gmail (email tab, robot, sending reports) |
+| `PERISKOPE_API_KEY` / `PERISKOPE_PHONE` | No | — | Personal WhatsApp for the robot (can be set in the UI instead) |
+| `GRANOLA_API_KEY` | No | — | Granola meeting notes for the robot (or set in the UI) |
+| `METRICOOL_TOKEN` / `METRICOOL_USER_ID` | No | — | Social figures for monthly reports (or set in the UI) |
+
+## Testing notes
+
+- In the cloud sandbox, never write to `nbm-projects.db` from a second process while the server is running:
+  the WAL index isn't shared reliably between processes there and the server's later writes can vanish.
+  Stop the server first, or point scripts at a copy with `DB_PATH=/path/to/copy.db`. (Production is one process.)
+- The robot and report writer take an injected client (`runIntake({ claude, sources })`,
+  `draftReport(id, period, { claude })`) so they can be tested without network or an API key.
+  `METRICOOL_API_BASE` overrides the Metricool host for tests only.
 
 ## How to run locally
 

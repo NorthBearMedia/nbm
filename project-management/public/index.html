@@ -12,7 +12,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=88">
+  <link rel="stylesheet" href="styles.css?v=94">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -27,8 +27,9 @@
     </div>
     <div class="nav-center">
       <button class="nav-tab active" data-view="dashboard"><span class="nav-icon">&#9670;</span> Dashboard</button>
+      <button class="nav-tab" data-view="whiteboard"><span class="nav-icon">&#128203;</span> Whiteboard</button>
       <button class="nav-tab" data-view="notebook"><span class="nav-icon">&#128211;</span> Notebook</button>
-      <button class="nav-tab" data-view="inbox"><span class="nav-icon">&#128229;</span> Inbox <span id="inboxCount" class="nav-count" style="display:none"></span></button>
+      <button class="nav-tab" data-view="inbox"><span class="nav-icon">&#128229;</span> Inbox <span id="inboxCount" class="nav-count" style="display:none"></span><span id="robotCount" class="nav-count robot-count" style="display:none" title="Suggestions from your messages, waiting for a yes or no"></span></button>
       <button class="nav-tab" data-view="clients"><span class="nav-icon">&#9783;</span> Tasks</button>
       <button class="nav-tab" data-view="planning"><span class="nav-icon">&#128467;</span> Planning</button>
       <div class="nav-more-wrap" style="position:relative">
@@ -95,6 +96,7 @@
           <button class="nav-dropdown-item" id="manageUsersBtn">&#9881; Users &amp; Permissions</button>
           <button class="nav-dropdown-item" id="manageBackupsBtn" style="display:none">&#128190; Backups</button>
           <button class="nav-dropdown-item" id="globalHistoryBtn" style="display:none">&#128337; Activity Log</button>
+          <button class="nav-dropdown-item" id="robotSettingsBtn" style="display:none" onclick="openRobotSettings()">&#129302; Robot &amp; sources</button>
           <div class="nav-dropdown-sep"></div>
           <button class="nav-dropdown-item" onclick="exportExcel()">&#128202; Export to Excel</button>
           <button class="nav-dropdown-item" id="viewArchiveBtn">&#128230; Archive</button>
@@ -363,6 +365,26 @@
           <h2>Task Inbox</h2>
           <p>Dump anything here — sort it later. New tasks start as <strong>Inbox</strong>.</p>
         </div>
+        <!-- The robot's suggestions (owner only): drafted from email, WhatsApp,
+             meeting notes and captures. Nothing reaches the list until accepted. -->
+        <div id="robotTray" class="robot-tray" style="display:none">
+          <div class="robot-head">
+            <div class="robot-head-text">
+              <h3>&#10024; Suggested from your messages <span id="robotTrayCount" class="robot-pill" style="display:none"></span></h3>
+              <div class="robot-status" id="robotStatus"></div>
+            </div>
+            <div class="robot-head-btns">
+              <button class="btn btn-ghost btn-sm" id="robotRunBtn" onclick="robotRunNow()">&#8635; Check now</button>
+              <button class="btn btn-ghost btn-sm" onclick="openRobotSettings()">&#9881; Sources</button>
+            </div>
+          </div>
+          <details class="robot-paste">
+            <summary>&#128203; Paste an email, an AI chat answer or meeting notes — the robot pulls the tasks out</summary>
+            <textarea id="robotPasteText" rows="6" maxlength="20000" placeholder="Paste anything here…"></textarea>
+            <div class="robot-paste-row"><button class="btn btn-primary btn-sm" id="robotPasteBtn" onclick="robotPaste()">Find tasks</button></div>
+          </details>
+          <div id="robotList"></div>
+        </div>
         <div class="inbox-quickadd">
           <input type="text" id="inboxTitle" placeholder="What needs doing? (type and press Enter)" onkeydown="if(event.key==='Enter')quickAddInbox()">
           <input type="text" id="inboxNotes" placeholder="Notes (optional)">
@@ -372,6 +394,24 @@
           <button class="btn btn-primary" onclick="quickAddInbox()">Add</button>
         </div>
         <div id="inboxList"></div>
+      </div>
+    </div>
+
+    <!-- Whiteboard View — every client at a glance, like the board on the wall -->
+    <div id="whiteboardView" style="display:none">
+      <div class="wb-wrap">
+        <div class="wb-toolbar">
+          <div>
+            <h2 class="wb-heading">The Whiteboard</h2>
+            <div class="wb-subhead" id="wbSubhead"></div>
+          </div>
+          <select id="wbOrder" class="filter-select" onchange="wbSetOrder(this.value)" title="Order of the clients">
+            <option value="board">My client order</option>
+            <option value="attention">Needs attention first</option>
+            <option value="name">A–Z</option>
+          </select>
+        </div>
+        <div class="wb-board" id="wbBoard"></div>
       </div>
     </div>
 
@@ -518,6 +558,12 @@
       <div class="form-group"><label>Agreement Type (legacy)</label><select id="clientType"><option value="recurring">Recurring</option><option value="ad-hoc">Ad Hoc / One-off</option></select></div>
       <div class="form-group"><label>Notes</label><textarea id="clientNotes" rows="2"></textarea></div>
       <div class="form-row"><div class="form-group"><label>Gmail Link</label><input type="url" id="clientGmail" placeholder="https://mail.google.com/..."></div><div class="form-group"><label>Google Drive Link</label><input type="url" id="clientDrive" placeholder="https://drive.google.com/..."></div></div>
+      <div class="form-section-title money-owner-only">Monthly report</div>
+      <div class="form-row money-owner-only">
+        <div class="form-group"><label>Pulse dashboard link</label><input type="url" id="clientPulseLink" placeholder="https://…/r/…"></div>
+        <div class="form-group"><label>Metricool brand</label><select id="clientMetricool"><option value="">Not linked</option></select></div>
+      </div>
+      <div class="form-group money-owner-only"><label>Send reports to</label><input type="text" id="clientReportEmail" placeholder="name@client.co.uk, accounts@client.co.uk"></div>
       <div class="form-group"><label>Logo</label><input type="file" id="clientLogo" accept="image/*"></div>
       <div class="form-group" id="privateClientGroup" style="display:none"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="clientPrivate"> <span>Private Client</span> <span style="font-size:11px;color:var(--text-secondary)">(only visible to you)</span></label></div>
       <div class="form-actions"><button type="button" class="btn btn-ghost" onclick="closeModal('clientModal')">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
@@ -669,6 +715,18 @@
     </div>
   </div>
 
+  <!-- Robot & sources (owner only) — what the robot reads, keys, capture link -->
+  <div class="modal modal-lg" id="robotModal" style="max-width:680px">
+    <div class="modal-header"><h2>&#129302; Robot &amp; sources</h2><button class="modal-close" onclick="closeModal('robotModal')">&times;</button></div>
+    <div class="robot-settings" id="robotSettingsBody"></div>
+  </div>
+
+  <!-- Monthly client report (owner only): draft → edit → PDF → email -->
+  <div class="modal modal-lg" id="reportModal" style="max-width:860px">
+    <div class="modal-header"><h2 id="reportTitle">Monthly report</h2><button class="modal-close" onclick="closeModal('reportModal')">&times;</button></div>
+    <div class="report-body" id="reportBody"></div>
+  </div>
+
   <footer class="app-footer">
     <img src="/NBM%20Logo%20No%20NG%20Light%20Lines.png" alt="" style="width:28px;opacity:0.4">
     <span>&copy; 2026 North Bear Media. All rights reserved.</span>
@@ -734,6 +792,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=88"></script>
+  <script src="app.js?v=94"></script>
 </body>
 </html>

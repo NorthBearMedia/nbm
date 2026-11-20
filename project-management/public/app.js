@@ -22,6 +22,8 @@ async function loadCurrentUser() {
       if (ghb) ghb.style.display = currentUser.role === 'owner' ? '' : 'none';
       const bkb = document.getElementById('manageBackupsBtn');
       if (bkb) bkb.style.display = currentUser.role === 'owner' ? '' : 'none';
+      const rsb = document.getElementById('robotSettingsBtn');
+      if (rsb) rsb.style.display = currentUser.role === 'owner' ? '' : 'none';
     } else {
       window.location.href = '/login';
     }
@@ -73,17 +75,18 @@ function renderNotifs() {
   const d = document.getElementById('notifDropdown');
   d.innerHTML = notifState.list.length
     ? notifState.list.map(n =>
-        `<button class="nav-dropdown-item notif-item ${n.is_read ? '' : 'notif-unread'}" onclick="openNotif(${n.id}, ${n.task_id || 'null'})">
+        `<button class="nav-dropdown-item notif-item ${n.is_read ? '' : 'notif-unread'}" onclick="openNotif(${n.id}, ${n.task_id || 'null'}, ${n.type === 'robot'})">
           <span class="notif-msg">${esc(n.message)}</span>
           <span class="notif-time">${timeAgo(n.created_at)}</span>
         </button>`).join('')
       + `<div class="nav-dropdown-sep"></div><button class="nav-dropdown-item" onclick="markAllNotifsRead()">Mark all read</button>`
     : '<div class="nav-dropdown-item" style="color:var(--text-muted);cursor:default">Nothing yet — review requests and approvals land here.</div>';
 }
-async function openNotif(id, taskId) {
+async function openNotif(id, taskId, fromRobot) {
   document.getElementById('notifDropdown').classList.remove('open');
   try { await api('/api/notifications/read', { method: 'PUT', body: { id } }); } catch {}
   fetchNotifications();
+  if (fromRobot) return switchView('inbox');   // suggestions live at the top of the Inbox
   if (taskId && findTaskById(taskId)) editTask(taskId);
 }
 async function markAllNotifsRead() {
@@ -96,6 +99,7 @@ document.addEventListener('click', (e) => {
 });
 fetchNotifications();
 setInterval(fetchNotifications, 60000);
+setInterval(() => fetchRobotCount(), 60000);   // owner-only; a no-op for everyone else
 
 // ─── Global quick capture — a task from ANY view, two keystrokes ─────────
 function toggleQuickTask(e) {
@@ -187,6 +191,8 @@ async function loadClients() {
     loadPlanningView();
   } else if (currentView === 'notebook') {
     loadNotebookView();
+  } else if (currentView === 'whiteboard') {
+    loadWhiteboardView();
   }
 }
 
@@ -579,7 +585,7 @@ async function loadServerPrefs() {
 
 // ─── View Switching ─────────────────────────────────────
 function applyViewVisibility() {
-  const views = { dashboard: 'dashboardView', notebook: 'notebookView', inbox: 'inboxView', clients: 'clientsView', today: 'todayView', planning: 'planningView', calendar: 'calendarView', focus: 'focusView', email: 'emailView' };
+  const views = { dashboard: 'dashboardView', whiteboard: 'whiteboardView', notebook: 'notebookView', inbox: 'inboxView', clients: 'clientsView', today: 'todayView', planning: 'planningView', calendar: 'calendarView', focus: 'focusView', email: 'emailView' };
   for (const [v, id] of Object.entries(views)) {
     const el = document.getElementById(id);
     if (el) el.style.display = currentView === v ? '' : 'none';
@@ -601,6 +607,7 @@ function switchView(view) {
   setPref('nbm_view', view);
   applyViewVisibility();
   if (view === 'dashboard') loadDashboard();
+  if (view === 'whiteboard') loadWhiteboardView();
   if (view === 'notebook') loadNotebookView();
   if (view === 'inbox') loadInboxView();
   if (view === 'clients') renderClients();
@@ -975,6 +982,7 @@ function openClientDetail(id) {
       <span class="cd-type">${typeLabelClient(c.client_type)}</span>
       ${c.monthly_value ? `<span class="cd-value">${fmtMoney(c.monthly_value)}/mo</span>` : ''}
       <span style="flex:1"></span>
+      ${isOwner() ? `<button class="btn btn-ghost btn-sm" onclick="closeModal('clientDetailModal');openReport(${c.id})">&#128202; Monthly report</button>` : ''}
       <button class="btn btn-ghost btn-sm" onclick="closeModal('clientDetailModal');editClient(${c.id})">Edit client</button>
       <button class="btn btn-primary btn-sm" onclick="newTaskFromClient(${c.id})">+ Task</button>
     </div>
@@ -1248,6 +1256,9 @@ function updateInboxCount() {
   const badge = document.getElementById('inboxCount');
   // Cap at 9+ — past a point the exact number is just shame-rendering, not information.
   if (badge) { badge.textContent = n > 9 ? '9+' : n; badge.style.display = n ? '' : 'none'; }
+  const rb = document.getElementById('robotCount');
+  const p = robot.pending;
+  if (rb) { rb.textContent = '✨' + (p > 9 ? '9+' : p); rb.style.display = p ? '' : 'none'; }
 }
 
 function clientSelectOptions(sel) {
@@ -1256,6 +1267,7 @@ function clientSelectOptions(sel) {
 }
 
 function loadInboxView() {
+  loadRobotTray();
   document.getElementById('inboxClient').innerHTML = clientSelectOptions('');
   const list = document.getElementById('inboxList');
   const items = allTasksFlat().filter(t => t.task_status === 'inbox')
@@ -1304,6 +1316,852 @@ async function quickAddInbox() {
   await loadClients();
   loadInboxView();
   titleEl.focus();
+}
+
+// ─── The robot: suggestions drafted from your messages ───────────────────
+// Owner only. It reads email / WhatsApp / meeting notes / captures and
+// proposes new tasks, tick-offs and status changes. Nothing touches the task
+// list until it's accepted here — one click, or edit first.
+let robot = { pending: 0, list: [], status: null, editing: null, running: false, denied: false };
+const isOwner = () => currentUser?.role === 'owner';
+const safeUrl = u => /^https?:\/\//i.test(u || '') ? u : '';
+const fmtShort = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : '';
+
+async function fetchRobotCount() {
+  if (!isOwner() || robot.denied) return;
+  try {
+    const r = await api('/api/suggestions/count');
+    if (r.pending === robot.pending) return;
+    robot.pending = r.pending;
+    updateInboxCount();
+    // New ones arrived while the Inbox is open — refresh in place (never mid-edit).
+    if (currentView === 'inbox' && robot.editing === null && !robot.running) loadRobotTray();
+  } catch {}
+}
+
+async function loadRobotTray() {
+  const tray = document.getElementById('robotTray');
+  if (!tray) return;
+  if (!isOwner()) { tray.style.display = 'none'; return; }
+  tray.style.display = '';
+  try {
+    const [list, status] = await Promise.all([api('/api/suggestions'), api('/api/intake/status')]);
+    robot.list = list; robot.status = status; robot.pending = list.length;
+    if (robot.editing !== null && !list.some(s => s.id === robot.editing)) robot.editing = null;
+    updateInboxCount();
+    renderRobotTray();
+  } catch (e) {
+    // A second owner account: the robot reads someone else's messages — no tray.
+    if (/Only the account/.test(e.message)) { robot.denied = true; tray.style.display = 'none'; return; }
+    document.getElementById('robotStatus').textContent = 'Couldn’t load suggestions — ' + e.message;
+  }
+}
+
+function robotStatusLine(s) {
+  if (!s) return '';
+  if (!s.hasApiKey) return '<span class="robot-warn">⚠ The robot needs ANTHROPIC_API_KEY set on Railway before it can read anything.</span>';
+  const src = s.sources;
+  const anySource = src.gmail || src.mailboxes.some(m => m.status === 'ok') || src.whatsappNumbers || src.periskope.configured || src.granola.configured;
+  const parts = [];
+  if (robot.running || s.busy) parts.push('<span class="robot-busy">Reading your messages now…</span>');
+  else if (!s.enabled) parts.push('<span class="robot-warn">Paused — switch it back on in ⚙ Sources.</span>');
+  else if (!anySource) parts.push('Nothing connected yet — open <a href="#" onclick="openRobotSettings();return false">⚙ Sources</a> to connect email and WhatsApp.');
+  const lr = s.lastRun;
+  if (lr && !(robot.running || s.busy)) {
+    if (lr.status === 'error') parts.push(`<span class="robot-warn">⚠ Last check ${timeAgo(lr.started_at)} didn’t finish: ${esc((lr.detail?.notes || [])[0] || 'unknown error')}</span>`);
+    else parts.push(`Last checked ${timeAgo(lr.started_at)} — read ${lr.items} new, suggested ${lr.suggestions}`);
+  }
+  if (s.enabled && anySource && !(robot.running || s.busy)) parts.push(s.inOfficeHours ? 'checks every hour' : 'next check in office hours (Mon–Fri 8–6)');
+  const needs = src.mailboxes.filter(m => m.status !== 'ok').map(m => m.email);
+  if (needs.length) parts.push(`<span class="robot-warn">${esc(needs.join(', '))} needs reconnecting</span>`);
+  return parts.join(' · ');
+}
+
+const SG_KIND = {
+  new_task: { icon: '➕', label: 'New task',   btn: '✓ Add to list', done: 'Added' },
+  complete: { icon: '✔',  label: 'Looks done', btn: '✓ Tick it off', done: 'Ticked off' },
+  update:   { icon: '↻',  label: 'Update',     btn: '✓ Update it',   done: 'Updated' },
+};
+
+function sgClientChip(s) {
+  if (!s.client_name || s.client_is_system) return '<span class="sg-client sg-client-none">No client</span>';
+  const mark = s.client_logo
+    ? `<img src="${esc(s.client_logo)}" alt="">`
+    : `<span class="sg-cl-f" style="background:hsl(${clientHue(s.client_name)} 52% 74%)">${esc((s.client_code || s.client_name).charAt(0).toUpperCase())}</span>`;
+  return `<span class="sg-client">${mark}${esc(s.client_name)}</span>`;
+}
+
+function sgWhat(s) {
+  if (s.kind === 'new_task') return esc(s.title);
+  const ref = s.task_id ? `<span class="task-ref">${taskRef(s.task_id)}</span> ` : '';
+  const name = esc(s.task_title || s.title);
+  if (s.kind === 'complete') return ref + name;
+  const changes = [];
+  if (s.new_status) changes.push(statusLabel(s.new_status));
+  if (s.deadline) changes.push('due ' + fmtShort(s.deadline));
+  return `${ref}${name} <span class="sg-arrow">→ ${esc(changes.join(', '))}</span>`;
+}
+
+function sgEditForm(s) {
+  return `<div class="sg-edit">
+    <input type="text" id="sgeTitle" value="${esc(s.title)}" maxlength="200" onkeydown="if(event.key==='Enter')sgAccept(${s.id},true)">
+    <select id="sgeClient">${clientSelectOptions(s.client_id || '')}</select>
+    <input type="date" id="sgeDue" value="${esc(s.deadline || '')}" title="Due date">
+    <select id="sgeWho" title="Who does it"><option value="">Nobody yet</option>${assigneePool.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select>
+    <button class="btn btn-primary btn-sm" onclick="sgAccept(${s.id},true)">✓ Add</button>
+    <button class="btn btn-ghost btn-sm" onclick="sgEdit(null)">Cancel</button>
+  </div>`;
+}
+
+function sgCard(s) {
+  const k = SG_KIND[s.kind] || SG_KIND.new_task;
+  const url = safeUrl(s.source_url);
+  const src = url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(s.source_label)}</a>` : esc(s.source_label);
+  return `<div class="sg-card sg-${s.kind}" id="sg-${s.id}">
+    <div class="sg-top">
+      <span class="sg-kind">${k.icon} ${k.label}</span>
+      ${sgClientChip(s)}
+      ${s.kind === 'new_task' && s.deadline ? `<span class="sg-due">📅 ${fmtShort(s.deadline)}</span>` : ''}
+      ${s.confidence !== 'high' ? '<span class="sg-conf" title="Fairly sure, not certain — worth a glance">probably</span>' : ''}
+      <span class="sg-when">${timeAgo(s.created_at)}</span>
+    </div>
+    <div class="sg-title">${sgWhat(s)}</div>
+    ${s.kind === 'new_task' && s.notes ? `<div class="sg-notes">${esc(s.notes)}</div>` : ''}
+    ${s.evidence ? `<div class="sg-evidence">“${esc(s.evidence)}”</div>` : ''}
+    <div class="sg-src">from ${src}</div>
+    ${robot.editing === s.id ? sgEditForm(s) : `<div class="sg-btns">
+      <button class="btn btn-primary btn-sm" onclick="sgAccept(${s.id})">${k.btn}</button>
+      ${s.kind === 'new_task' ? `<button class="btn btn-ghost btn-sm" onclick="sgEdit(${s.id})">✎ Edit first</button>` : ''}
+      <button class="btn btn-ghost btn-sm sg-no" onclick="sgDismiss(${s.id})">✕ Not needed</button>
+    </div>`}
+  </div>`;
+}
+
+function renderRobotTray() {
+  // Keep what's been typed into an open "Edit first" form across the redraw.
+  const editVals = robot.editing !== null && document.getElementById('sgeTitle')
+    ? ['sgeTitle', 'sgeClient', 'sgeDue', 'sgeWho'].map(id => [id, document.getElementById(id).value]) : null;
+  const editFocus = document.activeElement?.id;
+  renderRobotTrayInner();
+  if (editVals && document.getElementById('sgeTitle')) {
+    for (const [id, v] of editVals) document.getElementById(id).value = v;
+    if (editFocus && editFocus.startsWith('sge')) document.getElementById(editFocus)?.focus();
+  }
+}
+function renderRobotTrayInner() {
+  document.getElementById('robotStatus').innerHTML = robotStatusLine(robot.status);
+  const n = robot.list.length;
+  const cnt = document.getElementById('robotTrayCount');
+  cnt.textContent = n; cnt.style.display = n ? '' : 'none';
+  const s = robot.status;
+  const runBtn = document.getElementById('robotRunBtn');
+  if (!robot.running) runBtn.disabled = !s?.hasApiKey || !!s?.busy;
+  document.getElementById('robotPasteBtn').disabled = !s?.hasApiKey;
+  const list = document.getElementById('robotList');
+  if (!n) {
+    list.innerHTML = '<div class="robot-empty">Nothing waiting for you. New suggestions land here as messages come in.</div>';
+    return;
+  }
+  const sure = robot.list.filter(x => x.confidence === 'high').length;
+  list.innerHTML = (sure > 1 ? `<div class="robot-bulk"><button class="btn btn-ghost btn-sm" onclick="sgAcceptAllSure()">✓ Accept all ${sure} confident ones</button></div>` : '')
+    + robot.list.map(sgCard).join('');
+}
+
+function sgEdit(id) {
+  robot.editing = id;
+  renderRobotTray();
+  if (id !== null) setTimeout(() => document.getElementById('sgeTitle')?.focus(), 20);
+}
+
+function sgRemove(id) {
+  robot.list = robot.list.filter(x => x.id !== id);
+  robot.pending = robot.list.length;
+  if (robot.editing === id) robot.editing = null;
+  updateInboxCount();
+  renderRobotTray();
+  if (currentView === 'whiteboard') renderWhiteboard();
+}
+
+async function sgAccept(id, fromEdit) {
+  const s = robot.list.find(x => x.id === id);
+  if (!s || s._busy) return;
+  let body = {};
+  if (fromEdit) {
+    const title = document.getElementById('sgeTitle').value.trim();
+    if (!title) return toast('Give it a title first');
+    body = {
+      title,
+      client_id: document.getElementById('sgeClient').value || null,
+      deadline: document.getElementById('sgeDue').value,
+      assignee: document.getElementById('sgeWho').value,
+    };
+  }
+  s._busy = true;
+  document.querySelectorAll(`#sg-${id} button`).forEach(b => { b.disabled = true; });
+  try {
+    const r = await api(`/api/suggestions/${id}/accept`, { method: 'POST', body });
+    sgRemove(id);
+    toast(`${(SG_KIND[s.kind] || SG_KIND.new_task).done} — ${taskRef(r.task.id)}`, true);
+    loadClients();
+  } catch (e) {
+    s._busy = false;
+    if (/already handled/i.test(e.message)) { sgRemove(id); return; }
+    if (/already closed/i.test(e.message)) { sgRemove(id); toast('That task’s already closed — cleared it'); return; }
+    document.querySelectorAll(`#sg-${id} button`).forEach(b => { b.disabled = false; });
+    toast('Not saved — ' + e.message);
+  }
+}
+
+async function sgDismiss(id) {
+  try {
+    await api(`/api/suggestions/${id}/dismiss`, { method: 'POST' });
+  } catch (e) {
+    if (!/already handled/i.test(e.message)) return toast('Not saved — ' + e.message);
+  }
+  sgRemove(id);   // the robot remembers the no and won't suggest it again
+}
+
+async function sgAcceptAllSure() {
+  const sure = robot.list.filter(x => x.confidence === 'high');
+  if (!sure.length) return;
+  const counts = {};
+  sure.forEach(x => { counts[x.kind] = (counts[x.kind] || 0) + 1; });
+  const what = [counts.new_task && `add ${counts.new_task} task${counts.new_task > 1 ? 's' : ''}`,
+    counts.complete && `tick off ${counts.complete}`, counts.update && `update ${counts.update}`].filter(Boolean).join(', ');
+  if (!confirm(`Accept all ${sure.length} confident suggestions? This will ${what}.`)) return;
+  try {
+    const r = await api('/api/suggestions/accept-all', { method: 'POST', body: { ids: sure.map(x => x.id) } });
+    toast(`Done — ${r.accepted} accepted${r.cleared ? `, ${r.cleared} no longer needed` : ''}${r.errors.length ? `, ${r.errors.length} couldn’t be (${r.errors[0].error})` : ''}`, !r.errors.length);
+  } catch (e) { toast('Not saved — ' + e.message); }
+  await loadClients();
+  if (currentView !== 'inbox') loadRobotTray();
+}
+
+async function robotRunNow() {
+  if (robot.running) return;
+  robot.running = true;
+  const btn = document.getElementById('robotRunBtn');
+  btn.disabled = true; btn.textContent = 'Checking…';
+  document.getElementById('robotStatus').innerHTML = '<span class="robot-busy">Reading your messages now — this can take a minute…</span>';
+  try {
+    const r = await api('/api/intake/run', { method: 'POST' });
+    if (r.status === 'error') toast('Check didn’t finish — ' + (r.notes[0] || 'try again shortly'));
+    else toast(r.suggestions ? `Found ${r.suggestions} new suggestion${r.suggestions === 1 ? '' : 's'}` : 'All caught up — nothing new needs a task', true);
+  } catch (e) { toast('Check failed — ' + e.message); }
+  robot.running = false;
+  btn.innerHTML = '&#8635; Check now';
+  loadRobotTray();
+  fetchNotifications();
+}
+
+async function robotPaste() {
+  const ta = document.getElementById('robotPasteText');
+  const text = ta.value.trim();
+  if (!text) return ta.focus();
+  const btn = document.getElementById('robotPasteBtn');
+  btn.disabled = true; btn.textContent = 'Reading…';
+  try {
+    const r = await api('/api/intake/paste', { method: 'POST', body: { text } });
+    if (r.status === 'error') toast('Couldn’t read it — ' + (r.notes?.[0] || 'try again'));
+    else {
+      ta.value = '';
+      const n = r.created.length;
+      toast(n ? `Found ${n} — they’re in the list below` : 'Nothing that needs a task in that', !!n);
+    }
+  } catch (e) { toast('Not read — ' + e.message); }
+  btn.textContent = 'Find tasks';
+  loadRobotTray();
+}
+
+// ─── Whiteboard: every client at a glance, like the board on the wall ──────
+// One zone per client: the robot's latest line, what it thinks is done or
+// new, what's left to do (tick / +1 day), what we're waiting on them for and
+// what got done this month. Same tasks as everywhere else, laid out per client.
+let wbOrder = localStorage.getItem('nbm_wb_order') || 'board';
+const wbExpanded = new Set();
+const WB_TODO_LIMIT = 8;
+const WB_RAG_RANK = { red: 0, amber: 1, blue: 2, green: 3 };
+
+function wbSetOrder(v) {
+  wbOrder = ['board', 'attention', 'name'].includes(v) ? v : 'board';
+  setPref('nbm_wb_order', wbOrder);
+  renderWhiteboard();
+}
+function wbToggleMore(cid) { wbExpanded.has(cid) ? wbExpanded.delete(cid) : wbExpanded.add(cid); renderWhiteboard(); }
+
+// "2h ago" for ISO stamps with a zone (the robot's) as well as SQLite UTC ones.
+function agoAny(ds) {
+  if (!ds) return '';
+  if (/(Z|[+-]\d\d:?\d\d)$/.test(ds)) { const d = new Date(ds); return isNaN(d) ? '' : timeAgo(d.toISOString().slice(0, 19)); }
+  return timeAgo(ds);
+}
+
+async function loadWhiteboardView() {
+  renderWhiteboard();
+  if (!isOwner() || robot.denied) return;
+  try {
+    robot.list = await api('/api/suggestions');
+    robot.pending = robot.list.length;
+    updateInboxCount();
+    renderWhiteboard();
+  } catch {}
+}
+
+function wbItem(t, today) {
+  const done = t.task_status === 'done';
+  const d = t.planned_date || t.deadline || '';
+  const over = !done && t.deadline && t.deadline < today;
+  const tags = [];
+  if (!done && t.task_status === 'review') tags.push('<span class="wb-tag">review</span>');
+  if (!done && t.task_status === 'waiting-on-me') tags.push('<span class="wb-tag">on me</span>');
+  if (t.assignee && t.assignee !== currentUser?.display_name) tags.push(`<span class="wb-who" title="${esc(t.assignee)}">${esc(t.assignee.split(' ')[0])}</span>`);
+  const dateTip = [t.planned_date && `Planned ${fmtDateShort(t.planned_date)}`, t.deadline && `Due ${fmtDateShort(t.deadline)}`].filter(Boolean).join(' · ');
+  return `<div class="wb-item ${done ? 'wb-done' : ''}">
+    <button class="wb-box ${done ? 'wb-ticked' : ''}" onclick="nbTick(${t.id})" title="${done ? 'Untick' : 'Tick off'}">${done ? '&#10003;' : ''}</button>
+    <span class="wb-text" onclick="editTask(${t.id})" title="Open ${taskRef(t.id)}">${esc(t.title)}</span>
+    ${tags.join('')}
+    ${!done && d ? `<span class="wb-date ${over ? 'wb-over' : ''}" title="${esc(dateTip)}">${over ? relDate(t.deadline) : relDate(d)}</span>` : ''}
+    ${!done && d ? `<button class="wb-push" onclick="nbPush1(${t.id})" title="Push it a day">+1d</button>` : ''}
+  </div>`;
+}
+
+function wbSg(s) {
+  const k = { new_task: '➕ New', complete: '✔ Done?', update: '↻' }[s.kind] || '';
+  const what = s.kind === 'new_task' ? esc(s.title)
+    : esc(s.task_title || s.title) + (s.kind === 'update' && s.new_status ? ` <b>→ ${esc(statusLabel(s.new_status))}</b>` : '');
+  const tip = (s.evidence ? `“${s.evidence}” — ` : '') + (s.source_label || '');
+  return `<div class="wb-sg" title="${esc(tip)}">
+    <span class="wb-sg-k">${k}</span><span class="wb-sg-t">${what}</span>
+    <button class="wb-sg-yes" onclick="sgAccept(${s.id})" title="Yes — do it">&#10003;</button>
+    <button class="wb-sg-no" onclick="sgDismiss(${s.id})" title="Not needed">&times;</button>
+  </div>`;
+}
+
+function wbZone(c, todo, waiting, done, sugs, today) {
+  const { status } = clientControlData(c);
+  const sCfg = CONTROL_STATUS[status] || CONTROL_STATUS.green;
+  const logo = c.logo_url
+    ? `<img class="wb-logo" src="${esc(c.logo_url)}" alt="">`
+    : `<span class="wb-logo wb-logo-f" style="background:hsl(${clientHue(c.name)} 52% 74%)">${esc((c.code || c.name).charAt(0).toUpperCase())}</span>`;
+  const eff = t => t.planned_date || t.deadline || '9999';
+  todo.sort((a, b) => {
+    const ao = a.deadline && a.deadline < today ? 0 : 1, bo = b.deadline && b.deadline < today ? 0 : 1;
+    if (ao !== bo) return ao - bo;
+    return eff(a) < eff(b) ? -1 : eff(a) > eff(b) ? 1 : a.id - b.id;
+  });
+  const showAll = wbExpanded.has(c.id);
+  const shown = showAll ? todo : todo.slice(0, WB_TODO_LIMIT);
+  const more = todo.length - shown.length;
+  const lc = daysSince(c.last_contact_date);
+  const spoke = lc === null ? '' : lc <= 0 ? 'spoke today' : lc === 1 ? 'spoke yesterday' : `spoke ${lc}d ago`;
+  return `<section class="wb-zone wb-${status}">
+    <header class="wb-head">
+      ${logo}
+      <h3 onclick="openClientDetail(${c.id})" title="Open ${esc(c.name)}">${esc(c.name)}</h3>
+      <span class="wb-spoke ${lc !== null && lc > 14 ? 'wb-stale' : ''}" title="Last contact${c.last_contact_date ? ' ' + c.last_contact_date : ''}">${spoke}</span>
+      <span class="wb-rag" title="${esc(sCfg.label)}"></span>
+    </header>
+    ${c.last_touch_summary ? `<div class="wb-latest" title="The robot's latest from your messages">${esc(c.last_touch_summary)} <span class="wb-ago">${agoAny(c.last_touch_at)}</span></div>` : ''}
+    ${sugs.length ? `<div class="wb-sgs">${sugs.map(wbSg).join('')}</div>` : ''}
+    ${todo.length ? `<div class="wb-label">To do <span>${todo.length}</span></div>${shown.map(t => wbItem(t, today)).join('')}
+      ${more > 0 ? `<button class="wb-more" onclick="wbToggleMore(${c.id})">+ ${more} more…</button>` : (showAll && todo.length > WB_TODO_LIMIT ? `<button class="wb-more" onclick="wbToggleMore(${c.id})">show less</button>` : '')}` : ''}
+    ${waiting.length ? `<div class="wb-label">Waiting on them <span>${waiting.length}</span></div>${waiting.map(t => wbItem(t, today)).join('')}` : ''}
+    ${done.length ? `<div class="wb-label wb-label-done">Done this month <span>${done.length}</span></div>${done.slice(0, 6).map(t => wbItem(t, today)).join('')}${done.length > 6 ? `<div class="wb-more-note">+ ${done.length - 6} more</div>` : ''}` : ''}
+    ${todo.length || waiting.length || done.length ? '' : '<div class="wb-nothing">Nothing open.</div>'}
+    <input class="wb-add" data-cid="${c.id}" placeholder="+ add for ${esc(c.name)}…" onkeydown="if(event.key==='Enter')wbAdd(${c.id},this)">
+  </section>`;
+}
+
+function renderWhiteboard() {
+  const board = document.getElementById('wbBoard');
+  if (!board || currentView !== 'whiteboard') return;
+  const sel = document.getElementById('wbOrder');
+  if (sel) sel.value = wbOrder;
+  const today = localDateStr(new Date());
+  const monthStart = today.slice(0, 7) + '-01';
+  const owner = isOwner();
+  const sugByClient = new Map();
+  if (owner) for (const s of robot.list) {
+    if (!s.client_id || s.client_is_system) continue;
+    if (!sugByClient.has(s.client_id)) sugByClient.set(s.client_id, []);
+    sugByClient.get(s.client_id).push(s);
+  }
+  let list = clients.filter(c => !c.is_system && !c.archived);
+  if (wbOrder === 'name') list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+  else if (wbOrder === 'attention') list = [...list].sort((a, b) =>
+    ((WB_RAG_RANK[clientControlData(a).status] ?? 3) - (WB_RAG_RANK[clientControlData(b).status] ?? 3)) || a.name.localeCompare(b.name));
+
+  const zones = [], quiet = [];
+  let nTodo = 0, nWaiting = 0, nDone = 0;
+  for (const c of list) {
+    const tasks = c.tasks || [];
+    const open = tasks.filter(isOpenTask);
+    const todo = open.filter(t => t.task_status !== 'waiting-on-client');
+    const waiting = open.filter(t => t.task_status === 'waiting-on-client');
+    const done = tasks.filter(t => t.task_status === 'done' && (t.completed_at || '') >= monthStart)
+      .sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || ''));
+    const sugs = sugByClient.get(c.id) || [];
+    nTodo += todo.length; nWaiting += waiting.length; nDone += done.length;
+    if (!open.length && !sugs.length && !done.length) { quiet.push(c); continue; }
+    zones.push(wbZone(c, todo, waiting, done, sugs, today));
+  }
+  const sys = clients.find(c => c.is_system);
+  const loose = (sys?.tasks || []).filter(isOpenTask).length;
+  const looseSugs = owner ? robot.list.filter(s => !s.client_id || s.client_is_system).length : 0;
+  const foot = [];
+  if (quiet.length) foot.push(`<div class="wb-quiet"><span class="wb-quiet-k">Quiet:</span> ${quiet.map(c =>
+    `<button onclick="openClientDetail(${c.id})" title="Nothing open — click to open">${esc(c.name)}</button>`).join('')}</div>`);
+  if (loose || looseSugs) foot.push(`<div class="wb-loose" onclick="switchView('inbox')">📥 ${[loose && `${loose} task${loose > 1 ? 's' : ''}`, looseSugs && `${looseSugs} suggestion${looseSugs > 1 ? 's' : ''}`].filter(Boolean).join(' and ')} without a client — sort them in the Inbox →</div>`);
+  // A redraw (tick, robot refresh) must not eat what's typed in any add box.
+  const drafts = [...board.querySelectorAll('.wb-add')].filter(i => i.value).map(i => [i.dataset.cid, i.value]);
+  const typing = document.activeElement?.classList.contains('wb-add') ? document.activeElement : null;
+  const keep = typing && { cid: typing.dataset.cid, pos: typing.selectionStart };
+  board.innerHTML = (zones.join('') || '<div class="wb-empty">The board is clear — nothing open for any client.</div>')
+    + (foot.length ? `<div class="wb-foot">${foot.join('')}</div>` : '');
+  for (const [cid, v] of drafts) { const el = board.querySelector(`.wb-add[data-cid="${cid}"]`); if (el) el.value = v; }
+  if (keep) {
+    const el = board.querySelector(`.wb-add[data-cid="${keep.cid}"]`);
+    if (el) { el.focus(); try { el.setSelectionRange(keep.pos, keep.pos); } catch {} }
+  }
+  document.getElementById('wbSubhead').textContent =
+    `${nTodo} to do · ${nWaiting} waiting on clients · ${nDone} done this month`;
+}
+
+const wbSaving = new Set();
+async function wbAdd(cid, input) {
+  const title = input.value.trim();
+  if (!title || wbSaving.has(cid)) return;      // a second Enter while saving does nothing
+  wbSaving.add(cid);
+  try {
+    await api('/api/tasks', { method: 'POST', body: { title, client_id: cid, task_status: 'inbox' } });
+    // Clear only what was saved — anything typed since stays.
+    const box = document.querySelector(`.wb-add[data-cid="${cid}"]`);
+    if (box && box.value.trim() === title) box.value = '';
+    await loadClients();      // the redraw keeps focus wherever you are now
+  } catch (e) { toast('Not saved — ' + e.message); }
+  finally { wbSaving.delete(cid); }
+}
+
+// ─── Monthly client report: draft → edit → PDF → email (owner only) ───────
+// What we did (ticked-off tasks) + website (Pulse) + social (Metricool),
+// worded for the client by The Bear's model; every figure comes from a source.
+let rep = { clientId: null, period: '', list: [], cur: null, busy: false };
+const repDrafting = new Set();     // `${clientId}|${period}` drafts in flight (survive closing the modal)
+let metricoolBrandCache = null;
+
+async function loadMetricoolOptions(selected) {
+  const sel = document.getElementById('clientMetricool');
+  if (!sel) return;
+  const fill = (list, note) => {
+    const opts = ['<option value="">Not linked</option>'].concat(list.map(b =>
+      `<option value="${esc(b.id)}" ${String(selected) === b.id ? 'selected' : ''}>${esc(b.label)}${b.networks?.length ? ' — ' + esc(b.networks.join(', ')) : ''}</option>`));
+    if (selected && !list.some(b => b.id === String(selected))) opts.push(`<option value="${esc(selected)}" selected>Brand #${esc(selected)}</option>`);
+    sel.innerHTML = opts.join('');
+    sel.title = note || '';
+  };
+  if (metricoolBrandCache) return fill(metricoolBrandCache);
+  fill([], 'Loading Metricool brands…');
+  try { metricoolBrandCache = await api('/api/metricool/brands'); fill(metricoolBrandCache); }
+  catch (e) { fill([], e.message); }
+}
+
+function repMonths() {
+  const now = new Date(), out = [];
+  for (let i = 0; i < 13; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    out.push({ value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+      label: d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) });
+  }
+  return out;
+}
+
+async function openReport(clientId, period) {
+  if (!isOwner()) return;
+  const c = clients.find(x => x.id === clientId);
+  rep = { clientId, period: period || repMonths()[1].value, list: [], cur: null, busy: false };
+  document.getElementById('reportTitle').textContent = `📊 ${c ? c.name : 'Client'} — monthly report`;
+  document.getElementById('reportBody').innerHTML = '<div class="rs-loading">Loading…</div>';
+  openModal('reportModal');
+  await repLoad();
+}
+
+// rep is replaced whenever the modal opens for a client; async work checks it
+// still owns the modal before writing (a 30–60 s draft can outlive a switch).
+async function repLoad() {
+  const my = rep;
+  try {
+    const list = await api(`/api/reports?client_id=${my.clientId}`);
+    const hit = list.find(r => r.period === my.period);
+    const cur = hit ? await api(`/api/reports/${hit.id}`) : null;
+    if (rep !== my) return;
+    my.list = list; my.cur = cur;
+  } catch (e) { if (rep === my) toast('Couldn’t load reports — ' + e.message); }
+  if (rep === my) repRender();
+}
+
+function repSetPeriod(v) { if (rep.busy) return toast('Hang on — still drafting'); rep = { ...rep, period: v, cur: null }; repLoad(); }
+
+function repSourceLine(facts) {
+  const c = clients.find(x => x.id === rep.clientId) || {};
+  const ok = t => `<span class="rep-ok">✓ ${t}</span>`, warn = t => `<span class="rep-warn">⚠ ${t}</span>`;
+  const parts = [];
+  if (facts) parts.push(facts.tasks.done.length ? ok(`${facts.tasks.done.length} jobs ticked off`) : warn('No jobs ticked off that month'));
+  const w = facts?.website, s = facts?.social;
+  if (!facts) parts.push(c.pulse_link ? ok('Website linked (Pulse)') : warn('Website not linked'));
+  else if (w.status === 'ok') parts.push(ok(`Website: ${w.visitors ?? w.googleClicks ?? '—'} ${w.visitors !== null ? 'visitors' : 'Google clicks'}`));
+  else parts.push(warn(w.status === 'missing' ? 'Website not linked' : `Website: ${esc(w.message)}`));
+  if (!facts) parts.push(c.metricool_blog_id ? ok('Social linked (Metricool)') : warn('Social not linked'));
+  else if (s.status === 'ok') parts.push(ok(`Social: ${s.networks.map(n => `${n.network} ${n.posts}`).join(', ')} posts`));
+  else parts.push(warn(s.status === 'missing' ? 'Social not linked' : `Social: ${esc(s.message)}`));
+  const needsLink = (!facts && (!c.pulse_link || !c.metricool_blog_id)) || (facts && (w.status === 'missing' || s.status === 'missing'));
+  return parts.join(' · ') + (needsLink ? ` — <a href="#" onclick="closeModal('reportModal');editClient(${rep.clientId});return false">link them in Edit client</a>` : '');
+}
+
+function repRender() {
+  const body = document.getElementById('reportBody');
+  const months = repMonths().map(m => `<option value="${m.value}" ${m.value === rep.period ? 'selected' : ''}>${m.label}</option>`).join('');
+  const r = rep.cur, content = r?.content, d = content?.draft;
+  const history = rep.list.length ? `<div class="rep-history">${rep.list.map(x => {
+      const lbl = new Date(x.period + '-01T00:00:00').toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+      return `<button class="${x.period === rep.period ? 'on' : ''}" onclick="repSetPeriod('${x.period}')">${lbl} · ${x.sent_at ? 'sent ' + timeAgo(x.sent_at) : 'draft'}</button>`;
+    }).join('')}</div>` : '';
+  let html = `<div class="rep-top">
+      <select id="repMonth" class="filter-select" onchange="repSetPeriod(this.value)">${months}</select>
+      <button class="btn ${r ? 'btn-ghost' : 'btn-primary'} btn-sm" id="repDraftBtn" onclick="repDraft()" ${repDrafting.has(`${rep.clientId}|${rep.period}`) ? 'disabled' : ''}>${repDrafting.has(`${rep.clientId}|${rep.period}`) ? 'Drafting…' : r ? '↻ Redraft from scratch' : '✨ Draft the report'}</button>
+      <span class="rep-sources">${repSourceLine(content?.facts)}</span>
+    </div>${history}`;
+  if (!r) {
+    html += `<div class="rep-empty">Pulls together what you ticked off for this client in the month, their website figures from Pulse and their social media from Metricool, then writes it up for the client. You check it, tweak it, and send it as a branded PDF.</div>`;
+    body.innerHTML = html;
+    return;
+  }
+  const f = content.facts;
+  const hl = (d.highlights.length ? d.highlights : [{ title: '', detail: '' }]).map((h, i) => `<div class="rep-hl">
+      <input type="text" class="rep-hl-t" value="${esc(h.title)}" placeholder="Highlight" maxlength="90">
+      <input type="text" class="rep-hl-d" value="${esc(h.detail)}" placeholder="One line of detail" maxlength="320">
+      <button class="btn-icon" onclick="this.closest('.rep-hl').remove()" title="Remove">&times;</button>
+    </div>`).join('');
+  html += `${content.note ? `<div class="rep-note">${esc(content.note)}</div>` : ''}
+    ${r.sent_at ? `<div class="rep-sent">✓ Sent to ${esc(r.sent_to)} ${timeAgo(r.sent_at)} — editing now changes your copy only.</div>` : ''}
+    <div class="rep-form">
+      <label>Headline</label><input type="text" id="repHeadline" value="${esc(d.headline)}" maxlength="200">
+      <label>Intro</label><textarea id="repIntro" rows="3" maxlength="900">${esc(d.intro)}</textarea>
+      <label>What we did in ${esc(content.month)} <span class="rep-hint">${f.tasks.done.length} jobs ticked off — grouped into highlights</span></label>
+      <div id="repHighlights">${hl}</div>
+      <button class="btn btn-ghost btn-sm rep-add" onclick="repAddHighlight()">+ Add highlight</button>
+      ${f.website.status === 'ok' ? `<label>Website <span class="rep-hint">${esc(repWebLine(f.website))}</span></label>${repWindowWarning(content)}
+        <textarea id="repWeb" rows="3" maxlength="700">${esc(d.website_summary)}</textarea>` : ''}
+      ${f.social.status === 'ok' ? `<label>Social media <span class="rep-hint">${esc(f.social.networks.map(n => `${n.network}: ${n.posts} posts${n.reach !== null ? ', reach ' + n.reach.toLocaleString('en-GB') : ''}`).join(' · '))}</span></label>
+        <textarea id="repSocial" rows="3" maxlength="700">${esc(d.social_summary)}</textarea>` : ''}
+      <label>Coming up in ${esc(content.nextMonth)} <span class="rep-hint">one per line</span></label>
+      <textarea id="repNext" rows="3">${esc(d.next_month.join('\n'))}</textarea>
+    </div>
+    <div class="rep-actions">
+      <button class="btn btn-ghost btn-sm" onclick="repSave(true)">Save changes</button>
+      <button class="btn btn-ghost btn-sm" onclick="repPreview()">Preview PDF &#8599;</button>
+      <button class="btn btn-primary btn-sm" onclick="repShowSend()">&#9993; Email it to the client…</button>
+    </div>
+    <div class="rep-send" id="repSend" style="display:none"></div>`;
+  body.innerHTML = html;
+}
+
+// Pulse serves the last 30 days to yesterday. Drafted well after the month
+// ends, those figures don't match it — say so before it reaches a client.
+function repWindowWarning(content) {
+  const w = content.facts.website.window;
+  if (!w) return '';
+  const [y, m] = content.period.split('-').map(Number);
+  const monthEnd = localDateStr(new Date(y, m, 0));
+  const late = (new Date(w.end + 'T00:00:00') - new Date(monthEnd + 'T00:00:00')) / 864e5;
+  if (late <= 5) return '';
+  return `<div class="rep-note">The website figures cover ${fmtDateShort(w.start)} – ${fmtDateShort(w.end)} (Pulse gives the last 30 days). For figures that match ${esc(content.month)}, draft the report in the first few days of ${esc(content.nextMonth)}.</div>`;
+}
+
+function repWebLine(w) {
+  const bits = [];
+  if (w.visitors !== null) bits.push(`${w.visitors.toLocaleString('en-GB')} visitors`);
+  if (w.googleClicks !== null) bits.push(`${w.googleClicks.toLocaleString('en-GB')} Google clicks`);
+  if (w.window) bits.push(`${fmtDateShort(w.window.start)} – ${fmtDateShort(w.window.end)}`);
+  return bits.join(' · ');
+}
+
+function repAddHighlight() {
+  const wrap = document.getElementById('repHighlights');
+  wrap.insertAdjacentHTML('beforeend', `<div class="rep-hl">
+    <input type="text" class="rep-hl-t" placeholder="Highlight" maxlength="90">
+    <input type="text" class="rep-hl-d" placeholder="One line of detail" maxlength="320">
+    <button class="btn-icon" onclick="this.closest('.rep-hl').remove()" title="Remove">&times;</button></div>`);
+  wrap.lastElementChild.querySelector('input').focus();
+}
+
+function repCollect() {
+  const val = id => document.getElementById(id)?.value ?? '';
+  return {
+    headline: val('repHeadline'), intro: val('repIntro'),
+    highlights: [...document.querySelectorAll('#repHighlights .rep-hl')].map(row => ({
+      title: row.querySelector('.rep-hl-t').value, detail: row.querySelector('.rep-hl-d').value })).filter(h => h.title.trim()),
+    website_summary: val('repWeb'), social_summary: val('repSocial'),
+    next_month: val('repNext').split('\n').map(x => x.trim()).filter(Boolean),
+  };
+}
+
+async function repSave(announce) {
+  const cur = rep.cur;
+  if (!cur) return false;
+  try {
+    const r = await api(`/api/reports/${cur.id}`, { method: 'PUT', body: { draft: repCollect() } });
+    cur.content.draft = r.draft;
+    if (announce) toast('Saved', true);
+    return true;
+  } catch (e) { toast('Not saved — ' + e.message); return false; }
+}
+
+async function repDraft() {
+  if (rep.busy) return;
+  if (rep.cur && !confirm('Start again from fresh figures? Your edits to this draft will be replaced.')) return;
+  const my = rep;
+  const key = `${my.clientId}|${my.period}`;
+  if (repDrafting.has(key)) return toast('Already drafting that one — give it a minute');
+  repDrafting.add(key);
+  my.busy = true;
+  const btn = document.getElementById('repDraftBtn');
+  btn.disabled = true;
+  btn.textContent = 'Gathering figures and writing it up…';
+  try {
+    const cur = await api('/api/reports/draft', { method: 'POST', body: { client_id: my.clientId, period: my.period } });
+    const list = await api(`/api/reports?client_id=${my.clientId}`);
+    my.cur = cur; my.list = list;
+  } catch (e) { if (rep === my) toast('Couldn’t draft it — ' + e.message); }
+  repDrafting.delete(key);
+  my.busy = false;
+  if (rep === my) repRender();
+  else toast(`The ${clients.find(c => c.id === my.clientId)?.name || ''} report draft is ready`, true);
+}
+
+async function repPreview() {
+  // Open the tab inside the click (pop-up blockers), then point it at the PDF once saved.
+  const w = window.open('', '_blank');
+  if (!(await repSave(false))) { w?.close(); return; }
+  const url = `/api/reports/${rep.cur.id}/pdf?t=${Date.now()}`;
+  if (w) w.location = url; else window.location = url;
+}
+
+function repShowSend() {
+  const box = document.getElementById('repSend');
+  const c = clients.find(x => x.id === rep.cur.client_id) || {};     // the report's own client
+  const content = rep.cur.content;
+  const me = currentUser?.display_name || '';
+  box.style.display = '';
+  box.innerHTML = `<label>To</label><input type="text" id="repTo" value="${esc(c.report_email || '')}" placeholder="name@client.co.uk">
+    <label>Subject</label><input type="text" id="repSubject" value="${esc(`Your ${content.label} report — North Bear Media`)}">
+    <label>Message</label><textarea id="repMsg" rows="7">${esc(`Hi there,\n\nHere’s your report for ${content.month}: what we’ve done for you, how your website and social media performed, and what’s coming up next.\n\nAny questions, just reply to this email.\n\nThanks,\n${me}\nNorth Bear Media`)}</textarea>
+    <div class="rep-actions"><button class="btn btn-primary btn-sm" id="repSendBtn" onclick="repSend()">Send with the PDF attached</button>
+    <span class="rep-hint">Sent from your Gmail; it lands in your Sent folder.</span></div>`;
+  document.getElementById('repTo').focus();
+}
+
+async function repSend() {
+  const to = document.getElementById('repTo').value.trim();
+  if (!to) return toast('Who should it go to?');
+  const cur = rep.cur;
+  if (!confirm(`Send ${cur.content.client.name}’s ${cur.content.label} report to ${to}?`)) return;
+  if (!(await repSave(false))) return;
+  const btn = document.getElementById('repSendBtn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try {
+    const r = await api(`/api/reports/${cur.id}/send`, { method: 'POST', body: {
+      to, subject: document.getElementById('repSubject').value, message: document.getElementById('repMsg').value } });
+    toast(`Sent to ${r.sent_to}`, true);
+    await repLoad();
+  } catch (e) {
+    toast(e.message);
+    btn.disabled = false; btn.textContent = 'Send with the PDF attached';
+  }
+}
+
+// ─── Robot & sources settings (☰ menu, owner only) ─────────────────────────
+async function openRobotSettings() {
+  document.getElementById('navDropdown')?.classList.remove('open');
+  if (!isOwner()) return;
+  const body = document.getElementById('robotSettingsBody');
+  if (!document.getElementById('robotModal').classList.contains('active')) body.innerHTML = '<div class="rs-loading">Loading…</div>';
+  openModal('robotModal');
+  try { robot.status = await api('/api/intake/status'); renderRobotSettings(); }
+  catch (e) { body.innerHTML = `<div class="rs-loading">Couldn’t load — ${esc(e.message)}</div>`; }
+}
+
+const RUN_TRIGGER = { schedule: 'Hourly check', manual: 'Check now', paste: 'Paste', capture: 'Capture link', test: 'Test' };
+const RUN_STATUS = { ok: '✓', idle: '✓ nothing new', partial: '◐ part done', error: '⚠ failed', running: '… running' };
+
+function rsKeyInput(id, configured, fromEnv, placeholder) {
+  if (fromEnv) return `<input type="password" id="${id}" disabled placeholder="Set on the server (Railway)">`;
+  return `<input type="password" id="${id}" autocomplete="off" placeholder="${configured ? 'Saved ✓ — paste a new key to replace it' : esc(placeholder)}">`;
+}
+
+function renderRobotSettings() {
+  const s = robot.status;
+  const src = s.sources;
+  const dot = on => `<span class="rs-dot ${on ? 'on' : ''}"></span>`;
+  const mailboxRows = src.mailboxes.map(m => `<div class="rs-src">
+      ${dot(m.status === 'ok')}
+      <div class="rs-src-main"><strong>${esc(m.email)}</strong><div class="rs-sub">${m.status === 'ok' ? 'Extra mailbox — read-only' : '⚠ Google stopped letting us read this — reconnect it'}</div></div>
+      ${m.status === 'ok' ? '' : '<a class="btn btn-ghost btn-sm" href="/auth/gmail/connect?purpose=intake">Reconnect</a>'}
+      <button class="btn btn-ghost btn-sm" onclick="robotRemoveMailbox(${m.id})">Remove</button>
+    </div>`).join('');
+  const runs = (s.recentRuns || []).map(r => `<div class="rs-run">
+      <span>${fmtDateTime(r.started_at)}</span><span>${esc(RUN_TRIGGER[r.trigger_type] || r.trigger_type)}</span>
+      <span class="rs-run-st rs-${r.status}">${RUN_STATUS[r.status] || esc(r.status)}</span>
+      <span>read ${r.items} · suggested ${r.suggestions}</span>
+    </div>`).join('');
+  const notes = (s.lastRun?.detail?.notes || []).slice(0, 4).map(n => `<li>${esc(n)}</li>`).join('');
+  const tokens = (s.month.input_tokens || 0) + (s.month.output_tokens || 0);
+
+  document.getElementById('robotSettingsBody').innerHTML = `
+    <section class="rs-sec">
+      <label class="rs-toggle">
+        <input type="checkbox" ${s.enabled ? 'checked' : ''} onchange="robotSetEnabled(this.checked)">
+        <span class="rs-switch"></span>
+        <span><strong>Read my messages every hour</strong>
+          <span class="rs-sub">Mon–Fri, 8am–6pm. It only ever <em>suggests</em> — nothing goes on your list until you tick it in the Inbox.</span></span>
+      </label>
+      ${s.hasApiKey ? '' : '<div class="robot-warn rs-block">⚠ Needs ANTHROPIC_API_KEY set on Railway before it can read anything.</div>'}
+      <div class="rs-stats">This month: <b>${s.month.runs}</b> checks · <b>${s.month.suggestions}</b> suggestions · ${(tokens / 1000).toFixed(0)}k tokens</div>
+    </section>
+
+    <section class="rs-sec">
+      <h4>What it reads</h4>
+      <div class="rs-sub rs-block-sub">It only links a message to a client when it knows the sender: add client contacts’ emails and numbers to <b>Important contacts</b> in Edit client — and every suggestion you accept teaches it more.</div>
+      <div class="rs-src">
+        ${dot(!!src.gmail)}
+        <div class="rs-src-main"><strong>Work email</strong><div class="rs-sub">${src.gmail ? esc(src.gmail) + ' — inbox and sent' : (s.gmailOAuthConfigured ? 'Not connected' : 'Gmail isn’t set up on the server')}</div></div>
+        ${!src.gmail && s.gmailOAuthConfigured ? '<a class="btn btn-ghost btn-sm" href="/auth/gmail/connect">Connect</a>' : ''}
+      </div>
+      ${mailboxRows}
+      ${s.gmailOAuthConfigured ? `<div class="rs-src rs-add">
+        <span class="rs-dot"></span>
+        <div class="rs-src-main"><strong>Another Gmail</strong><div class="rs-sub">e.g. your personal email — read-only, nothing is ever sent from it</div></div>
+        <a class="btn btn-ghost btn-sm" href="/auth/gmail/connect?purpose=intake">+ Connect</a>
+      </div>` : ''}
+      <div class="rs-src">
+        ${dot(src.whatsappNumbers > 0)}
+        <div class="rs-src-main"><strong>WhatsApp Business</strong><div class="rs-sub">${src.whatsappNumbers ? `${src.whatsappNumbers} number${src.whatsappNumbers > 1 ? 's' : ''} connected` : 'Not connected — set it up from the WhatsApp panel on the dashboard'}</div></div>
+      </div>
+      <div class="rs-src rs-src-form">
+        ${dot(src.periskope.configured)}
+        <div class="rs-src-main"><strong>Personal WhatsApp</strong> <span class="rs-sub-inline">via Periskope</span>
+          <div class="rs-sub">Periskope → Settings → API → copy your key. Your number is the one linked in Periskope.</div>
+          <div class="rs-fields">
+            ${rsKeyInput('rsPeriKey', src.periskope.configured, src.periskope.fromEnv, 'Periskope API key')}
+            <input type="tel" id="rsPeriPhone" value="${esc(src.periskope.phone || '')}" placeholder="Your number, e.g. 447700900123">
+            <button class="btn btn-ghost btn-sm" onclick="robotSaveSource('periskope')">Save &amp; test</button>
+          </div>
+          <div class="rs-test" id="rsTest-periskope"></div>
+        </div>
+      </div>
+      <div class="rs-src rs-src-form">
+        ${dot(src.granola.configured)}
+        <div class="rs-src-main"><strong>Meeting notes</strong> <span class="rs-sub-inline">via Granola</span>
+          <div class="rs-sub">Granola → Settings → API → create a key. Action points from meetings become suggestions.</div>
+          <div class="rs-fields">
+            ${rsKeyInput('rsGranolaKey', src.granola.configured, src.granola.fromEnv, 'Granola API key')}
+            <button class="btn btn-ghost btn-sm" onclick="robotSaveSource('granola')">Save &amp; test</button>
+          </div>
+          <div class="rs-test" id="rsTest-granola"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="rs-sec">
+      <h4>Monthly reports</h4>
+      <div class="rs-src rs-src-form">
+        ${dot(s.metricool.configured && !!s.metricool.userId)}
+        <div class="rs-src-main"><strong>Social media figures</strong> <span class="rs-sub-inline">via Metricool</span>
+          <div class="rs-sub">Metricool → Account settings → API: copy the token and your user ID. Then link each client to its brand in Edit client.</div>
+          <div class="rs-fields">
+            ${rsKeyInput('rsMcToken', s.metricool.configured, s.metricool.fromEnv, 'Metricool API token')}
+            <input type="text" id="rsMcUser" value="${esc(s.metricool.userId || '')}" placeholder="User ID, e.g. 3883072" inputmode="numeric">
+            <button class="btn btn-ghost btn-sm" onclick="robotSaveSource('metricool')">Save &amp; test</button>
+          </div>
+          <div class="rs-test" id="rsTest-metricool"></div>
+        </div>
+      </div>
+      <div class="rs-sub">Website figures come from each client’s Pulse dashboard link — paste it in Edit client.</div>
+    </section>
+
+    <section class="rs-sec">
+      <h4>Send to Console — for your phone, Grok, Claude and anything else</h4>
+      <div class="rs-capture">
+        <input type="text" readonly value="${esc(s.captureUrl)}" onclick="this.select()" id="rsCaptureUrl">
+        <button class="btn btn-ghost btn-sm" onclick="robotCopyCapture()">Copy</button>
+        <button class="btn btn-ghost btn-sm" onclick="robotNewCaptureLink()" title="The old link stops working">New link</button>
+      </div>
+      <div class="rs-sub">Open this link on your phone → Share → <b>Add to Home Screen</b>. Paste anything into it — a to-do list, a Grok or Claude answer, notes from a call — and the robot turns it into suggestions here within a minute. Keep it private: anyone with the link can send you suggestions (they still need your yes).</div>
+    </section>
+
+    <section class="rs-sec">
+      <h4>Recent checks</h4>
+      ${runs || '<div class="rs-sub">None yet.</div>'}
+      ${notes ? `<ul class="rs-notes">${notes}</ul>` : ''}
+    </section>`;
+}
+
+async function robotSaveSettings(body, okMsg) {
+  try {
+    await api('/api/intake/settings', { method: 'PUT', body });
+    robot.status = await api('/api/intake/status');
+    renderRobotSettings();
+    if (okMsg) toast(okMsg, true);
+    if (currentView === 'inbox') renderRobotTray();
+    return true;
+  } catch (e) { toast('Not saved — ' + e.message); return false; }
+}
+
+function robotSetEnabled(on) {
+  robotSaveSettings({ enabled: on }, on ? 'Robot on — it checks every hour in office hours' : 'Robot paused');
+}
+
+async function robotSaveSource(svc) {
+  const body = {};
+  if (svc === 'periskope') {
+    const k = document.getElementById('rsPeriKey');
+    if (k && !k.disabled && k.value.trim()) body.periskope_api_key = k.value.trim();
+    body.periskope_phone = document.getElementById('rsPeriPhone').value;
+  } else if (svc === 'metricool') {
+    const k = document.getElementById('rsMcToken');
+    if (k && !k.disabled && k.value.trim()) body.metricool_token = k.value.trim();
+    body.metricool_user_id = document.getElementById('rsMcUser').value;
+    metricoolBrandCache = null;   // new key → fetch the brand list again
+  } else {
+    const k = document.getElementById('rsGranolaKey');
+    if (k && !k.disabled && k.value.trim()) body.granola_api_key = k.value.trim();
+  }
+  if (!(await robotSaveSettings(body))) return;
+  const out = document.getElementById(`rsTest-${svc}`);
+  out.className = 'rs-test'; out.textContent = 'Testing…';
+  try {
+    const r = await api(`/api/intake/test/${svc}`, { method: 'POST' });
+    out.className = 'rs-test ' + (r.ok ? 'ok' : 'bad');
+    out.textContent = (r.ok ? '✓ ' : '⚠ ') + r.detail;
+  } catch (e) { out.className = 'rs-test bad'; out.textContent = '⚠ ' + e.message; }
+}
+
+async function robotRemoveMailbox(id) {
+  const email = robot.status?.sources.mailboxes.find(m => m.id === id)?.email || 'this mailbox';
+  if (!confirm(`Stop reading ${email}? Suggestions already made stay.`)) return;
+  try { await api(`/api/intake/mailboxes/${id}`, { method: 'DELETE' }); } catch (e) { return toast('Not removed — ' + e.message); }
+  openRobotSettings();
+}
+
+async function robotCopyCapture() {
+  const el = document.getElementById('rsCaptureUrl');
+  try { await navigator.clipboard.writeText(el.value); }
+  catch { el.select(); document.execCommand('copy'); }
+  toast('Link copied', true);
+}
+
+function robotNewCaptureLink() {
+  if (!confirm('Make a new link? The old one stops working straight away — update your phone shortcut after.')) return;
+  robotSaveSettings({ regenerate_capture_token: true }, 'New link made');
 }
 
 // ─── Notebook (paper day-book) ──────────────────────────
@@ -1905,7 +2763,7 @@ async function nbTick(id) {
   // Optimistic: flip the bullet instantly from the local cache, save behind it.
   t.task_status = done ? 'scheduled' : 'done';
   t.completed_at = done ? '' : localDateStr(new Date());
-  loadNotebookView();
+  nbRerender();
   if (!done) { try { celebrate(); } catch {} }
   try {
     await api(`/api/tasks/${id}`, { method: 'PUT', body: { task_status: t.task_status } });
@@ -1917,9 +2775,11 @@ async function nbTick(id) {
     t.task_status = prevStatus;
     t.completed_at = prevCompleted;
     toast('Not saved — ' + e.message);
-    loadNotebookView();
+    nbRerender();
   }
 }
+// Ticks are used from the Notebook and the Whiteboard — redraw whichever is open.
+function nbRerender() { if (currentView === 'whiteboard') renderWhiteboard(); else loadNotebookView(); }
 
 async function nbHighlight(id) {
   const t = findTaskById(id);
@@ -2810,7 +3670,8 @@ async function showArchiveModal(){
 document.getElementById('addClientBtn').addEventListener('click',()=>{
   document.getElementById('clientModalTitle').textContent='New Client';
   document.getElementById('clientFormError').style.display='none';
-  ['clientId','clientName','clientCode','clientNotes','clientGmail','clientDrive','clientMonthlyValue','clientAgreementSummary','clientRecurringDeliverables','clientLastContact','clientNextScheduled','clientContacts'].forEach(id=>document.getElementById(id).value='');
+  ['clientId','clientName','clientCode','clientNotes','clientGmail','clientDrive','clientMonthlyValue','clientAgreementSummary','clientRecurringDeliverables','clientLastContact','clientNextScheduled','clientContacts','clientPulseLink','clientReportEmail'].forEach(id=>document.getElementById(id).value='');
+  if (isOwner()) loadMetricoolOptions('');
   document.getElementById('clientType').value='recurring';
   document.getElementById('clientTypeBand').value='retainer';
   document.getElementById('clientControlStatus').value='';
@@ -2842,6 +3703,9 @@ function editClient(id){
   document.getElementById('clientNotes').value=c.notes||'';
   document.getElementById('clientGmail').value=c.gmail_link||'';
   document.getElementById('clientDrive').value=c.drive_link||'';
+  document.getElementById('clientPulseLink').value=c.pulse_link||'';
+  document.getElementById('clientReportEmail').value=c.report_email||'';
+  if (isOwner()) loadMetricoolOptions(c.metricool_blog_id||'');
   document.getElementById('clientLogo').value='';
   document.getElementById('clientPrivate').checked=!!c.is_private;
   document.getElementById('privateClientGroup').style.display=currentUser?.role==='owner'?'':'none';
@@ -2863,6 +3727,11 @@ document.getElementById('clientForm').addEventListener('submit',async e=>{
     control_status:document.getElementById('clientControlStatus').value,
     risk_level:document.getElementById('clientRiskLevel').value,
     important_contacts:document.getElementById('clientContacts').value};
+  if (isOwner()) {
+    data.pulse_link = document.getElementById('clientPulseLink').value.trim();
+    data.metricool_blog_id = document.getElementById('clientMetricool').value;
+    data.report_email = document.getElementById('clientReportEmail').value.trim();
+  }
   if (!data.name.trim()) { errEl.textContent='Client name is required.'; errEl.style.display='block'; return; }
   if (!data.code || data.code.length !== 3) { errEl.textContent='Client code must be exactly 3 letters.'; errEl.style.display='block'; return; }
   data.code = data.code.toUpperCase();
@@ -3967,6 +4836,16 @@ async function toggleTaskPin(taskId, event) {
       const savedView = appPrefs.nbm_view || localStorage.getItem('nbm_view');
       if (savedView && savedView !== 'dashboard' && document.querySelector(`[data-view="${savedView}"]`)) switchView(savedView);
     } catch {}
+    fetchRobotCount();
+    // Back from Google after connecting an extra mailbox for the robot.
+    if (location.hash === '#robot' || location.hash === '#robot-same-mailbox') {
+      const same = location.hash === '#robot-same-mailbox';
+      history.replaceState(null, '', location.pathname);
+      if (isOwner()) {
+        openRobotSettings();
+        toast(same ? 'That’s already your main work Gmail — connect your other account' : 'Mailbox connected — the robot reads it from the next check', !same);
+      }
+    }
   } catch(e) {
     console.error('Init error:', e);
     document.getElementById('clientList').innerHTML='<div class="empty-state"><p>Error loading data. Please refresh.</p></div>';

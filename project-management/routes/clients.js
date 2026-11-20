@@ -64,6 +64,32 @@ function computeControl(client, tasks, today) {
   return { status, risk };
 }
 
+// Client financials, the robot's "latest" line (drawn from the owner's own
+// messages) and report settings are owner-only.
+export function hideOwnerFields(client) {
+  client.monthly_value = 0;
+  client.agreement_summary = '';
+  client.last_touch_summary = '';
+  client.last_touch_at = '';
+  client.report_email = '';
+  client.pulse_link = '';
+  client.metricool_blog_id = '';
+  return client;
+}
+
+// Report settings: a Pulse dashboard link, a Metricool brand id, who gets the report.
+const cleanUrl = v => {
+  if (v === undefined) return undefined;
+  const t = String(v || '').trim().slice(0, 300);
+  return t === '' || /^https?:\/\/\S+$/i.test(t) ? t : null;
+};
+const cleanDigits = v => (v === undefined ? undefined : String(v || '').replace(/\D/g, '').slice(0, 20));
+const cleanEmails = v => {
+  if (v === undefined) return undefined;
+  const list = String(v || '').split(/[,;\s]+/).map(e => e.trim()).filter(Boolean);
+  return list.every(e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) ? list.join(', ').slice(0, 300) : null;
+};
+
 router.get('/', requireAuth, (req, res) => {
   const { filter, include_archived } = req.query;
   const arc = include_archived === '1' ? '' : 'AND archived = 0';
@@ -149,10 +175,7 @@ router.get('/', requireAuth, (req, res) => {
     client.board = { outstanding, waiting, overdue, recurring, next_due_date: nextDue };
 
     // Client financials are owner-only: staff see client health, not money.
-    if (!isOwner) {
-      client.monthly_value = 0;
-      client.agreement_summary = '';
-    }
+    if (!isOwner) hideOwnerFields(client);
   }
   res.json(clients);
 });
@@ -160,8 +183,16 @@ router.get('/', requireAuth, (req, res) => {
 router.post('/', requireAuth, requireWrite, (req, res) => {
   let { name, code, agreement_type, notes, gmail_link, drive_link, is_private,
     client_type, monthly_value, agreement_summary, recurring_deliverables,
-    last_contact_date, next_scheduled_date, control_status, risk_level, important_contacts } = req.body;
+    last_contact_date, next_scheduled_date, control_status, risk_level, important_contacts,
+    pulse_link, metricool_blog_id, report_email } = req.body;
   if (!name) return res.status(400).json({ error: 'Client name is required' });
+  // Report settings are owner-only; staff posts never carry them.
+  const owner = req.user.role === 'owner';
+  pulse_link = owner ? cleanUrl(pulse_link) : undefined;
+  metricool_blog_id = owner ? cleanDigits(metricool_blog_id) : undefined;
+  report_email = owner ? cleanEmails(report_email) : undefined;
+  if (pulse_link === null) return res.status(400).json({ error: 'The Pulse link should be the full dashboard address (https://…)' });
+  if (report_email === null) return res.status(400).json({ error: 'Report email: use proper addresses, separated by commas' });
   last_contact_date = cleanDate(last_contact_date);
   next_scheduled_date = cleanDate(next_scheduled_date);
   monthly_value = cleanMoney(monthly_value);
@@ -181,8 +212,13 @@ router.post('/', requireAuth, requireWrite, (req, res) => {
     ct, monthly_value || 0, agreement_summary || '', recurring_deliverables || '',
     last_contact_date || '', next_scheduled_date || '', cs, rl, important_contacts || ''
   );
+  if (owner) {
+    db.prepare('UPDATE clients SET pulse_link = ?, metricool_blog_id = ?, report_email = ? WHERE id = ?')
+      .run(pulse_link || '', metricool_blog_id || '', report_email || '', result.lastInsertRowid);
+  }
   logActivity('client', result.lastInsertRowid, 'created', req.user.display_name, `Created client "${name}"`);
-  res.json(db.prepare('SELECT * FROM clients WHERE id = ?').get(result.lastInsertRowid));
+  const created = db.prepare('SELECT * FROM clients WHERE id = ?').get(result.lastInsertRowid);
+  res.json(owner ? created : hideOwnerFields(created));
 });
 
 router.put('/reorder', requireAuth, requireWrite, (req, res) => {
@@ -196,9 +232,15 @@ router.put('/reorder', requireAuth, requireWrite, (req, res) => {
 router.put('/:id', requireAuth, requireWrite, (req, res) => {
   let { name, code, agreement_type, notes, logo_url, gmail_link, drive_link, is_private,
     client_type, monthly_value, agreement_summary, recurring_deliverables,
-    last_contact_date, next_scheduled_date, control_status, risk_level, important_contacts } = req.body;
+    last_contact_date, next_scheduled_date, control_status, risk_level, important_contacts,
+    pulse_link, metricool_blog_id, report_email } = req.body;
   const old = requireClientAccess(req, res);
   if (!old) return;
+  pulse_link = cleanUrl(pulse_link);
+  metricool_blog_id = cleanDigits(metricool_blog_id);
+  report_email = cleanEmails(report_email);
+  if (pulse_link === null) return res.status(400).json({ error: 'The Pulse link should be the full dashboard address (https://…)' });
+  if (report_email === null) return res.status(400).json({ error: 'Report email: use proper addresses, separated by commas' });
   if (is_private && req.user.role !== 'owner') return res.status(403).json({ error: 'Only owners can make clients private' });
   if (client_type !== undefined && !isValidClientType(client_type)) return res.status(400).json({ error: 'Invalid client_type' });
   if (control_status !== undefined && !isValidControlStatus(control_status)) return res.status(400).json({ error: 'Invalid control_status' });
@@ -208,12 +250,16 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   monthly_value = cleanMoney(monthly_value);
   // Financials are owner-only: staff never see these fields, so a staff save
   // must never overwrite them (their form posts blanks).
-  if (req.user.role !== 'owner') { monthly_value = undefined; agreement_summary = undefined; }
+  if (req.user.role !== 'owner') {
+    monthly_value = undefined; agreement_summary = undefined;
+    pulse_link = undefined; metricool_blog_id = undefined; report_email = undefined;
+  }
 
-  db.prepare('UPDATE clients SET name=COALESCE(?,name), code=COALESCE(?,code), agreement_type=COALESCE(?,agreement_type), notes=COALESCE(?,notes), logo_url=COALESCE(?,logo_url), gmail_link=COALESCE(?,gmail_link), drive_link=COALESCE(?,drive_link), is_private=COALESCE(?,is_private), client_type=COALESCE(?,client_type), monthly_value=COALESCE(?,monthly_value), agreement_summary=COALESCE(?,agreement_summary), recurring_deliverables=COALESCE(?,recurring_deliverables), last_contact_date=COALESCE(?,last_contact_date), next_scheduled_date=COALESCE(?,next_scheduled_date), control_status=COALESCE(?,control_status), risk_level=COALESCE(?,risk_level), important_contacts=COALESCE(?,important_contacts) WHERE id=?')
+  db.prepare('UPDATE clients SET name=COALESCE(?,name), code=COALESCE(?,code), agreement_type=COALESCE(?,agreement_type), notes=COALESCE(?,notes), logo_url=COALESCE(?,logo_url), gmail_link=COALESCE(?,gmail_link), drive_link=COALESCE(?,drive_link), is_private=COALESCE(?,is_private), client_type=COALESCE(?,client_type), monthly_value=COALESCE(?,monthly_value), agreement_summary=COALESCE(?,agreement_summary), recurring_deliverables=COALESCE(?,recurring_deliverables), last_contact_date=COALESCE(?,last_contact_date), next_scheduled_date=COALESCE(?,next_scheduled_date), control_status=COALESCE(?,control_status), risk_level=COALESCE(?,risk_level), important_contacts=COALESCE(?,important_contacts), pulse_link=COALESCE(?,pulse_link), metricool_blog_id=COALESCE(?,metricool_blog_id), report_email=COALESCE(?,report_email) WHERE id=?')
     .run(name, code, agreement_type, notes, logo_url, gmail_link, drive_link, is_private !== undefined ? (is_private ? 1 : 0) : null,
       client_type, monthly_value, agreement_summary, recurring_deliverables,
-      last_contact_date, next_scheduled_date, control_status, risk_level, important_contacts, req.params.id);
+      last_contact_date, next_scheduled_date, control_status, risk_level, important_contacts,
+      pulse_link, metricool_blog_id, report_email, req.params.id);
 
   const changes = [];
   if (name && name !== old.name) changes.push(`name: "${old.name}" → "${name}"`);
@@ -224,7 +270,8 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   if (notes !== undefined && notes !== old.notes) changes.push('updated notes');
   if (changes.length) logActivity('client', req.params.id, 'updated', req.user.display_name, changes.join(', '));
 
-  res.json(db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id));
+  const updated = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
+  res.json(req.user.role === 'owner' ? updated : hideOwnerFields(updated));
 });
 
 router.delete('/:id', requireAuth, requireRole('owner'), (req, res) => {
@@ -259,7 +306,10 @@ router.get('/:id/history', requireAuth, (req, res) => {
   if (!client) return res.status(404).json({ error: 'Client not found' });
   if (client.is_private && req.user.role !== 'owner') return res.status(403).json({ error: 'Access denied' });
   const limit = Math.min(parseInt(req.query.limit) || 100, 500);
-  const tids = db.prepare('SELECT id FROM tasks WHERE client_id = ?').all(cid).map(t => t.id);
+  // Staff see the history of their own tasks only (same rule as the task lists).
+  const mine = req.user.role === 'owner' ? '' : 'AND (assignee = ? OR secondary_assignee = ?)';
+  const tids = db.prepare(`SELECT id FROM tasks WHERE client_id = ? ${mine}`)
+    .all(...(mine ? [cid, req.user.display_name, req.user.display_name] : [cid])).map(t => t.id);
   const conds = ["(entity_type='client' AND entity_id=?)"];
   const params = [cid];
   if (tids.length) { conds.push(`(entity_type='task' AND entity_id IN (${tids.map(() => '?').join(',')}))`); params.push(...tids); }

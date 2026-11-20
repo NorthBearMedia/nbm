@@ -43,7 +43,10 @@ routes/
    | `RAILWAY_VOLUME_MOUNT_PATH` | Yes | — | Set to `/data` (path where you mounted the volume) |
    | `NODE_ENV` | Recommended | — | Set to `production` for secure cookies + HSTS |
    | `SEED_ADMIN` | First deploy only | — | Set to `1` to create the default admin user |
-   | `ANTHROPIC_API_KEY` | No | — | Enables the in-app Claude assistant. Get one from https://console.anthropic.com/settings/keys |
+   | `ANTHROPIC_API_KEY` | No | — | Enables the in-app Claude assistant, the intake robot and the report writer. Get one from https://console.anthropic.com/settings/keys |
+   | `CLAUDE_MODEL` | No | `claude-opus-5-5` | Model override; falls back to `claude-opus-4-6` automatically if rejected |
+   | `GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET` | No | — | Google OAuth app: Email tab, the robot's mailboxes, sending reports |
+   | `PERISKOPE_API_KEY`, `PERISKOPE_PHONE`, `GRANOLA_API_KEY`, `METRICOOL_TOKEN`, `METRICOOL_USER_ID` | No | — | Optional — these can be entered in ☰ → Robot & sources instead (stored write-only) |
 
 3. **Root Directory**: Set to `project-management` in Railway service settings.
 

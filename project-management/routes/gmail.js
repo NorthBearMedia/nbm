@@ -15,6 +15,9 @@ function getRedirectUri(req) {
   return `${proto}://${host}/auth/gmail/callback`;
 }
 
+// The robot reads for the first owner account only (see routes/intake.js).
+const robotOwnerId = () => db.prepare("SELECT id FROM users WHERE role = 'owner' ORDER BY id LIMIT 1").get()?.id;
+
 function makeOAuth2(req) {
   return new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, getRedirectUri(req));
 }
@@ -40,6 +43,24 @@ export function gmailClientForUser(userId) {
   return oauth2;
 }
 
+// Extra read-only mailboxes the intake robot watches (e.g. a personal Gmail),
+// stored separately from the main Email-tab connection.
+export function gmailClientForMailbox(row) {
+  if (!CLIENT_ID || !CLIENT_SECRET || !row) return null;
+  const oauth2 = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET);
+  oauth2.setCredentials({
+    access_token: row.access_token,
+    refresh_token: row.refresh_token,
+    expiry_date: row.expiry_date,
+  });
+  oauth2.on('tokens', (tokens) => {
+    db.prepare(
+      'UPDATE intake_mailboxes SET access_token = ?, expiry_date = ?, refresh_token = COALESCE(?, refresh_token) WHERE id = ?'
+    ).run(tokens.access_token, tokens.expiry_date, tokens.refresh_token || null, row.id);
+  });
+  return oauth2;
+}
+
 function getAuthenticatedClient(req) {
   return gmailClientForUser(req.user.id);
 }
@@ -57,17 +78,21 @@ router.get('/auth/gmail/connect', requireAuth, (req, res) => {
   // CSRF protection: bind this flow to the browser via a random state nonce,
   // so an attacker can't complete a forged callback and attach THEIR Gmail
   // account to the victim's session.
-  const state = randomBytes(16).toString('hex');
+  // ?purpose=intake connects an EXTRA mailbox for the intake robot to read
+  // (owner only, read-only scope). It shares this flow and the one registered
+  // callback URL; the purpose rides in the state nonce.
+  const forIntake = req.query.purpose === 'intake';
+  if (forIntake && req.user.id !== robotOwnerId()) return res.status(403).send('Owner only');
+  const state = randomBytes(16).toString('hex') + (forIntake ? '.intake' : '');
   res.cookie('gmail_oauth_state', state, { httpOnly: true, sameSite: 'lax', maxAge: 10 * 60 * 1000, secure: !!(process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV === 'production') });
   const oauth2 = makeOAuth2(req);
   const url = oauth2.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
     state,
-    scope: [
-      'https://www.googleapis.com/auth/gmail.modify',
-      'https://www.googleapis.com/auth/gmail.send',
-    ],
+    scope: forIntake
+      ? ['https://www.googleapis.com/auth/gmail.readonly']
+      : ['https://www.googleapis.com/auth/gmail.modify', 'https://www.googleapis.com/auth/gmail.send'],
   });
   res.redirect(url);
 });
@@ -87,6 +112,19 @@ router.get('/auth/gmail/callback', requireAuth, async (req, res) => {
     const gmail = google.gmail({ version: 'v1', auth: oauth2 });
     const profile = await gmail.users.getProfile({ userId: 'me' });
     const email = profile.data.emailAddress || '';
+
+    if (state.endsWith('.intake')) {
+      if (req.user.id !== robotOwnerId()) return res.status(403).send('Owner only');
+      const main = db.prepare('SELECT email FROM gmail_tokens WHERE user_id = ?').get(req.user.id);
+      if (main && main.email && main.email.toLowerCase() === email.toLowerCase()) {
+        return res.redirect('/#robot-same-mailbox');
+      }
+      if (!tokens.refresh_token) return res.status(400).send('Google did not return a refresh token — remove the app at myaccount.google.com/permissions and connect again.');
+      db.prepare(
+        "INSERT INTO intake_mailboxes (user_id, email, access_token, refresh_token, expiry_date, status) VALUES (?, ?, ?, ?, ?, 'ok') ON CONFLICT(email) DO UPDATE SET access_token=excluded.access_token, refresh_token=excluded.refresh_token, expiry_date=excluded.expiry_date, status='ok'"
+      ).run(req.user.id, email, tokens.access_token, tokens.refresh_token, tokens.expiry_date);
+      return res.redirect('/#robot');
+    }
 
     db.prepare(
       'INSERT INTO gmail_tokens (user_id, access_token, refresh_token, expiry_date, email) VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET access_token=?, refresh_token=?, expiry_date=?, email=?'
