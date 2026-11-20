@@ -122,7 +122,7 @@ function loadKnownContacts() {
 }
 
 function senderKnown(clientId, item, known) {
-  if (item.direction === 'sent' || item.source === 'granola' || item.source === 'capture') return true;   // Norton's own words
+  if (item.direction === 'sent' || item.source === 'granola' || item.source === 'capture' || item.source === 'claude') return true;   // Norton's own words
   if (!clientId) return false;
   const k = known.get(clientId);
   const c = String(item.contact || '').trim().toLowerCase();
@@ -493,6 +493,82 @@ function captureSource() {
   };
 }
 
+// Messages relayed in by Claude — an hourly Claude task reads Norton's own
+// connected Gmail, personal WhatsApp, Granola and Claude sessions and posts
+// them here (POST /relay/items), in the same shape as the robot's own
+// sources, so seen-tracking, the who's-who rule and dedupe all apply alike.
+const RELAY_SOURCES = ['gmail', 'periskope', 'granola', 'claude'];
+const RELAY_LABEL = { gmail: 'Email', periskope: 'WhatsApp', granola: 'Meeting', claude: 'Claude' };
+
+export function acceptRelayItems({ source, mailbox, until, items }) {
+  if (!RELAY_SOURCES.includes(source)) throw Object.assign(new Error(`source must be one of ${RELAY_SOURCES.join(', ')}`), { status: 400 });
+  if (!Array.isArray(items)) throw Object.assign(new Error('items must be a list'), { status: 400 });
+  const box = String(mailbox || '').trim().toLowerCase().slice(0, 200)
+    || (db.prepare('SELECT email FROM gmail_tokens WHERE user_id = ?').get(ownerUser()?.id)?.email || 'relay').toLowerCase();
+  const s = v => String(v ?? '').replace(/\u0000/g, '').trim();
+  const ins = db.prepare('INSERT OR IGNORE INTO intake_relay (source, ref, item) VALUES (?, ?, ?)');
+  let accepted = 0, duplicates = 0, rejected = 0;
+  for (const raw of items.slice(0, 200)) {
+    const ref0 = s(raw?.ref).slice(0, 200);
+    const text = s(raw?.text).slice(0, source === 'granola' ? 6000 : 3000);
+    if (!ref0 || (!text && !s(raw?.subject))) { rejected++; continue; }
+    // Gmail refs match the robot's own reader (mailbox:id), so one email is never read twice.
+    const ref = source === 'gmail' ? `${box}:${ref0}` : ref0;
+    if (isSeen(source, ref)) { duplicates++; continue; }
+    const when = Date.parse(raw?.date);
+    const direction = ['sent', 'received', 'chat', 'meeting', 'note'].includes(raw?.direction) ? raw.direction
+      : ({ gmail: 'received', periskope: 'chat', granola: 'meeting', claude: 'note' })[source];
+    const url = /^https:\/\//i.test(s(raw?.url)) ? s(raw.url).slice(0, 500) : '';
+    const item = {
+      source, ref, date: Number.isFinite(when) ? new Date(when).toISOString() : new Date().toISOString(), direction,
+      who: s(raw?.who).slice(0, 300), contact: s(raw?.contact).toLowerCase().slice(0, 200),
+      subject: s(raw?.subject).slice(0, 300), text: source === 'gmail' ? cleanBody(text) || text : text,
+      label: (s(raw?.label) || `${RELAY_LABEL[source]} · ${s(raw?.who) || s(raw?.subject)}`).slice(0, 160), url,
+    };
+    if (source === 'periskope' && Array.isArray(raw?.messageIds)) item._messageIds = raw.messageIds.map(x => String(x).slice(0, 200)).slice(0, 300);
+    const r = ins.run(source, ref, JSON.stringify(item));
+    if (r.changes) accepted++; else duplicates++;
+  }
+  const end = Date.parse(until);
+  if (Number.isFinite(end) && end <= Date.now() + 5 * 60 * 1000) {
+    const prev = Date.parse(getMeta(`relay_until_${source}`, '')) || 0;
+    if (end > prev) setMeta(`relay_until_${source}`, new Date(end).toISOString());
+  }
+  setMeta(`relay_last_${source}`, new Date().toISOString());
+  return { accepted, duplicates, rejected };
+}
+
+// Where each relayed source should pick up from (10 minutes' overlap — seen
+// refs are dropped), and which sources Console already reads for itself.
+export function relayStatus() {
+  const owner = ownerUser();
+  const mailbox = owner ? db.prepare('SELECT email FROM gmail_tokens WHERE user_id = ?').get(owner.id)?.email || '' : '';
+  const since = {};
+  for (const src of RELAY_SOURCES) {
+    const until = Date.parse(getMeta(`relay_until_${src}`, '')) || (Date.now() - 24 * 3600 * 1000);
+    since[src] = new Date(Math.max(until - 10 * 60 * 1000, Date.now() - FIRST_RUN_LOOKBACK_MS)).toISOString();
+  }
+  const skip = [];
+  if (mailbox) skip.push('gmail');
+  if (getSecret('periskope_api_key', 'PERISKOPE_API_KEY')) skip.push('periskope');
+  if (getSecret('granola_api_key', 'GRANOLA_API_KEY')) skip.push('granola');
+  return { since, skip, mailbox };
+}
+
+function relaySource() {
+  const rows = db.prepare("SELECT * FROM intake_relay WHERE processed_at = '' ORDER BY id LIMIT 200").all();
+  if (!rows.length) return null;
+  const items = rows.map(r => { try { return { ...JSON.parse(r.item), _relayId: r.id }; } catch { return null; } }).filter(Boolean);
+  return {
+    name: 'Relayed by Claude', items, skipped: 0, notes: [],
+    commit(processed) {
+      const done = items.filter(i => processed.has(i.ref));
+      for (const it of done) for (const id of it._messageIds || []) markSeen('periskope', id);
+      if (done.length) db.prepare(`UPDATE intake_relay SET processed_at = datetime('now') WHERE id IN (${done.map(() => '?').join(',')})`).run(...done.map(i => i._relayId));
+    },
+  };
+}
+
 // ─── The prompt ──────────────────────────────────────────────────────────────
 const RULES = `You are the intake assistant inside North Bear Console, the task system of North Bear Media — a small UK creative and marketing agency run by Norton. You are shown new emails, WhatsApp chats, meeting notes and notes Norton captured. Your job: notice the WORK in them, so Norton never has to type tasks in by hand.
 
@@ -720,7 +796,7 @@ export function applyFindings(input, items, runId, ctx = loadValidationContext()
   const seenTouch = new Set();
   for (const t of (Array.isArray(input?.client_touches) ? input.client_touches : []).slice(0, 60)) {
     const item = items[(parseInt(t?.item, 10) || 0) - 1];
-    if (!item || !ctx.clientIds.has(t.client_id) || item.source === 'capture') continue;  // a note to self isn't contact
+    if (!item || !ctx.clientIds.has(t.client_id) || item.source === 'capture' || item.source === 'claude') continue;  // a note to self isn't contact
     if (!senderKnown(t.client_id, item, ctx.known)) continue;   // a stranger can't rewrite a client's card
     const k = `${t.client_id}|${t.item}`;
     if (seenTouch.has(k)) continue;
@@ -762,6 +838,7 @@ async function gatherSources(only, owner, selfEmails, runNotes) {
     }
   };
   if (want('capture')) await add('Captured notes', async () => captureSource());
+  if (want('relay')) await add('Relayed by Claude', async () => relaySource());
   if (want('gmail')) {
     const main = db.prepare('SELECT email FROM gmail_tokens WHERE user_id = ?').get(owner.id);
     const auth = main ? gmailClientForUser(owner.id) : null;
@@ -922,7 +999,7 @@ export function scheduleCaptureRun() {
   clearTimeout(captureTimer);
   captureTimer = setTimeout(() => {
     if (!getClaude()) return;
-    runIntake({ trigger: 'capture', only: ['capture'] })
+    runIntake({ trigger: 'capture', only: ['capture', 'relay'] })
       .catch(err => console.error('[Intake] capture run failed:', err.message));
   }, 20 * 1000);
 }

@@ -2232,6 +2232,7 @@ function renderRobotSettings() {
 
     <section class="rs-sec">
       <h4>What it reads</h4>
+      ${robotRelayLine(s)}
       <div class="rs-sub rs-block-sub">It only links a message to a client when it knows the sender: add client contacts’ emails and numbers to <b>Important contacts</b> in Edit client — and every suggestion you accept teaches it more.</div>
       <div class="rs-src">
         ${dot(!!src.gmail)}
@@ -2320,6 +2321,17 @@ function renderRobotSettings() {
       ${runs || '<div class="rs-sub">None yet.</div>'}
       ${notes ? `<ul class="rs-notes">${notes}</ul>` : ''}
     </section>`;
+}
+
+// The hourly Claude relay (Gmail / WhatsApp / Granola / Claude sessions read
+// through Norton's own Claude connectors) — when each last came in.
+function robotRelayLine(s) {
+  const r = s.relay || {};
+  const names = { gmail: 'Email', periskope: 'WhatsApp', granola: 'Meetings', claude: 'Claude sessions' };
+  const live = Object.entries(names).filter(([k]) => r[k]?.last);
+  if (!live.length) return '<div class="rs-relay rs-relay-off">Claude relay: not running yet — it reads your Gmail, WhatsApp, Granola and Claude sessions every hour once it is.</div>';
+  return `<div class="rs-relay"><span class="rs-dot on"></span> Read for you by Claude every hour: ${live.map(([k, n]) =>
+    `<b>${n}</b> ${timeAgo(r[k].last.replace('T', ' ').slice(0, 19))} (${r[k].week} this week)`).join(' · ')}</div>`;
 }
 
 async function robotSaveSettings(body, okMsg) {

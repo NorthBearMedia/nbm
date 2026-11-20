@@ -376,6 +376,17 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     processed_at TEXT DEFAULT ''
   );
+  -- Messages relayed in by Claude (an hourly Claude task reading Norton's
+  -- connected Gmail / WhatsApp / Granola / Claude sessions), waiting for the robot.
+  CREATE TABLE IF NOT EXISTS intake_relay (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source TEXT NOT NULL,
+    ref TEXT NOT NULL,
+    item TEXT NOT NULL,                       -- JSON in the robot's item shape
+    created_at TEXT DEFAULT (datetime('now')),
+    processed_at TEXT DEFAULT '',
+    UNIQUE (source, ref)
+  );
   CREATE TABLE IF NOT EXISTS contact_map (
     identifier TEXT PRIMARY KEY,              -- lowercased email, or phone digits
     client_id INTEGER NOT NULL,
