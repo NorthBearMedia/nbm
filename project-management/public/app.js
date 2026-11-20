@@ -637,6 +637,10 @@ let dashWaConfigs = [];
 let bpDoNowCount = 0;
 
 async function loadDashboard() {
+  if (isOwner() && !robot.denied) {
+    api('/api/suggestions').then(list => { robot.list = list; robot.pending = list.length; updateInboxCount();
+      if (currentView === 'dashboard') renderControlBoard(); }).catch(() => {});
+  }
   renderDashGreeting();
   renderDashStats();
   renderBattlePlan();
@@ -751,7 +755,7 @@ function renderBattlePlan() {
   const section = document.getElementById('battlePlan');
   if (!el || !section) return;
   const today = localDateStr(new Date());
-  const tasks = allTasksFlat().filter(t => !t.client_is_system && isOpenTask(t));
+  const tasks = allTasksFlat().filter(isOpenTask);     // every open task — with or without a client
 
   const isOverdue = t => t.deadline && t.deadline < today;
   const isUrgent = t => t.task_type === 'urgent';
@@ -794,7 +798,7 @@ function renderBattlePlan() {
       <span class="bp-text" onclick="editTask(${t.id})" title="Open task">${esc(t.title)}</span>
       ${why ? `<span class="bp-why ${why.bad ? 'bp-why-bad' : ''}">${why.text}</span>` : ''}
       ${est ? `<span class="bp-est">${est}</span>` : ''}
-      <span class="bp-sub">${esc(t.client_name || '')}</span>
+      <span class="bp-sub">${t.client_is_system ? 'No client' : esc(t.client_name || '')}</span>
       <span class="bp-actions">
         <button class="bp-act bp-focus" title="Start focus timer" onclick="event.stopPropagation();focusForTask(${t.id})">&#9201;</button>
         <button class="bp-act bp-done" title="Mark done" onclick="event.stopPropagation();bpDone(${t.id})">&#10003;</button>
@@ -876,7 +880,8 @@ function renderControlBoard() {
   board.className = compact ? 'cb-list' : 'cb-grid';
   const densBtn = document.getElementById('cbDensity');
   if (densBtn) densBtn.innerHTML = compact ? '&#9638;' : '&#9776;';
-  board.innerHTML = list.map(compact ? clientRowHTML : clientCardHTML).join('');
+  board.innerHTML = list.map(compact ? clientRowHTML : clientCardHTML).join('')
+    + (!statusF && !typeF ? noClientCardHTML(compact) : '');
 }
 
 // Compact one-line-per-client mode: scanning becomes linear instead of grid-hopping.
@@ -888,7 +893,8 @@ function toggleBoardDensity() {
 }
 
 function clientRowHTML(c) {
-  const { status, risk, b } = clientControlData(c);
+  const { status, risk } = clientControlData(c);
+  const b = { overdue: taskGroups(c.tasks).overdue };
   const sCfg = CONTROL_STATUS[status] || CONTROL_STATUS.green;
   const na = clientNextAction(c);
   const lcDays = daysSince(c.last_contact_date);
@@ -910,6 +916,9 @@ function fmtMoney(n) {
 
 function clientCardHTML(c) {
   const { status, risk, b } = clientControlData(c);
+  const today = localDateStr(new Date());
+  const g = taskGroups(c.tasks, today);
+  const sugs = suggestionsFor(c.id);
   const sCfg = CONTROL_STATUS[status] || CONTROL_STATUS.green;
   const overrideTag = c.control_status ? '<span class="cb-override" title="Manual override">override</span>' : '';
   const logo = c.logo_url ? `<img src="${esc(c.logo_url)}" class="cb-logo" alt="">` : `<span class="cb-logo cb-logo-code">${esc(c.code || c.name.substring(0,3))}</span>`;
@@ -934,11 +943,12 @@ function clientCardHTML(c) {
     </div>
     <div class="cb-next ${na.urgent?'cb-next-urgent':''}" title="Recommended next action"><span class="cb-next-arrow">➜</span> ${esc(na.text)}</div>
     <div class="cb-stats">
-      <span class="cb-stat ${b.overdue?'cb-stat-bad':''}" title="Overdue">${b.overdue||0} overdue</span>
-      <span class="cb-stat" title="Outstanding tasks">${b.outstanding||0} open</span>
-      <span class="cb-stat" title="Waiting">${b.waiting||0} waiting</span>
+      <span class="cb-stat ${g.overdue?'cb-stat-bad':''}" title="Overdue">${g.overdue} overdue</span>
+      <span class="cb-stat" title="To do">${g.todo.length} to do</span>
+      <span class="cb-stat" title="Waiting on the client or on you">${g.waiting.length} waiting</span>
       ${workloadLine ? `<span class="cb-stat cb-stat-workload">${workloadLine}</span>` : ''}
     </div>
+    ${g.open || sugs.length || g.doneMonth.length ? `<div class="cb-tasks" onclick="event.stopPropagation()">${clientTaskListHTML(g, sugs, today, { doneList: false })}</div>` : ''}
     <div class="cb-meta">
       <span title="Next due">Due: ${b.next_due_date ? relDateHtml(b.next_due_date) : '—'}</span>
       <span title="Next scheduled work">Sched: ${c.next_scheduled_date ? relDateHtml(c.next_scheduled_date) : '—'}</span>
@@ -946,6 +956,32 @@ function clientCardHTML(c) {
     </div>
     <div class="cb-contact ${lcStale?'cb-contact-stale':''}" title="Last contact">${lastContactLabel(c.last_contact_date)}${lcStale?' ⚠':''}</div>
     <div class="cb-status-line"><span class="rag-pill ${sCfg.cls}">${sCfg.label}</span>${overrideTag}</div>
+  </div>`;
+}
+
+// Tasks captured without a client, on the board like any client.
+function noClientCardHTML(compact) {
+  const today = localDateStr(new Date());
+  const g = taskGroups(clients.find(c => c.is_system)?.tasks, today);
+  const sugs = suggestionsFor('none');
+  if (!g.open && !sugs.length) return '';
+  if (compact) {
+    return `<div class="cb-row" onclick="switchView('whiteboard')">
+      <span class="rag-dot"></span><span class="cb-row-name">📥 No client</span>
+      <span class="cb-row-next">➜ ${g.open} to sort — give them a client</span>
+      ${g.overdue ? `<span class="cb-stat cb-stat-bad">${g.overdue} overdue</span>` : ''}</div>`;
+  }
+  return `<div class="cb-card cb-card-noclient">
+    <div class="cb-card-top">
+      <span class="cb-logo cb-logo-code">&#128229;</span>
+      <div class="cb-card-name"><div class="cb-name">No client</div><div class="cb-sub">Captured without a client</div></div>
+    </div>
+    <div class="cb-stats">
+      <span class="cb-stat ${g.overdue ? 'cb-stat-bad' : ''}">${g.overdue} overdue</span>
+      <span class="cb-stat">${g.todo.length} to do</span>
+      <span class="cb-stat">${g.waiting.length} waiting</span>
+    </div>
+    <div class="cb-tasks">${clientTaskListHTML(g, sugs, today, { doneList: false })}</div>
   </div>`;
 }
 
@@ -960,14 +996,10 @@ function openClientDetail(id) {
   const sCfg = CONTROL_STATUS[status] || CONTROL_STATUS.green;
   document.getElementById('clientDetailTitle').textContent = c.name;
   const tasks = c.tasks || [];
-  const isWaiting = t => t.task_status === 'waiting-on-client' || t.task_status === 'waiting-on-me';
-  const recurring = tasks.filter(t => isOpenTask(t) && (t.task_type === 'recurring' || t.is_recurring));
-  const waiting = tasks.filter(isWaiting);
-  const adhoc = tasks.filter(t => isOpenTask(t) && !isWaiting(t) && t.task_type !== 'recurring' && !t.is_recurring);
-  const completed = tasks.filter(t => t.task_status === 'done');
+  const g = taskGroups(tasks);
   const taskLine = t => `<div class="cd-task" onclick="openTaskFromClient(${c.id},${t.id})">
       <span class="status-badge status-${t.task_status}">${statusLabel(t.task_status)}</span>
-      <span class="cd-task-title">${esc(t.title)}</span>
+      <span class="cd-task-title">${(t.task_type === 'recurring' || t.is_recurring) ? '<span title="Recurring">&#8635; </span>' : ''}${esc(t.title)}</span>
       ${t.task_band ? `<span class="band-badge ${bandClass(t.task_band)}">${bandLabel(t.task_band)}</span>` : ''}
       ${t.deadline ? `<span class="cd-task-due ${getDeadlineClass(t.deadline, t.progress)}">${fmtDateShort(t.deadline)}</span>` : ''}
     </div>`;
@@ -996,10 +1028,9 @@ function openClientDetail(id) {
         <div class="cd-block"><h4>Key dates</h4><p>Last contact: ${c.last_contact_date || '—'}<br>Next scheduled: ${c.next_scheduled_date || '—'}<br>Next due: ${b.next_due_date ? fmtDateShort(b.next_due_date) : '—'}</p></div>
       </div>
       <div>
-        ${section('Waiting', waiting)}
-        ${section('Recurring', recurring)}
-        ${section('Ad hoc / open', adhoc)}
-        ${section('Completed', completed.slice(0, 10))}
+        ${section('To do', g.todo)}
+        ${section('Waiting', g.waiting)}
+        ${section('Done this month', g.doneMonth)}
         ${tasks.length === 0 ? '<div class="dash-widget-empty">No tasks yet.</div>' : ''}
       </div>
     </div>`;
@@ -1060,12 +1091,11 @@ function renderDashUrgentTasks() {
   const today = localDateStr(new Date());
   const tasks = [];
   for (const c of clients) {
-    if (c.is_system) continue;
     for (const t of (c.tasks || [])) {
       if (!isOpenTask(t)) continue;
       const isOverdue = t.deadline && t.deadline < today;
       const isUrgent = t.task_type === 'urgent' || t.task_band === 'today';
-      if (isOverdue || isUrgent) tasks.push({ ...t, client_name: c.name, client_code: c.code, overdue: isOverdue });
+      if (isOverdue || isUrgent) tasks.push({ ...t, client_name: c.is_system ? 'No client' : c.name, client_code: c.code, overdue: isOverdue });
     }
   }
   tasks.sort((a, b) => (a.overdue === b.overdue ? 0 : a.overdue ? -1 : 1));
@@ -1081,11 +1111,10 @@ function renderDashSchedule() {
   const today = localDateStr(new Date());
   const tasks = [];
   for (const c of clients) {
-    if (c.is_system) continue;
     for (const t of (c.tasks || [])) {
       if (!isOpenTask(t)) continue;
       const d = t.planned_date || t.deadline || '';
-      if (d === today || t.task_band === 'today') tasks.push({ ...t, client_name: c.name });
+      if (d === today || t.task_band === 'today') tasks.push({ ...t, client_name: c.is_system ? 'No client' : c.name });
     }
   }
   const body = document.getElementById('dashScheduleBody');
@@ -1249,6 +1278,36 @@ function allTasksFlat() {
     out.push({ ...t, client_name: c.name, client_code: c.code, client_logo: c.logo_url, client_id: c.id, client_is_system: c.is_system });
   }
   return out;
+}
+
+// ─── One set of task rules for every view ───────────────────────────────
+// The Dashboard, Whiteboard, Notebook and a client's detail all read tasks
+// through these, so a task shows in the same place everywhere and every count
+// agrees. To do = open and not waiting · Waiting = on the client or on you ·
+// Overdue = past its deadline · Done this month = ticked off this month.
+function isWaitingTask(t) { return t.task_status === 'waiting-on-client' || t.task_status === 'waiting-on-me'; }
+function isOverdueTask(t, today = localDateStr(new Date())) { return isOpenTask(t) && !!t.deadline && t.deadline < today; }
+function sortOpenTasks(list, today) {
+  const due = t => t.planned_date || t.deadline || '9999';
+  return [...list].sort((a, b) => (isOverdueTask(b, today) - isOverdueTask(a, today))
+    || (due(a) < due(b) ? -1 : due(a) > due(b) ? 1 : a.id - b.id));
+}
+function taskGroups(tasks, today = localDateStr(new Date())) {
+  const monthStart = today.slice(0, 7) + '-01';
+  const open = (tasks || []).filter(isOpenTask);
+  return {
+    todo: sortOpenTasks(open.filter(t => !isWaitingTask(t)), today),
+    waiting: sortOpenTasks(open.filter(isWaitingTask), today),
+    doneMonth: (tasks || []).filter(t => t.task_status === 'done' && (t.completed_at || '') >= monthStart)
+      .sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || '') || b.id - a.id),
+    overdue: open.filter(t => isOverdueTask(t, today)).length,
+    open: open.length,
+  };
+}
+// The robot's pending suggestions for one client (owner only; 'none' = no client).
+function suggestionsFor(clientId) {
+  if (!isOwner() || robot.denied) return [];
+  return robot.list.filter(s => (clientId === 'none' ? (!s.client_id || s.client_is_system) : s.client_id === clientId && !s.client_is_system));
 }
 
 function updateInboxCount() {
@@ -1480,6 +1539,7 @@ function sgRemove(id) {
   updateInboxCount();
   renderRobotTray();
   if (currentView === 'whiteboard') renderWhiteboard();
+  if (currentView === 'dashboard') renderControlBoard();
 }
 
 async function sgAccept(id, fromEdit) {
@@ -1575,11 +1635,10 @@ async function robotPaste() {
 
 // ─── Whiteboard: every client at a glance, like the board on the wall ──────
 // One zone per client: the robot's latest line, what it thinks is done or
-// new, what's left to do (tick / +1 day), what we're waiting on them for and
-// what got done this month. Same tasks as everywhere else, laid out per client.
+// new, every open task (tick / +1 day), what's waiting and what got done this
+// month — plus a "No client" zone. Same tasks and counts as the Dashboard and
+// Notebook (taskGroups), just laid out per client.
 let wbOrder = localStorage.getItem('nbm_wb_order') || 'board';
-const wbExpanded = new Set();
-const WB_TODO_LIMIT = 8;
 const WB_RAG_RANK = { red: 0, amber: 1, blue: 2, green: 3 };
 
 function wbSetOrder(v) {
@@ -1587,7 +1646,6 @@ function wbSetOrder(v) {
   setPref('nbm_wb_order', wbOrder);
   renderWhiteboard();
 }
-function wbToggleMore(cid) { wbExpanded.has(cid) ? wbExpanded.delete(cid) : wbExpanded.add(cid); renderWhiteboard(); }
 
 // "2h ago" for ISO stamps with a zone (the robot's) as well as SQLite UTC ones.
 function agoAny(ds) {
@@ -1607,12 +1665,14 @@ async function loadWhiteboardView() {
   } catch {}
 }
 
+// One task line — used by the Whiteboard and the Dashboard's client cards.
 function wbItem(t, today) {
   const done = t.task_status === 'done';
   const d = t.planned_date || t.deadline || '';
   const over = !done && t.deadline && t.deadline < today;
   const tags = [];
   if (!done && t.task_status === 'review') tags.push('<span class="wb-tag">review</span>');
+  if (!done && t.task_status === 'waiting-on-client') tags.push('<span class="wb-tag wb-tag-them">on them</span>');
   if (!done && t.task_status === 'waiting-on-me') tags.push('<span class="wb-tag">on me</span>');
   if (t.assignee && t.assignee !== currentUser?.display_name) tags.push(`<span class="wb-who" title="${esc(t.assignee)}">${esc(t.assignee.split(' ')[0])}</span>`);
   const dateTip = [t.planned_date && `Planned ${fmtDateShort(t.planned_date)}`, t.deadline && `Due ${fmtDateShort(t.deadline)}`].filter(Boolean).join(' · ');
@@ -1637,21 +1697,24 @@ function wbSg(s) {
   </div>`;
 }
 
-function wbZone(c, todo, waiting, done, sugs, today) {
+// The task list of one client (or of "No client"): suggestions, To do,
+// Waiting, Done this month — identical on the Whiteboard and the Dashboard.
+function clientTaskListHTML(g, sugs, today, { doneList = true } = {}) {
+  return `${sugs.length ? `<div class="wb-sgs">${sugs.map(wbSg).join('')}</div>` : ''}
+    ${g.todo.length ? `<div class="wb-label">To do <span>${g.todo.length}</span></div>${g.todo.map(t => wbItem(t, today)).join('')}` : ''}
+    ${g.waiting.length ? `<div class="wb-label">Waiting <span>${g.waiting.length}</span></div>${g.waiting.map(t => wbItem(t, today)).join('')}` : ''}
+    ${g.doneMonth.length ? (doneList
+      ? `<div class="wb-label wb-label-done">Done this month <span>${g.doneMonth.length}</span></div>${g.doneMonth.map(t => wbItem(t, today)).join('')}`
+      : `<div class="wb-label wb-label-done">Done this month <span>${g.doneMonth.length}</span></div>`) : ''}
+    ${g.open || g.doneMonth.length || sugs.length ? '' : '<div class="wb-nothing">Nothing open.</div>'}`;
+}
+
+function wbZone(c, g, sugs, today) {
   const { status } = clientControlData(c);
   const sCfg = CONTROL_STATUS[status] || CONTROL_STATUS.green;
   const logo = c.logo_url
     ? `<img class="wb-logo" src="${esc(c.logo_url)}" alt="">`
     : `<span class="wb-logo wb-logo-f" style="background:hsl(${clientHue(c.name)} 52% 74%)">${esc((c.code || c.name).charAt(0).toUpperCase())}</span>`;
-  const eff = t => t.planned_date || t.deadline || '9999';
-  todo.sort((a, b) => {
-    const ao = a.deadline && a.deadline < today ? 0 : 1, bo = b.deadline && b.deadline < today ? 0 : 1;
-    if (ao !== bo) return ao - bo;
-    return eff(a) < eff(b) ? -1 : eff(a) > eff(b) ? 1 : a.id - b.id;
-  });
-  const showAll = wbExpanded.has(c.id);
-  const shown = showAll ? todo : todo.slice(0, WB_TODO_LIMIT);
-  const more = todo.length - shown.length;
   const lc = daysSince(c.last_contact_date);
   const spoke = lc === null ? '' : lc <= 0 ? 'spoke today' : lc === 1 ? 'spoke yesterday' : `spoke ${lc}d ago`;
   return `<section class="wb-zone wb-${status}">
@@ -1662,13 +1725,20 @@ function wbZone(c, todo, waiting, done, sugs, today) {
       <span class="wb-rag" title="${esc(sCfg.label)}"></span>
     </header>
     ${c.last_touch_summary ? `<div class="wb-latest" title="The robot's latest from your messages">${esc(c.last_touch_summary)} <span class="wb-ago">${agoAny(c.last_touch_at)}</span></div>` : ''}
-    ${sugs.length ? `<div class="wb-sgs">${sugs.map(wbSg).join('')}</div>` : ''}
-    ${todo.length ? `<div class="wb-label">To do <span>${todo.length}</span></div>${shown.map(t => wbItem(t, today)).join('')}
-      ${more > 0 ? `<button class="wb-more" onclick="wbToggleMore(${c.id})">+ ${more} more…</button>` : (showAll && todo.length > WB_TODO_LIMIT ? `<button class="wb-more" onclick="wbToggleMore(${c.id})">show less</button>` : '')}` : ''}
-    ${waiting.length ? `<div class="wb-label">Waiting on them <span>${waiting.length}</span></div>${waiting.map(t => wbItem(t, today)).join('')}` : ''}
-    ${done.length ? `<div class="wb-label wb-label-done">Done this month <span>${done.length}</span></div>${done.slice(0, 6).map(t => wbItem(t, today)).join('')}${done.length > 6 ? `<div class="wb-more-note">+ ${done.length - 6} more</div>` : ''}` : ''}
-    ${todo.length || waiting.length || done.length ? '' : '<div class="wb-nothing">Nothing open.</div>'}
+    ${clientTaskListHTML(g, sugs, today)}
     <input class="wb-add" data-cid="${c.id}" placeholder="+ add for ${esc(c.name)}…" onkeydown="if(event.key==='Enter')wbAdd(${c.id},this)">
+  </section>`;
+}
+
+// Tasks captured without a client get a zone of their own — nothing hides.
+function wbNoClientZone(g, sugs, today) {
+  return `<section class="wb-zone wb-noclient">
+    <header class="wb-head">
+      <span class="wb-logo wb-logo-f wb-logo-inbox">&#128229;</span>
+      <h3 onclick="switchView('inbox')" title="Sort them in the Inbox">No client</h3>
+    </header>
+    ${clientTaskListHTML(g, sugs, today)}
+    <input class="wb-add" data-cid="none" placeholder="+ add without a client…" onkeydown="if(event.key==='Enter')wbAdd(null,this)">
   </section>`;
 }
 
@@ -1678,14 +1748,6 @@ function renderWhiteboard() {
   const sel = document.getElementById('wbOrder');
   if (sel) sel.value = wbOrder;
   const today = localDateStr(new Date());
-  const monthStart = today.slice(0, 7) + '-01';
-  const owner = isOwner();
-  const sugByClient = new Map();
-  if (owner) for (const s of robot.list) {
-    if (!s.client_id || s.client_is_system) continue;
-    if (!sugByClient.has(s.client_id)) sugByClient.set(s.client_id, []);
-    sugByClient.get(s.client_id).push(s);
-  }
   let list = clients.filter(c => !c.is_system && !c.archived);
   if (wbOrder === 'name') list = [...list].sort((a, b) => a.name.localeCompare(b.name));
   else if (wbOrder === 'attention') list = [...list].sort((a, b) =>
@@ -1694,52 +1756,48 @@ function renderWhiteboard() {
   const zones = [], quiet = [];
   let nTodo = 0, nWaiting = 0, nDone = 0;
   for (const c of list) {
-    const tasks = c.tasks || [];
-    const open = tasks.filter(isOpenTask);
-    const todo = open.filter(t => t.task_status !== 'waiting-on-client');
-    const waiting = open.filter(t => t.task_status === 'waiting-on-client');
-    const done = tasks.filter(t => t.task_status === 'done' && (t.completed_at || '') >= monthStart)
-      .sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || ''));
-    const sugs = sugByClient.get(c.id) || [];
-    nTodo += todo.length; nWaiting += waiting.length; nDone += done.length;
-    if (!open.length && !sugs.length && !done.length) { quiet.push(c); continue; }
-    zones.push(wbZone(c, todo, waiting, done, sugs, today));
+    const g = taskGroups(c.tasks, today);
+    const sugs = suggestionsFor(c.id);
+    nTodo += g.todo.length; nWaiting += g.waiting.length; nDone += g.doneMonth.length;
+    if (!g.open && !sugs.length && !g.doneMonth.length) { quiet.push(c); continue; }
+    zones.push(wbZone(c, g, sugs, today));
   }
   const sys = clients.find(c => c.is_system);
-  const loose = (sys?.tasks || []).filter(isOpenTask).length;
-  const looseSugs = owner ? robot.list.filter(s => !s.client_id || s.client_is_system).length : 0;
-  const foot = [];
-  if (quiet.length) foot.push(`<div class="wb-quiet"><span class="wb-quiet-k">Quiet:</span> ${quiet.map(c =>
-    `<button onclick="openClientDetail(${c.id})" title="Nothing open — click to open">${esc(c.name)}</button>`).join('')}</div>`);
-  if (loose || looseSugs) foot.push(`<div class="wb-loose" onclick="switchView('inbox')">📥 ${[loose && `${loose} task${loose > 1 ? 's' : ''}`, looseSugs && `${looseSugs} suggestion${looseSugs > 1 ? 's' : ''}`].filter(Boolean).join(' and ')} without a client — sort them in the Inbox →</div>`);
+  const gNone = taskGroups(sys?.tasks, today);
+  const sugsNone = suggestionsFor('none');
+  if (gNone.open || gNone.doneMonth.length || sugsNone.length) {
+    zones.push(wbNoClientZone(gNone, sugsNone, today));
+    nTodo += gNone.todo.length; nWaiting += gNone.waiting.length; nDone += gNone.doneMonth.length;
+  }
+  const foot = quiet.length ? `<div class="wb-foot"><div class="wb-quiet"><span class="wb-quiet-k">Quiet:</span> ${quiet.map(c =>
+    `<button onclick="openClientDetail(${c.id})" title="Nothing open — click to open">${esc(c.name)}</button>`).join('')}</div></div>` : '';
   // A redraw (tick, robot refresh) must not eat what's typed in any add box.
   const drafts = [...board.querySelectorAll('.wb-add')].filter(i => i.value).map(i => [i.dataset.cid, i.value]);
   const typing = document.activeElement?.classList.contains('wb-add') ? document.activeElement : null;
   const keep = typing && { cid: typing.dataset.cid, pos: typing.selectionStart };
-  board.innerHTML = (zones.join('') || '<div class="wb-empty">The board is clear — nothing open for any client.</div>')
-    + (foot.length ? `<div class="wb-foot">${foot.join('')}</div>` : '');
+  board.innerHTML = (zones.join('') || '<div class="wb-empty">The board is clear — nothing open for any client.</div>') + foot;
   for (const [cid, v] of drafts) { const el = board.querySelector(`.wb-add[data-cid="${cid}"]`); if (el) el.value = v; }
   if (keep) {
     const el = board.querySelector(`.wb-add[data-cid="${keep.cid}"]`);
     if (el) { el.focus(); try { el.setSelectionRange(keep.pos, keep.pos); } catch {} }
   }
-  document.getElementById('wbSubhead').textContent =
-    `${nTodo} to do · ${nWaiting} waiting on clients · ${nDone} done this month`;
+  document.getElementById('wbSubhead').textContent = `${nTodo} to do · ${nWaiting} waiting · ${nDone} done this month`;
 }
 
 const wbSaving = new Set();
 async function wbAdd(cid, input) {
   const title = input.value.trim();
-  if (!title || wbSaving.has(cid)) return;      // a second Enter while saving does nothing
-  wbSaving.add(cid);
+  const key = cid || 'none';
+  if (!title || wbSaving.has(key)) return;      // a second Enter while saving does nothing
+  wbSaving.add(key);
   try {
-    await api('/api/tasks', { method: 'POST', body: { title, client_id: cid, task_status: 'inbox' } });
+    await api('/api/tasks', { method: 'POST', body: cid ? { title, client_id: cid, task_status: 'inbox' } : { title, task_status: 'inbox' } });
     // Clear only what was saved — anything typed since stays.
-    const box = document.querySelector(`.wb-add[data-cid="${cid}"]`);
+    const box = document.querySelector(`.wb-add[data-cid="${key}"]`);
     if (box && box.value.trim() === title) box.value = '';
     await loadClients();      // the redraw keeps focus wherever you are now
   } catch (e) { toast('Not saved — ' + e.message); }
-  finally { wbSaving.delete(cid); }
+  finally { wbSaving.delete(key); }
 }
 
 // ─── Monthly client report: draft → edit → PDF → email (owner only) ───────
@@ -2699,10 +2757,10 @@ function loadNotebookView() {
   items.sort(nbComparator(nbOrder));
 
   // Footer note in pencil (counts across the whole filtered set, not just this page)
-  const openCount = items.filter(isOpenTask).length;
+  const pageGroups = taskGroups(items, today);
   const tickedToday = allTasksFlat().filter(t => t.task_status === 'done' && (t.completed_at || '') === today && (!nbClient || String(t.client_id) === nbClient)).length;
   document.getElementById('nbFooter').textContent =
-    `${openCount} thing${openCount === 1 ? '' : 's'} to do here${tickedToday ? ` · ${tickedToday} ticked off today` : ''}`;
+    `${pageGroups.todo.length} to do · ${pageGroups.waiting.length} waiting${tickedToday ? ` · ${tickedToday} ticked off today` : ''}`;
 
   // Quick-add hint follows the client filter ("writing on that client's page")
   document.getElementById('nbNewTask').placeholder = nbClient
@@ -2779,7 +2837,13 @@ async function nbTick(id) {
   }
 }
 // Ticks are used from the Notebook and the Whiteboard — redraw whichever is open.
-function nbRerender() { if (currentView === 'whiteboard') renderWhiteboard(); else loadNotebookView(); }
+function nbRerender() {
+  if (currentView === 'whiteboard') renderWhiteboard();
+  else if (currentView === 'dashboard') renderDashTasks();
+  else loadNotebookView();
+}
+// Just the task-driven parts of the Dashboard (no email/Xero/WhatsApp refetch).
+function renderDashTasks() { renderDashStats(); renderBattlePlan(); renderDashMomentum(); renderControlBoard(); }
 
 async function nbHighlight(id) {
   const t = findTaskById(id);

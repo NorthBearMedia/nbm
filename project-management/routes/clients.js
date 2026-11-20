@@ -132,7 +132,9 @@ router.get('/', requireAuth, (req, res) => {
     attachByTask.get(a.task_id).push(a);
   }
 
-  const now = new Date().toISOString().split('T')[0];
+  // UK calendar date — the same "today" the views use (UTC is a day behind
+  // between midnight and 1am in summer).
+  const now = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date());
   const doneStatuses = ['completed', 'invoiced'];
 
   for (const client of clients) {
