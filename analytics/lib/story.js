@@ -149,6 +149,9 @@ export function buildStory(data) {
     const label = topPage.path === '/' ? 'Your homepage' : `Your "${pageLabel(topPage.path, topPage.title)}" page`;
     wins.push({ key: 'top-page', title: `${label} was the busiest`, detail: `${n0(topPage.views)} views ${period.the.startsWith('this') ? period.the : `in ${period.the}`}.` });
   }
+  if (data.siteCheck && data.siteCheck.total >= 5 && data.siteCheck.passed === data.siteCheck.total) {
+    wins.push({ key: 'health', title: `Passed all ${data.siteCheck.total} site health checks`, detail: 'Quick to answer, secure, set up for phones and ready for Google.' });
+  }
   if (data.uptime && data.uptime.outages === 0) {
     wins.push({ key: 'uptime', title: 'No downtime', detail: `Your website was up and answering for all of ${period.the}.` });
   }
@@ -212,12 +215,16 @@ export function buildStory(data) {
   if (data.siteHealth?.performance != null && data.siteHealth.performance < 50) {
     watch.push({ key: 'speed', title: 'Phone loading speed', detail: `Google scores the site ${data.siteHealth.performance} out of 100 for speed on a phone.` });
   }
+  // Failed health checks are ours to put right, so they are said plainly.
+  for (const c of (data.siteCheck?.items || []).filter(i => !i.ok).slice(0, 2)) {
+    watch.push({ key: `check-${c.key}`, title: `${c.label}: needs attention`, detail: c.detail });
+  }
   if (data.uptime && data.uptime.outages > 0) {
     watch.push({ key: 'downtime', title: 'Some downtime', detail: `The site was unreachable for ${data.uptime.downtimeText} across ${data.uptime.outages} outage${data.uptime.outages === 1 ? '' : 's'}.` });
   }
 
   // Most telling first: renderers show the first three or four.
-  const ORDER = ['page-one', 'yoy', 'visits', 'clicks', 'climber', 'new-searches', 'shown', 'top-page', 'uptime', 'ai', 'time'];
+  const ORDER = ['page-one', 'yoy', 'visits', 'clicks', 'climber', 'new-searches', 'shown', 'top-page', 'uptime', 'health', 'ai', 'time'];
   wins.sort((a, b) => ORDER.indexOf(a.key) - ORDER.indexOf(b.key));
 
   // ---------- verdict ----------
@@ -269,7 +276,7 @@ export function buildStory(data) {
     pageOne: allTargets.length ? { count: pageOne.length, of: allTargets.length } : null,
     yoy,
     wins: wins.slice(0, 6),
-    watch: watch.slice(0, 4),
+    watch: watch.slice(0, 5),
     nearly,
   };
 }

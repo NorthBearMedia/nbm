@@ -1248,10 +1248,32 @@ function healthSection(ctx, y) {
     y = noteBox(doc, y, 'Not connected yet', 'Microsoft Clarity is not connected for this site yet. Once it is, you will see how people actually use your pages: scrolling, clicks and signs of frustration.') + 20;
   }
 
-  // Site health (Google PageSpeed, tested as a phone)
+  // Pulse's own daily check of the live site: always there, key or no key.
+  const sc = data.siteCheck && Array.isArray(data.siteCheck.items) && data.siteCheck.items.length ? data.siteCheck : null;
+  if (sc) {
+    const rows = Math.ceil(sc.items.length / 2);
+    const rowH = 35;
+    y = room(ctx, y, 44 + rows * rowH);
+    y = subhead(doc, th, M, y, CW, 'Site health check', `${sc.passed} of ${sc.total} passed, checked daily on your live site`);
+    const colW = (CW - 24) / 2;
+    sc.items.forEach((c, i) => {
+      const x = M + (i % 2) * (colW + 24);
+      const yy = y + Math.floor(i / 2) * rowH;
+      if (c.ok) doc.rect(x, yy + 2.5, 7, 7).fill(C.green);
+      else doc.rect(x + 0.75, yy + 3.25, 5.5, 5.5).lineWidth(1.5).stroke(C.yellow);
+      line(doc, clean(c.label), x + 15, yy, { font: 'semi', size: 9.5, color: th.fg, width: colW - 15 });
+      para(doc, clean(c.detail), x + 15, yy + 13, { font: 'reg', size: 8, color: th.sub, width: colW - 15, lineGap: 1, maxLines: 2 });
+    });
+    y += rows * rowH;
+    if (sc.passed < sc.total) y += para(doc, 'Anything marked with an open square is on our list to put right.', M, y + 4, { size: 8, width: CW, color: th.quiet }) + 8;
+    hRule(doc, M, y, CW, th.rule);
+    y += ctx.d.gap;
+  }
+
+  // Google's own scores (PageSpeed, tested as a phone)
   if (hasScores) {
     y = room(ctx, y, 130);
-    y = subhead(doc, th, M, y, CW, 'Site health check', 'Scored out of 100 by Google, tested as a phone');
+    y = subhead(doc, th, M, y, CW, sc ? "Google's scores" : 'Site health check', 'Scored out of 100 by Google, tested as a phone');
     const grade = v => (v == null ? 'Not scored' : v >= 90 ? 'Excellent' : v >= 50 ? 'Room to improve' : 'Needs attention');
     const items = [
       ['Loading speed', sh.performance, 'How quickly pages appear on a phone'],
@@ -1299,7 +1321,8 @@ function closing(ctx, y) {
   if (data.ga4?.overview && !data.ga4.unreliable) sources.push(['Visits and pages', data.ga4.sourceLabel || 'Website analytics']);
   if (data.search?.summary) sources.push(['Google figures', 'Google Search Console']);
   if (data.clarity) sources.push(['Behaviour', 'Microsoft Clarity']);
-  if (data.siteHealth) sources.push(['Site health', 'Google PageSpeed']);
+  if (data.siteCheck) sources.push(['Site health', data.siteHealth ? 'North Bear Pulse checks, Google PageSpeed' : 'North Bear Pulse daily checks']);
+  else if (data.siteHealth) sources.push(['Site health', 'Google PageSpeed']);
   if (data.uptime) sources.push(['Availability', 'North Bear Pulse monitoring']);
   const glossary = [
     ['Visit', 'One trip to your website by one person.'],

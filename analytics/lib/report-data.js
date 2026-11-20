@@ -309,6 +309,14 @@ export async function gatherReportData(site, start, end, opts = {}) {
 
   await Promise.all(jobs);
 
+  // Pulse's own daily health check of the live site (sitecheck.js). A
+  // dashboard load only ever reads the stored result; a report run may
+  // refresh one that has gone stale.
+  try {
+    const { getSiteCheck } = await import('./sitecheck.js');
+    data.siteCheck = await getSiteCheck(site, { refresh: !opts.fast });
+  } catch { data.siteCheck = null; }
+
   // Website availability for the period (null unless it may be shown).
   try { data.uptime = reportUptime(site, start, end); } catch { data.uptime = null; }
 

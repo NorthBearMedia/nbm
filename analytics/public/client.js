@@ -478,6 +478,16 @@ function behaviourSection(d) {
   }
 
   let panels = '';
+  // Pulse's own daily check of the live site: always present, key or no key.
+  const sc = d.siteCheck && Array.isArray(d.siteCheck.items) && d.siteCheck.items.length ? d.siteCheck : null;
+  if (sc) {
+    const all = sc.passed === sc.total;
+    panels += `<div class="panel">
+      <div class="panel-head"><h2 class="sub">Site health check</h2><span class="tagline${all ? ' good' : ''}">${esc(sc.passed)} of ${esc(sc.total)} passed</span></div>
+      <ul class="checks">${sc.items.map(c => `<li class="${c.ok ? 'ok' : 'todo'}"><b>${esc(c.label)}</b><span>${esc(c.detail)}</span></li>`).join('')}</ul>
+      <p class="caption">Checked every day by North Bear Media on your live site.${all ? '' : ' Anything marked here is on our list to put right.'}</p>
+    </div>`;
+  }
   if (sh) {
     const meter = (label, v) => {
       if (v == null) return '';
@@ -490,7 +500,7 @@ function behaviourSection(d) {
       </div>`;
     };
     panels += `<div class="panel">
-      <div class="panel-head"><h2 class="sub">Site health</h2></div>
+      <div class="panel-head"><h2 class="sub">Google's scores</h2></div>
       <div class="meters">${meter('Speed on a phone', sh.performance)}${meter('Easy for Google to read', sh.seo)}${meter('Built to best practice', sh.bestPractices)}</div>
       <p class="caption">Scored out of 100 by Google's own test, run as a phone. 90 or more is excellent.</p>
     </div>`;
@@ -508,7 +518,8 @@ function behaviourSection(d) {
       <p class="caption">Your homepage is checked every 5 minutes, day and night${u.measuredFrom ? ` (measured from ${esc(new Date(u.measuredFrom).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }))})` : ''}.</p>
     </div>`;
   }
-  if (panels) h += `<div class="${sh && u ? 'cols' : 'stack'} gap-lg" style="${sh && u ? 'grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))' : ''}">${panels}</div>`;
+  const several = [sc, sh, u].filter(Boolean).length > 1;
+  if (panels) h += `<div class="${several ? 'cols' : 'stack'} gap-lg" style="${several ? 'grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))' : ''}">${panels}</div>`;
   return h + '</div></section>';
 }
 

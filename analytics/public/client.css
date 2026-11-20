@@ -359,3 +359,16 @@ h1, h2, h3, p { margin: 0; }
   .blocks i { opacity: 1; }
   .progress::before { left: 0; width: 100%; }
 }
+
+/* Site health check: one row per check, a filled square for a pass and an
+   open yellow one for something that needs putting right. */
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.checks li { position: relative; padding: 12px 0 12px 26px; border-top: 1px solid var(--rule); font-size: 14px; line-height: 1.45; color: var(--mut); }
+.checks li:first-child { border-top: 0; padding-top: 2px; }
+.checks li:first-child::before { top: 7px; }
+.checks li::before { content: ''; position: absolute; left: 0; top: 17px; width: 11px; height: 11px; background: var(--green); }
+.checks li.todo::before { background: none; border: 2px solid var(--yellow); }
+.checks b { display: block; color: var(--fg); font-weight: 700; font-size: 15px; }
+.checks span { display: block; }
+.tagline { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--mut); }
+.tagline.good { color: var(--good); }
