@@ -219,11 +219,12 @@ everywhere in the UI. `progress` / `priority` are kept as **synced shadow values
   no client (active or archived) matches — Control Board header "+N in Xero, not in Console" → one-click add
   (retainer, linked, Xero's name kept as an alias if you rename it).
 - **Claude relay (hourly):** Norton's Claude connectors (Gmail, Periskope = personal WhatsApp, Granola,
-  Metricool) can't be handed to Console, so a Claude session does the reading: the cloud session
-  "North Bear Console relay (lean)" is woken by scheduled tasks — hourly Mon–Fri 08:23–17:23 UK, and on the
-  1st at 07:37 — and each wake runs one throwaway subagent (keeps the session's context, and cost, small).
-  Its first message holds the full HOURLY JOB / MONTHLY JOB text. (Scheduled tasks can't carry connectors
-  on this account, so the work runs inside that session, which has them.) The hourly job posts new
+  Metricool) can't be handed to Console, so Claude sessions do the reading, woken by scheduled tasks:
+  "North Bear Console relay (lean)" hourly Mon–Fri 08:23–17:23 UK, and "North Bear Console relay — monthly
+  social" on the 1st at 07:37 (created with its Metricool tools pre-approved — without that, an unattended
+  run stops at a permission prompt). Each wake runs one throwaway subagent (keeps the session's context,
+  and cost, small); each session's first message holds its full job text. (Scheduled tasks can't carry
+  connectors on this account, so the work runs inside sessions that have them.) The hourly job posts new
   messages and Claude-session summaries to `POST /relay/items`; `GET /relay/status` says where to pick up
   from, which sources Console already reads itself (skip), robot health counts and the Metricool-linked
   brands. The monthly job posts last month's per-network social figures to `POST /relay/social`
