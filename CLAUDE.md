@@ -125,6 +125,7 @@ intake_runs       one row per robot run: trigger_type, status, items, suggestion
 intake_seen       (source, ref) of every message already read — never sent to Claude twice
 intake_mailboxes  extra read-only Gmail accounts for the robot (OAuth tokens)
 intake_captures   text sent to the capture link / pasted in the Inbox, until processed
+intake_relay      messages relayed in by the hourly Claude task (source, ref, item JSON), until processed
 contact_map       email/phone/chat id → client, learned when a suggestion is accepted
 client_reports    client_id, period (YYYY-MM), content JSON {facts, draft}, sent_at, sent_to
 app_meta keys     intake_enabled, intake_cursor_*, intake_last_*, capture_token, and the write-only
@@ -216,6 +217,12 @@ everywhere in the UI. `progress` / `priority` are kept as **synced shadow values
 - **In Xero, not in Console:** the retainers check also lists Xero contacts with active repeating invoices that
   no client (active or archived) matches — Control Board header "+N in Xero, not in Console" → one-click add
   (retainer, linked, Xero's name kept as an alias if you rename it).
+- **Claude relay (hourly):** a scheduled Claude task (claude.ai scheduled task, Mon–Fri office hours) reads
+  Norton's own Claude connectors — Gmail, Periskope (personal WhatsApp), Granola — and his recent Claude
+  sessions, and posts new messages to `POST /relay/items` (`GET /relay/status` says where to pick up from
+  and which sources Console already reads itself). Auth: `Authorization: Bearer <capture-link secret>`
+  (the whole capture link is accepted). Items land in `intake_relay` in the robot's item shape and go
+  through the same robot (seen-tracking, who's-who, dedupe). Gmail refs match the robot's own reader.
 - **Claude connector (MCP):** `POST /mcp/<capture token>` — a stateless Streamable-HTTP MCP server with one
   write-only tool, `send_to_console`, which drops text into the capture queue (→ robot suggestions). Added in
   claude.ai as a custom connector (Settings → Connectors) or `claude mcp add --transport http`, so any Claude

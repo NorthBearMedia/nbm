@@ -13,6 +13,7 @@ import { logActivity } from '../lib/activity.js';
 import { createTaskCore, updateTaskCore } from './tasks.js';
 import {
   runIntake, intakeBusy, getMeta, setMeta, getSecret, scheduleCaptureRun, inOfficeHours, ukToday, ownerUser,
+  acceptRelayItems, relayStatus,
 } from '../lib/intake.js';
 import { getClaude, currentModel } from '../lib/claude.js';
 import { metricoolBrands } from '../lib/report.js';
@@ -240,6 +241,10 @@ router.get('/api/intake/status', ...ownerOnly, (req, res) => {
     },
     captureUrl: `${originOf(req)}/capture/${captureToken()}`,
     connectorUrl: `${originOf(req)}/mcp/${captureToken()}`,
+    relay: Object.fromEntries(['gmail', 'periskope', 'granola', 'claude'].map(src => [src, {
+      last: getMeta(`relay_last_${src}`, ''),
+      week: db.prepare("SELECT COUNT(*) AS n FROM intake_relay WHERE source = ? AND created_at >= datetime('now', '-7 days')").get(src).n,
+    }])),
   });
 });
 
@@ -353,6 +358,33 @@ router.post('/capture/:token',
     }
     res.json({ ok: true, message: 'Captured — the robot will turn it into suggestions shortly.' });
   });
+
+// ─── Relay: Claude reading Norton's connectors, hourly ───────────────────────
+// A scheduled Claude task (Norton's own Gmail / WhatsApp / Granola connectors
+// in Claude, plus his Claude sessions) posts new messages here. The key is the
+// capture-link secret, sent as "Authorization: Bearer <key>" — the whole
+// capture link is accepted too, so it can be pasted as it is.
+function relayKeyOk(req) {
+  let key = String(req.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  if (/^https?:\/\//i.test(key)) key = key.replace(/\/+$/, '').split('/').pop();
+  return tokenOk(key);
+}
+router.get('/relay/status', (req, res) => {
+  if (!relayKeyOk(req)) return res.status(401).json({ error: 'Key needed' });
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ ok: true, now: new Date().toISOString(), ...relayStatus() });
+});
+router.post('/relay/items', (req, res) => {
+  if (!relayKeyOk(req)) return res.status(401).json({ error: 'Key needed' });
+  if (captureLimited(req.ip || 'unknown')) return res.status(429).json({ error: 'Too many requests — try again later' });
+  try {
+    const r = acceptRelayItems(req.body || {});
+    if (r.accepted) scheduleCaptureRun();          // the robot reads them within a minute
+    res.json({ ok: true, ...r });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
 
 // ─── Claude connector (MCP) ──────────────────────────────────────────────────
 // Claude can't share chat history with other apps, so Console plugs into
