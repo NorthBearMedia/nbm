@@ -4,7 +4,7 @@
 import db, { getSetting, setSetting } from '../database.js';
 import * as ga4 from './ga4.js';
 import * as gsc from './gsc.js';
-import { syncSite } from './clarity.js';
+import { syncSite, aggregate } from './clarity.js';
 import { gatherFathom } from './fathom.js';
 import { getFathomToken } from './runtime-config.js';
 import { addDays, todayISO } from './dates.js';
@@ -201,9 +201,21 @@ async function siteHealth(site, start, end) {
     const base = snaps.n > 0
       ? `${snaps.n} day(s) of data (latest ${snaps.last})${syncErr ? ' · last sync error: ' + syncErr : ''}`
       : (syncErr ? 'token errors: ' + syncErr : 'token saved, no data stored yet');
+    // Days of data is not the same as data. A token can be read every
+    // night and come back empty, because the tag is missing from the site
+    // or is on it but cannot start. Two sites read "OK, 114 days of data"
+    // here for four months without one visit ever being recorded, and a
+    // tag that fails on its first line still shows as "tag on site".
+    // Fathom counting real visits over the same week is the proof that
+    // people came and Clarity did not see them. Three empty days are
+    // asked for first, so a site connected this morning is not accused.
+    const week = aggregate(site.id, addDays(todayISO(), -7), todayISO());
+    const silent = week && week.daysCovered >= 3 && week.sessions === 0 && fathomVisits >= 10;
     // Data arriving = working, whatever the HTML grep says. No data AND no
     // tag found = the tracking tag is missing (the usual "not working").
-    out.clarity = snaps.n > 0
+    out.clarity = silent
+      ? bad(`nothing recorded on any of the last ${week.daysCovered} days checked, while Fathom counted ${fathomVisits} visits in the week. ${tagOnPage === false ? 'The tag is not on the site' : 'The tag is on the site but is not starting'}: paste this site's current Tracking code over the old one.`)
+      : snaps.n > 0
       ? ok(`${base}${tagOnPage === false ? ' · ' + tagNote : ''}`)
       : bad(`${base} · ${tagOnPage === false ? 'TAG NOT ON SITE ✗ — add the Clarity snippet in the site builder' : tagNote}`);
   }

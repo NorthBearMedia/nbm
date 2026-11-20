@@ -254,11 +254,18 @@ const CLARITY_PROJECTS = {
   'muskengineering.co.uk': 'xg3udlsbmh',
   'swanwickkidsclub.co.uk': 'xg3utf6jha',
   'iwpg.co.uk': 'xg3v5sa9io',
-  'northbearmedia.co.uk': 'xg3vog45d2',
+  'northbearmedia.co.uk': 'wc20samifi',
   'woodlandwalkdaycare.co.uk': 'xg3vy1okig',
   'pslimited.uk': 'xg3w5kwwni',
   'primeprandmarketing.co.uk': 'xg3wcloljd',
   'wowstays.co.uk': 'xg3wjoxrm0',
+  // New, small sites carry North Bear Media's own project (wc20samifi,
+  // the one on northbearmedia.co.uk) and Pulse divides its figures up by
+  // web address: see lib/clarity.js. Microsoft only lets a project be
+  // made by hand in its console, so this is how a site gets Clarity
+  // without anyone having to open it.
+  'reynoldslogisticservices.com': 'wc20samifi',
+  'arrasleacabins.com': 'wc20samifi',
 };
 
 // GA4 web measurement IDs, keyed by domain — read directly from NBM's own

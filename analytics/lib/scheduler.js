@@ -8,7 +8,7 @@ import { join } from 'path';
 import db, { backupDatabase, getSetting, setSetting } from '../database.js';
 import { config } from '../config.js';
 import { runReport } from './reporter.js';
-import { syncSite } from './clarity.js';
+import { syncSite, shareTokens, findProjectsFromTokens, joinSharedIfEmpty } from './clarity.js';
 import { nextRunAt, addDays, todayISO } from './dates.js';
 import { runRound, runDailyChecks, ensureFeedToken } from './monitor.js';
 
@@ -68,12 +68,13 @@ export async function sendDueReports() {
 }
 
 export async function syncAllClarity() {
+  try { findProjectsFromTokens(); shareTokens(); joinSharedIfEmpty(); } catch (err) { console.error(`[clarity] matching sites to projects failed: ${err.message}`); }
   const sites = db.prepare(`SELECT * FROM sites WHERE active = 1 AND clarity_api_token != ''`).all();
   let synced = 0;
   for (const site of sites) {
     try {
       const r = await syncSite(site);
-      if (r.synced) synced++;
+      if (r.synced) synced += r.sites || 1;
     } catch (err) {
       console.error(`[clarity] sync failed for ${site.client_name}: ${err.message}`);
     }
