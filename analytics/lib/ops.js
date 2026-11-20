@@ -23,7 +23,7 @@ import { googleClient } from './google.js';
 import { getGscReaderEmail, getHostingerToken, getFathomToken, getEmailBcc, getSmtp, getEmailFrom, getAppUrl } from './runtime-config.js';
 import { mailer } from './email.js';
 import { randomBytes } from 'crypto';
-import { ensureInjectCron, deleteInjectCrons, injectCronOutput, verifyTag, ensureCron, cronOutputMatching, deleteCronsMatching, HOSTINGER_USER, rootDirFor, SNIPPET_VERSION, listCrons } from './inject.js';
+import { buildSnippet, ensureInjectCron, deleteInjectCrons, injectCronOutput, verifyTag, ensureCron, cronOutputMatching, deleteCronsMatching, HOSTINGER_USER, rootDirFor, SNIPPET_VERSION, listCrons } from './inject.js';
 import { readBodyCapped } from './fetch-body.js';
 
 // Per-install secret guarding the injector-script endpoint. Created once.
@@ -348,6 +348,8 @@ const TARGET_KEYWORDS = {
   'ensohr.co.uk': 'enso hr, hr consultant',
   'cn-maintenance.com': 'cn maintenance, property maintenance',
   'reynoldslogisticservices.com': 'haulage nottingham, pallet distribution nottingham, warehousing nottingham, reynolds logistics',
+  // Starter list drawn from the site's own homepage wording.
+  'arrasleacabins.com': 'arraslea cabins, holiday cabins belper, cabins with hot tub peak district, hot tub cabins derbyshire, shepherds hut peak district',
 };
 
 // Sites the owner manages but whose DOMAINS he doesn't control (so no
@@ -368,6 +370,14 @@ const NEW_SITES = [
   { name: 'Enso HR', domain: 'ensohr.co.uk' },
   { name: 'CN Maintenance', domain: 'cn-maintenance.com' },
   { name: 'Reynolds Logistics', domain: 'reynoldslogisticservices.com' },
+  // Added before the new website exists: the domain is being moved over
+  // from its old website builder and the site rebuilt. waitForTag keeps the
+  // uptime monitor paused until OUR tracking code is seen on the live
+  // homepage (see startMonitoringWhenLive), so the old site and the move
+  // itself are never counted. "about" is the business in its own words,
+  // from its current homepage, for the report writer.
+  { name: 'Arraslea Cabins', domain: 'arrasleacabins.com', waitForTag: true,
+    about: 'Four hand-crafted holiday cabins in Belper, on the edge of the Peak District, each private with its own hot tub: Rosewood, Bramble, Brock and the Shepherd\'s Cabin (The Hideaway). Guests check availability on Airbnb and can book direct.' },
 ];
 
 // Keyword lists agreed with a client, rather than derived from their search
@@ -419,10 +429,18 @@ function ensureManagedSites() {
   for (const m of wanted) {
     const existing = db.prepare("SELECT id FROM sites WHERE lower(replace(domain,'www.','')) = ?").get(m.domain);
     if (existing) continue;
-    db.prepare(`INSERT INTO sites (client_name, domain, report_frequency, notes, dashboard_token, next_report_at, delivery_hold)
-                VALUES (?, ?, 'monthly', ?, ?, ?, 1)`)
-      .run(m.name, m.domain, m.note, newDashboardToken(), nextRunAt('monthly'));
-    console.log('[ops] site created (delivery held):', m.domain);
+    db.prepare(`INSERT INTO sites (client_name, domain, report_frequency, notes, dashboard_token, next_report_at, delivery_hold, monitor_paused)
+                VALUES (?, ?, 'monthly', ?, ?, ?, 1, ?)`)
+      .run(m.name, m.domain, m.about || m.note, newDashboardToken(), nextRunAt('monthly'), m.waitForTag ? 1 : 0);
+    if (m.waitForTag) {
+      let waiting = [];
+      try { waiting = JSON.parse(getSetting('monitor_wait_for_tag') || '[]'); } catch { /* start a fresh list */ }
+      if (!waiting.includes(m.domain)) setSetting('monitor_wait_for_tag', JSON.stringify([...waiting, m.domain]));
+      let wanted = [];
+      try { wanted = JSON.parse(getSetting('tracking_code_wanted') || '[]'); } catch { /* start a fresh list */ }
+      if (!wanted.includes(m.domain)) setSetting('tracking_code_wanted', JSON.stringify([...wanted, m.domain]));
+    }
+    console.log('[ops] site created (delivery held):', m.domain, m.waitForTag ? '(uptime monitor paused until its tracking code is live)' : '');
   }
 }
 
@@ -997,6 +1015,83 @@ export async function retrofitTags() {
 }
 
 // ── Generic new-site onboarding: any active site missing its GA4 or
+// A site added before its website exists starts with the uptime monitor
+// paused: a domain that is still being moved or built would be reported
+// DOWN within ten minutes, and that false outage would sit in its first
+// report. Each hour this looks at the live homepage of every waiting
+// site, and the first time it finds OUR tracking code there (the block's
+// marker, or this site's own Google or Fathom ID), monitoring starts and
+// the owner is told once. Finding the code is the proof that the new site
+// is live and wired up; an old site still parked on the domain does not
+// count. If the owner switches monitoring on by hand first, that stands.
+export async function startMonitoringWhenLive() {
+  let waiting = [];
+  try { waiting = JSON.parse(getSetting('monitor_wait_for_tag') || '[]'); } catch { return { waiting: 0 }; }
+  if (!waiting.length) return { waiting: 0 };
+  const still = [];
+  const started = [];
+  for (const domain of waiting) {
+    const site = db.prepare("SELECT * FROM sites WHERE lower(replace(domain,'www.','')) = ?").get(domain);
+    if (!site || !site.monitor_paused) continue; // removed, or switched on by hand
+    const html = (await fetchLivePage(domain)) || '';
+    const ours = html.includes('NBM-GA-TAG')
+      || (site.ga4_measurement_id && html.includes(site.ga4_measurement_id))
+      || (site.fathom_site_id && html.includes(`data-site="${site.fathom_site_id}"`));
+    if (!ours) { still.push(domain); continue; }
+    db.prepare('UPDATE sites SET monitor_paused = 0 WHERE id = ?').run(site.id);
+    started.push(domain);
+    console.log('[ops] tracking code found on', domain, ': uptime monitoring started');
+    try {
+      const { sendAlert } = await import('./monitor.js');
+      await sendAlert(`live:${domain}`, `LIVE: ${domain} is being tracked`,
+        [`Pulse found its tracking code on the live homepage of ${domain}.`, '',
+          'Uptime monitoring for the site has started, and visits will begin to appear in Pulse over the next day.',
+          'Open the Connections panel in Pulse to see each source come through.'].join('\n'), { once: true });
+    } catch (e) { console.error('[ops] could not send the live notice:', e.message); }
+  }
+  setSetting('monitor_wait_for_tag', JSON.stringify(still));
+  return { waiting: still.length, started };
+}
+
+// A site added before its website is live needs its tracking code handed
+// to whoever is building it. As soon as Pulse has made the site's own
+// Google tag and Fathom site, it emails the owner the exact block (the
+// same one the Tracking code window shows), once. Nobody has to open
+// Pulse and copy it out.
+export async function sendTrackingCodeWhenReady() {
+  let wanted = [];
+  try { wanted = JSON.parse(getSetting('tracking_code_wanted') || '[]'); } catch { return { waiting: 0 }; }
+  if (!wanted.length) return { waiting: 0 };
+  const still = [];
+  const sent = [];
+  for (const domain of wanted) {
+    const site = db.prepare("SELECT * FROM sites WHERE lower(replace(domain,'www.','')) = ?").get(domain);
+    if (!site) continue;
+    // Wait for both tags, so the block is sent once and complete.
+    if (!site.ga4_measurement_id || (getFathomToken() && !site.fathom_site_id)) { still.push(domain); continue; }
+    const block = buildSnippet(site.ga4_measurement_id, site.clarity_project_id || '',
+      { consentBanner: getSetting('consent_banner') === 'true', fathomId: site.fathom_site_id || '' });
+    try {
+      const { sendAlert } = await import('./monitor.js');
+      await sendAlert(`tracking-code:${domain}`, `TRACKING CODE: ${domain}`,
+        [`The tracking code for ${site.client_name} (${domain}) is ready.`, '',
+          'Paste this block, whole and unchanged, immediately before </head> on every page:', '',
+          block, '',
+          `Google tag: ${site.ga4_measurement_id}`,
+          `Fathom site: ${site.fathom_site_id || 'not set up'}`,
+          `Clarity: ${site.clarity_project_id || 'not set up (add the project ID in Pulse, then copy the block again from the Tracking code window)'}`,
+          '', 'Pulse starts monitoring the site by itself the first time it sees this code on the live homepage.'].join('\n'), { once: true });
+      sent.push(domain);
+      console.log('[ops] tracking code emailed to the owner for', domain);
+    } catch (e) {
+      still.push(domain); // email not working yet: try again next pass
+      console.error('[ops] could not email the tracking code:', e.message);
+    }
+  }
+  setSetting('tracking_code_wanted', JSON.stringify(still));
+  return { waiting: still.length, sent };
+}
+
 // Search Console wiring gets completed hands-off, hourly, idempotently.
 // GA4: adopt an existing property whose web stream matches the domain, or
 // CREATE property + web stream in the agency's GA account (delegated).
@@ -2091,6 +2186,11 @@ export function scheduleOpsSweep() {
   // Search Console DNS-or-tag, platform classification) — hourly.
   try {
     cron.schedule('37 * * * *', () => onboardNewSites().catch(e => console.error('[onboard]', e.message)), { timezone: config.timezone, noOverlap: true });
+    cron.schedule('47 * * * *', () => startMonitoringWhenLive().catch(e => console.error('[ops] wait for tag:', e.message)), { timezone: config.timezone, noOverlap: true });
+    // The Google tag and Fathom site are made about four and a half
+    // minutes after boot, so look soon after that, then again, then hourly.
+    for (const ms of [330_000, 480_000, 780_000]) setTimeout(() => sendTrackingCodeWhenReady().catch(e => console.error('[ops] tracking code:', e.message)), ms);
+    cron.schedule('57 * * * *', () => sendTrackingCodeWhenReady().catch(e => console.error('[ops] tracking code:', e.message)), { timezone: config.timezone, noOverlap: true });
   } catch (e) { console.error('[onboard] schedule failed:', e.message); }
   setTimeout(() => onboardNewSites().catch(e => console.error('[onboard]', e.message)), 240_000);
   // Prove each source carries the right domain's traffic — hourly.
