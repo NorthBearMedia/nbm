@@ -74,6 +74,7 @@ export function hideOwnerFields(client) {
   client.report_email = '';
   client.pulse_link = '';
   client.metricool_blog_id = '';
+  client.xero_contact_id = '';
   return client;
 }
 
@@ -132,7 +133,9 @@ router.get('/', requireAuth, (req, res) => {
     attachByTask.get(a.task_id).push(a);
   }
 
-  const now = new Date().toISOString().split('T')[0];
+  // UK calendar date — the same "today" the views use (UTC is a day behind
+  // between midnight and 1am in summer).
+  const now = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date());
   const doneStatuses = ['completed', 'invoiced'];
 
   for (const client of clients) {
@@ -184,7 +187,7 @@ router.post('/', requireAuth, requireWrite, (req, res) => {
   let { name, code, agreement_type, notes, gmail_link, drive_link, is_private,
     client_type, monthly_value, agreement_summary, recurring_deliverables,
     last_contact_date, next_scheduled_date, control_status, risk_level, important_contacts,
-    pulse_link, metricool_blog_id, report_email } = req.body;
+    pulse_link, metricool_blog_id, report_email, xero_contact_id } = req.body;
   if (!name) return res.status(400).json({ error: 'Client name is required' });
   // Report settings are owner-only; staff posts never carry them.
   const owner = req.user.role === 'owner';
@@ -193,6 +196,8 @@ router.post('/', requireAuth, requireWrite, (req, res) => {
   report_email = owner ? cleanEmails(report_email) : undefined;
   if (pulse_link === null) return res.status(400).json({ error: 'The Pulse link should be the full dashboard address (https://…)' });
   if (report_email === null) return res.status(400).json({ error: 'Report email: use proper addresses, separated by commas' });
+  xero_contact_id = owner ? String(xero_contact_id || '').trim().toLowerCase() : '';
+  if (xero_contact_id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(xero_contact_id)) return res.status(400).json({ error: 'Unknown Xero contact' });
   last_contact_date = cleanDate(last_contact_date);
   next_scheduled_date = cleanDate(next_scheduled_date);
   monthly_value = cleanMoney(monthly_value);
@@ -213,8 +218,8 @@ router.post('/', requireAuth, requireWrite, (req, res) => {
     last_contact_date || '', next_scheduled_date || '', cs, rl, important_contacts || ''
   );
   if (owner) {
-    db.prepare('UPDATE clients SET pulse_link = ?, metricool_blog_id = ?, report_email = ? WHERE id = ?')
-      .run(pulse_link || '', metricool_blog_id || '', report_email || '', result.lastInsertRowid);
+    db.prepare('UPDATE clients SET pulse_link = ?, metricool_blog_id = ?, report_email = ?, xero_contact_id = ? WHERE id = ?')
+      .run(pulse_link || '', metricool_blog_id || '', report_email || '', xero_contact_id, result.lastInsertRowid);
   }
   logActivity('client', result.lastInsertRowid, 'created', req.user.display_name, `Created client "${name}"`);
   const created = db.prepare('SELECT * FROM clients WHERE id = ?').get(result.lastInsertRowid);
@@ -233,7 +238,7 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   let { name, code, agreement_type, notes, logo_url, gmail_link, drive_link, is_private,
     client_type, monthly_value, agreement_summary, recurring_deliverables,
     last_contact_date, next_scheduled_date, control_status, risk_level, important_contacts,
-    pulse_link, metricool_blog_id, report_email } = req.body;
+    pulse_link, metricool_blog_id, report_email, xero_contact_id } = req.body;
   const old = requireClientAccess(req, res);
   if (!old) return;
   pulse_link = cleanUrl(pulse_link);
@@ -241,6 +246,10 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   report_email = cleanEmails(report_email);
   if (pulse_link === null) return res.status(400).json({ error: 'The Pulse link should be the full dashboard address (https://…)' });
   if (report_email === null) return res.status(400).json({ error: 'Report email: use proper addresses, separated by commas' });
+  if (xero_contact_id !== undefined) {
+    xero_contact_id = String(xero_contact_id || '').trim().toLowerCase();
+    if (xero_contact_id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(xero_contact_id)) return res.status(400).json({ error: 'Unknown Xero contact' });
+  }
   if (is_private && req.user.role !== 'owner') return res.status(403).json({ error: 'Only owners can make clients private' });
   if (client_type !== undefined && !isValidClientType(client_type)) return res.status(400).json({ error: 'Invalid client_type' });
   if (control_status !== undefined && !isValidControlStatus(control_status)) return res.status(400).json({ error: 'Invalid control_status' });
@@ -252,14 +261,14 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   // must never overwrite them (their form posts blanks).
   if (req.user.role !== 'owner') {
     monthly_value = undefined; agreement_summary = undefined;
-    pulse_link = undefined; metricool_blog_id = undefined; report_email = undefined;
+    pulse_link = undefined; metricool_blog_id = undefined; report_email = undefined; xero_contact_id = undefined;
   }
 
-  db.prepare('UPDATE clients SET name=COALESCE(?,name), code=COALESCE(?,code), agreement_type=COALESCE(?,agreement_type), notes=COALESCE(?,notes), logo_url=COALESCE(?,logo_url), gmail_link=COALESCE(?,gmail_link), drive_link=COALESCE(?,drive_link), is_private=COALESCE(?,is_private), client_type=COALESCE(?,client_type), monthly_value=COALESCE(?,monthly_value), agreement_summary=COALESCE(?,agreement_summary), recurring_deliverables=COALESCE(?,recurring_deliverables), last_contact_date=COALESCE(?,last_contact_date), next_scheduled_date=COALESCE(?,next_scheduled_date), control_status=COALESCE(?,control_status), risk_level=COALESCE(?,risk_level), important_contacts=COALESCE(?,important_contacts), pulse_link=COALESCE(?,pulse_link), metricool_blog_id=COALESCE(?,metricool_blog_id), report_email=COALESCE(?,report_email) WHERE id=?')
+  db.prepare('UPDATE clients SET name=COALESCE(?,name), code=COALESCE(?,code), agreement_type=COALESCE(?,agreement_type), notes=COALESCE(?,notes), logo_url=COALESCE(?,logo_url), gmail_link=COALESCE(?,gmail_link), drive_link=COALESCE(?,drive_link), is_private=COALESCE(?,is_private), client_type=COALESCE(?,client_type), monthly_value=COALESCE(?,monthly_value), agreement_summary=COALESCE(?,agreement_summary), recurring_deliverables=COALESCE(?,recurring_deliverables), last_contact_date=COALESCE(?,last_contact_date), next_scheduled_date=COALESCE(?,next_scheduled_date), control_status=COALESCE(?,control_status), risk_level=COALESCE(?,risk_level), important_contacts=COALESCE(?,important_contacts), pulse_link=COALESCE(?,pulse_link), metricool_blog_id=COALESCE(?,metricool_blog_id), report_email=COALESCE(?,report_email), xero_contact_id=COALESCE(?,xero_contact_id) WHERE id=?')
     .run(name, code, agreement_type, notes, logo_url, gmail_link, drive_link, is_private !== undefined ? (is_private ? 1 : 0) : null,
       client_type, monthly_value, agreement_summary, recurring_deliverables,
       last_contact_date, next_scheduled_date, control_status, risk_level, important_contacts,
-      pulse_link, metricool_blog_id, report_email, req.params.id);
+      pulse_link, metricool_blog_id, report_email, xero_contact_id, req.params.id);
 
   const changes = [];
   if (name && name !== old.name) changes.push(`name: "${old.name}" → "${name}"`);

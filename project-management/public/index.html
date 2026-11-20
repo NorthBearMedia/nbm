@@ -12,7 +12,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=94">
+  <link rel="stylesheet" href="styles.css?v=97">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -160,7 +160,7 @@
         <!-- CLIENT CONTROL BOARD (hero) -->
         <div id="controlBoardSection">
           <div class="cb-header">
-            <h3 class="cb-title">Client Control Board</h3>
+            <h3 class="cb-title">Client Control Board <span id="cbXeroSummary" class="cb-xero-summary"></span></h3>
             <div class="cb-controls">
               <select id="cbStatusFilter" class="filter-select" onchange="renderControlBoard()">
                 <option value="">All statuses</option>
@@ -542,7 +542,9 @@
       <div class="form-row"><div class="form-group"><label>Client Name</label><input type="text" id="clientName" required></div><div class="form-group"><label>Code (exactly 3 letters)</label><input type="text" id="clientCode" minlength="3" maxlength="3" pattern="[A-Za-z]{3}" placeholder="e.g. NBM" required style="text-transform:uppercase"></div></div>
       <div class="form-row">
         <div class="form-group"><label>Client Type</label><select id="clientTypeBand"><option value="retainer">Retainer</option><option value="project">Project</option><option value="ad-hoc">Ad hoc</option><option value="prospect">Prospect</option></select></div>
-        <div class="form-group money-owner-only"><label>Monthly Value (£)</label><input type="number" id="clientMonthlyValue" min="0" step="50" placeholder="0"></div>
+        <div class="form-group money-owner-only"><label>Monthly Value (£)</label><input type="number" id="clientMonthlyValue" min="0" step="50" placeholder="0">
+          <select id="clientXeroContact" class="xero-select" onchange="xeroFormHint()" title="The Xero contact this client is billed under"><option value="">Xero: not linked</option></select>
+          <div class="xero-hint" id="clientXeroHint"></div></div>
       </div>
       <div class="form-group money-owner-only"><label>Agreement Summary</label><input type="text" id="clientAgreementSummary" placeholder="e.g. 12-mo retainer — 4 reels + 8 posts / month"></div>
       <div class="form-group"><label>Recurring Deliverables</label><textarea id="clientRecurringDeliverables" rows="2" placeholder="One per line"></textarea></div>
@@ -792,6 +794,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=94"></script>
+  <script src="app.js?v=97"></script>
 </body>
 </html>

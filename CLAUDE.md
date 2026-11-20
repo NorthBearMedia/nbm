@@ -114,6 +114,8 @@ notifications
 -- The intake robot + monthly reports (Nov 2026). No foreign keys anywhere here — nothing cascades.
 clients (+)       last_touch_summary, last_touch_at   the robot's one-line "latest" per client
                   pulse_link, metricool_blog_id, report_email   monthly report settings (owner-only)
+                  xero_contact_id   the Xero contact the client is billed under (owner-only); when
+                                    set, monthly_value follows Xero's repeating invoices
 suggestions       kind (new_task|complete|update), status (pending|accepted|dismissed|expired),
                   client_id, task_id, title, notes, deadline, new_status, confidence, evidence,
                   source, source_label, source_url, source_ref, contact, run_id, decided_*, result_task_id
@@ -196,8 +198,19 @@ everywhere in the UI. `progress` / `priority` are kept as **synced shadow values
   label/link copied from the message not the model. Accepting goes through `createTaskCore`/`updateTaskCore`
   in `routes/tasks.js` (same path as manual edits). Settings: ☰ → Robot & sources.
 - **Whiteboard view (Nov 2026):** one zone per client — status colour, last spoke, the robot's latest line, its
-  suggestions with yes/no, To do (tick / +1 day), Waiting on them, Done this month, quick add. Quiet clients
-  collapse to one row. Same tasks and code paths as the Notebook (`nbTick`, `nbPush1`).
+  suggestions with yes/no, every open task (tick / +1 day), Waiting, Done this month, quick add, plus a
+  "No client" zone. Quiet clients collapse to one row. Same tasks and code paths as the Notebook and the
+  Dashboard cards (`taskGroups`, `nbTick`, `nbPush1`).
+- **One set of task rules for every view (Nov 2026):** `taskGroups()` in app.js decides To do / Waiting
+  (on client or on you) / overdue (past deadline) / Done this month for the Dashboard cards, the Whiteboard,
+  the Notebook footer and the client detail. Every view lists every open task — tasks with no client get
+  their own "No client" card/zone. Keep new views on taskGroups so the counts always agree.
+- **Retainers checked against Xero (Nov 2026, owner-only):** `GET /api/xero/retainers` reads the owner's
+  active repeating sales invoices (monthly equivalent, ex VAT, several per contact added up, finished or
+  draft schedules ignored; cached 15 min, `?fresh=1` re-checks). Clients match a Xero contact by
+  `xero_contact_id` or an unambiguous name match. Linked clients follow Xero automatically (logged);
+  name matches show ✓ Xero or ⚠ Xero £X on the Dashboard card (one click adopts + links). Edit client has
+  the Xero contact picker. Needs `XERO_CLIENT_ID`/`XERO_CLIENT_SECRET` and Xero connected in the Workspace strip.
 - **Monthly client report (Nov 2026, owner-only):** client detail → 📊 Monthly report. Gathers jobs ticked off
   that month + Pulse website figures (client's dashboard link → `/api/client/<token>/data?range=30`, a rolling
   30 days to yesterday, so draft early in the following month) + Metricool posts per network (brand id), Claude

@@ -2679,6 +2679,51 @@ select { color-scheme:dark; }
 @media (max-width:600px) {
   .wb-board { padding:16px 14px 20px; border-width:6px; border-bottom-width:10px; grid-template-columns:1fr; }
 }
+.wb-tag.wb-tag-them { color:var(--wb-blue); }
+.wb-noclient .wb-head { border-bottom-color:var(--wb-ink-soft); border-bottom-style:dashed; }
+.wb-logo-inbox { background:rgba(31,42,55,.08); font-size:15px; }
+
+/* The same task list on the Dashboard's client cards (dark theme): the
+   whiteboard markup with the app's own colours and type. */
+.cb-tasks {
+  --wb-ink:var(--text); --wb-ink-soft:var(--text-secondary); --wb-line:var(--border);
+  --wb-red:var(--danger); --wb-amber:var(--warning); --wb-blue:var(--blue); --wb-green:var(--primary);
+  margin-top:10px; padding-top:6px; border-top:1px solid var(--border); max-height:320px; overflow-y:auto; cursor:default;
+  scrollbar-width:thin;
+}
+.cb-tasks .wb-label { font-size:9.5px; color:var(--text-muted); margin:8px 0 2px; }
+.cb-tasks .wb-label span { background:var(--bg-glass); }
+.cb-tasks .wb-label-done { color:var(--primary); }
+.cb-tasks .wb-item { font-size:12.5px; line-height:1.35; padding:3px 0; color:var(--text); }
+.cb-tasks .wb-box { width:14px; height:14px; border-width:1.5px; border-color:var(--text-secondary); font-size:10px; }
+.cb-tasks .wb-box:hover { border-color:var(--primary); background:var(--primary-bg); }
+.cb-tasks .wb-text:hover { color:var(--primary); }
+.cb-tasks .wb-date { font-size:11px; color:var(--text-muted); }
+.cb-tasks .wb-date.wb-over { color:var(--danger); }
+.cb-tasks .wb-tag { font-size:10px; padding:0 5px; }
+.cb-tasks .wb-who { font-size:11px; }
+.cb-tasks .wb-push { font-family:inherit; font-size:10px; color:var(--text-muted); border-color:var(--border); }
+.cb-tasks .wb-push:hover { color:var(--text); border-color:var(--text-secondary); }
+.cb-tasks .wb-sg { font-size:12px; background:var(--blue-bg); color:var(--text); border-left-color:var(--blue); }
+.cb-tasks .wb-sg-k { color:var(--blue); font-size:11px; }
+.cb-tasks .wb-sg button { width:22px; height:22px; font-size:11px; }
+.cb-tasks .wb-nothing { font-size:12px; color:var(--text-muted); }
+.cb-card-noclient { border-style:dashed; cursor:default; }
+
+/* Retainer check against Xero (owner only) */
+.xero-badge { display:inline-flex; align-items:center; gap:3px; font-size:10px; font-weight:700; letter-spacing:.02em; padding:1px 7px; border-radius:9px; margin-left:6px; white-space:nowrap; border:1px solid transparent; font-family:inherit; }
+.xero-ok { color:var(--success); background:var(--success-bg); }
+button.xero-badge { cursor:pointer; }
+.xero-warn { color:var(--warning); background:var(--warning-bg); border-color:rgba(251,191,36,.35); }
+button.xero-warn:hover { border-color:var(--warning); }
+.cb-xero-summary { font-family:var(--font-body, inherit); font-size:12px; font-weight:500; color:var(--text-secondary); margin-left:10px; }
+.xero-ok-text { color:var(--success); }
+.xero-warn-text { color:var(--warning); }
+.xero-refresh { background:none; border:0; color:var(--text-muted); cursor:pointer; font-size:13px; padding:0 2px; }
+.xero-refresh:hover { color:var(--text); }
+.xero-select { margin-top:6px; width:100%; }
+.xero-hint { font-size:11px; color:var(--text-muted); margin-top:4px; line-height:1.4; }
+#clientMonthlyValue[readonly] { opacity:.75; cursor:not-allowed; }
 
 @media (max-width:600px) {
   .robot-tray { padding:12px; }

@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { randomBytes } from 'crypto';
 import db from '../database.js';
-import { requireAuth } from '../middleware.js';
+import { requireAuth, requireRole } from '../middleware.js';
+import { logActivity } from '../lib/activity.js';
 
 const router = Router();
 
@@ -10,6 +11,7 @@ const XERO_TOKEN_URL = 'https://identity.xero.com/connect/token';
 const XERO_CONNECTIONS_URL = 'https://api.xero.com/connections';
 const XERO_INVOICES_URL = 'https://api.xero.com/api.xro/2.0/Invoices';
 const XERO_PAYMENTS_URL = 'https://api.xero.com/api.xro/2.0/Payments';
+const XERO_REPEATING_URL = 'https://api.xero.com/api.xro/2.0/RepeatingInvoices';
 
 const SCOPES = 'openid profile email accounting.transactions.read accounting.contacts.read accounting.settings.read offline_access';
 
@@ -296,6 +298,98 @@ router.get('/api/xero/dashboard', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Not connected to Xero' });
     }
     res.status(500).json({ error: 'Failed to fetch Xero data' });
+  }
+});
+
+// ─── Retainers: is each client's monthly value what Xero actually bills? ───
+// Xero's active repeating sales invoices give each contact's monthly amount
+// (ex VAT). A client is matched to a contact by an explicit link
+// (clients.xero_contact_id) or, failing that, by an unambiguous name match.
+// Linked clients follow Xero: their monthly value is kept in step.
+
+// Xero sends dates as "/Date(1764547200000+0000)/" (or an ISO "…String").
+function xeroDay(v) {
+  const m = String(v || '').match(/\/Date\((\d+)/);
+  if (m) return new Date(+m[1]).toISOString().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}/.test(String(v || '')) ? String(v).slice(0, 10) : '';
+}
+function monthlyOf(ri) {
+  const sub = Number(ri.SubTotal) || 0;
+  const every = Number(ri.Schedule?.Period) || 1;
+  return String(ri.Schedule?.Unit || 'MONTHLY').toUpperCase() === 'WEEKLY' ? (sub * 52) / 12 / every : sub / every;
+}
+// "Smartmove Homes (Derbyshire) Ltd" and "Smartmove Homes" are the same business.
+const normName = s => String(s || '').toLowerCase().replace(/&/g, ' and ').replace(/\([^)]*\)/g, ' ')
+  .replace(/\b(ltd|limited|plc|llp|the|company|co|group|uk)\b/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
+
+const retainerCache = new Map();   // userId → { at, contacts }
+async function xeroRetainerContacts(userId, fresh) {
+  const hit = retainerCache.get(userId);
+  if (hit && !fresh && Date.now() - hit.at < 15 * 60 * 1000) return hit;
+  const data = await xeroGet(userId, XERO_REPEATING_URL);
+  const today = new Date().toISOString().slice(0, 10);
+  const byContact = new Map();
+  for (const ri of data.RepeatingInvoices || []) {
+    if (ri.Type !== 'ACCREC' || ri.Status !== 'AUTHORISED' || !ri.Contact?.ContactID) continue;
+    const end = xeroDay(ri.Schedule?.EndDateString || ri.Schedule?.EndDate);
+    if (end && end < today) continue;                         // a schedule that has finished
+    const id = ri.Contact.ContactID.toLowerCase();
+    if (!byContact.has(id)) byContact.set(id, { contactId: id, name: ri.Contact.Name || '', monthly: 0, templates: [] });
+    const c = byContact.get(id);
+    const m = monthlyOf(ri);
+    c.monthly += m;
+    c.templates.push({ reference: String(ri.Reference || '').slice(0, 80), monthly: Math.round(m * 100) / 100,
+      next: xeroDay(ri.Schedule?.NextScheduledDateString || ri.Schedule?.NextScheduledDate) });
+  }
+  const contacts = [...byContact.values()].map(c => ({ ...c, monthly: Math.round(c.monthly * 100) / 100 }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const entry = { at: Date.now(), contacts };
+  retainerCache.set(userId, entry);
+  return entry;
+}
+
+function matchClients(contacts) {
+  const out = {};
+  for (const c of db.prepare('SELECT id, name, xero_contact_id FROM clients WHERE archived = 0 AND is_system = 0').all()) {
+    let hit = null, by = '';
+    if (c.xero_contact_id) {
+      hit = contacts.find(x => x.contactId === c.xero_contact_id) || { contactId: c.xero_contact_id, name: '', monthly: 0, templates: [] };
+      by = 'linked';
+    } else {
+      const n = normName(c.name);
+      const cands = n ? contacts.filter(x => {
+        const m = normName(x.name);
+        return m && (m === n || (Math.min(m.length, n.length) >= 5 && (m.includes(n) || n.includes(m))));
+      }) : [];
+      if (cands.length === 1) { hit = cands[0]; by = 'name'; }
+    }
+    out[c.id] = hit ? { ...hit, by } : null;
+  }
+  return out;
+}
+
+router.get('/api/xero/retainers', requireAuth, requireRole('owner'), async (req, res) => {
+  if (!getCredentials() || !getStoredTokens(req.user.id)) return res.json({ connected: false });
+  try {
+    const { at, contacts } = await xeroRetainerContacts(req.user.id, req.query.fresh === '1');
+    const matches = matchClients(contacts);
+    // Linked clients follow Xero (only to a real amount — a paused schedule
+    // shows as a warning instead of zeroing the client).
+    const synced = [];
+    for (const [cid, m] of Object.entries(matches)) {
+      if (!m || m.by !== 'linked' || !m.monthly) continue;
+      const row = db.prepare('SELECT monthly_value FROM clients WHERE id = ?').get(cid);
+      if (Math.abs((row?.monthly_value || 0) - m.monthly) < 0.5) continue;
+      db.prepare('UPDATE clients SET monthly_value = ? WHERE id = ?').run(m.monthly, cid);
+      logActivity('client', +cid, 'updated', req.user.display_name,
+        `Monthly value £${row?.monthly_value || 0} → £${m.monthly} (from Xero repeating invoices)`);
+      synced.push(+cid);
+    }
+    res.json({ connected: true, checkedAt: new Date(at).toISOString(), contacts, matches, synced });
+  } catch (err) {
+    console.error('[Xero] Retainers error:', err.message);
+    const gone = /No Xero connection|refresh failed|invalid_grant|401/i.test(err.message);
+    res.status(502).json({ connected: !gone, error: gone ? 'Xero needs reconnecting (Workspace strip on the Dashboard)' : 'Couldn’t reach Xero just now' });
   }
 });
 
