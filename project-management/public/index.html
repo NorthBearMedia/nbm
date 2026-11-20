@@ -12,7 +12,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="/NBM%20Logo%20Black%20BG.png">
-  <link rel="stylesheet" href="styles.css?v=89">
+  <link rel="stylesheet" href="styles.css?v=91">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -27,6 +27,7 @@
     </div>
     <div class="nav-center">
       <button class="nav-tab active" data-view="dashboard"><span class="nav-icon">&#9670;</span> Dashboard</button>
+      <button class="nav-tab" data-view="whiteboard"><span class="nav-icon">&#128203;</span> Whiteboard</button>
       <button class="nav-tab" data-view="notebook"><span class="nav-icon">&#128211;</span> Notebook</button>
       <button class="nav-tab" data-view="inbox"><span class="nav-icon">&#128229;</span> Inbox <span id="inboxCount" class="nav-count" style="display:none"></span><span id="robotCount" class="nav-count robot-count" style="display:none" title="Suggestions from your messages, waiting for a yes or no"></span></button>
       <button class="nav-tab" data-view="clients"><span class="nav-icon">&#9783;</span> Tasks</button>
@@ -396,6 +397,24 @@
       </div>
     </div>
 
+    <!-- Whiteboard View — every client at a glance, like the board on the wall -->
+    <div id="whiteboardView" style="display:none">
+      <div class="wb-wrap">
+        <div class="wb-toolbar">
+          <div>
+            <h2 class="wb-heading">The Whiteboard</h2>
+            <div class="wb-subhead" id="wbSubhead"></div>
+          </div>
+          <select id="wbOrder" class="filter-select" onchange="wbSetOrder(this.value)" title="Order of the clients">
+            <option value="board">My client order</option>
+            <option value="attention">Needs attention first</option>
+            <option value="name">A–Z</option>
+          </select>
+        </div>
+        <div class="wb-board" id="wbBoard"></div>
+      </div>
+    </div>
+
     <!-- Notebook View — the paper day-book -->
     <div id="notebookView" style="display:none">
       <div class="nb-wrap">
@@ -761,6 +780,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-  <script src="app.js?v=89"></script>
+  <script src="app.js?v=90"></script>
 </body>
 </html>

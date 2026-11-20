@@ -191,6 +191,8 @@ async function loadClients() {
     loadPlanningView();
   } else if (currentView === 'notebook') {
     loadNotebookView();
+  } else if (currentView === 'whiteboard') {
+    loadWhiteboardView();
   }
 }
 
@@ -583,7 +585,7 @@ async function loadServerPrefs() {
 
 // ─── View Switching ─────────────────────────────────────
 function applyViewVisibility() {
-  const views = { dashboard: 'dashboardView', notebook: 'notebookView', inbox: 'inboxView', clients: 'clientsView', today: 'todayView', planning: 'planningView', calendar: 'calendarView', focus: 'focusView', email: 'emailView' };
+  const views = { dashboard: 'dashboardView', whiteboard: 'whiteboardView', notebook: 'notebookView', inbox: 'inboxView', clients: 'clientsView', today: 'todayView', planning: 'planningView', calendar: 'calendarView', focus: 'focusView', email: 'emailView' };
   for (const [v, id] of Object.entries(views)) {
     const el = document.getElementById(id);
     if (el) el.style.display = currentView === v ? '' : 'none';
@@ -605,6 +607,7 @@ function switchView(view) {
   setPref('nbm_view', view);
   applyViewVisibility();
   if (view === 'dashboard') loadDashboard();
+  if (view === 'whiteboard') loadWhiteboardView();
   if (view === 'notebook') loadNotebookView();
   if (view === 'inbox') loadInboxView();
   if (view === 'clients') renderClients();
@@ -1462,6 +1465,7 @@ function sgRemove(id) {
   if (robot.editing === id) robot.editing = null;
   updateInboxCount();
   renderRobotTray();
+  if (currentView === 'whiteboard') renderWhiteboard();
 }
 
 async function sgAccept(id, fromEdit) {
@@ -1552,6 +1556,173 @@ async function robotPaste() {
   } catch (e) { toast('Not read — ' + e.message); }
   btn.textContent = 'Find tasks';
   loadRobotTray();
+}
+
+// ─── Whiteboard: every client at a glance, like the board on the wall ──────
+// One zone per client: the robot's latest line, what it thinks is done or
+// new, what's left to do (tick / +1 day), what we're waiting on them for and
+// what got done this month. Same tasks as everywhere else, laid out per client.
+let wbOrder = localStorage.getItem('nbm_wb_order') || 'board';
+const wbExpanded = new Set();
+const WB_TODO_LIMIT = 8;
+const WB_RAG_RANK = { red: 0, amber: 1, blue: 2, green: 3 };
+
+function wbSetOrder(v) {
+  wbOrder = ['board', 'attention', 'name'].includes(v) ? v : 'board';
+  setPref('nbm_wb_order', wbOrder);
+  renderWhiteboard();
+}
+function wbToggleMore(cid) { wbExpanded.has(cid) ? wbExpanded.delete(cid) : wbExpanded.add(cid); renderWhiteboard(); }
+
+// "2h ago" for ISO stamps with a zone (the robot's) as well as SQLite UTC ones.
+function agoAny(ds) {
+  if (!ds) return '';
+  if (/(Z|[+-]\d\d:?\d\d)$/.test(ds)) { const d = new Date(ds); return isNaN(d) ? '' : timeAgo(d.toISOString().slice(0, 19)); }
+  return timeAgo(ds);
+}
+
+async function loadWhiteboardView() {
+  renderWhiteboard();
+  if (!isOwner()) return;
+  try {
+    robot.list = await api('/api/suggestions');
+    robot.pending = robot.list.length;
+    updateInboxCount();
+    renderWhiteboard();
+  } catch {}
+}
+
+function wbItem(t, today) {
+  const done = t.task_status === 'done';
+  const d = t.planned_date || t.deadline || '';
+  const over = !done && t.deadline && t.deadline < today;
+  const tags = [];
+  if (!done && t.task_status === 'review') tags.push('<span class="wb-tag">review</span>');
+  if (!done && t.task_status === 'waiting-on-me') tags.push('<span class="wb-tag">on me</span>');
+  if (t.assignee && t.assignee !== currentUser?.display_name) tags.push(`<span class="wb-who" title="${esc(t.assignee)}">${esc(t.assignee.split(' ')[0])}</span>`);
+  const dateTip = [t.planned_date && `Planned ${fmtDateShort(t.planned_date)}`, t.deadline && `Due ${fmtDateShort(t.deadline)}`].filter(Boolean).join(' · ');
+  return `<div class="wb-item ${done ? 'wb-done' : ''}">
+    <button class="wb-box ${done ? 'wb-ticked' : ''}" onclick="nbTick(${t.id})" title="${done ? 'Untick' : 'Tick off'}">${done ? '&#10003;' : ''}</button>
+    <span class="wb-text" onclick="editTask(${t.id})" title="Open ${taskRef(t.id)}">${esc(t.title)}</span>
+    ${tags.join('')}
+    ${!done && d ? `<span class="wb-date ${over ? 'wb-over' : ''}" title="${esc(dateTip)}">${over ? relDate(t.deadline) : relDate(d)}</span>` : ''}
+    ${!done && d ? `<button class="wb-push" onclick="nbPush1(${t.id})" title="Push it a day">+1d</button>` : ''}
+  </div>`;
+}
+
+function wbSg(s) {
+  const k = { new_task: '➕ New', complete: '✔ Done?', update: '↻' }[s.kind] || '';
+  const what = s.kind === 'new_task' ? esc(s.title)
+    : esc(s.task_title || s.title) + (s.kind === 'update' && s.new_status ? ` <b>→ ${esc(statusLabel(s.new_status))}</b>` : '');
+  const tip = (s.evidence ? `“${s.evidence}” — ` : '') + (s.source_label || '');
+  return `<div class="wb-sg" title="${esc(tip)}">
+    <span class="wb-sg-k">${k}</span><span class="wb-sg-t">${what}</span>
+    <button class="wb-sg-yes" onclick="sgAccept(${s.id})" title="Yes — do it">&#10003;</button>
+    <button class="wb-sg-no" onclick="sgDismiss(${s.id})" title="Not needed">&times;</button>
+  </div>`;
+}
+
+function wbZone(c, todo, waiting, done, sugs, today) {
+  const { status } = clientControlData(c);
+  const sCfg = CONTROL_STATUS[status] || CONTROL_STATUS.green;
+  const logo = c.logo_url
+    ? `<img class="wb-logo" src="${esc(c.logo_url)}" alt="">`
+    : `<span class="wb-logo wb-logo-f" style="background:hsl(${clientHue(c.name)} 52% 74%)">${esc((c.code || c.name).charAt(0).toUpperCase())}</span>`;
+  const eff = t => t.planned_date || t.deadline || '9999';
+  todo.sort((a, b) => {
+    const ao = a.deadline && a.deadline < today ? 0 : 1, bo = b.deadline && b.deadline < today ? 0 : 1;
+    if (ao !== bo) return ao - bo;
+    return eff(a) < eff(b) ? -1 : eff(a) > eff(b) ? 1 : a.id - b.id;
+  });
+  const showAll = wbExpanded.has(c.id);
+  const shown = showAll ? todo : todo.slice(0, WB_TODO_LIMIT);
+  const more = todo.length - shown.length;
+  const lc = daysSince(c.last_contact_date);
+  const spoke = lc === null ? '' : lc <= 0 ? 'spoke today' : lc === 1 ? 'spoke yesterday' : `spoke ${lc}d ago`;
+  return `<section class="wb-zone wb-${status}">
+    <header class="wb-head">
+      ${logo}
+      <h3 onclick="openClientDetail(${c.id})" title="Open ${esc(c.name)}">${esc(c.name)}</h3>
+      <span class="wb-spoke ${lc !== null && lc > 14 ? 'wb-stale' : ''}" title="Last contact${c.last_contact_date ? ' ' + c.last_contact_date : ''}">${spoke}</span>
+      <span class="wb-rag" title="${esc(sCfg.label)}"></span>
+    </header>
+    ${c.last_touch_summary ? `<div class="wb-latest" title="The robot's latest from your messages">${esc(c.last_touch_summary)} <span class="wb-ago">${agoAny(c.last_touch_at)}</span></div>` : ''}
+    ${sugs.length ? `<div class="wb-sgs">${sugs.map(wbSg).join('')}</div>` : ''}
+    ${todo.length ? `<div class="wb-label">To do <span>${todo.length}</span></div>${shown.map(t => wbItem(t, today)).join('')}
+      ${more > 0 ? `<button class="wb-more" onclick="wbToggleMore(${c.id})">+ ${more} more…</button>` : (showAll && todo.length > WB_TODO_LIMIT ? `<button class="wb-more" onclick="wbToggleMore(${c.id})">show less</button>` : '')}` : ''}
+    ${waiting.length ? `<div class="wb-label">Waiting on them <span>${waiting.length}</span></div>${waiting.map(t => wbItem(t, today)).join('')}` : ''}
+    ${done.length ? `<div class="wb-label wb-label-done">Done this month <span>${done.length}</span></div>${done.slice(0, 6).map(t => wbItem(t, today)).join('')}${done.length > 6 ? `<div class="wb-more-note">+ ${done.length - 6} more</div>` : ''}` : ''}
+    ${todo.length || waiting.length || done.length ? '' : '<div class="wb-nothing">Nothing open.</div>'}
+    <input class="wb-add" data-cid="${c.id}" placeholder="+ add for ${esc(c.name)}…" onkeydown="if(event.key==='Enter')wbAdd(${c.id},this)">
+  </section>`;
+}
+
+function renderWhiteboard() {
+  const board = document.getElementById('wbBoard');
+  if (!board || currentView !== 'whiteboard') return;
+  const sel = document.getElementById('wbOrder');
+  if (sel) sel.value = wbOrder;
+  const today = localDateStr(new Date());
+  const monthStart = today.slice(0, 7) + '-01';
+  const owner = isOwner();
+  const sugByClient = new Map();
+  if (owner) for (const s of robot.list) {
+    if (!s.client_id || s.client_is_system) continue;
+    if (!sugByClient.has(s.client_id)) sugByClient.set(s.client_id, []);
+    sugByClient.get(s.client_id).push(s);
+  }
+  let list = clients.filter(c => !c.is_system && !c.archived);
+  if (wbOrder === 'name') list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+  else if (wbOrder === 'attention') list = [...list].sort((a, b) =>
+    ((WB_RAG_RANK[clientControlData(a).status] ?? 3) - (WB_RAG_RANK[clientControlData(b).status] ?? 3)) || a.name.localeCompare(b.name));
+
+  const zones = [], quiet = [];
+  let nTodo = 0, nWaiting = 0, nDone = 0;
+  for (const c of list) {
+    const tasks = c.tasks || [];
+    const open = tasks.filter(isOpenTask);
+    const todo = open.filter(t => t.task_status !== 'waiting-on-client');
+    const waiting = open.filter(t => t.task_status === 'waiting-on-client');
+    const done = tasks.filter(t => t.task_status === 'done' && (t.completed_at || '') >= monthStart)
+      .sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || ''));
+    const sugs = sugByClient.get(c.id) || [];
+    nTodo += todo.length; nWaiting += waiting.length; nDone += done.length;
+    if (!open.length && !sugs.length && !done.length) { quiet.push(c); continue; }
+    zones.push(wbZone(c, todo, waiting, done, sugs, today));
+  }
+  const sys = clients.find(c => c.is_system);
+  const loose = (sys?.tasks || []).filter(isOpenTask).length;
+  const looseSugs = owner ? robot.list.filter(s => !s.client_id || s.client_is_system).length : 0;
+  const foot = [];
+  if (quiet.length) foot.push(`<div class="wb-quiet"><span class="wb-quiet-k">Quiet:</span> ${quiet.map(c =>
+    `<button onclick="openClientDetail(${c.id})" title="Nothing open — click to open">${esc(c.name)}</button>`).join('')}</div>`);
+  if (loose || looseSugs) foot.push(`<div class="wb-loose" onclick="switchView('inbox')">📥 ${[loose && `${loose} task${loose > 1 ? 's' : ''}`, looseSugs && `${looseSugs} suggestion${looseSugs > 1 ? 's' : ''}`].filter(Boolean).join(' and ')} without a client — sort them in the Inbox →</div>`);
+  // A redraw (tick, robot refresh) must not eat what you're typing in an add box.
+  const typing = document.activeElement?.classList.contains('wb-add') ? document.activeElement : null;
+  const keep = typing && { cid: typing.dataset.cid, value: typing.value, pos: typing.selectionStart };
+  board.innerHTML = (zones.join('') || '<div class="wb-empty">The board is clear — nothing open for any client.</div>')
+    + (foot.length ? `<div class="wb-foot">${foot.join('')}</div>` : '');
+  if (keep) {
+    const el = board.querySelector(`.wb-add[data-cid="${keep.cid}"]`);
+    if (el) { el.value = keep.value; el.focus(); try { el.setSelectionRange(keep.pos, keep.pos); } catch {} }
+  }
+  document.getElementById('wbSubhead').textContent =
+    `${nTodo} to do · ${nWaiting} waiting on clients · ${nDone} done this month`;
+}
+
+async function wbAdd(cid, input) {
+  const title = input.value.trim();
+  if (!title || input.disabled) return;
+  input.disabled = true;
+  try {
+    await api('/api/tasks', { method: 'POST', body: { title, client_id: cid, task_status: 'inbox' } });
+    input.value = '';
+    input.disabled = false;
+    input.focus();          // the redraw keeps focus in whichever add box is active
+    await loadClients();
+    document.querySelector(`.wb-add[data-cid="${cid}"]`)?.focus();
+  } catch (e) { toast('Not saved — ' + e.message); }
+  finally { input.disabled = false; }
 }
 
 // ─── Robot & sources settings (☰ menu, owner only) ─────────────────────────
@@ -2315,7 +2486,7 @@ async function nbTick(id) {
   // Optimistic: flip the bullet instantly from the local cache, save behind it.
   t.task_status = done ? 'scheduled' : 'done';
   t.completed_at = done ? '' : localDateStr(new Date());
-  loadNotebookView();
+  nbRerender();
   if (!done) { try { celebrate(); } catch {} }
   try {
     await api(`/api/tasks/${id}`, { method: 'PUT', body: { task_status: t.task_status } });
@@ -2327,9 +2498,11 @@ async function nbTick(id) {
     t.task_status = prevStatus;
     t.completed_at = prevCompleted;
     toast('Not saved — ' + e.message);
-    loadNotebookView();
+    nbRerender();
   }
 }
+// Ticks are used from the Notebook and the Whiteboard — redraw whichever is open.
+function nbRerender() { if (currentView === 'whiteboard') renderWhiteboard(); else loadNotebookView(); }
 
 async function nbHighlight(id) {
   const t = findTaskById(id);

@@ -1936,6 +1936,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 }
 
 /* ─── RESPONSIVE ─────────────────────────────────────── */
+/* Laptop widths: tighten the navbar step by step so every tab and button
+   fits without a sideways scroll (phones scroll the tabs instead, below). */
+@media (max-width: 1600px) { .nav-tab { padding: 9px 12px; gap: 6px; } }
+@media (max-width: 1500px) { .nav-tab .nav-icon { display: none; } }
+@media (max-width: 1340px) { .nav-brand h1 { display: none; } }
 @media (max-width: 900px) {
   .navbar { padding: 0 16px; gap: 10px; }
   .nav-brand h1 { display: none; }
@@ -2560,6 +2565,86 @@ select { color-scheme:dark; }
 .rs-run-st.rs-partial, .rs-run-st.rs-error { color:var(--warning); }
 .rs-run-st.rs-running { color:var(--blue); }
 .rs-notes { margin:8px 0 0 18px; padding:0; font-size:12px; color:var(--text-muted); }
+/* ─── WHITEBOARD (every client at a glance) ─────────── */
+/* A physical-object surface like the Notebook's paper: its own marker palette. */
+.wb-wrap {
+  --wb-ink:#1f2a37; --wb-ink-soft:#5b6573; --wb-line:rgba(31,42,55,.13);
+  --wb-red:#d93a3a; --wb-amber:#d98200; --wb-blue:#2563eb; --wb-green:#178a59;
+  --wb-font:'Patrick Hand','Kalam',cursive;
+  max-width:1500px; margin:0 auto; padding-top:8px;
+}
+.wb-toolbar { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+.wb-heading { font-family:var(--font-heading); font-size:20px; margin:0; }
+.wb-subhead { color:var(--text-secondary); font-size:13px; margin-top:4px; }
+.wb-board {
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:22px 30px; align-items:start;
+  padding:26px 28px 30px; border-radius:6px; color:var(--wb-ink);
+  background:linear-gradient(160deg, #fdfefe 0%, #f3f6f7 55%, #eef2f3 100%);
+  border:10px solid #c6ccd1; border-bottom-width:16px;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.08), inset 0 2px 14px rgba(0,0,0,.06), 0 14px 44px rgba(0,0,0,.5);
+}
+.wb-zone { font-family:var(--wb-font); min-width:0; }
+.wb-head { display:flex; align-items:center; gap:8px; padding-bottom:5px; margin-bottom:6px; border-bottom:4px solid var(--wb-green); border-radius:0 0 3px 3px; }
+.wb-red .wb-head { border-bottom-color:var(--wb-red); }
+.wb-amber .wb-head { border-bottom-color:var(--wb-amber); }
+.wb-blue .wb-head { border-bottom-color:var(--wb-blue); }
+.wb-logo { width:26px; height:26px; border-radius:6px; object-fit:cover; flex-shrink:0; }
+.wb-logo-f { display:inline-flex; align-items:center; justify-content:center; font-family:var(--font-heading); font-weight:800; font-size:13px; color:#231f20; }
+.wb-head h3 { font-family:var(--wb-font); font-size:24px; font-weight:400; margin:0; line-height:1.1; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; }
+.wb-head h3:hover { text-decoration:underline; text-decoration-thickness:2px; }
+.wb-spoke { font-size:14px; color:var(--wb-ink-soft); white-space:nowrap; }
+.wb-spoke.wb-stale { color:var(--wb-red); }
+.wb-rag { width:12px; height:12px; border-radius:50%; flex-shrink:0; background:var(--wb-green); }
+.wb-red .wb-rag { background:var(--wb-red); }
+.wb-amber .wb-rag { background:var(--wb-amber); }
+.wb-blue .wb-rag { background:var(--wb-blue); }
+.wb-latest { font-size:16px; line-height:1.25; color:var(--wb-ink-soft); margin:2px 0 6px; }
+.wb-latest::before { content:'💬 '; }
+.wb-ago { font-size:13px; opacity:.75; white-space:nowrap; }
+.wb-sgs { margin:4px 0 6px; }
+.wb-sg { display:flex; align-items:center; gap:6px; background:#e7f0ff; border-left:3px solid var(--wb-blue); border-radius:3px; padding:2px 4px 2px 7px; margin:3px 0; font-size:16px; color:#173a8a; line-height:1.25; }
+.wb-sg-k { white-space:nowrap; font-size:14px; opacity:.85; }
+.wb-sg-t { flex:1; min-width:0; }
+.wb-sg button { flex-shrink:0; width:24px; height:24px; border-radius:50%; border:1.5px solid currentColor; background:transparent; cursor:pointer; font-size:13px; line-height:1; padding:0; }
+.wb-sg-yes { color:var(--wb-green); }
+.wb-sg-yes:hover { background:var(--wb-green); color:#fff; }
+.wb-sg-no { color:var(--wb-ink-soft); }
+.wb-sg-no:hover { background:var(--wb-ink-soft); color:#fff; }
+.wb-label { font-family:var(--font-heading); font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--wb-ink-soft); margin:8px 0 1px; }
+.wb-label span { background:var(--wb-line); border-radius:8px; padding:0 6px; margin-left:3px; }
+.wb-label-done { color:var(--wb-green); }
+.wb-item { display:flex; align-items:center; gap:7px; font-size:18px; line-height:1.25; padding:2px 0; }
+.wb-box { flex-shrink:0; width:16px; height:16px; border:2px solid var(--wb-ink); border-radius:3px; background:transparent; cursor:pointer; padding:0; display:inline-flex; align-items:center; justify-content:center; font-size:13px; line-height:1; color:var(--wb-green); font-weight:700; }
+.wb-box:hover { border-color:var(--wb-green); background:rgba(23,138,89,.08); }
+.wb-box.wb-ticked { border-color:var(--wb-green); }
+.wb-text { flex:1; min-width:0; cursor:pointer; overflow-wrap:anywhere; }
+.wb-text:hover { color:var(--wb-blue); }
+.wb-done .wb-text { color:var(--wb-ink-soft); text-decoration:line-through; text-decoration-color:rgba(23,138,89,.7); text-decoration-thickness:2px; }
+.wb-tag { font-size:12px; color:var(--wb-amber); border:1.5px solid currentColor; border-radius:8px; padding:0 5px; white-space:nowrap; }
+.wb-who { font-size:13px; color:var(--wb-blue); white-space:nowrap; }
+.wb-date { font-size:14px; color:var(--wb-ink-soft); white-space:nowrap; }
+.wb-date.wb-over { color:var(--wb-red); }
+.wb-push { flex-shrink:0; font-family:var(--wb-font); font-size:13px; color:var(--wb-ink-soft); background:transparent; border:1.5px solid var(--wb-line); border-radius:8px; padding:0 5px; cursor:pointer; }
+.wb-push:hover { color:var(--wb-ink); border-color:var(--wb-ink-soft); }
+@media (hover:hover) { .wb-push { visibility:hidden; } .wb-item:hover .wb-push { visibility:visible; } }
+.wb-more { font-family:var(--wb-font); font-size:15px; color:var(--wb-blue); background:none; border:0; padding:2px 0; cursor:pointer; }
+.wb-more-note { font-size:14px; color:var(--wb-ink-soft); padding-left:23px; }
+.wb-nothing { font-size:16px; color:var(--wb-ink-soft); padding:4px 0; }
+.wb-add { width:100%; box-sizing:border-box; margin-top:6px; font-family:var(--wb-font); font-size:17px; color:var(--wb-ink); background:transparent; border:0; border-bottom:1.5px dashed var(--wb-line); padding:3px 2px; outline:none; }
+.wb-add::placeholder { color:rgba(91,101,115,.55); }
+.wb-add:focus { border-bottom-color:var(--wb-blue); }
+.wb-empty { grid-column:1/-1; font-size:20px; color:var(--wb-ink-soft); text-align:center; padding:30px 0; font-family:var(--wb-font); }
+.wb-foot { grid-column:1/-1; border-top:2px solid var(--wb-line); padding-top:12px; font-family:var(--wb-font); font-size:16px; display:flex; flex-direction:column; gap:8px; }
+.wb-quiet { display:flex; flex-wrap:wrap; gap:6px; align-items:center; color:var(--wb-ink-soft); }
+.wb-quiet-k { margin-right:2px; }
+.wb-quiet button { font-family:var(--wb-font); font-size:15px; color:var(--wb-ink); background:rgba(31,42,55,.05); border:1.5px solid var(--wb-line); border-radius:12px; padding:0 9px; cursor:pointer; }
+.wb-quiet button:hover { border-color:var(--wb-ink-soft); }
+.wb-loose { color:var(--wb-blue); cursor:pointer; }
+.wb-loose:hover { text-decoration:underline; }
+@media (max-width:600px) {
+  .wb-board { padding:16px 14px 20px; border-width:6px; border-bottom-width:10px; grid-template-columns:1fr; }
+}
+
 @media (max-width:600px) {
   .robot-tray { padding:12px; }
   .robot-settings { padding:4px 16px 20px; }
@@ -3001,7 +3086,7 @@ select { color-scheme:dark; }
 .nav-more-wrap .nav-dropdown { right: auto; left: 0; }
 #navMoreBtn.active { color: var(--text); background: var(--bg-glass); }
 
-@media (max-width: 860px) {
+@media (max-width: 1179px) {
   .nav-center {
     flex: 1; min-width: 0; overflow-x: auto; justify-content: flex-start;
     scrollbar-width: none;
