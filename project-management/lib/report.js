@@ -210,8 +210,22 @@ function postFigures(p) {
   };
 }
 
+// Figures relayed by Claude from Norton's Metricool connection (monthly run).
+function relayedSocial(client, b) {
+  const row = db.prepare('SELECT data FROM report_social WHERE client_id = ? AND period = ?').get(client.id, b.start.slice(0, 7));
+  if (!row) return null;
+  try {
+    const d = JSON.parse(row.data);
+    return d.networks?.length ? { status: 'ok', brand: d.brand || '', networks: d.networks, notes: [], via: d.via || '' } : null;
+  } catch { return null; }
+}
+
 async function gatherSocial(client, b) {
   if (!client.metricool_blog_id) return { status: 'missing' };
+  const { token, userId } = mcCreds();
+  if (!token || !userId) {
+    return relayedSocial(client, b) || { status: 'error', message: 'No social figures for this month yet — they arrive on the 1st (via Claude), or add a Metricool key' };
+  }
   try {
     const brands = await metricoolBrands();
     const brand = brands.find(x => x.id === String(client.metricool_blog_id));
@@ -248,10 +262,10 @@ async function gatherSocial(client, b) {
         top: ranked[0] && ranked[0].text ? { text: ranked[0].text, url: ranked[0].url, interactions: ranked[0].interactions, views: ranked[0].views } : null,
       });
     }
-    if (!out.length) return { status: 'error', message: notes[0] || 'No social networks are connected to that Metricool brand' };
+    if (!out.length) return relayedSocial(client, b) || { status: 'error', message: notes[0] || 'No social networks are connected to that Metricool brand' };
     return { status: 'ok', brand: brand.label, networks: out, notes };
   } catch (err) {
-    return { status: 'error', message: err.message };
+    return relayedSocial(client, b) || { status: 'error', message: err.message };
   }
 }
 

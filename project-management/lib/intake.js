@@ -562,7 +562,11 @@ export function relayStatus() {
   if (mailbox) skip.push('gmail');
   if (getSecret('periskope_api_key', 'PERISKOPE_API_KEY')) skip.push('periskope');
   if (getSecret('granola_api_key', 'GRANOLA_API_KEY')) skip.push('granola');
-  return { since, skip, mailbox, robot };
+  // Clients linked to a Metricool brand — the monthly run fetches their figures.
+  const metricool = db.prepare(`SELECT id, name, metricool_blog_id FROM clients
+    WHERE archived = 0 AND is_system = 0 AND metricool_blog_id != '' ORDER BY name`).all()
+    .map(c => ({ blog_id: c.metricool_blog_id, client: c.name }));
+  return { since, skip, mailbox, robot, metricool };
 }
 
 function relaySource() {
