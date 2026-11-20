@@ -269,6 +269,16 @@ try {
 } catch (err) {
   console.error('[Seed] Client fix Nov 2026 error:', err.message);
 }
+try {
+  if (!db.prepare("SELECT value FROM app_meta WHERE key='clients_fix_2026_11_v2'").get()) {
+    const { amendClientsNov2026v2 } = await import('./scripts/fix-clients-2026-11.js');
+    const r = amendClientsNov2026v2(db);
+    db.prepare("INSERT INTO app_meta (key, value) VALUES ('clients_fix_2026_11_v2', ?)").run(new Date().toISOString());
+    console.log(`[Seed] Client fix Nov 2026 v2: ${r.updated.length} updated.`);
+  }
+} catch (err) {
+  console.error('[Seed] Client fix Nov 2026 v2 error:', err.message);
+}
 
 // ─── Error Handler ──────────────────────────────────────
 app.use((err, req, res, next) => {
