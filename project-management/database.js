@@ -309,6 +309,8 @@ try { db.exec("ALTER TABLE clients ADD COLUMN last_touch_at TEXT DEFAULT ''"); }
 try { db.exec("ALTER TABLE clients ADD COLUMN pulse_link TEXT DEFAULT ''"); } catch {}
 try { db.exec("ALTER TABLE clients ADD COLUMN metricool_blog_id TEXT DEFAULT ''"); } catch {}
 try { db.exec("ALTER TABLE clients ADD COLUMN report_email TEXT DEFAULT ''"); } catch {}
+// The Xero contact a client is billed under — when set, the monthly value follows Xero's repeating invoices.
+try { db.exec("ALTER TABLE clients ADD COLUMN xero_contact_id TEXT DEFAULT ''"); } catch {}
 db.exec(`
   CREATE TABLE IF NOT EXISTS suggestions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

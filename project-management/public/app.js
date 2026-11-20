@@ -637,6 +637,7 @@ let dashWaConfigs = [];
 let bpDoNowCount = 0;
 
 async function loadDashboard() {
+  loadXeroRetainers();
   if (isOwner() && !robot.denied) {
     api('/api/suggestions').then(list => { robot.list = list; robot.pending = list.length; updateInboxCount();
       if (currentView === 'dashboard') renderControlBoard(); }).catch(() => {});
@@ -882,6 +883,7 @@ function renderControlBoard() {
   if (densBtn) densBtn.innerHTML = compact ? '&#9638;' : '&#9776;';
   board.innerHTML = list.map(compact ? clientRowHTML : clientCardHTML).join('')
     + (!statusF && !typeF ? noClientCardHTML(compact) : '');
+  renderXeroSummary();
 }
 
 // Compact one-line-per-client mode: scanning becomes linear instead of grid-hopping.
@@ -905,7 +907,7 @@ function clientRowHTML(c) {
     <span class="cb-row-next ${na.urgent ? 'cb-row-next-urgent' : ''}">➜ ${esc(na.text)}</span>
     ${b.overdue ? `<span class="cb-stat cb-stat-bad">${b.overdue} overdue</span>` : ''}
     ${lcStale ? `<span class="cb-row-stale" title="${lastContactLabel(c.last_contact_date)}">⚠ ${lcDays}d</span>` : ''}
-    <span class="cb-row-value">${c.monthly_value ? clientValueLabel(c) : typeLabelClient(c.client_type)}</span>
+    <span class="cb-row-value">${c.monthly_value ? clientValueLabel(c) : typeLabelClient(c.client_type)}${xeroBadge(c)}</span>
   </div>`;
 }
 
@@ -936,7 +938,7 @@ function clientCardHTML(c) {
       ${logo}
       <div class="cb-card-name">
         <div class="cb-name">${esc(c.name)} ${c.is_private?'<span title="Private">🔒</span>':''}</div>
-        <div class="cb-sub">${esc(typeLabelClient(c.client_type))}</div>
+        <div class="cb-sub">${esc(typeLabelClient(c.client_type))}${xeroBadge(c)}</div>
       </div>
       ${valueChip}
       <span class="rag-dot ${sCfg.cls}" title="${sCfg.label}"></span>
@@ -957,6 +959,106 @@ function clientCardHTML(c) {
     <div class="cb-contact ${lcStale?'cb-contact-stale':''}" title="Last contact">${lastContactLabel(c.last_contact_date)}${lcStale?' ⚠':''}</div>
     <div class="cb-status-line"><span class="rag-pill ${sCfg.cls}">${sCfg.label}</span>${overrideTag}</div>
   </div>`;
+}
+
+// ─── Retainers checked against Xero (owner only) ─────────────────────────
+// Xero's repeating invoices say what each client is really billed a month.
+// A client linked to its Xero contact follows Xero automatically; any other
+// match by name shows ✓ when Console agrees, or ⚠ with Xero's figure to adopt.
+let xeroRet = null;
+async function loadXeroRetainers(fresh) {
+  if (!isOwner()) return;
+  try {
+    const r = await api(`/api/xero/retainers${fresh ? '?fresh=1' : ''}`);
+    xeroRet = r;
+    if (r.synced?.length) { await loadClients(); return; }      // amounts were brought in line with Xero
+  } catch (e) { xeroRet = { connected: true, error: e.message }; }
+  if (currentView === 'dashboard') renderControlBoard();
+}
+const fmtPounds = n => '£' + Number(n || 0).toLocaleString('en-GB', { maximumFractionDigits: 2 });
+
+function xeroBadge(c) {
+  if (!isOwner() || !xeroRet?.connected || !xeroRet.matches) return '';
+  const m = xeroRet.matches[c.id];
+  if (!m) return '';
+  const xm = m.monthly || 0, cm = c.monthly_value || 0;
+  const who = esc(m.name || 'the linked Xero contact');
+  if (!xm) return m.by === 'linked'
+    ? `<span class="xero-badge xero-warn" title="Linked to ${who}, but Xero has no active repeating invoice for them">⚠ none in Xero</span>` : '';
+  if (Math.abs(xm - cm) < 0.5) {
+    return `<span class="xero-badge xero-ok" title="${m.by === 'linked' ? 'Follows' : 'Matches'} Xero — ${who}: ${m.templates.map(t => `${esc(t.reference || 'repeating invoice')} ${fmtPounds(t.monthly)}`).join(' + ')}">✓ Xero</span>`;
+  }
+  return `<button class="xero-badge xero-warn" onclick="event.stopPropagation();xeroUseAmount(${c.id})"
+    title="Xero bills ${who} ${fmtPounds(xm)} a month — click to use it (the client then follows Xero)">⚠ Xero ${fmtPounds(xm)}</button>`;
+}
+
+async function xeroUseAmount(cid) {
+  const c = clients.find(x => x.id === cid);
+  const m = xeroRet?.matches?.[cid];
+  if (!c || !m) return;
+  if (!confirm(`Set ${c.name}'s monthly value to ${fmtPounds(m.monthly)} from Xero (${m.name})?\n\nIt will then follow Xero automatically.`)) return;
+  try {
+    await api(`/api/clients/${cid}`, { method: 'PUT', body: { monthly_value: m.monthly, xero_contact_id: m.contactId } });
+    toast(`${c.name}: ${fmtPounds(m.monthly)}/month, linked to Xero`, true);
+    await loadClients();
+    loadXeroRetainers();
+  } catch (e) { toast('Not saved — ' + e.message); }
+}
+
+function renderXeroSummary() {
+  const el = document.getElementById('cbXeroSummary');
+  if (!el) return;
+  if (!isOwner() || !xeroRet) { el.innerHTML = ''; return; }
+  if (!xeroRet.connected) { el.innerHTML = ''; return; }
+  if (xeroRet.error) { el.innerHTML = `<span class="xero-warn-text" title="${esc(xeroRet.error)}">⚠ Xero check failed</span>`; return; }
+  const real = clients.filter(c => !c.is_system && !c.archived);
+  let ok = 0, differ = 0, unmatched = 0;
+  for (const c of real) {
+    const m = xeroRet.matches[c.id];
+    if (!m) { if (c.client_type === 'retainer') unmatched++; continue; }
+    if (m.monthly && Math.abs(m.monthly - (c.monthly_value || 0)) < 0.5) ok++; else differ++;
+  }
+  const parts = [`<span class="xero-ok-text">✓ ${ok} match Xero</span>`];
+  if (differ) parts.push(`<span class="xero-warn-text">⚠ ${differ} differ</span>`);
+  if (unmatched) parts.push(`<span title="Retainer clients with no Xero contact matched — link them in Edit client">${unmatched} retainer${unmatched > 1 ? 's' : ''} not linked</span>`);
+  el.innerHTML = `${parts.join(' · ')} <button class="xero-refresh" onclick="loadXeroRetainers(true)" title="Check Xero again now">&#8635;</button>`;
+}
+
+// Edit client: which Xero contact this client is billed under.
+function fillXeroPicker(c) {
+  const sel = document.getElementById('clientXeroContact');
+  if (!sel) return;
+  const contacts = xeroRet?.contacts || [];
+  const linked = c?.xero_contact_id || '';
+  const opts = ['<option value="">Xero: not linked</option>'].concat(contacts.map(x =>
+    `<option value="${esc(x.contactId)}" ${x.contactId === linked ? 'selected' : ''}>Xero: ${esc(x.name)} — ${fmtPounds(x.monthly)}/mo</option>`));
+  if (linked && !contacts.some(x => x.contactId === linked)) opts.push(`<option value="${esc(linked)}" selected>Xero: linked contact (no active repeating invoice)</option>`);
+  sel.innerHTML = opts.join('');
+  sel.disabled = !xeroRet?.connected || !!xeroRet.error;
+  sel.dataset.clientId = c ? c.id : '';
+  xeroFormHint();
+}
+
+function xeroFormHint() {
+  const sel = document.getElementById('clientXeroContact');
+  const hint = document.getElementById('clientXeroHint');
+  const input = document.getElementById('clientMonthlyValue');
+  if (!sel || !hint) return;
+  if (!xeroRet?.connected) { hint.textContent = 'Connect Xero (Workspace strip on the Dashboard) to check this against your invoices.'; input.readOnly = false; return; }
+  if (xeroRet.error) { hint.textContent = xeroRet.error; input.readOnly = false; return; }
+  const chosen = (xeroRet.contacts || []).find(x => x.contactId === sel.value);
+  if (chosen) {
+    input.value = chosen.monthly;
+    input.readOnly = true;
+    hint.innerHTML = `Follows Xero: ${esc(chosen.templates.map(t => `${t.reference || 'repeating invoice'} ${fmtPounds(t.monthly)}`).join(' + '))}`;
+    return;
+  }
+  input.readOnly = false;
+  const cid = +sel.dataset.clientId;
+  const m = cid ? xeroRet.matches?.[cid] : null;
+  hint.innerHTML = m && m.by === 'name' && m.monthly
+    ? `Xero bills <b>${esc(m.name)}</b> ${fmtPounds(m.monthly)}/month — pick them above to follow Xero.`
+    : 'Pick the Xero contact this client is billed under and the amount follows Xero.';
 }
 
 // Tasks captured without a client, on the board like any client.
@@ -3736,6 +3838,7 @@ document.getElementById('addClientBtn').addEventListener('click',()=>{
   document.getElementById('clientFormError').style.display='none';
   ['clientId','clientName','clientCode','clientNotes','clientGmail','clientDrive','clientMonthlyValue','clientAgreementSummary','clientRecurringDeliverables','clientLastContact','clientNextScheduled','clientContacts','clientPulseLink','clientReportEmail'].forEach(id=>document.getElementById(id).value='');
   if (isOwner()) loadMetricoolOptions('');
+  if (isOwner()) fillXeroPicker(null);
   document.getElementById('clientType').value='recurring';
   document.getElementById('clientTypeBand').value='retainer';
   document.getElementById('clientControlStatus').value='';
@@ -3770,6 +3873,7 @@ function editClient(id){
   document.getElementById('clientPulseLink').value=c.pulse_link||'';
   document.getElementById('clientReportEmail').value=c.report_email||'';
   if (isOwner()) loadMetricoolOptions(c.metricool_blog_id||'');
+  if (isOwner()) fillXeroPicker(c);
   document.getElementById('clientLogo').value='';
   document.getElementById('clientPrivate').checked=!!c.is_private;
   document.getElementById('privateClientGroup').style.display=currentUser?.role==='owner'?'':'none';
@@ -3792,6 +3896,8 @@ document.getElementById('clientForm').addEventListener('submit',async e=>{
     risk_level:document.getElementById('clientRiskLevel').value,
     important_contacts:document.getElementById('clientContacts').value};
   if (isOwner()) {
+    const xsel = document.getElementById('clientXeroContact');
+    if (xsel && !xsel.disabled) data.xero_contact_id = xsel.value;
     data.pulse_link = document.getElementById('clientPulseLink').value.trim();
     data.metricool_blog_id = document.getElementById('clientMetricool').value;
     data.report_email = document.getElementById('clientReportEmail').value.trim();
