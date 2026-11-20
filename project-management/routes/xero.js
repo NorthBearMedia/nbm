@@ -348,19 +348,20 @@ async function xeroRetainerContacts(userId, fresh) {
   return entry;
 }
 
-function matchClients(contacts) {
+function matchClients(contacts, { includeArchived = false } = {}) {
   const out = {};
-  for (const c of db.prepare('SELECT id, name, xero_contact_id FROM clients WHERE archived = 0 AND is_system = 0').all()) {
+  for (const c of db.prepare(`SELECT id, name, aliases, xero_contact_id FROM clients WHERE is_system = 0 ${includeArchived ? '' : 'AND archived = 0'}`).all()) {
     let hit = null, by = '';
     if (c.xero_contact_id) {
       hit = contacts.find(x => x.contactId === c.xero_contact_id) || { contactId: c.xero_contact_id, name: '', monthly: 0, templates: [] };
       by = 'linked';
     } else {
-      const n = normName(c.name);
-      const cands = n ? contacts.filter(x => {
+      // The client's name or any "also known as" name (Keto & Clarity → "Uni Nutrition").
+      const names = [c.name, ...String(c.aliases || '').split(',')].map(normName).filter(Boolean);
+      const cands = contacts.filter(x => {
         const m = normName(x.name);
-        return m && (m === n || (Math.min(m.length, n.length) >= 5 && (m.includes(n) || n.includes(m))));
-      }) : [];
+        return m && names.some(n => m === n || (Math.min(m.length, n.length) >= 5 && (m.includes(n) || n.includes(m))));
+      });
       if (cands.length === 1) { hit = cands[0]; by = 'name'; }
     }
     out[c.id] = hit ? { ...hit, by } : null;
@@ -385,7 +386,11 @@ router.get('/api/xero/retainers', requireAuth, requireRole('owner'), async (req,
         `Monthly value £${row?.monthly_value || 0} → £${m.monthly} (from Xero repeating invoices)`);
       synced.push(+cid);
     }
-    res.json({ connected: true, checkedAt: new Date(at).toISOString(), contacts, matches, synced });
+    // Retainers billed in Xero with no client in Console at all (archived
+    // clients count as "in Console" — taken off on purpose).
+    const known = new Set(Object.values(matchClients(contacts, { includeArchived: true })).filter(Boolean).map(m => m.contactId));
+    const unmatched = contacts.filter(x => !known.has(x.contactId) && x.monthly > 0).sort((a, b) => b.monthly - a.monthly);
+    res.json({ connected: true, checkedAt: new Date(at).toISOString(), contacts, matches, synced, unmatched });
   } catch (err) {
     console.error('[Xero] Retainers error:', err.message);
     const gone = /No Xero connection|refresh failed|invalid_grant|401/i.test(err.message);

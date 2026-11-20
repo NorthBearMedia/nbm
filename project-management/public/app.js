@@ -1021,7 +1021,48 @@ function renderXeroSummary() {
   const parts = [`<span class="xero-ok-text">✓ ${ok} match Xero</span>`];
   if (differ) parts.push(`<span class="xero-warn-text">⚠ ${differ} differ</span>`);
   if (unmatched) parts.push(`<span title="Retainer clients with no Xero contact matched — link them in Edit client">${unmatched} retainer${unmatched > 1 ? 's' : ''} not linked</span>`);
+  const missing = xeroRet.unmatched?.length || 0;
+  if (missing) parts.push(`<button class="xero-missing-link" onclick="openXeroMissing()" title="Clients you bill monthly in Xero that aren't in Console">+${missing} in Xero, not in Console</button>`);
   el.innerHTML = `${parts.join(' · ')} <button class="xero-refresh" onclick="loadXeroRetainers(true)" title="Check Xero again now">&#8635;</button>`;
+}
+
+// Retainers billed in Xero with no client in Console: add them in one click,
+// already linked (so the amount follows Xero) and with Xero's name kept as an
+// "also known as" if you give the client a different name.
+function openXeroMissing() {
+  renderXeroMissing();
+  openModal('xeroMissingModal');
+}
+function renderXeroMissing() {
+  const body = document.getElementById('xeroMissingBody');
+  const list = xeroRet?.unmatched || [];
+  if (!list.length) { body.innerHTML = '<div class="rs-loading">Every client you bill monthly in Xero is in Console.</div>'; return; }
+  body.innerHTML = `<p class="rs-sub">Billed every month in Xero but not a client here. Give it the name you use, then add it — or leave it if it's just hosting.</p>`
+    + list.map(x => `<div class="xm-row" data-id="${esc(x.contactId)}">
+      <div class="xm-main">
+        <input type="text" class="xm-name" value="${esc(x.name)}" maxlength="80" title="Client name in Console">
+        <div class="xm-sub">${esc(x.name)} · ${esc(x.templates.map(t => t.reference || 'repeating invoice').join(' + '))}</div>
+      </div>
+      <span class="xm-amt">${fmtPounds(x.monthly)}/mo</span>
+      <button class="btn btn-primary btn-sm" onclick="xeroAddClient('${esc(x.contactId)}', this)">+ Add</button>
+    </div>`).join('');
+}
+async function xeroAddClient(contactId, btn) {
+  const x = (xeroRet?.unmatched || []).find(c => c.contactId === contactId);
+  if (!x) return;
+  const name = btn.closest('.xm-row').querySelector('.xm-name').value.trim() || x.name;
+  btn.disabled = true;
+  try {
+    await api('/api/clients', { method: 'POST', body: {
+      name, client_type: 'retainer', agreement_type: 'recurring', monthly_value: x.monthly, xero_contact_id: x.contactId,
+      aliases: name.toLowerCase() === x.name.toLowerCase() ? '' : x.name,
+    } });
+    toast(`${name} added — ${fmtPounds(x.monthly)}/month, following Xero`, true);
+    xeroRet.unmatched = xeroRet.unmatched.filter(c => c.contactId !== contactId);
+    renderXeroMissing();
+    await loadClients();
+    loadXeroRetainers(true);
+  } catch (e) { btn.disabled = false; toast('Not added — ' + e.message); }
 }
 
 // Edit client: which Xero contact this client is billed under.
@@ -1122,6 +1163,7 @@ function openClientDetail(id) {
     </div>
     <div class="cd-grid">
       <div>
+        ${c.aliases ? `<div class="cd-block"><h4>Also known as</h4><p>${esc(c.aliases)}</p></div>` : ''}
         ${c.agreement_summary ? `<div class="cd-block"><h4>Agreement</h4><p>${esc(c.agreement_summary)}</p></div>` : ''}
         ${c.recurring_deliverables ? `<div class="cd-block"><h4>Recurring deliverables</h4><p style="white-space:pre-wrap">${esc(c.recurring_deliverables)}</p></div>` : ''}
         ${c.notes ? `<div class="cd-block"><h4>Notes</h4><p style="white-space:pre-wrap">${esc(c.notes)}</p></div>` : ''}
@@ -2259,6 +2301,21 @@ function renderRobotSettings() {
     </section>
 
     <section class="rs-sec">
+      <h4>Claude — your conversations into Console</h4>
+      <div class="rs-sub rs-block-sub">Claude can't share your chat history with other apps, so Console plugs into Claude instead: once connected, any Claude conversation can send its tasks, decisions and updates here (they arrive as suggestions for your yes).</div>
+      <div class="rs-capture">
+        <input type="text" readonly value="${esc(s.connectorUrl || '')}" onclick="this.select()" id="rsConnectorUrl">
+        <button class="btn btn-ghost btn-sm" onclick="robotCopy('rsConnectorUrl')">Copy</button>
+      </div>
+      <ol class="rs-steps">
+        <li>In Claude: <b>Settings → Connectors → Add custom connector</b>. Name it <i>North Bear Console</i> and paste the address above.</li>
+        <li>In Claude: <b>Settings → Profile</b>, add to your preferences: <i>“When a conversation produces tasks, decisions, deadlines or updates for a North Bear client, send them to North Bear Console.”</i></li>
+        <li>In Claude Code (optional): <code>claude mcp add --transport http north-bear-console &lt;address&gt;</code></li>
+      </ol>
+      <div class="rs-sub">Same secret as the Send to Console link — “New link” above changes both.</div>
+    </section>
+
+    <section class="rs-sec">
       <h4>Recent checks</h4>
       ${runs || '<div class="rs-sub">None yet.</div>'}
       ${notes ? `<ul class="rs-notes">${notes}</ul>` : ''}
@@ -2312,8 +2369,9 @@ async function robotRemoveMailbox(id) {
   openRobotSettings();
 }
 
-async function robotCopyCapture() {
-  const el = document.getElementById('rsCaptureUrl');
+async function robotCopyCapture() { return robotCopy('rsCaptureUrl'); }
+async function robotCopy(id) {
+  const el = document.getElementById(id);
   try { await navigator.clipboard.writeText(el.value); }
   catch { el.select(); document.execCommand('copy'); }
   toast('Link copied', true);
@@ -3836,7 +3894,7 @@ async function showArchiveModal(){
 document.getElementById('addClientBtn').addEventListener('click',()=>{
   document.getElementById('clientModalTitle').textContent='New Client';
   document.getElementById('clientFormError').style.display='none';
-  ['clientId','clientName','clientCode','clientNotes','clientGmail','clientDrive','clientMonthlyValue','clientAgreementSummary','clientRecurringDeliverables','clientLastContact','clientNextScheduled','clientContacts','clientPulseLink','clientReportEmail'].forEach(id=>document.getElementById(id).value='');
+  ['clientId','clientName','clientCode','clientNotes','clientGmail','clientDrive','clientMonthlyValue','clientAgreementSummary','clientRecurringDeliverables','clientLastContact','clientNextScheduled','clientContacts','clientPulseLink','clientReportEmail','clientAliases'].forEach(id=>document.getElementById(id).value='');
   if (isOwner()) loadMetricoolOptions('');
   if (isOwner()) fillXeroPicker(null);
   document.getElementById('clientType').value='recurring';
@@ -3867,6 +3925,7 @@ function editClient(id){
   document.getElementById('clientControlStatus').value=c.control_status||'';
   document.getElementById('clientRiskLevel').value=c.risk_level||'';
   document.getElementById('clientContacts').value=c.important_contacts||'';
+  document.getElementById('clientAliases').value=c.aliases||'';
   document.getElementById('clientNotes').value=c.notes||'';
   document.getElementById('clientGmail').value=c.gmail_link||'';
   document.getElementById('clientDrive').value=c.drive_link||'';
@@ -3894,7 +3953,8 @@ document.getElementById('clientForm').addEventListener('submit',async e=>{
     next_scheduled_date:document.getElementById('clientNextScheduled').value,
     control_status:document.getElementById('clientControlStatus').value,
     risk_level:document.getElementById('clientRiskLevel').value,
-    important_contacts:document.getElementById('clientContacts').value};
+    important_contacts:document.getElementById('clientContacts').value,
+    aliases:document.getElementById('clientAliases').value};
   if (isOwner()) {
     const xsel = document.getElementById('clientXeroContact');
     if (xsel && !xsel.disabled) data.xero_contact_id = xsel.value;

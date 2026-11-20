@@ -239,6 +239,7 @@ router.get('/api/intake/status', ...ownerOnly, (req, res) => {
       userId: getSecret('metricool_user_id', 'METRICOOL_USER_ID'),
     },
     captureUrl: `${originOf(req)}/capture/${captureToken()}`,
+    connectorUrl: `${originOf(req)}/mcp/${captureToken()}`,
   });
 });
 
@@ -352,5 +353,86 @@ router.post('/capture/:token',
     }
     res.json({ ok: true, message: 'Captured — the robot will turn it into suggestions shortly.' });
   });
+
+// ─── Claude connector (MCP) ──────────────────────────────────────────────────
+// Claude can't share chat history with other apps, so Console plugs into
+// Claude instead: added as a custom connector (claude.ai → Settings →
+// Connectors, or `claude mcp add` in Claude Code), every conversation gets a
+// send_to_console tool. What it sends joins the capture queue, so the robot
+// turns it into suggestions that still wait for Norton's yes — same secret
+// token as the capture link, same write-only reach (nothing can be read).
+// Streamable HTTP transport, plain JSON responses, stateless.
+const MCP_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
+const MCP_TOOL = {
+  name: 'send_to_console',
+  title: 'Send to North Bear Console',
+  description: "Send an update to North Bear Console, Norton's task list for North Bear Media. Use it whenever the conversation " +
+    'produces something for the list: a new task or action point, a deadline, something finished, something now waiting on a ' +
+    'client, or a decision about a client. Name the client and include dates. Console turns it into suggestions Norton approves.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      text: { type: 'string', description: 'The update in plain words: the tasks, decisions, deadlines or what was done. Name the client.' },
+      title: { type: 'string', description: 'Optional short label, e.g. the conversation topic.' },
+    },
+    required: ['text'],
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+};
+const rpcError = (id, code, message) => ({ jsonrpc: '2.0', id: id ?? null, error: { code, message } });
+
+function mcpHandle(m, ip) {
+  const ok = result => ({ jsonrpc: '2.0', id: m.id, result });
+  switch (m.method) {
+    case 'initialize': {
+      const asked = m.params?.protocolVersion;
+      return ok({
+        protocolVersion: MCP_VERSIONS.includes(asked) ? asked : MCP_VERSIONS[0],
+        capabilities: { tools: { listChanged: false } },
+        serverInfo: { name: 'north-bear-console', title: 'North Bear Console', version: '1.0.0' },
+        instructions: "Whenever a conversation produces tasks, decisions, deadlines or updates for one of Norton's North Bear Media " +
+          'clients, send them to North Bear Console with send_to_console.',
+      });
+    }
+    case 'ping': return ok({});
+    case 'tools/list': return ok({ tools: [MCP_TOOL] });
+    case 'resources/list': return ok({ resources: [] });
+    case 'prompts/list': return ok({ prompts: [] });
+    case 'tools/call': {
+      if (m.params?.name !== MCP_TOOL.name) return rpcError(m.id, -32602, `Unknown tool: ${m.params?.name}`);
+      const args = m.params?.arguments || {};
+      const text = String(args.text || '').trim();
+      const fail = msg => ok({ content: [{ type: 'text', text: msg }], isError: true });
+      if (!text) return fail('Nothing to send — the text was empty.');
+      if (text.length > 20000) return fail('Too long — send under 20,000 characters at a time.');
+      if (captureLimited(ip)) return fail('Too many sends in the last hour — try again later.');
+      const label = `Claude · ${String(args.title || 'conversation').replace(/\s+/g, ' ').trim().slice(0, 100)}`;
+      db.prepare('INSERT INTO intake_captures (text, label) VALUES (?, ?)').run(text, label);
+      scheduleCaptureRun();
+      return ok({ content: [{ type: 'text', text: "Sent to North Bear Console. It becomes suggestions in Norton's Inbox within a minute, for him to approve." }] });
+    }
+    default: return rpcError(m.id, -32601, `Method not found: ${m.method}`);
+  }
+}
+
+router.post('/mcp/:token', (req, res) => {
+  if (!tokenOk(req.params.token)) return res.status(404).json(rpcError(null, -32001, 'Not found'));
+  const batch = Array.isArray(req.body);
+  const msgs = batch ? req.body : [req.body];
+  const out = [];
+  for (const m of msgs) {
+    if (!m || typeof m !== 'object' || m.jsonrpc !== '2.0' || typeof m.method !== 'string') {
+      out.push(rpcError(m?.id, -32600, 'Invalid request'));
+      continue;
+    }
+    if (m.id === undefined || m.id === null) continue;            // a notification: nothing to answer
+    out.push(mcpHandle(m, req.ip || 'unknown'));
+  }
+  if (!out.length) return res.status(202).end();
+  res.json(batch ? out : out[0]);
+});
+// No server-initiated stream and no sessions to end.
+router.get('/mcp/:token', (req, res) => res.status(405).set('Allow', 'POST').end());
+router.delete('/mcp/:token', (req, res) => res.status(405).set('Allow', 'POST').end());
 
 export default router;

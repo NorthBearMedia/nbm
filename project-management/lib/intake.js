@@ -112,8 +112,8 @@ function loadKnownContacts() {
     if (!id.includes('@') && phoneTail(id)) k.phones.add(phoneTail(id));
   };
   for (const r of db.prepare('SELECT identifier, client_id FROM contact_map').all()) learn(kn(r.client_id), r.identifier);
-  for (const c of db.prepare('SELECT id, important_contacts, notes FROM clients WHERE is_system = 0').all()) {
-    const text = `${c.important_contacts || ''}\n${c.notes || ''}`;
+  for (const c of db.prepare('SELECT id, important_contacts, notes, aliases FROM clients WHERE is_system = 0').all()) {
+    const text = `${c.important_contacts || ''}\n${c.notes || ''}\n${c.aliases || ''}`;
     const k = kn(c.id);
     for (const e of text.match(/[^\s@<>(),;:"']+@[^\s@<>(),;:"']+\.[a-z]{2,}/gi) || []) learn(k, e);
     for (const p of text.match(/\+?\d[\d\s().-]{7,}\d/g) || []) { const t = phoneTail(p); if (t) k.phones.add(t); }
@@ -568,7 +568,7 @@ const RECORD_TOOL = {
 
 function buildContext(ownerName, selfIds) {
   const today = new Date();
-  const clients = db.prepare(`SELECT id, name, code, client_type, important_contacts FROM clients
+  const clients = db.prepare(`SELECT id, name, code, client_type, important_contacts, aliases FROM clients
     WHERE archived = 0 AND is_system = 0 ORDER BY name`).all();
   const known = new Map();
   for (const r of db.prepare('SELECT identifier, client_id FROM contact_map').all()) {
@@ -592,7 +592,8 @@ function buildContext(ownerName, selfIds) {
     const extra = [c.code, c.client_type].filter(Boolean).join(', ');
     const contacts = String(c.important_contacts || '').replace(/\s+/g, ' ').slice(0, 160);
     const k = (known.get(c.id) || []).slice(0, 8).join(', ');
-    lines.push(`#${c.id} ${c.name}${extra ? ` [${extra}]` : ''}${contacts ? ` — contacts: ${contacts}` : ''}${k ? ` — known addresses: ${k}` : ''}`);
+    const aka = String(c.aliases || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+    lines.push(`#${c.id} ${c.name}${extra ? ` [${extra}]` : ''}${aka ? ` — also known as: ${aka}` : ''}${contacts ? ` — contacts: ${contacts}` : ''}${k ? ` — known addresses: ${k}` : ''}`);
   }
   lines.push('', 'OPEN TASKS (NB number — title — status, due date, assignee):');
   const perClient = new Map();

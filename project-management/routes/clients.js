@@ -85,6 +85,8 @@ const cleanUrl = v => {
   return t === '' || /^https?:\/\/\S+$/i.test(t) ? t : null;
 };
 const cleanDigits = v => (v === undefined ? undefined : String(v || '').replace(/\D/g, '').slice(0, 20));
+const cleanAliases = v => (v === undefined ? undefined : [...new Set(String(v || '').split(/[,\n;]+/)
+  .map(a => a.replace(/\s+/g, ' ').trim().slice(0, 80)).filter(Boolean))].slice(0, 10).join(', '));
 const cleanEmails = v => {
   if (v === undefined) return undefined;
   const list = String(v || '').split(/[,;\s]+/).map(e => e.trim()).filter(Boolean);
@@ -187,7 +189,7 @@ router.post('/', requireAuth, requireWrite, (req, res) => {
   let { name, code, agreement_type, notes, gmail_link, drive_link, is_private,
     client_type, monthly_value, agreement_summary, recurring_deliverables,
     last_contact_date, next_scheduled_date, control_status, risk_level, important_contacts,
-    pulse_link, metricool_blog_id, report_email, xero_contact_id } = req.body;
+    pulse_link, metricool_blog_id, report_email, xero_contact_id, aliases } = req.body;
   if (!name) return res.status(400).json({ error: 'Client name is required' });
   // Report settings are owner-only; staff posts never carry them.
   const owner = req.user.role === 'owner';
@@ -221,6 +223,7 @@ router.post('/', requireAuth, requireWrite, (req, res) => {
     db.prepare('UPDATE clients SET pulse_link = ?, metricool_blog_id = ?, report_email = ?, xero_contact_id = ? WHERE id = ?')
       .run(pulse_link || '', metricool_blog_id || '', report_email || '', xero_contact_id, result.lastInsertRowid);
   }
+  if (cleanAliases(aliases)) db.prepare('UPDATE clients SET aliases = ? WHERE id = ?').run(cleanAliases(aliases), result.lastInsertRowid);
   logActivity('client', result.lastInsertRowid, 'created', req.user.display_name, `Created client "${name}"`);
   const created = db.prepare('SELECT * FROM clients WHERE id = ?').get(result.lastInsertRowid);
   res.json(owner ? created : hideOwnerFields(created));
@@ -238,7 +241,8 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   let { name, code, agreement_type, notes, logo_url, gmail_link, drive_link, is_private,
     client_type, monthly_value, agreement_summary, recurring_deliverables,
     last_contact_date, next_scheduled_date, control_status, risk_level, important_contacts,
-    pulse_link, metricool_blog_id, report_email, xero_contact_id } = req.body;
+    pulse_link, metricool_blog_id, report_email, xero_contact_id, aliases } = req.body;
+  aliases = cleanAliases(aliases);
   const old = requireClientAccess(req, res);
   if (!old) return;
   pulse_link = cleanUrl(pulse_link);
@@ -264,11 +268,11 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
     pulse_link = undefined; metricool_blog_id = undefined; report_email = undefined; xero_contact_id = undefined;
   }
 
-  db.prepare('UPDATE clients SET name=COALESCE(?,name), code=COALESCE(?,code), agreement_type=COALESCE(?,agreement_type), notes=COALESCE(?,notes), logo_url=COALESCE(?,logo_url), gmail_link=COALESCE(?,gmail_link), drive_link=COALESCE(?,drive_link), is_private=COALESCE(?,is_private), client_type=COALESCE(?,client_type), monthly_value=COALESCE(?,monthly_value), agreement_summary=COALESCE(?,agreement_summary), recurring_deliverables=COALESCE(?,recurring_deliverables), last_contact_date=COALESCE(?,last_contact_date), next_scheduled_date=COALESCE(?,next_scheduled_date), control_status=COALESCE(?,control_status), risk_level=COALESCE(?,risk_level), important_contacts=COALESCE(?,important_contacts), pulse_link=COALESCE(?,pulse_link), metricool_blog_id=COALESCE(?,metricool_blog_id), report_email=COALESCE(?,report_email), xero_contact_id=COALESCE(?,xero_contact_id) WHERE id=?')
+  db.prepare('UPDATE clients SET name=COALESCE(?,name), code=COALESCE(?,code), agreement_type=COALESCE(?,agreement_type), notes=COALESCE(?,notes), logo_url=COALESCE(?,logo_url), gmail_link=COALESCE(?,gmail_link), drive_link=COALESCE(?,drive_link), is_private=COALESCE(?,is_private), client_type=COALESCE(?,client_type), monthly_value=COALESCE(?,monthly_value), agreement_summary=COALESCE(?,agreement_summary), recurring_deliverables=COALESCE(?,recurring_deliverables), last_contact_date=COALESCE(?,last_contact_date), next_scheduled_date=COALESCE(?,next_scheduled_date), control_status=COALESCE(?,control_status), risk_level=COALESCE(?,risk_level), important_contacts=COALESCE(?,important_contacts), pulse_link=COALESCE(?,pulse_link), metricool_blog_id=COALESCE(?,metricool_blog_id), report_email=COALESCE(?,report_email), xero_contact_id=COALESCE(?,xero_contact_id), aliases=COALESCE(?,aliases) WHERE id=?')
     .run(name, code, agreement_type, notes, logo_url, gmail_link, drive_link, is_private !== undefined ? (is_private ? 1 : 0) : null,
       client_type, monthly_value, agreement_summary, recurring_deliverables,
       last_contact_date, next_scheduled_date, control_status, risk_level, important_contacts,
-      pulse_link, metricool_blog_id, report_email, xero_contact_id, req.params.id);
+      pulse_link, metricool_blog_id, report_email, xero_contact_id, aliases, req.params.id);
 
   const changes = [];
   if (name && name !== old.name) changes.push(`name: "${old.name}" → "${name}"`);
@@ -277,6 +281,7 @@ router.put('/:id', requireAuth, requireWrite, (req, res) => {
   if (control_status !== undefined && control_status !== old.control_status) changes.push(`status override: ${old.control_status || 'auto'} → ${control_status || 'auto'}`);
   if (risk_level !== undefined && risk_level !== old.risk_level) changes.push(`risk override: ${old.risk_level || 'auto'} → ${risk_level || 'auto'}`);
   if (notes !== undefined && notes !== old.notes) changes.push('updated notes');
+  if (aliases !== undefined && aliases !== (old.aliases || '')) changes.push(`also known as: ${aliases || '—'}`);
   if (changes.length) logActivity('client', req.params.id, 'updated', req.user.display_name, changes.join(', '));
 
   const updated = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);

@@ -2566,6 +2566,8 @@ select { color-scheme:dark; }
 .rs-run-st.rs-partial, .rs-run-st.rs-error { color:var(--warning); }
 .rs-run-st.rs-running { color:var(--blue); }
 .rs-notes { margin:8px 0 0 18px; padding:0; font-size:12px; color:var(--text-muted); }
+.rs-steps { margin:8px 0 8px 18px; padding:0; font-size:12px; color:var(--text-secondary); line-height:1.6; }
+.rs-steps code { font-size:11px; background:var(--bg-input); border:1px solid var(--border); border-radius:6px; padding:1px 5px; }
 /* ─── MONTHLY CLIENT REPORT ─────────────────────────── */
 .form-section-title { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-secondary); margin:6px 0 8px; padding-top:10px; border-top:1px solid var(--border); }
 .report-body { padding:6px 28px 24px; max-height:76vh; overflow-y:auto; }
@@ -2724,6 +2726,13 @@ button.xero-warn:hover { border-color:var(--warning); }
 .xero-select { margin-top:6px; width:100%; }
 .xero-hint { font-size:11px; color:var(--text-muted); margin-top:4px; line-height:1.4; }
 #clientMonthlyValue[readonly] { opacity:.75; cursor:not-allowed; }
+.xero-missing-link { background:none; border:0; padding:0; font:inherit; color:var(--blue); cursor:pointer; text-decoration:underline; text-decoration-color:rgba(96,165,250,.4); }
+.xero-missing { padding:6px 28px 24px; max-height:70vh; overflow-y:auto; }
+.xm-row { display:flex; align-items:center; gap:10px; padding:10px 0; border-top:1px solid var(--border-light); }
+.xm-main { flex:1; min-width:0; }
+.xm-name { width:100%; box-sizing:border-box; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); padding:6px 10px; color:var(--text); font:inherit; font-size:13px; font-weight:600; outline:none; }
+.xm-sub { font-size:11px; color:var(--text-muted); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.xm-amt { font-weight:700; font-size:13px; white-space:nowrap; }
 
 @media (max-width:600px) {
   .robot-tray { padding:12px; }

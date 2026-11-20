@@ -116,6 +116,8 @@ clients (+)       last_touch_summary, last_touch_at   the robot's one-line "late
                   pulse_link, metricool_blog_id, report_email   monthly report settings (owner-only)
                   xero_contact_id   the Xero contact the client is billed under (owner-only); when
                                     set, monthly_value follows Xero's repeating invoices
+                  aliases           "also known as" names, comma-separated (contact person, company or
+                                    trading name) — read by the robot and by the Xero name match
 suggestions       kind (new_task|complete|update), status (pending|accepted|dismissed|expired),
                   client_id, task_id, title, notes, deadline, new_status, confidence, evidence,
                   source, source_label, source_url, source_ref, contact, run_id, decided_*, result_task_id
@@ -211,6 +213,17 @@ everywhere in the UI. `progress` / `priority` are kept as **synced shadow values
   `xero_contact_id` or an unambiguous name match. Linked clients follow Xero automatically (logged);
   name matches show ✓ Xero or ⚠ Xero £X on the Dashboard card (one click adopts + links). Edit client has
   the Xero contact picker. Needs `XERO_CLIENT_ID`/`XERO_CLIENT_SECRET` and Xero connected in the Workspace strip.
+- **In Xero, not in Console:** the retainers check also lists Xero contacts with active repeating invoices that
+  no client (active or archived) matches — Control Board header "+N in Xero, not in Console" → one-click add
+  (retainer, linked, Xero's name kept as an alias if you rename it).
+- **Claude connector (MCP):** `POST /mcp/<capture token>` — a stateless Streamable-HTTP MCP server with one
+  write-only tool, `send_to_console`, which drops text into the capture queue (→ robot suggestions). Added in
+  claude.ai as a custom connector (Settings → Connectors) or `claude mcp add --transport http`, so any Claude
+  conversation can send its tasks/decisions here. Claude can't share chat history with apps; this is the
+  route. Same secret as the capture link; nothing can be read through it.
+- **One-time data fixes** run at boot from `scripts/*.js`, each guarded by an `app_meta` flag (see server.js):
+  Willis Cooper / Richford task lists, and `fix-clients-2026-11.js` (Keto & Clarity = Sasha Lonsgren / Uni
+  Nutrition at £1,850; add Ginger Butchers and Isis Rescue linked to Xero + Metricool; archive Caring Places).
 - **Monthly client report (Nov 2026, owner-only):** client detail → 📊 Monthly report. Gathers jobs ticked off
   that month + Pulse website figures (client's dashboard link → `/api/client/<token>/data?range=30`, a rolling
   30 days to yesterday, so draft early in the following month) + Metricool posts per network (brand id), Claude
