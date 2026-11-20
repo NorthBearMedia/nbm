@@ -1438,6 +1438,17 @@ function sgCard(s) {
 }
 
 function renderRobotTray() {
+  // Keep what's been typed into an open "Edit first" form across the redraw.
+  const editVals = robot.editing !== null && document.getElementById('sgeTitle')
+    ? ['sgeTitle', 'sgeClient', 'sgeDue', 'sgeWho'].map(id => [id, document.getElementById(id).value]) : null;
+  const editFocus = document.activeElement?.id;
+  renderRobotTrayInner();
+  if (editVals && document.getElementById('sgeTitle')) {
+    for (const [id, v] of editVals) document.getElementById(id).value = v;
+    if (editFocus && editFocus.startsWith('sge')) document.getElementById(editFocus)?.focus();
+  }
+}
+function renderRobotTrayInner() {
   document.getElementById('robotStatus').innerHTML = robotStatusLine(robot.status);
   const n = robot.list.length;
   const cnt = document.getElementById('robotTrayCount');
@@ -1495,6 +1506,7 @@ async function sgAccept(id, fromEdit) {
   } catch (e) {
     s._busy = false;
     if (/already handled/i.test(e.message)) { sgRemove(id); return; }
+    if (/already closed/i.test(e.message)) { sgRemove(id); toast('That task’s already closed — cleared it'); return; }
     document.querySelectorAll(`#sg-${id} button`).forEach(b => { b.disabled = false; });
     toast('Not saved — ' + e.message);
   }
@@ -1519,7 +1531,7 @@ async function sgAcceptAllSure() {
   if (!confirm(`Accept all ${sure.length} confident suggestions? This will ${what}.`)) return;
   try {
     const r = await api('/api/suggestions/accept-all', { method: 'POST', body: { ids: sure.map(x => x.id) } });
-    toast(`Done — ${r.accepted} accepted${r.errors.length ? `, ${r.errors.length} couldn’t be (${r.errors[0].error})` : ''}`, !r.errors.length);
+    toast(`Done — ${r.accepted} accepted${r.cleared ? `, ${r.cleared} no longer needed` : ''}${r.errors.length ? `, ${r.errors.length} couldn’t be (${r.errors[0].error})` : ''}`, !r.errors.length);
   } catch (e) { toast('Not saved — ' + e.message); }
   await loadClients();
   if (currentView !== 'inbox') loadRobotTray();
@@ -1700,38 +1712,41 @@ function renderWhiteboard() {
   if (quiet.length) foot.push(`<div class="wb-quiet"><span class="wb-quiet-k">Quiet:</span> ${quiet.map(c =>
     `<button onclick="openClientDetail(${c.id})" title="Nothing open — click to open">${esc(c.name)}</button>`).join('')}</div>`);
   if (loose || looseSugs) foot.push(`<div class="wb-loose" onclick="switchView('inbox')">📥 ${[loose && `${loose} task${loose > 1 ? 's' : ''}`, looseSugs && `${looseSugs} suggestion${looseSugs > 1 ? 's' : ''}`].filter(Boolean).join(' and ')} without a client — sort them in the Inbox →</div>`);
-  // A redraw (tick, robot refresh) must not eat what you're typing in an add box.
+  // A redraw (tick, robot refresh) must not eat what's typed in any add box.
+  const drafts = [...board.querySelectorAll('.wb-add')].filter(i => i.value).map(i => [i.dataset.cid, i.value]);
   const typing = document.activeElement?.classList.contains('wb-add') ? document.activeElement : null;
-  const keep = typing && { cid: typing.dataset.cid, value: typing.value, pos: typing.selectionStart };
+  const keep = typing && { cid: typing.dataset.cid, pos: typing.selectionStart };
   board.innerHTML = (zones.join('') || '<div class="wb-empty">The board is clear — nothing open for any client.</div>')
     + (foot.length ? `<div class="wb-foot">${foot.join('')}</div>` : '');
+  for (const [cid, v] of drafts) { const el = board.querySelector(`.wb-add[data-cid="${cid}"]`); if (el) el.value = v; }
   if (keep) {
     const el = board.querySelector(`.wb-add[data-cid="${keep.cid}"]`);
-    if (el) { el.value = keep.value; el.focus(); try { el.setSelectionRange(keep.pos, keep.pos); } catch {} }
+    if (el) { el.focus(); try { el.setSelectionRange(keep.pos, keep.pos); } catch {} }
   }
   document.getElementById('wbSubhead').textContent =
     `${nTodo} to do · ${nWaiting} waiting on clients · ${nDone} done this month`;
 }
 
+const wbSaving = new Set();
 async function wbAdd(cid, input) {
   const title = input.value.trim();
-  if (!title || input.disabled) return;
-  input.disabled = true;
+  if (!title || wbSaving.has(cid)) return;      // a second Enter while saving does nothing
+  wbSaving.add(cid);
   try {
     await api('/api/tasks', { method: 'POST', body: { title, client_id: cid, task_status: 'inbox' } });
-    input.value = '';
-    input.disabled = false;
-    input.focus();          // the redraw keeps focus in whichever add box is active
-    await loadClients();
-    document.querySelector(`.wb-add[data-cid="${cid}"]`)?.focus();
+    // Clear only what was saved — anything typed since stays.
+    const box = document.querySelector(`.wb-add[data-cid="${cid}"]`);
+    if (box && box.value.trim() === title) box.value = '';
+    await loadClients();      // the redraw keeps focus wherever you are now
   } catch (e) { toast('Not saved — ' + e.message); }
-  finally { input.disabled = false; }
+  finally { wbSaving.delete(cid); }
 }
 
 // ─── Monthly client report: draft → edit → PDF → email (owner only) ───────
 // What we did (ticked-off tasks) + website (Pulse) + social (Metricool),
 // worded for the client by The Bear's model; every figure comes from a source.
 let rep = { clientId: null, period: '', list: [], cur: null, busy: false };
+const repDrafting = new Set();     // `${clientId}|${period}` drafts in flight (survive closing the modal)
 let metricoolBrandCache = null;
 
 async function loadMetricoolOptions(selected) {
@@ -1770,16 +1785,21 @@ async function openReport(clientId, period) {
   await repLoad();
 }
 
+// rep is replaced whenever the modal opens for a client; async work checks it
+// still owns the modal before writing (a 30–60 s draft can outlive a switch).
 async function repLoad() {
+  const my = rep;
   try {
-    rep.list = await api(`/api/reports?client_id=${rep.clientId}`);
-    const hit = rep.list.find(r => r.period === rep.period);
-    rep.cur = hit ? await api(`/api/reports/${hit.id}`) : null;
-  } catch (e) { toast('Couldn’t load reports — ' + e.message); }
-  repRender();
+    const list = await api(`/api/reports?client_id=${my.clientId}`);
+    const hit = list.find(r => r.period === my.period);
+    const cur = hit ? await api(`/api/reports/${hit.id}`) : null;
+    if (rep !== my) return;
+    my.list = list; my.cur = cur;
+  } catch (e) { if (rep === my) toast('Couldn’t load reports — ' + e.message); }
+  if (rep === my) repRender();
 }
 
-function repSetPeriod(v) { rep.period = v; repLoad(); }
+function repSetPeriod(v) { if (rep.busy) return toast('Hang on — still drafting'); rep = { ...rep, period: v, cur: null }; repLoad(); }
 
 function repSourceLine(facts) {
   const c = clients.find(x => x.id === rep.clientId) || {};
@@ -1807,7 +1827,7 @@ function repRender() {
     }).join('')}</div>` : '';
   let html = `<div class="rep-top">
       <select id="repMonth" class="filter-select" onchange="repSetPeriod(this.value)">${months}</select>
-      <button class="btn ${r ? 'btn-ghost' : 'btn-primary'} btn-sm" id="repDraftBtn" onclick="repDraft()">${r ? '↻ Redraft from scratch' : '✨ Draft the report'}</button>
+      <button class="btn ${r ? 'btn-ghost' : 'btn-primary'} btn-sm" id="repDraftBtn" onclick="repDraft()" ${repDrafting.has(`${rep.clientId}|${rep.period}`) ? 'disabled' : ''}>${repDrafting.has(`${rep.clientId}|${rep.period}`) ? 'Drafting…' : r ? '↻ Redraft from scratch' : '✨ Draft the report'}</button>
       <span class="rep-sources">${repSourceLine(content?.facts)}</span>
     </div>${history}`;
   if (!r) {
@@ -1886,10 +1906,11 @@ function repCollect() {
 }
 
 async function repSave(announce) {
-  if (!rep.cur) return false;
+  const cur = rep.cur;
+  if (!cur) return false;
   try {
-    const r = await api(`/api/reports/${rep.cur.id}`, { method: 'PUT', body: { draft: repCollect() } });
-    rep.cur.content.draft = r.draft;
+    const r = await api(`/api/reports/${cur.id}`, { method: 'PUT', body: { draft: repCollect() } });
+    cur.content.draft = r.draft;
     if (announce) toast('Saved', true);
     return true;
   } catch (e) { toast('Not saved — ' + e.message); return false; }
@@ -1898,16 +1919,23 @@ async function repSave(announce) {
 async function repDraft() {
   if (rep.busy) return;
   if (rep.cur && !confirm('Start again from fresh figures? Your edits to this draft will be replaced.')) return;
-  rep.busy = true;
+  const my = rep;
+  const key = `${my.clientId}|${my.period}`;
+  if (repDrafting.has(key)) return toast('Already drafting that one — give it a minute');
+  repDrafting.add(key);
+  my.busy = true;
   const btn = document.getElementById('repDraftBtn');
   btn.disabled = true;
   btn.textContent = 'Gathering figures and writing it up…';
   try {
-    rep.cur = await api('/api/reports/draft', { method: 'POST', body: { client_id: rep.clientId, period: rep.period } });
-    rep.list = await api(`/api/reports?client_id=${rep.clientId}`);
-  } catch (e) { toast('Couldn’t draft it — ' + e.message); }
-  rep.busy = false;
-  repRender();
+    const cur = await api('/api/reports/draft', { method: 'POST', body: { client_id: my.clientId, period: my.period } });
+    const list = await api(`/api/reports?client_id=${my.clientId}`);
+    my.cur = cur; my.list = list;
+  } catch (e) { if (rep === my) toast('Couldn’t draft it — ' + e.message); }
+  repDrafting.delete(key);
+  my.busy = false;
+  if (rep === my) repRender();
+  else toast(`The ${clients.find(c => c.id === my.clientId)?.name || ''} report draft is ready`, true);
 }
 
 async function repPreview() {
@@ -1920,7 +1948,7 @@ async function repPreview() {
 
 function repShowSend() {
   const box = document.getElementById('repSend');
-  const c = clients.find(x => x.id === rep.clientId) || {};
+  const c = clients.find(x => x.id === rep.cur.client_id) || {};     // the report's own client
   const content = rep.cur.content;
   const me = currentUser?.display_name || '';
   box.style.display = '';
@@ -1935,12 +1963,13 @@ function repShowSend() {
 async function repSend() {
   const to = document.getElementById('repTo').value.trim();
   if (!to) return toast('Who should it go to?');
-  if (!confirm(`Send the ${rep.cur.content.label} report to ${to}?`)) return;
+  const cur = rep.cur;
+  if (!confirm(`Send ${cur.content.client.name}’s ${cur.content.label} report to ${to}?`)) return;
   if (!(await repSave(false))) return;
   const btn = document.getElementById('repSendBtn');
   btn.disabled = true; btn.textContent = 'Sending…';
   try {
-    const r = await api(`/api/reports/${rep.cur.id}/send`, { method: 'POST', body: {
+    const r = await api(`/api/reports/${cur.id}/send`, { method: 'POST', body: {
       to, subject: document.getElementById('repSubject').value, message: document.getElementById('repMsg').value } });
     toast(`Sent to ${r.sent_to}`, true);
     await repLoad();

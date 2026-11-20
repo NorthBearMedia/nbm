@@ -183,8 +183,16 @@ router.get('/', requireAuth, (req, res) => {
 router.post('/', requireAuth, requireWrite, (req, res) => {
   let { name, code, agreement_type, notes, gmail_link, drive_link, is_private,
     client_type, monthly_value, agreement_summary, recurring_deliverables,
-    last_contact_date, next_scheduled_date, control_status, risk_level, important_contacts } = req.body;
+    last_contact_date, next_scheduled_date, control_status, risk_level, important_contacts,
+    pulse_link, metricool_blog_id, report_email } = req.body;
   if (!name) return res.status(400).json({ error: 'Client name is required' });
+  // Report settings are owner-only; staff posts never carry them.
+  const owner = req.user.role === 'owner';
+  pulse_link = owner ? cleanUrl(pulse_link) : undefined;
+  metricool_blog_id = owner ? cleanDigits(metricool_blog_id) : undefined;
+  report_email = owner ? cleanEmails(report_email) : undefined;
+  if (pulse_link === null) return res.status(400).json({ error: 'The Pulse link should be the full dashboard address (https://…)' });
+  if (report_email === null) return res.status(400).json({ error: 'Report email: use proper addresses, separated by commas' });
   last_contact_date = cleanDate(last_contact_date);
   next_scheduled_date = cleanDate(next_scheduled_date);
   monthly_value = cleanMoney(monthly_value);
@@ -204,8 +212,13 @@ router.post('/', requireAuth, requireWrite, (req, res) => {
     ct, monthly_value || 0, agreement_summary || '', recurring_deliverables || '',
     last_contact_date || '', next_scheduled_date || '', cs, rl, important_contacts || ''
   );
+  if (owner) {
+    db.prepare('UPDATE clients SET pulse_link = ?, metricool_blog_id = ?, report_email = ? WHERE id = ?')
+      .run(pulse_link || '', metricool_blog_id || '', report_email || '', result.lastInsertRowid);
+  }
   logActivity('client', result.lastInsertRowid, 'created', req.user.display_name, `Created client "${name}"`);
-  res.json(db.prepare('SELECT * FROM clients WHERE id = ?').get(result.lastInsertRowid));
+  const created = db.prepare('SELECT * FROM clients WHERE id = ?').get(result.lastInsertRowid);
+  res.json(owner ? created : hideOwnerFields(created));
 });
 
 router.put('/reorder', requireAuth, requireWrite, (req, res) => {

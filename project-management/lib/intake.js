@@ -71,17 +71,23 @@ export function ownerUser() {
 const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 // Near-duplicate titles: "Christmas opening-hours post" vs "Christmas
 // opening-hours post for socials" is the same job.
-const titleWords = s => new Set(norm(s).split(' ').filter(w => w.length > 2));
-function sameJob(a, b) {
+// But "Send Q3 report" / "Send Q4 report" and "Send TV copy" / "Send PR copy"
+// are different jobs: short words and numbers count, filler words don't.
+const FILLER = new Set(['the', 'a', 'an', 'and', 'or', 'to', 'for', 'of', 'on', 'onto', 'in', 'into', 'at', 'by',
+  'with', 'from', 're', 'our', 'their', 'your', 'my', 'his', 'her', 'its', 'this', 'that', 'these', 'those', 'is', 'are', 'be']);
+const titleWords = s => new Set(norm(s).split(' ').filter(w => w && (w.length >= 2 || /\d/.test(w)) && !FILLER.has(w)));
+export function sameJob(a, b) {
   const na = norm(a), nb = norm(b);
   if (!na || !nb) return false;
   if (na === nb) return true;
-  if (Math.min(na.length, nb.length) >= 12 && (na.includes(nb) || nb.includes(na))) return true;
   const A = titleWords(a), B = titleWords(b);
+  const numsA = [...A].filter(w => /\d/.test(w)).sort().join(' '), numsB = [...B].filter(w => /\d/.test(w)).sort().join(' ');
+  if (numsA && numsB && numsA !== numsB) return false;          // Q3 vs Q4, 3 reels vs 5 reels
+  if (Math.min(na.length, nb.length) >= 12 && (na.includes(nb) || nb.includes(na))) return true;
   if (A.size < 2 || B.size < 2) return false;
   let shared = 0;
   for (const w of A) if (B.has(w)) shared++;
-  return shared / (A.size + B.size - shared) >= 0.7;
+  return shared / (A.size + B.size - shared) >= 0.75;
 }
 
 // ─── Who's who ───────────────────────────────────────────────────────────────
@@ -242,9 +248,13 @@ export function gmailToItem(m, mailbox) {
 function timeCursor(key) {
   return +getMeta(key, '0') || (Date.now() - FIRST_RUN_LOOKBACK_MS);
 }
-function commitTimeCursor(key, since, startedAt, items, processed) {
-  const left = items.filter(i => !processed.has(i.ref));
-  const next = left.length ? Math.min(...left.map(i => Date.parse(i.date))) - 60000 : startedAt - OVERLAP_MS;
+// The cursor never passes a message that wasn't processed: an unprocessed
+// item holds it at its EARLIEST message (_holdTs), and a source adds holds for
+// anything it fetched but couldn't hand over (capped, failed to open).
+function commitTimeCursor(key, since, startedAt, items, processed, holds = []) {
+  const pending = items.filter(i => !processed.has(i.ref)).map(i => i._holdTs ?? Date.parse(i.date));
+  const all = [...pending, ...holds].filter(Number.isFinite);
+  const next = all.length ? Math.min(...all) - 60000 : startedAt - OVERLAP_MS;
   setMeta(key, String(Math.max(next, since)));
 }
 
@@ -261,28 +271,38 @@ async function gmailSource({ auth, mailbox, onAuthError }) {
       const r = await gmail.users.messages.list({ userId: 'me', q, maxResults: 100, pageToken });
       ids.push(...(r.data.messages || []).map(m => m.id));
       pageToken = r.data.nextPageToken;
-    } while (pageToken && ids.length < 150);
+    } while (pageToken && ids.length < 2000);
   } catch (err) {
     if (/invalid_grant|invalid credentials|unauthorized/i.test(err?.message || '') || err?.code === 401) onAuthError?.();
     throw err;
   }
-  const notes = pageToken ? [`${mailbox}: more mail than one run reads — the oldest was skipped`] : [];
-  const fresh = ids.slice(0, 150).filter(id => !isSeen('gmail', `${mailbox.toLowerCase()}:${id}`));
+  const mb = mailbox.toLowerCase();
+  const notes = pageToken ? [`${mailbox}: an exceptionally busy spell — mail beyond the newest 2,000 wasn't reached`] : [];
+  // Gmail lists newest first. Open the OLDEST unread-by-the-robot first, and
+  // keep the cursor where it is while anything is left over or failed to
+  // open — already-read mail is skipped by id, so the next run carries on.
+  const unseen = ids.filter(id => !isSeen('gmail', `${mb}:${id}`));
+  const fresh = unseen.slice(-150);
+  const holds = unseen.length > fresh.length ? [since] : [];
   const items = [];
   let skipped = 0;
   for (let i = 0; i < fresh.length; i += 10) {
     const batch = await Promise.all(fresh.slice(i, i + 10).map(id =>
-      gmail.users.messages.get({ userId: 'me', id, format: 'full' }).then(r => r.data).catch(() => null)));
+      gmail.users.messages.get({ userId: 'me', id, format: 'full' }).then(r => r.data).catch(err => {
+        if (err?.code === 404 || err?.status === 404) { markSeen('gmail', `${mb}:${id}`); return null; }   // deleted since listing
+        holds.push(since);
+        return null;
+      })));
     for (const m of batch) {
       if (!m) continue;
       const it = gmailToItem(m, mailbox);
       if (it) items.push(it);
-      else { skipped++; markSeen('gmail', `${mailbox.toLowerCase()}:${m.id}`); }
+      else { skipped++; markSeen('gmail', `${mb}:${m.id}`); }
     }
   }
   return {
     name: `Email (${mailbox})`, items, skipped, notes,
-    commit(processed) { commitTimeCursor(key, since, startedAt, items, processed); },
+    commit(processed) { commitTimeCursor(key, since, startedAt, items, processed, holds); },
   };
 }
 
@@ -360,9 +380,15 @@ async function periskopeSource() {
     if (!byChat.has(m.chat_id)) byChat.set(m.chat_id, []);
     byChat.get(m.chat_id).push(m);
   }
+  // Oldest-waiting chats first; chats beyond this run's 40 hold the cursor at
+  // their earliest unread message so the next run picks them up.
+  const firstTs = id => Math.min(...byChat.get(id).map(m => Date.parse(m.timestamp)));
+  const ordered = [...byChat.keys()].sort((a, b) => firstTs(a) - firstTs(b));
+  const chatIds = ordered.slice(0, 40);
+  const holds = ordered.slice(40).map(firstTs);
+  const notes = holds.length ? [`Personal WhatsApp: ${holds.length} more chat(s) wait for the next run`] : [];
   // Chat names (messages carry none); best effort.
   const names = new Map();
-  const chatIds = [...byChat.keys()].slice(0, 40);
   for (let i = 0; i < chatIds.length; i += 25) {
     try {
       const u = new URL('https://api.periskope.app/v1/chats');
@@ -374,7 +400,8 @@ async function periskopeSource() {
   }
   const items = [];
   for (const chatId of chatIds) {
-    const list = byChat.get(chatId).sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp)).slice(-40);
+    const whole = byChat.get(chatId).sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
+    const list = whole.slice(-40);    // the latest 40 lines go to Claude; the chat counts as read once it's processed
     const info = names.get(chatId) || { name: '', group: /@g\.us$/.test(chatId) };
     const label = info.name || '+' + digits(chatId.split('@')[0]);
     const lines = list.map(m => {
@@ -387,14 +414,15 @@ async function periskopeSource() {
       who: `${label}${info.group ? ' (group)' : ''} — personal WhatsApp`,
       contact: info.group ? chatId : digits(chatId.split('@')[0]),
       subject: '', text: lines.join('\n').slice(-3000), label: `WhatsApp · ${label}`, url: '',
-      _messageIds: list.map(m => m.message_id),
+      _messageIds: whole.map(m => m.message_id),
+      _holdTs: Date.parse(whole[0].timestamp),
     });
   }
   return {
-    name: 'Personal WhatsApp', items, skipped: msgs.length - usable.length, notes: [],
+    name: 'Personal WhatsApp', items, skipped: msgs.length - usable.length, notes,
     commit(processed) {
       for (const it of items) if (processed.has(it.ref)) for (const id of it._messageIds) markSeen('periskope', id);
-      commitTimeCursor(key, since, startedAt, items, processed);
+      commitTimeCursor(key, since, startedAt, items, processed, holds);
     },
   };
 }
@@ -419,13 +447,16 @@ async function granolaSource(ownerEmails) {
     if (!r.hasMore || !r.cursor) break;
     cursor = r.cursor;
   }
-  const items = [];
-  for (const n of list.slice(0, 20)) {
+  const items = [], holds = [];
+  for (const n of list) {
     const ref = `granola:${n.id}`;
     if (isSeen('granola', ref)) continue;
+    const updated = Date.parse(n.updated_at || n.created_at) || since;
+    if (items.length >= 20) { holds.push(updated); continue; }        // next run
     const note = await fetchJson(`https://public-api.granola.ai/v1/notes/${encodeURIComponent(n.id)}`, { headers }).catch(() => null);
-    const summary = note?.summary_markdown || note?.summary_text || '';
-    if (!summary.trim()) continue;
+    if (!note) { holds.push(updated); continue; }                     // couldn't open: try again
+    const summary = note.summary_markdown || note.summary_text || '';
+    if (!summary.trim()) continue;    // summary not written yet — its update brings it back (updated_after)
     const people = (note.attendees || []).map(a => a.name ? `${a.name}${a.email ? ` <${a.email}>` : ''}` : a.email).filter(Boolean);
     const external = (note.attendees || []).map(a => String(a.email || '').toLowerCase()).find(e => e && !ownerEmails.has(e)) || '';
     items.push({
@@ -433,11 +464,12 @@ async function granolaSource(ownerEmails) {
       who: people.join(', ').slice(0, 300) || 'Meeting', contact: external,
       subject: note.title || n.title || 'Meeting', text: summary.slice(0, 6000),
       label: `Meeting · ${note.title || n.title || 'notes'}`, url: note.web_url || '',
+      _holdTs: updated,
     });
   }
   return {
     name: 'Granola meetings', items, skipped: 0, notes: [],
-    commit(processed) { commitTimeCursor(key, since, startedAt, items, processed); },
+    commit(processed) { commitTimeCursor(key, since, startedAt, items, processed, holds); },
   };
 }
 
@@ -834,6 +866,9 @@ async function doRun({ trigger = 'manual', only = null, claude = null, sources =
       }
       if (chunks.length > MAX_CALLS_PER_RUN) runNotes.push('Busy hour — some items wait for the next run');
     }
+    // Items already read in an earlier run count as processed too — otherwise a
+    // quiet chat that was read last time would pin its source's cursor forever.
+    for (const s of srcs) for (const it of s.items) if (!processed.has(it.ref) && isSeen(it.source, it.ref)) processed.add(it.ref);
     for (const s of srcs) { try { s.commit(processed); } catch (e) { runNotes.push(`${s.name}: ${e.message}`); } }
 
     // A paste shows its results on screen straight away — no need to ping too.

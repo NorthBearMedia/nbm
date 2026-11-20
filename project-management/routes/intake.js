@@ -106,18 +106,33 @@ export function acceptSuggestion(id, overrides, user, origin) {
       notes: o.notes !== undefined ? String(o.notes) : provenance,
       references_text: personal ? '' : (s.source_url || ''),
     }, user);
-  } else if (s.kind === 'complete') {
-    result = updateTaskCore(s.task_id, { task_status: 'done' }, user, origin);
   } else {
-    const body = {};
-    if (s.new_status) body.task_status = s.new_status;
-    if (s.deadline) body.deadline = s.deadline;
-    result = updateTaskCore(s.task_id, body, user, origin);
+    // A tick-off / update for a task that's since been closed would reopen
+    // it (and a recurring one would leave two copies) — clear it instead.
+    const t = db.prepare('SELECT task_status, archived FROM tasks WHERE id = ?').get(s.task_id);
+    if (!t || t.archived || ['done', 'cancelled'].includes(t.task_status)) {
+      db.prepare(`UPDATE suggestions SET status = 'expired', decided_at = datetime('now'), decided_by = 'System' WHERE id = ?`).run(s.id);
+      return { status: 409, json: { error: 'That task is already closed — suggestion cleared', expired: true } };
+    }
+    if (s.kind === 'complete') {
+      result = updateTaskCore(s.task_id, { task_status: 'done' }, user, origin);
+    } else {
+      const body = {};
+      if (s.new_status) body.task_status = s.new_status;
+      if (s.deadline) body.deadline = s.deadline;
+      result = updateTaskCore(s.task_id, body, user, origin);
+    }
   }
   if (result.status !== 200) return result;
   const task = result.json;
   db.prepare(`UPDATE suggestions SET status = 'accepted', decided_at = datetime('now'), decided_by = ?, result_task_id = ?
     WHERE id = ?`).run(user.display_name, task.id, s.id);
+  // The newest word on a task wins: older pending tick-offs / updates for the
+  // same task are moot once one has been accepted.
+  if (s.kind !== 'new_task') {
+    db.prepare(`UPDATE suggestions SET status = 'expired', decided_at = datetime('now'), decided_by = 'System'
+      WHERE status = 'pending' AND id != ? AND task_id = ? AND kind IN ('complete', 'update')`).run(s.id, s.task_id);
+  }
   learnContact(s.contact, task.client_id);
   // Who/what it came from stays off the activity log, which staff can see.
   logActivity('task', task.id, 'updated', user.display_name, `Accepted the robot's suggestion (${s.kind.replace('_', ' ')})`);
@@ -133,12 +148,16 @@ router.post('/api/suggestions/accept-all', ...ownerOnly, (req, res) => {
   const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter(Number.isInteger).slice(0, 100) : [];
   let accepted = 0;
   const errors = [];
-  for (const id of ids) {
+  // Newest first, so when two suggestions touch the same task the latest wins
+  // and the older one is cleared rather than applied on top.
+  let cleared = 0;
+  for (const id of [...ids].sort((a, b) => b - a)) {
     const r = acceptSuggestion(id, {}, req.user, originOf(req));
     if (r.status === 200) accepted++;
+    else if (r.status === 409) cleared++;      // already handled / overtaken — not an error
     else errors.push({ id, error: r.json.error });
   }
-  res.json({ accepted, errors });
+  res.json({ accepted, cleared, errors });
 });
 
 router.post('/api/suggestions/:id/dismiss', ...ownerOnly, (req, res) => {
