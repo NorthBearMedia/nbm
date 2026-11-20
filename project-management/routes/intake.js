@@ -17,6 +17,7 @@ import {
 } from '../lib/intake.js';
 import { getClaude, currentModel } from '../lib/claude.js';
 import { metricoolBrands } from '../lib/report.js';
+import { normName } from './xero.js';
 
 const router = Router();
 // The robot reads ONE person's messages (the first owner account — whose
@@ -239,6 +240,10 @@ router.get('/api/intake/status', ...ownerOnly, (req, res) => {
       fromEnv: !!process.env.METRICOOL_TOKEN,
       userId: getSecret('metricool_user_id', 'METRICOOL_USER_ID'),
     },
+    // The latest month of social figures relayed in by Claude (no key needed).
+    social: db.prepare(`SELECT period, COUNT(*) AS clients FROM report_social
+      WHERE period = (SELECT MAX(period) FROM report_social)`).get(),
+    pulseLinked: db.prepare("SELECT COUNT(*) AS n FROM clients WHERE is_system = 0 AND archived = 0 AND COALESCE(pulse_link, '') <> ''").get().n,
     captureUrl: `${originOf(req)}/capture/${captureToken()}`,
     connectorUrl: `${originOf(req)}/mcp/${captureToken()}`,
     relay: Object.fromEntries(['gmail', 'periskope', 'granola', 'claude'].map(src => [src, {
@@ -384,6 +389,41 @@ router.post('/relay/items', (req, res) => {
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   }
+});
+
+// Monthly, before the figures: the brands in Norton's Metricool. A client not
+// yet linked to a brand gets linked when exactly one brand fits its name or an
+// "also known as" name ("Ivy House" → Ivy House Residential Home) and that
+// brand fits no other client — logged. Replies with every linked brand, so
+// Claude only fetches figures for clients Console has.
+router.post('/relay/brands', (req, res) => {
+  if (!relayKeyOk(req)) return res.status(401).json({ error: 'Key needed' });
+  const brands = (Array.isArray(req.body?.brands) ? req.body.brands.slice(0, 200) : [])
+    .map(b => ({ id: String(b?.blog_id || '').replace(/\D/g, '').slice(0, 20), label: String(b?.label || '').replace(/\s+/g, ' ').trim().slice(0, 100) }))
+    .filter(b => b.id && b.label);
+  const key = s => normName(s).replace(/ /g, '');
+  const fits = (a, b) => !!a && !!b && (a === b || (Math.min(a.length, b.length) >= 5 && (a.includes(b) || b.includes(a))));
+  const active = db.prepare('SELECT id, name, aliases, metricool_blog_id FROM clients WHERE is_system = 0 AND archived = 0').all();
+  const taken = new Set(active.map(c => c.metricool_blog_id).filter(Boolean));
+  const free = active.filter(c => !c.metricool_blog_id);
+  const names = c => [c.name, ...String(c.aliases || '').split(',')].map(key).filter(Boolean);
+  const pairs = [];
+  for (const b of brands) {
+    if (taken.has(b.id)) continue;
+    const hits = free.filter(c => names(c).some(n => fits(n, key(b.label))));
+    if (hits.length === 1) pairs.push({ b, c: hits[0] });
+  }
+  const author = ownerUser()?.display_name || 'Console';
+  const newlyLinked = [];
+  for (const { b, c } of pairs) {
+    if (pairs.filter(p => p.c.id === c.id).length > 1) continue;   // two brands fit one client — leave it to Norton
+    const r = db.prepare("UPDATE clients SET metricool_blog_id = ? WHERE id = ? AND COALESCE(metricool_blog_id, '') = ''").run(b.id, c.id);
+    if (!r.changes) continue;
+    logActivity('client', c.id, 'updated', author, `Linked to Metricool brand "${b.label}" — matched by name, for the monthly report (automatic)`);
+    newlyLinked.push(c.name);
+  }
+  const linked = relayStatus().metricool;
+  res.json({ ok: true, linked, newlyLinked, unmatched: brands.filter(b => !linked.some(l => l.blog_id === b.id)).map(b => b.label) });
 });
 
 // Monthly: last month's social figures per Metricool brand, read through

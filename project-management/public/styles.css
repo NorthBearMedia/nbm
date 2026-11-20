@@ -2570,6 +2570,13 @@ select { color-scheme:dark; }
 .rs-relay { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12px; color:var(--text-secondary); background:var(--primary-bg); border:1px solid var(--border-glow); border-radius:var(--radius); padding:8px 12px; margin-bottom:10px; }
 .rs-relay b { color:var(--text); }
 .rs-relay-off { background:var(--bg-glass); border-color:var(--border); color:var(--text-muted); }
+.rs-sub.rs-ok { color:var(--text-secondary); }
+.rs-alt { margin-top:4px; }
+.rs-alt > summary { cursor:pointer; font-size:12px; color:var(--text-muted); list-style:none; width:fit-content; }
+.rs-alt > summary::-webkit-details-marker { display:none; }
+.rs-alt > summary::before { content:'▸ '; }
+.rs-alt[open] > summary::before { content:'▾ '; }
+.rs-alt > summary:hover { color:var(--text-secondary); }
 .rs-steps code { font-size:11px; background:var(--bg-input); border:1px solid var(--border); border-radius:6px; padding:1px 5px; }
 /* ─── MONTHLY CLIENT REPORT ─────────────────────────── */
 .form-section-title { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-secondary); margin:6px 0 8px; padding-top:10px; border-top:1px solid var(--border); }

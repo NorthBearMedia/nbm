@@ -319,7 +319,7 @@ function monthlyOf(ri) {
   return String(ri.Schedule?.Unit || 'MONTHLY').toUpperCase() === 'WEEKLY' ? (sub * 52) / 12 / every : sub / every;
 }
 // "Smartmove Homes (Derbyshire) Ltd" and "Smartmove Homes" are the same business.
-const normName = s => String(s || '').toLowerCase().replace(/&/g, ' and ').replace(/\([^)]*\)/g, ' ')
+export const normName = s => String(s || '').toLowerCase().replace(/&/g, ' and ').replace(/\([^)]*\)/g, ' ')
   .replace(/\b(ltd|limited|plc|llp|the|company|co|group|uk)\b/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
 
 const retainerCache = new Map();   // userId → { at, contacts }

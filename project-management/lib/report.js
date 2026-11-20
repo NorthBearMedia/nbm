@@ -13,10 +13,13 @@ import PDFDocument from 'pdfkit';
 import { existsSync } from 'fs';
 import { join, dirname, basename, extname } from 'path';
 import { fileURLToPath } from 'url';
+import { randomBytes } from 'crypto';
 import db from '../database.js';
 import { uploadsDir } from '../middleware.js';
 import { getSecret } from './intake.js';
 import { getClaude, callClaude } from './claude.js';
+import { logActivity } from './activity.js';
+import { normName } from '../routes/xero.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ASSETS = join(__dirname, '..', 'assets');
@@ -119,7 +122,82 @@ export function parsePulseLink(link) {
   return { origin: u.origin, token: m[1] };
 }
 
+// ─── Pulse dashboard links, filled in automatically ─────────────────────────
+// Console asks Pulse (analytics/server.js, POST /api/console/sites) for every
+// client's dashboard link with a one-time code, and Pulse checks the code with
+// Console (GET /pulse/verify/:code, routes/reports.js) before it answers — so
+// there is no shared key to set up on either app. A client with no Pulse link
+// gets the dashboard whose client name or website fits it, only when exactly
+// one does (and it fits no other client). PULSE_URL overrides Pulse's address.
+const pulseCodes = new Map();          // one-time code → expiry
+export function pulseCodeOk(code) {
+  const exp = pulseCodes.get(code);
+  pulseCodes.delete(code);
+  return !!exp && exp > Date.now();
+}
+
+async function pulseSites() {
+  const code = randomBytes(24).toString('hex');
+  pulseCodes.set(code, Date.now() + 60_000);
+  const base = (process.env.PULSE_URL || 'https://nbm-production-604e.up.railway.app').replace(/\/+$/, '');
+  try {
+    const r = await fetch(`${base}/api/console/sites`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ nonce: code }), redirect: 'error', signal: AbortSignal.timeout(30_000),
+    });
+    if (!r.ok) throw new Error(`Pulse replied ${r.status}`);
+    const d = await r.json();
+    return Array.isArray(d?.sites) ? d.sites : [];
+  } finally { pulseCodes.delete(code); }
+}
+
+const nameKey = s => normName(s).replace(/ /g, '');
+const keysFit = (a, b) => !!a && !!b && (a === b || (Math.min(a.length, b.length) >= 5 && (a.includes(b) || b.includes(a))));
+const hostOf = d => String(d || '').toLowerCase().trim().replace(/^https?:\/\//, '').replace(/^www\./, '').split(/[/?#]/)[0];
+
+export async function linkPulseSites() {
+  const sites = (await pulseSites())
+    .map(s => ({ client: String(s?.client || ''), host: hostOf(s?.domain), url: String(s?.dashboardUrl || ''), p: parsePulseLink(s?.dashboardUrl) }))
+    .filter(s => s.p);
+  const clients = db.prepare("SELECT id, name, aliases, important_contacts, notes, pulse_link FROM clients WHERE is_system = 0 AND archived = 0").all();
+  const used = new Set(clients.map(c => parsePulseLink(c.pulse_link)?.token).filter(Boolean));
+  const open = sites.filter(s => !used.has(s.p.token));
+  const free = clients.filter(c => !c.pulse_link);
+  // Its name / "also known as" fits the Pulse client name or the website's name
+  // (muskengineering.co.uk → Musk Engineering), or a contact's email address or
+  // a note mentions the website.
+  const fits = (c, s) => {
+    const keys = [nameKey(s.client), nameKey(s.host.split('.')[0])];
+    if ([c.name, ...String(c.aliases || '').split(',')].map(nameKey).some(n => keys.some(k => keysFit(n, k)))) return true;
+    const text = `${c.important_contacts || ''} ${c.notes || ''}`.toLowerCase();
+    return !!s.host && text.split(/[\s,;<>()"']+/).some(w => w.replace(/^.*@/, '').replace(/^https?:\/\//, '').replace(/^www\./, '').split(/[/?#]/)[0] === s.host);
+  };
+  const author = db.prepare("SELECT display_name FROM users WHERE role = 'owner' ORDER BY id LIMIT 1").get()?.display_name || 'Console';
+  const linked = [];
+  for (const s of open) {
+    const hits = free.filter(c => fits(c, s));
+    if (hits.length !== 1 || open.some(o => o !== s && fits(hits[0], o))) continue;   // unclear — leave it to Norton
+    const c = hits[0];
+    if (!db.prepare("UPDATE clients SET pulse_link = ? WHERE id = ? AND COALESCE(pulse_link, '') = ''").run(s.url, c.id).changes) continue;
+    logActivity('client', c.id, 'updated', author, `Linked to its Pulse dashboard (${s.host || s.client}) — for the monthly report's website figures (automatic)`);
+    linked.push(c.name);
+  }
+  return { sites: sites.length, linked };
+}
+
+// The monthly report asks again when a client has no link yet (a client added
+// since the last daily check) — at most every 10 minutes.
+let pulseAskedAt = 0;
+async function pulseLinkFor(client) {
+  if (Date.now() - pulseAskedAt > 10 * 60_000) {
+    pulseAskedAt = Date.now();
+    try { await linkPulseSites(); } catch (err) { console.warn('[Pulse] link check failed:', err.message); }
+  }
+  return db.prepare('SELECT pulse_link FROM clients WHERE id = ?').get(client.id)?.pulse_link || '';
+}
+
 async function gatherWebsite(client) {
+  if (!client.pulse_link && client.id) client.pulse_link = await pulseLinkFor(client);
   if (!client.pulse_link) return { status: 'missing' };
   const p = parsePulseLink(client.pulse_link);
   if (!p) return { status: 'error', message: 'The Pulse link should be the client’s dashboard address: https://…/r/…' };

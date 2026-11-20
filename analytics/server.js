@@ -501,6 +501,31 @@ app.post('/api/client/:token/request-report', async (req, res) => {
   res.json({ ok: true, message: `Done! A fresh PDF report (${result.periodText}) is on its way to ${masked}.` });
 });
 
+// ─── North Bear Console: each client's dashboard link ─────────────
+// Console (Norton's task app) puts these on its monthly client reports. It
+// asks with a one-time code, and Pulse checks that code with Console itself
+// before answering — so only a request Console really made gets the links,
+// and there is no shared key to set up on either app. CONSOLE_URL overrides
+// the Console address (tests).
+const consoleAsks = { at: 0, n: 0 };
+app.post('/api/console/sites', async (req, res) => {
+  const code = String(req.body?.nonce || '');
+  if (!/^[a-f0-9]{48}$/.test(code)) return res.status(400).json({ error: 'Bad request' });
+  if (Date.now() - consoleAsks.at > 60_000) { consoleAsks.at = Date.now(); consoleAsks.n = 0; }
+  if (++consoleAsks.n > 20) return res.status(429).json({ error: 'Too many requests' });
+  const consoleUrl = (process.env.CONSOLE_URL || 'https://nbmconsole.pro').replace(/\/+$/, '');
+  try {
+    const r = await fetch(`${consoleUrl}/pulse/verify/${code}`, { redirect: 'error', signal: AbortSignal.timeout(10_000) });
+    if (!r.ok) return res.status(403).json({ error: 'Not recognised' });
+  } catch {
+    return res.status(502).json({ error: 'Could not check with Console' });
+  }
+  const base = getAppUrl() || `${req.protocol}://${req.get('host')}`;
+  const sites = db.prepare('SELECT client_name, domain, dashboard_token FROM sites WHERE active = 1 ORDER BY client_name').all();
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ sites: sites.map(s => ({ client: s.client_name, domain: s.domain, dashboardUrl: `${base}/r/${s.dashboard_token}` })) });
+});
+
 // ─── Pages + static ───────────────────────────────────────────────
 app.get('/r/:token', (req, res) => {
   if (!siteByToken(req.params.token)) return res.status(404).send('Dashboard not found');
