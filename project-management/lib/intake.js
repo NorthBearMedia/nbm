@@ -769,7 +769,8 @@ async function doRun({ trigger = 'manual', only = null, claude = null, sources =
     }
     for (const s of srcs) { try { s.commit(processed); } catch (e) { runNotes.push(`${s.name}: ${e.message}`); } }
 
-    if (totalCreated > 0) {
+    // A paste shows its results on screen straight away — no need to ping too.
+    if (totalCreated > 0 && trigger !== 'paste') {
       db.prepare("INSERT INTO notifications (user_id, type, task_id, message) VALUES (?, 'robot', NULL, ?)")
         .run(owner.id, `🤖 ${totalCreated} new suggestion${totalCreated === 1 ? '' : 's'} from your messages — review them in the Inbox`);
     }
@@ -792,6 +793,11 @@ export function inOfficeHours(d = new Date()) {
 }
 
 export function startIntakeScheduler() {
+  // A run cut short by a restart/deploy would otherwise show "running" forever.
+  // Its unprocessed items were never marked seen, so the next run picks them up.
+  db.prepare(`UPDATE intake_runs SET status = 'error', finished_at = datetime('now'),
+    detail = '{"sources":[],"notes":["Interrupted by a server restart — the next check picks up where it left off"]}'
+    WHERE status = 'running'`).run();
   const tick = async () => {
     try {
       if (getMeta('intake_enabled', '1') !== '1' || !getClaude() || busy || !inOfficeHours()) return;

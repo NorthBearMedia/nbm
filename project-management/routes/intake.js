@@ -55,7 +55,7 @@ function expireStale() {
       OR task_id IN (SELECT id FROM tasks WHERE archived = 1 OR task_status IN ('done', 'cancelled')))`).run();
 }
 
-const SUGGESTION_SELECT = `SELECT s.*, c.name AS client_name, c.code AS client_code, c.logo_url AS client_logo,
+const SUGGESTION_SELECT = `SELECT s.*, c.name AS client_name, c.code AS client_code, c.logo_url AS client_logo, c.is_system AS client_is_system,
     t.title AS task_title, t.task_status AS task_status, t.deadline AS task_deadline
   FROM suggestions s LEFT JOIN clients c ON c.id = s.client_id LEFT JOIN tasks t ON t.id = s.task_id`;
 

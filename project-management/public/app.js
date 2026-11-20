@@ -22,6 +22,8 @@ async function loadCurrentUser() {
       if (ghb) ghb.style.display = currentUser.role === 'owner' ? '' : 'none';
       const bkb = document.getElementById('manageBackupsBtn');
       if (bkb) bkb.style.display = currentUser.role === 'owner' ? '' : 'none';
+      const rsb = document.getElementById('robotSettingsBtn');
+      if (rsb) rsb.style.display = currentUser.role === 'owner' ? '' : 'none';
     } else {
       window.location.href = '/login';
     }
@@ -73,17 +75,18 @@ function renderNotifs() {
   const d = document.getElementById('notifDropdown');
   d.innerHTML = notifState.list.length
     ? notifState.list.map(n =>
-        `<button class="nav-dropdown-item notif-item ${n.is_read ? '' : 'notif-unread'}" onclick="openNotif(${n.id}, ${n.task_id || 'null'})">
+        `<button class="nav-dropdown-item notif-item ${n.is_read ? '' : 'notif-unread'}" onclick="openNotif(${n.id}, ${n.task_id || 'null'}, ${n.type === 'robot'})">
           <span class="notif-msg">${esc(n.message)}</span>
           <span class="notif-time">${timeAgo(n.created_at)}</span>
         </button>`).join('')
       + `<div class="nav-dropdown-sep"></div><button class="nav-dropdown-item" onclick="markAllNotifsRead()">Mark all read</button>`
     : '<div class="nav-dropdown-item" style="color:var(--text-muted);cursor:default">Nothing yet — review requests and approvals land here.</div>';
 }
-async function openNotif(id, taskId) {
+async function openNotif(id, taskId, fromRobot) {
   document.getElementById('notifDropdown').classList.remove('open');
   try { await api('/api/notifications/read', { method: 'PUT', body: { id } }); } catch {}
   fetchNotifications();
+  if (fromRobot) return switchView('inbox');   // suggestions live at the top of the Inbox
   if (taskId && findTaskById(taskId)) editTask(taskId);
 }
 async function markAllNotifsRead() {
@@ -96,6 +99,7 @@ document.addEventListener('click', (e) => {
 });
 fetchNotifications();
 setInterval(fetchNotifications, 60000);
+setInterval(() => fetchRobotCount(), 60000);   // owner-only; a no-op for everyone else
 
 // ─── Global quick capture — a task from ANY view, two keystrokes ─────────
 function toggleQuickTask(e) {
@@ -1248,6 +1252,9 @@ function updateInboxCount() {
   const badge = document.getElementById('inboxCount');
   // Cap at 9+ — past a point the exact number is just shame-rendering, not information.
   if (badge) { badge.textContent = n > 9 ? '9+' : n; badge.style.display = n ? '' : 'none'; }
+  const rb = document.getElementById('robotCount');
+  const p = robot.pending;
+  if (rb) { rb.textContent = '✨' + (p > 9 ? '9+' : p); rb.style.display = p ? '' : 'none'; }
 }
 
 function clientSelectOptions(sel) {
@@ -1256,6 +1263,7 @@ function clientSelectOptions(sel) {
 }
 
 function loadInboxView() {
+  loadRobotTray();
   document.getElementById('inboxClient').innerHTML = clientSelectOptions('');
   const list = document.getElementById('inboxList');
   const items = allTasksFlat().filter(t => t.task_status === 'inbox')
@@ -1304,6 +1312,408 @@ async function quickAddInbox() {
   await loadClients();
   loadInboxView();
   titleEl.focus();
+}
+
+// ─── The robot: suggestions drafted from your messages ───────────────────
+// Owner only. It reads email / WhatsApp / meeting notes / captures and
+// proposes new tasks, tick-offs and status changes. Nothing touches the task
+// list until it's accepted here — one click, or edit first.
+let robot = { pending: 0, list: [], status: null, editing: null, running: false };
+const isOwner = () => currentUser?.role === 'owner';
+const safeUrl = u => /^https?:\/\//i.test(u || '') ? u : '';
+const fmtShort = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : '';
+
+async function fetchRobotCount() {
+  if (!isOwner()) return;
+  try {
+    const r = await api('/api/suggestions/count');
+    if (r.pending === robot.pending) return;
+    robot.pending = r.pending;
+    updateInboxCount();
+    // New ones arrived while the Inbox is open — refresh in place (never mid-edit).
+    if (currentView === 'inbox' && robot.editing === null && !robot.running) loadRobotTray();
+  } catch {}
+}
+
+async function loadRobotTray() {
+  const tray = document.getElementById('robotTray');
+  if (!tray) return;
+  if (!isOwner()) { tray.style.display = 'none'; return; }
+  tray.style.display = '';
+  try {
+    const [list, status] = await Promise.all([api('/api/suggestions'), api('/api/intake/status')]);
+    robot.list = list; robot.status = status; robot.pending = list.length;
+    if (robot.editing !== null && !list.some(s => s.id === robot.editing)) robot.editing = null;
+    updateInboxCount();
+    renderRobotTray();
+  } catch (e) {
+    document.getElementById('robotStatus').textContent = 'Couldn’t load suggestions — ' + e.message;
+  }
+}
+
+function robotStatusLine(s) {
+  if (!s) return '';
+  if (!s.hasApiKey) return '<span class="robot-warn">⚠ The robot needs ANTHROPIC_API_KEY set on Railway before it can read anything.</span>';
+  const src = s.sources;
+  const anySource = src.gmail || src.mailboxes.some(m => m.status === 'ok') || src.whatsappNumbers || src.periskope.configured || src.granola.configured;
+  const parts = [];
+  if (robot.running || s.busy) parts.push('<span class="robot-busy">Reading your messages now…</span>');
+  else if (!s.enabled) parts.push('<span class="robot-warn">Paused — switch it back on in ⚙ Sources.</span>');
+  else if (!anySource) parts.push('Nothing connected yet — open <a href="#" onclick="openRobotSettings();return false">⚙ Sources</a> to connect email and WhatsApp.');
+  const lr = s.lastRun;
+  if (lr && !(robot.running || s.busy)) {
+    if (lr.status === 'error') parts.push(`<span class="robot-warn">⚠ Last check ${timeAgo(lr.started_at)} didn’t finish: ${esc((lr.detail?.notes || [])[0] || 'unknown error')}</span>`);
+    else parts.push(`Last checked ${timeAgo(lr.started_at)} — read ${lr.items} new, suggested ${lr.suggestions}`);
+  }
+  if (s.enabled && anySource && !(robot.running || s.busy)) parts.push(s.inOfficeHours ? 'checks every hour' : 'next check in office hours (Mon–Fri 8–6)');
+  const needs = src.mailboxes.filter(m => m.status !== 'ok').map(m => m.email);
+  if (needs.length) parts.push(`<span class="robot-warn">${esc(needs.join(', '))} needs reconnecting</span>`);
+  return parts.join(' · ');
+}
+
+const SG_KIND = {
+  new_task: { icon: '➕', label: 'New task',   btn: '✓ Add to list', done: 'Added' },
+  complete: { icon: '✔',  label: 'Looks done', btn: '✓ Tick it off', done: 'Ticked off' },
+  update:   { icon: '↻',  label: 'Update',     btn: '✓ Update it',   done: 'Updated' },
+};
+
+function sgClientChip(s) {
+  if (!s.client_name || s.client_is_system) return '<span class="sg-client sg-client-none">No client</span>';
+  const mark = s.client_logo
+    ? `<img src="${esc(s.client_logo)}" alt="">`
+    : `<span class="sg-cl-f" style="background:hsl(${clientHue(s.client_name)} 52% 74%)">${esc((s.client_code || s.client_name).charAt(0).toUpperCase())}</span>`;
+  return `<span class="sg-client">${mark}${esc(s.client_name)}</span>`;
+}
+
+function sgWhat(s) {
+  if (s.kind === 'new_task') return esc(s.title);
+  const ref = s.task_id ? `<span class="task-ref">${taskRef(s.task_id)}</span> ` : '';
+  const name = esc(s.task_title || s.title);
+  if (s.kind === 'complete') return ref + name;
+  const changes = [];
+  if (s.new_status) changes.push(statusLabel(s.new_status));
+  if (s.deadline) changes.push('due ' + fmtShort(s.deadline));
+  return `${ref}${name} <span class="sg-arrow">→ ${esc(changes.join(', '))}</span>`;
+}
+
+function sgEditForm(s) {
+  return `<div class="sg-edit">
+    <input type="text" id="sgeTitle" value="${esc(s.title)}" maxlength="200" onkeydown="if(event.key==='Enter')sgAccept(${s.id},true)">
+    <select id="sgeClient">${clientSelectOptions(s.client_id || '')}</select>
+    <input type="date" id="sgeDue" value="${esc(s.deadline || '')}" title="Due date">
+    <select id="sgeWho" title="Who does it"><option value="">Nobody yet</option>${assigneePool.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select>
+    <button class="btn btn-primary btn-sm" onclick="sgAccept(${s.id},true)">✓ Add</button>
+    <button class="btn btn-ghost btn-sm" onclick="sgEdit(null)">Cancel</button>
+  </div>`;
+}
+
+function sgCard(s) {
+  const k = SG_KIND[s.kind] || SG_KIND.new_task;
+  const url = safeUrl(s.source_url);
+  const src = url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(s.source_label)}</a>` : esc(s.source_label);
+  return `<div class="sg-card sg-${s.kind}" id="sg-${s.id}">
+    <div class="sg-top">
+      <span class="sg-kind">${k.icon} ${k.label}</span>
+      ${sgClientChip(s)}
+      ${s.kind === 'new_task' && s.deadline ? `<span class="sg-due">📅 ${fmtShort(s.deadline)}</span>` : ''}
+      ${s.confidence !== 'high' ? '<span class="sg-conf" title="Fairly sure, not certain — worth a glance">probably</span>' : ''}
+      <span class="sg-when">${timeAgo(s.created_at)}</span>
+    </div>
+    <div class="sg-title">${sgWhat(s)}</div>
+    ${s.kind === 'new_task' && s.notes ? `<div class="sg-notes">${esc(s.notes)}</div>` : ''}
+    ${s.evidence ? `<div class="sg-evidence">“${esc(s.evidence)}”</div>` : ''}
+    <div class="sg-src">from ${src}</div>
+    ${robot.editing === s.id ? sgEditForm(s) : `<div class="sg-btns">
+      <button class="btn btn-primary btn-sm" onclick="sgAccept(${s.id})">${k.btn}</button>
+      ${s.kind === 'new_task' ? `<button class="btn btn-ghost btn-sm" onclick="sgEdit(${s.id})">✎ Edit first</button>` : ''}
+      <button class="btn btn-ghost btn-sm sg-no" onclick="sgDismiss(${s.id})">✕ Not needed</button>
+    </div>`}
+  </div>`;
+}
+
+function renderRobotTray() {
+  document.getElementById('robotStatus').innerHTML = robotStatusLine(robot.status);
+  const n = robot.list.length;
+  const cnt = document.getElementById('robotTrayCount');
+  cnt.textContent = n; cnt.style.display = n ? '' : 'none';
+  const s = robot.status;
+  const runBtn = document.getElementById('robotRunBtn');
+  if (!robot.running) runBtn.disabled = !s?.hasApiKey || !!s?.busy;
+  document.getElementById('robotPasteBtn').disabled = !s?.hasApiKey;
+  const list = document.getElementById('robotList');
+  if (!n) {
+    list.innerHTML = '<div class="robot-empty">Nothing waiting for you. New suggestions land here as messages come in.</div>';
+    return;
+  }
+  const sure = robot.list.filter(x => x.confidence === 'high').length;
+  list.innerHTML = (sure > 1 ? `<div class="robot-bulk"><button class="btn btn-ghost btn-sm" onclick="sgAcceptAllSure()">✓ Accept all ${sure} confident ones</button></div>` : '')
+    + robot.list.map(sgCard).join('');
+}
+
+function sgEdit(id) {
+  robot.editing = id;
+  renderRobotTray();
+  if (id !== null) setTimeout(() => document.getElementById('sgeTitle')?.focus(), 20);
+}
+
+function sgRemove(id) {
+  robot.list = robot.list.filter(x => x.id !== id);
+  robot.pending = robot.list.length;
+  if (robot.editing === id) robot.editing = null;
+  updateInboxCount();
+  renderRobotTray();
+}
+
+async function sgAccept(id, fromEdit) {
+  const s = robot.list.find(x => x.id === id);
+  if (!s || s._busy) return;
+  let body = {};
+  if (fromEdit) {
+    const title = document.getElementById('sgeTitle').value.trim();
+    if (!title) return toast('Give it a title first');
+    body = {
+      title,
+      client_id: document.getElementById('sgeClient').value || null,
+      deadline: document.getElementById('sgeDue').value,
+      assignee: document.getElementById('sgeWho').value,
+    };
+  }
+  s._busy = true;
+  document.querySelectorAll(`#sg-${id} button`).forEach(b => { b.disabled = true; });
+  try {
+    const r = await api(`/api/suggestions/${id}/accept`, { method: 'POST', body });
+    sgRemove(id);
+    toast(`${(SG_KIND[s.kind] || SG_KIND.new_task).done} — ${taskRef(r.task.id)}`, true);
+    loadClients();
+  } catch (e) {
+    s._busy = false;
+    if (/already handled/i.test(e.message)) { sgRemove(id); return; }
+    document.querySelectorAll(`#sg-${id} button`).forEach(b => { b.disabled = false; });
+    toast('Not saved — ' + e.message);
+  }
+}
+
+async function sgDismiss(id) {
+  try {
+    await api(`/api/suggestions/${id}/dismiss`, { method: 'POST' });
+  } catch (e) {
+    if (!/already handled/i.test(e.message)) return toast('Not saved — ' + e.message);
+  }
+  sgRemove(id);   // the robot remembers the no and won't suggest it again
+}
+
+async function sgAcceptAllSure() {
+  const sure = robot.list.filter(x => x.confidence === 'high');
+  if (!sure.length) return;
+  const counts = {};
+  sure.forEach(x => { counts[x.kind] = (counts[x.kind] || 0) + 1; });
+  const what = [counts.new_task && `add ${counts.new_task} task${counts.new_task > 1 ? 's' : ''}`,
+    counts.complete && `tick off ${counts.complete}`, counts.update && `update ${counts.update}`].filter(Boolean).join(', ');
+  if (!confirm(`Accept all ${sure.length} confident suggestions? This will ${what}.`)) return;
+  try {
+    const r = await api('/api/suggestions/accept-all', { method: 'POST', body: { ids: sure.map(x => x.id) } });
+    toast(`Done — ${r.accepted} accepted${r.errors.length ? `, ${r.errors.length} couldn’t be (${r.errors[0].error})` : ''}`, !r.errors.length);
+  } catch (e) { toast('Not saved — ' + e.message); }
+  await loadClients();
+  if (currentView !== 'inbox') loadRobotTray();
+}
+
+async function robotRunNow() {
+  if (robot.running) return;
+  robot.running = true;
+  const btn = document.getElementById('robotRunBtn');
+  btn.disabled = true; btn.textContent = 'Checking…';
+  document.getElementById('robotStatus').innerHTML = '<span class="robot-busy">Reading your messages now — this can take a minute…</span>';
+  try {
+    const r = await api('/api/intake/run', { method: 'POST' });
+    if (r.status === 'error') toast('Check didn’t finish — ' + (r.notes[0] || 'try again shortly'));
+    else toast(r.suggestions ? `Found ${r.suggestions} new suggestion${r.suggestions === 1 ? '' : 's'}` : 'All caught up — nothing new needs a task', true);
+  } catch (e) { toast('Check failed — ' + e.message); }
+  robot.running = false;
+  btn.innerHTML = '&#8635; Check now';
+  loadRobotTray();
+  fetchNotifications();
+}
+
+async function robotPaste() {
+  const ta = document.getElementById('robotPasteText');
+  const text = ta.value.trim();
+  if (!text) return ta.focus();
+  const btn = document.getElementById('robotPasteBtn');
+  btn.disabled = true; btn.textContent = 'Reading…';
+  try {
+    const r = await api('/api/intake/paste', { method: 'POST', body: { text } });
+    if (r.status === 'error') toast('Couldn’t read it — ' + (r.notes?.[0] || 'try again'));
+    else {
+      ta.value = '';
+      const n = r.created.length;
+      toast(n ? `Found ${n} — they’re in the list below` : 'Nothing that needs a task in that', !!n);
+    }
+  } catch (e) { toast('Not read — ' + e.message); }
+  btn.textContent = 'Find tasks';
+  loadRobotTray();
+}
+
+// ─── Robot & sources settings (☰ menu, owner only) ─────────────────────────
+async function openRobotSettings() {
+  document.getElementById('navDropdown')?.classList.remove('open');
+  if (!isOwner()) return;
+  const body = document.getElementById('robotSettingsBody');
+  if (!document.getElementById('robotModal').classList.contains('active')) body.innerHTML = '<div class="rs-loading">Loading…</div>';
+  openModal('robotModal');
+  try { robot.status = await api('/api/intake/status'); renderRobotSettings(); }
+  catch (e) { body.innerHTML = `<div class="rs-loading">Couldn’t load — ${esc(e.message)}</div>`; }
+}
+
+const RUN_TRIGGER = { schedule: 'Hourly check', manual: 'Check now', paste: 'Paste', capture: 'Capture link', test: 'Test' };
+const RUN_STATUS = { ok: '✓', idle: '✓ nothing new', partial: '◐ part done', error: '⚠ failed', running: '… running' };
+
+function rsKeyInput(id, configured, fromEnv, placeholder) {
+  if (fromEnv) return `<input type="password" id="${id}" disabled placeholder="Set on the server (Railway)">`;
+  return `<input type="password" id="${id}" autocomplete="off" placeholder="${configured ? 'Saved ✓ — paste a new key to replace it' : esc(placeholder)}">`;
+}
+
+function renderRobotSettings() {
+  const s = robot.status;
+  const src = s.sources;
+  const dot = on => `<span class="rs-dot ${on ? 'on' : ''}"></span>`;
+  const mailboxRows = src.mailboxes.map(m => `<div class="rs-src">
+      ${dot(m.status === 'ok')}
+      <div class="rs-src-main"><strong>${esc(m.email)}</strong><div class="rs-sub">${m.status === 'ok' ? 'Extra mailbox — read-only' : '⚠ Google stopped letting us read this — reconnect it'}</div></div>
+      ${m.status === 'ok' ? '' : '<a class="btn btn-ghost btn-sm" href="/auth/gmail/connect?purpose=intake">Reconnect</a>'}
+      <button class="btn btn-ghost btn-sm" onclick="robotRemoveMailbox(${m.id})">Remove</button>
+    </div>`).join('');
+  const runs = (s.recentRuns || []).map(r => `<div class="rs-run">
+      <span>${fmtDateTime(r.started_at)}</span><span>${esc(RUN_TRIGGER[r.trigger_type] || r.trigger_type)}</span>
+      <span class="rs-run-st rs-${r.status}">${RUN_STATUS[r.status] || esc(r.status)}</span>
+      <span>read ${r.items} · suggested ${r.suggestions}</span>
+    </div>`).join('');
+  const notes = (s.lastRun?.detail?.notes || []).slice(0, 4).map(n => `<li>${esc(n)}</li>`).join('');
+  const tokens = (s.month.input_tokens || 0) + (s.month.output_tokens || 0);
+
+  document.getElementById('robotSettingsBody').innerHTML = `
+    <section class="rs-sec">
+      <label class="rs-toggle">
+        <input type="checkbox" ${s.enabled ? 'checked' : ''} onchange="robotSetEnabled(this.checked)">
+        <span class="rs-switch"></span>
+        <span><strong>Read my messages every hour</strong>
+          <span class="rs-sub">Mon–Fri, 8am–6pm. It only ever <em>suggests</em> — nothing goes on your list until you tick it in the Inbox.</span></span>
+      </label>
+      ${s.hasApiKey ? '' : '<div class="robot-warn rs-block">⚠ Needs ANTHROPIC_API_KEY set on Railway before it can read anything.</div>'}
+      <div class="rs-stats">This month: <b>${s.month.runs}</b> checks · <b>${s.month.suggestions}</b> suggestions · ${(tokens / 1000).toFixed(0)}k tokens</div>
+    </section>
+
+    <section class="rs-sec">
+      <h4>What it reads</h4>
+      <div class="rs-src">
+        ${dot(!!src.gmail)}
+        <div class="rs-src-main"><strong>Work email</strong><div class="rs-sub">${src.gmail ? esc(src.gmail) + ' — inbox and sent' : (s.gmailOAuthConfigured ? 'Not connected' : 'Gmail isn’t set up on the server')}</div></div>
+        ${!src.gmail && s.gmailOAuthConfigured ? '<a class="btn btn-ghost btn-sm" href="/auth/gmail/connect">Connect</a>' : ''}
+      </div>
+      ${mailboxRows}
+      ${s.gmailOAuthConfigured ? `<div class="rs-src rs-add">
+        <span class="rs-dot"></span>
+        <div class="rs-src-main"><strong>Another Gmail</strong><div class="rs-sub">e.g. your personal email — read-only, nothing is ever sent from it</div></div>
+        <a class="btn btn-ghost btn-sm" href="/auth/gmail/connect?purpose=intake">+ Connect</a>
+      </div>` : ''}
+      <div class="rs-src">
+        ${dot(src.whatsappNumbers > 0)}
+        <div class="rs-src-main"><strong>WhatsApp Business</strong><div class="rs-sub">${src.whatsappNumbers ? `${src.whatsappNumbers} number${src.whatsappNumbers > 1 ? 's' : ''} connected` : 'Not connected — set it up from the WhatsApp panel on the dashboard'}</div></div>
+      </div>
+      <div class="rs-src rs-src-form">
+        ${dot(src.periskope.configured)}
+        <div class="rs-src-main"><strong>Personal WhatsApp</strong> <span class="rs-sub-inline">via Periskope</span>
+          <div class="rs-sub">Periskope → Settings → API → copy your key. Your number is the one linked in Periskope.</div>
+          <div class="rs-fields">
+            ${rsKeyInput('rsPeriKey', src.periskope.configured, src.periskope.fromEnv, 'Periskope API key')}
+            <input type="tel" id="rsPeriPhone" value="${esc(src.periskope.phone || '')}" placeholder="Your number, e.g. 447700900123">
+            <button class="btn btn-ghost btn-sm" onclick="robotSaveSource('periskope')">Save &amp; test</button>
+          </div>
+          <div class="rs-test" id="rsTest-periskope"></div>
+        </div>
+      </div>
+      <div class="rs-src rs-src-form">
+        ${dot(src.granola.configured)}
+        <div class="rs-src-main"><strong>Meeting notes</strong> <span class="rs-sub-inline">via Granola</span>
+          <div class="rs-sub">Granola → Settings → API → create a key. Action points from meetings become suggestions.</div>
+          <div class="rs-fields">
+            ${rsKeyInput('rsGranolaKey', src.granola.configured, src.granola.fromEnv, 'Granola API key')}
+            <button class="btn btn-ghost btn-sm" onclick="robotSaveSource('granola')">Save &amp; test</button>
+          </div>
+          <div class="rs-test" id="rsTest-granola"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="rs-sec">
+      <h4>Send to Console — for your phone, Grok, Claude and anything else</h4>
+      <div class="rs-capture">
+        <input type="text" readonly value="${esc(s.captureUrl)}" onclick="this.select()" id="rsCaptureUrl">
+        <button class="btn btn-ghost btn-sm" onclick="robotCopyCapture()">Copy</button>
+        <button class="btn btn-ghost btn-sm" onclick="robotNewCaptureLink()" title="The old link stops working">New link</button>
+      </div>
+      <div class="rs-sub">Open this link on your phone → Share → <b>Add to Home Screen</b>. Paste anything into it — a to-do list, a Grok or Claude answer, notes from a call — and the robot turns it into suggestions here within a minute. Keep it private: anyone with the link can send you suggestions (they still need your yes).</div>
+    </section>
+
+    <section class="rs-sec">
+      <h4>Recent checks</h4>
+      ${runs || '<div class="rs-sub">None yet.</div>'}
+      ${notes ? `<ul class="rs-notes">${notes}</ul>` : ''}
+    </section>`;
+}
+
+async function robotSaveSettings(body, okMsg) {
+  try {
+    await api('/api/intake/settings', { method: 'PUT', body });
+    robot.status = await api('/api/intake/status');
+    renderRobotSettings();
+    if (okMsg) toast(okMsg, true);
+    if (currentView === 'inbox') renderRobotTray();
+    return true;
+  } catch (e) { toast('Not saved — ' + e.message); return false; }
+}
+
+function robotSetEnabled(on) {
+  robotSaveSettings({ enabled: on }, on ? 'Robot on — it checks every hour in office hours' : 'Robot paused');
+}
+
+async function robotSaveSource(svc) {
+  const body = {};
+  if (svc === 'periskope') {
+    const k = document.getElementById('rsPeriKey');
+    if (k && !k.disabled && k.value.trim()) body.periskope_api_key = k.value.trim();
+    body.periskope_phone = document.getElementById('rsPeriPhone').value;
+  } else {
+    const k = document.getElementById('rsGranolaKey');
+    if (k && !k.disabled && k.value.trim()) body.granola_api_key = k.value.trim();
+  }
+  if (!(await robotSaveSettings(body))) return;
+  const out = document.getElementById(`rsTest-${svc}`);
+  out.className = 'rs-test'; out.textContent = 'Testing…';
+  try {
+    const r = await api(`/api/intake/test/${svc}`, { method: 'POST' });
+    out.className = 'rs-test ' + (r.ok ? 'ok' : 'bad');
+    out.textContent = (r.ok ? '✓ ' : '⚠ ') + r.detail;
+  } catch (e) { out.className = 'rs-test bad'; out.textContent = '⚠ ' + e.message; }
+}
+
+async function robotRemoveMailbox(id) {
+  const email = robot.status?.sources.mailboxes.find(m => m.id === id)?.email || 'this mailbox';
+  if (!confirm(`Stop reading ${email}? Suggestions already made stay.`)) return;
+  try { await api(`/api/intake/mailboxes/${id}`, { method: 'DELETE' }); } catch (e) { return toast('Not removed — ' + e.message); }
+  openRobotSettings();
+}
+
+async function robotCopyCapture() {
+  const el = document.getElementById('rsCaptureUrl');
+  try { await navigator.clipboard.writeText(el.value); }
+  catch { el.select(); document.execCommand('copy'); }
+  toast('Link copied', true);
+}
+
+function robotNewCaptureLink() {
+  if (!confirm('Make a new link? The old one stops working straight away — update your phone shortcut after.')) return;
+  robotSaveSettings({ regenerate_capture_token: true }, 'New link made');
 }
 
 // ─── Notebook (paper day-book) ──────────────────────────
@@ -3967,6 +4377,16 @@ async function toggleTaskPin(taskId, event) {
       const savedView = appPrefs.nbm_view || localStorage.getItem('nbm_view');
       if (savedView && savedView !== 'dashboard' && document.querySelector(`[data-view="${savedView}"]`)) switchView(savedView);
     } catch {}
+    fetchRobotCount();
+    // Back from Google after connecting an extra mailbox for the robot.
+    if (location.hash === '#robot' || location.hash === '#robot-same-mailbox') {
+      const same = location.hash === '#robot-same-mailbox';
+      history.replaceState(null, '', location.pathname);
+      if (isOwner()) {
+        openRobotSettings();
+        toast(same ? 'That’s already your main work Gmail — connect your other account' : 'Mailbox connected — the robot reads it from the next check', !same);
+      }
+    }
   } catch(e) {
     console.error('Init error:', e);
     document.getElementById('clientList').innerHTML='<div class="empty-state"><p>Error loading data. Please refresh.</p></div>';
