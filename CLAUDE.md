@@ -126,6 +126,7 @@ intake_seen       (source, ref) of every message already read — never sent to 
 intake_mailboxes  extra read-only Gmail accounts for the robot (OAuth tokens)
 intake_captures   text sent to the capture link / pasted in the Inbox, until processed
 intake_relay      messages relayed in by the hourly Claude task (source, ref, item JSON), until processed
+report_social     (client_id, period) → a month's social figures relayed from Metricool for the report
 contact_map       email/phone/chat id → client, learned when a suggestion is accepted
 client_reports    client_id, period (YYYY-MM), content JSON {facts, draft}, sent_at, sent_to
 app_meta keys     intake_enabled, intake_cursor_*, intake_last_*, capture_token, and the write-only
@@ -217,12 +218,21 @@ everywhere in the UI. `progress` / `priority` are kept as **synced shadow values
 - **In Xero, not in Console:** the retainers check also lists Xero contacts with active repeating invoices that
   no client (active or archived) matches — Control Board header "+N in Xero, not in Console" → one-click add
   (retainer, linked, Xero's name kept as an alias if you rename it).
-- **Claude relay (hourly):** a scheduled Claude task (claude.ai scheduled task, Mon–Fri office hours) reads
-  Norton's own Claude connectors — Gmail, Periskope (personal WhatsApp), Granola — and his recent Claude
-  sessions, and posts new messages to `POST /relay/items` (`GET /relay/status` says where to pick up from
-  and which sources Console already reads itself). Auth: `Authorization: Bearer <capture-link secret>`
-  (the whole capture link is accepted). Items land in `intake_relay` in the robot's item shape and go
-  through the same robot (seen-tracking, who's-who, dedupe). Gmail refs match the robot's own reader.
+- **Claude relay (hourly):** Norton's Claude connectors (Gmail, Periskope = personal WhatsApp, Granola,
+  Metricool) can't be handed to Console, so Claude sessions do the reading, woken by scheduled tasks:
+  "North Bear Console relay (lean)" hourly Mon–Fri 08:23–17:23 UK, and "North Bear Console relay — monthly
+  social" on the 1st at 07:37 (created with its Metricool tools pre-approved — without that, an unattended
+  run stops at a permission prompt). Each wake runs one throwaway subagent (keeps the session's context,
+  and cost, small); each session's first message holds its full job text. (Scheduled tasks can't carry
+  connectors on this account, so the work runs inside sessions that have them.) The hourly job posts new
+  messages and Claude-session summaries to `POST /relay/items`; `GET /relay/status` says where to pick up
+  from, which sources Console already reads itself (skip), robot health counts and the Metricool-linked
+  brands. The monthly job posts last month's per-network social figures to `POST /relay/social`
+  (`report_social` table), which the monthly report uses when there's no Metricool key. Auth:
+  `Authorization: Bearer <capture-link secret>` (the whole link is accepted) — saved as a network
+  secret for nbmconsole.pro on the cloud environment, injected by the proxy. Items land in
+  `intake_relay` in the robot's item shape and go through the same robot (seen-tracking, who's-who,
+  dedupe). Gmail refs match the robot's own reader.
 - **Claude connector (MCP):** `POST /mcp/<capture token>` — a stateless Streamable-HTTP MCP server with one
   write-only tool, `send_to_console`, which drops text into the capture queue (→ robot suggestions). Added in
   claude.ai as a custom connector (Settings → Connectors) or `claude mcp add --transport http`, so any Claude
