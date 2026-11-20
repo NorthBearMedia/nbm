@@ -112,14 +112,43 @@ export function findProjectsFromTokens() {
     console.log(`[clarity] ${s.domain}: project ID read from its API token`);
   }
   const today = todayISO();
-  const untagged = found.filter(s => !(aggregate(s.id, addDays(today, -30), today)?.sessions > 0))
-    .map(s => String(s.domain || '').toLowerCase().replace(/^www\./, ''));
-  if (untagged.length) {
-    let wanted = [];
-    try { wanted = JSON.parse(getSetting('tracking_code_wanted') || '[]'); } catch { /* start a fresh list */ }
-    setSetting('tracking_code_wanted', JSON.stringify([...new Set([...wanted, ...untagged])]));
+  wantTrackingCode(found.filter(s => !(aggregate(s.id, addDays(today, -30), today)?.sessions > 0)));
+  return found.map(bare);
+}
+
+const bare = s => String(s.domain || '').toLowerCase().replace(/^www\./, '');
+function wantTrackingCode(sites) {
+  if (!sites.length) return;
+  let wanted = [];
+  try { wanted = JSON.parse(getSetting('tracking_code_wanted') || '[]'); } catch { /* start a fresh list */ }
+  setSetting('tracking_code_wanted', JSON.stringify([...new Set([...wanted, ...sites.map(bare)])]));
+}
+
+// Last resort for a site whose own project still cannot be named. Its
+// token has been read for a month or more and has never returned a single
+// visit, human or robot, so the project behind it has no tag on any
+// page. Rather than leave the site without behaviour data until someone
+// opens Clarity to look the ID up, it joins the project other sites
+// already share, and its tracking code is emailed to the owner. Its old
+// token is kept in settings in case it is ever wanted. Nothing is deleted.
+export function joinSharedIfEmpty() {
+  const shared = db.prepare(`SELECT clarity_project_id AS project, clarity_api_token AS token, COUNT(*) AS n FROM sites
+    WHERE active = 1 AND clarity_project_id != '' AND clarity_api_token != ''
+    GROUP BY clarity_api_token HAVING n > 1 ORDER BY n DESC LIMIT 1`).get();
+  if (!shared) return [];
+  const blank = db.prepare(`SELECT id, domain, clarity_api_token AS token FROM sites
+    WHERE active = 1 AND clarity_api_token != '' AND (clarity_project_id IS NULL OR clarity_project_id = '')`).all();
+  const moved = [];
+  for (const s of blank) {
+    const ever = aggregate(s.id, '2000-01-01', todayISO());
+    if (!ever || ever.daysCovered < 30 || ever.sessions > 0 || ever.botSessions > 0) continue;
+    setSetting(`clarity_token_before_sharing_${s.id}`, s.token);
+    db.prepare('UPDATE sites SET clarity_project_id = ?, clarity_api_token = ? WHERE id = ?').run(shared.project, shared.token, s.id);
+    moved.push(s);
+    console.log(`[clarity] ${s.domain}: its own project has never recorded a visit, so it now shares the project other sites use`);
   }
-  return found.map(s => String(s.domain || '').toLowerCase().replace(/^www\./, ''));
+  wantTrackingCode(moved);
+  return moved.map(bare);
 }
 
 // A site put on a project that another site already reads takes that
