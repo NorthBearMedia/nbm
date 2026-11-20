@@ -96,6 +96,20 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_monitor_incidents_site ON monitor_incidents(site_id, id);
+
+  -- "What we did this month": work North Bear did for a client, logged by
+  -- the owner and shown in that client's report beside the results.
+  CREATE TABLE IF NOT EXISTS work_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    site_id INTEGER NOT NULL,
+    done_on TEXT NOT NULL,
+    title TEXT NOT NULL,
+    detail TEXT NOT NULL DEFAULT '',
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_work_log_site ON work_log(site_id, done_on);
 `);
 
 // ─── Lightweight idempotent migrations ───────────────────────────

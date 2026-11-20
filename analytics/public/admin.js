@@ -452,6 +452,7 @@ function renderSites() {
         <button class="btn small" data-act="send">Send report now</button>
         <button class="btn small" data-act="test">Test connections</button>
         <button class="btn small" data-act="snippet">Tracking code</button>
+        <button class="btn small" data-act="work" title="Log work you did for this client. It shows in their report beside the results.">Work log</button>
         <button class="btn small" data-act="history">History</button>
         <button class="btn small" data-act="edit">Edit</button>
       </div>
@@ -518,6 +519,8 @@ $('#sitesGrid').addEventListener('click', async (e) => {
     btn.disabled = false; btn.textContent = 'Test connections';
   } else if (act === 'snippet') {
     showSnippetModal(site);
+  } else if (act === 'work') {
+    showWorkModal(site);
   } else if (act === 'history') {
     showHistoryModal(site);
   } else if (act === 'edit') {
@@ -705,6 +708,52 @@ function showSnippetModalContent(site, snippet, banner) {
       toast('Privacy wording copied');
     };
   }
+}
+
+// Work log: what North Bear did for this client. Each entry appears in
+// the client's report and dashboard for the period its date falls in.
+async function showWorkModal(site) {
+  const items = await api(`/api/sites/${site.id}/work`);
+  const today = new Date().toLocaleDateString('en-CA');
+  $('#modalRoot').innerHTML = `
+  <div class="modal-backdrop" id="backdrop">
+    <div class="modal" style="max-width:720px">
+      <h3>Work log: ${esc(site.client_name)}</h3>
+      <p class="hint" style="margin:-8px 0 16px">Log what you did and it appears in this client's next report and on their dashboard, under "What we did for you". The client reads these words, so write them the way you would say them.</p>
+      <form id="workForm" class="form-grid">
+        <div class="field"><label>Date done</label><input name="done_on" type="date" value="${today}" max="${today}" required></div>
+        <div class="field"><label>What was done</label><input name="title" maxlength="140" placeholder="New page for fire blanket sales" required></div>
+        <div class="field full"><label>A line of detail (optional)</label><input name="detail" maxlength="400" placeholder="Written around the searches people use to find them"></div>
+        <div class="field full"><button class="btn primary" type="submit">Add to the log</button></div>
+      </form>
+      ${items.length ? `<table class="data" style="margin-top:18px">
+        <thead><tr><th>Date</th><th>What was done</th><th></th></tr></thead>
+        <tbody>${items.map(w => `
+          <tr><td style="white-space:nowrap">${esc(w.done_on)}</td>
+            <td><strong>${esc(w.title)}</strong>${w.detail ? `<br><span class="hint">${esc(w.detail)}</span>` : ''}</td>
+            <td><button class="btn small danger" data-remove="${w.id}">Remove</button></td></tr>`).join('')}
+        </tbody></table>` : '<p class="hint" style="margin-top:18px">Nothing logged yet for this client.</p>'}
+      <div class="modal-actions"><button class="btn" id="cancelBtn">Close</button></div>
+    </div>
+  </div>`;
+  $('#cancelBtn').onclick = closeModal;
+  $('#backdrop').onclick = e => { if (e.target.id === 'backdrop') closeModal(); };
+  $('#workForm').onsubmit = async e => {
+    e.preventDefault();
+    const body = Object.fromEntries(new FormData(e.target));
+    try {
+      await api(`/api/sites/${site.id}/work`, { method: 'POST', body });
+      toast('Added to the log');
+      showWorkModal(site);
+    } catch (err) { toast(err.message, 'err', 8000); }
+  };
+  document.querySelectorAll('[data-remove]').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm('Remove this entry from the log?')) return;
+      try { await api(`/api/work/${btn.dataset.remove}`, { method: 'DELETE' }); showWorkModal(site); }
+      catch (err) { toast(err.message, 'err', 8000); }
+    };
+  });
 }
 
 // ─── History modal ────────────────────────────────────────────────

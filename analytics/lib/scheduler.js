@@ -130,6 +130,11 @@ export function startScheduler() {
   };
   cron.schedule('25 5 * * *', () => psi().catch(e => console.error('[psi]', e.message)), { timezone: config.timezone, noOverlap: true });
   setTimeout(() => psi().catch(e => console.error('[psi]', e.message)), 180_000);
+  // Pulse's own health check of every live site, once a day and shortly
+  // after boot, so reports and dashboards always have one to show.
+  const siteChecks = async () => { const { runAllSiteChecks } = await import('./sitecheck.js'); return runAllSiteChecks(); };
+  cron.schedule('35 4 * * *', () => siteChecks().catch(e => console.error('[sitecheck]', e.message)), { timezone: config.timezone, noOverlap: true });
+  setTimeout(() => siteChecks().catch(e => console.error('[sitecheck]', e.message)), 150_000);
   setTimeout(() => runRound().catch(e => console.error('[monitor]', e.message)), 20_000);
   setTimeout(() => runDailyChecks().catch(e => console.error('[monitor-daily]', e.message)), 90_000);
   console.log(`[scheduler] running (timezone ${config.timezone}) — reports hourly, Clarity 03:40+13:40, DB backup hourly`);

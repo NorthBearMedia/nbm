@@ -53,6 +53,17 @@ export async function fetchTopQueries(siteUrl, start, end, limit = 10) {
   }));
 }
 
+// Which pages Google sent people to, most clicked first.
+export async function fetchTopPages(siteUrl, start, end, limit = 25) {
+  const data = await query(siteUrl, { startDate: start, endDate: end, dimensions: ['page'], rowLimit: limit });
+  return (data.rows || []).map(r => ({
+    page: r.keys[0],
+    clicks: r.clicks,
+    impressions: r.impressions,
+    position: r.position,
+  }));
+}
+
 // Clicks and impressions per calendar month, for the report's long-view
 // chart. Search Console has no month dimension, so the daily rows (at
 // most about 400 for a year) are summed here.
