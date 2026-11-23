@@ -14,3 +14,14 @@ plate_lit.png
 bump_chk.jpg
 # candidate takes; the kept ones are copied into vo/ and variants/
 vo/cand/
+# v2 visual: derived renders and review scratch
+body2.mp4
+bumper2.mp4
+bumper2.ass
+test2.mp4
+master-*.mp4
+grad.png
+tf_*.jpg
+test_sheet.jpg
+sheet_v2.jpg
+plates/radio_top_*.jpg
