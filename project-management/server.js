@@ -23,7 +23,7 @@ import whatsappRoutes from './routes/whatsapp.js';
 import intakeRoutes from './routes/intake.js';
 import reportRoutes from './routes/reports.js';
 import { startIntakeScheduler } from './lib/intake.js';
-import { linkPulseSites } from './lib/report.js';
+import { linkPulseSites, linkMetricoolBrands } from './lib/report.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -279,6 +279,20 @@ try {
   }
 } catch (err) {
   console.error('[Seed] Client fix Nov 2026 v2 error:', err.message);
+}
+
+// ─── One-time: clients ↔ their Metricool brands (23 Nov 2026) ───
+// So the monthly relay fetches social figures for every client that has a
+// brand, not just the three linked by hand. Unambiguous name matches only.
+try {
+  if (!db.prepare("SELECT value FROM app_meta WHERE key='metricool_brands_2026_11'").get()) {
+    const { METRICOOL_BRANDS_2026_11 } = await import('./scripts/fix-clients-2026-11.js');
+    const r = linkMetricoolBrands(METRICOOL_BRANDS_2026_11);
+    db.prepare("INSERT INTO app_meta (key, value) VALUES ('metricool_brands_2026_11', ?)").run(new Date().toISOString());
+    console.log(`[Seed] Metricool brands: linked ${r.newlyLinked.join(', ') || 'none new'}; ${r.linked.length} clients have a brand.`);
+  }
+} catch (err) {
+  console.error('[Seed] Metricool brands error:', err.message);
 }
 
 // ─── Error Handler ──────────────────────────────────────

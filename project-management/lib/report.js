@@ -185,6 +185,38 @@ export async function linkPulseSites() {
   return { sites: sites.length, linked };
 }
 
+// Metricool brands → clients. A client not yet linked to a brand gets linked
+// when exactly one brand fits its name or an "also known as" name ("Ivy
+// House" → Ivy House Residential Home) and that brand fits no other client —
+// logged. Used by the monthly relay (POST /relay/brands) and at boot.
+// Returns every linked brand, so the relay only fetches figures Console uses.
+export function linkMetricoolBrands(list) {
+  const brands = list.slice(0, 200)
+    .map(b => ({ id: String(b?.blog_id || '').replace(/\D/g, '').slice(0, 20), label: String(b?.label || '').replace(/\s+/g, ' ').trim().slice(0, 100) }))
+    .filter(b => b.id && b.label);
+  const active = db.prepare('SELECT id, name, aliases, metricool_blog_id FROM clients WHERE is_system = 0 AND archived = 0').all();
+  const taken = new Set(active.map(c => c.metricool_blog_id).filter(Boolean));
+  const free = active.filter(c => !c.metricool_blog_id);
+  const names = c => [c.name, ...String(c.aliases || '').split(',')].map(nameKey).filter(Boolean);
+  const pairs = [];
+  for (const b of brands) {
+    if (taken.has(b.id)) continue;
+    const hits = free.filter(c => names(c).some(n => keysFit(n, nameKey(b.label))));
+    if (hits.length === 1) pairs.push({ b, c: hits[0] });
+  }
+  const author = db.prepare("SELECT display_name FROM users WHERE role = 'owner' ORDER BY id LIMIT 1").get()?.display_name || 'Console';
+  const newlyLinked = [];
+  for (const { b, c } of pairs) {
+    if (pairs.filter(p => p.c.id === c.id).length > 1) continue;   // two brands fit one client — leave it to Norton
+    if (!db.prepare("UPDATE clients SET metricool_blog_id = ? WHERE id = ? AND COALESCE(metricool_blog_id, '') = ''").run(b.id, c.id).changes) continue;
+    logActivity('client', c.id, 'updated', author, `Linked to Metricool brand "${b.label}" — matched by name, for the monthly report (automatic)`);
+    newlyLinked.push(c.name);
+  }
+  const linked = db.prepare(`SELECT metricool_blog_id AS blog_id, name AS client FROM clients
+    WHERE archived = 0 AND is_system = 0 AND COALESCE(metricool_blog_id, '') <> '' ORDER BY name`).all();
+  return { linked, newlyLinked, unmatched: brands.filter(b => !linked.some(l => l.blog_id === b.id)).map(b => b.label) };
+}
+
 // The monthly report asks again when a client has no link yet (a client added
 // since the last daily check) — at most every 10 minutes.
 let pulseAskedAt = 0;
