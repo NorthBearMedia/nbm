@@ -11,10 +11,23 @@ D = pathlib.Path(__file__).parent
 S = json.loads((D / "script.json").read_text()); LINES = {l["id"]: l for l in S["lines"]}
 TL = json.loads((D / "timeline.json").read_text()); T = TL["total"]
 W, H, FPS = 1080, 1920, 30
-PLATE = D / "plates" / "plate2.png"
-LED = (810, 1149)                 # the lens at the base of the first knob, in plate pixels
-FOCUS = (830, 1450)               # the push-in closes on the radio
-ZOOM = 0.06                       # over the whole episode
+# Each plate: the LED lens position and glow scale (plate pixels), the point the push-in closes
+# on, and how far it pushes over the episode. Swap plates by changing PLATE_NAME.
+# Push-in: from c0 at scale 1 to c1 at scale 1+zoom, eased so the first seconds feel still and the
+# creep builds. Plate 3 ends ~45% closer with the radio on the left third and the window holding the
+# right edge, so the rain stays in shot.
+PLATES = {
+ "plate2": {"led": (810, 1149), "glow": 1.0, "c0": (810, 1440), "c1": (830, 1450), "zoom": 0.06, "ease": 1.0},
+ "plate3": {"led": (884, 1799), "glow": 0.85, "c0": (1080, 1920), "c1": (1180, 1900), "zoom": 0.45, "ease": 1.35,
+            "rain": [[(1822, 38), (2160, 38), (2160, 1446), (1782, 1446)]]},
+}
+PLATE_NAME = "plate3"
+CFG = PLATES[PLATE_NAME]
+PLATE = D / "plates" / f"{PLATE_NAME}.png"
+LED, ZOOM, GS = CFG["led"], CFG["zoom"], CFG["glow"]
+RAIN = None
+if CFG.get("rain"):
+    sys.path.insert(0, str(D)); from radio_rain import Rain; RAIN = Rain(CFG["rain"])
 def run(c): subprocess.run(c, check=True, capture_output=True)
 
 # ---------- plates: dark, receiving (green), transmitting (red) ----------------------------
@@ -22,9 +35,10 @@ base = Image.open(PLATE).convert("RGB")
 def lit(glow, core):
     im = base.copy().convert("RGBA"); lay = Image.new("RGBA", im.size, (0, 0, 0, 0)); d = ImageDraw.Draw(lay)
     for r, a in ((240, 34), (150, 52), (84, 92), (40, 165)):      # sized for a phone screen
-        d.ellipse([LED[0]-r, LED[1]-r*0.8, LED[0]+r, LED[1]+r*0.8], fill=glow + (a,))
-    lay = lay.filter(ImageFilter.GaussianBlur(26))
-    ImageDraw.Draw(lay).rounded_rectangle([LED[0]-17, LED[1]-6, LED[0]+17, LED[1]+6], radius=5, fill=core + (255,))
+        r *= GS; d.ellipse([LED[0]-r, LED[1]-r*0.8, LED[0]+r, LED[1]+r*0.8], fill=glow + (a,))
+    lay = lay.filter(ImageFilter.GaussianBlur(26 * GS))
+    hw, hh = 17 * GS, 6 * GS
+    ImageDraw.Draw(lay).rounded_rectangle([LED[0]-hw, LED[1]-hh, LED[0]+hw, LED[1]+hh], radius=5 * GS, fill=core + (255,))
     return Image.alpha_composite(im, lay).convert("RGB")
 PL = {"off": base, "rx": lit((70, 240, 120), (205, 255, 215)), "tx": lit((255, 70, 45), (255, 190, 165))}
 IV = [(e["led_on"], e["led_off"], e["kind"]) for e in TL["lines"]]
@@ -130,11 +144,17 @@ ff = subprocess.Popen(["ffmpeg", "-y", "-v", "error",
                        f"vignette=PI/5,setpts=PTS+{t0:.3f}/TB,ass=captions2.ass,setpts=PTS-STARTPTS,format=yuv420p[v]",
     "-map", "[v]", "-map", "2:a", "-t", f"{dur:.3f}", "-c:v", "libx264", "-preset", "medium", "-crf", "19",
     "-r", str(FPS), "-c:a", "aac", "-b:a", "192k", str(out)], stdin=subprocess.PIPE, cwd=D)
-fx, fy = FOCUS; pw, ph_ = base.size
+pw, ph_ = base.size
 for i in range(int(round(dur * FPS))):
-    t = t0 + i / FPS; s = 1 + ZOOM * t / T
-    box = (fx - fx / s, fy - fy / s, fx + (pw - fx) / s, fy + (ph_ - fy) / s)
-    ff.stdin.write(PL[state(t)].resize((W, H), Image.LANCZOS, box=box).tobytes())
+    t = t0 + i / FPS; e = (t / T) ** CFG["ease"]; s = 1 + ZOOM * e
+    cx = CFG["c0"][0] + (CFG["c1"][0] - CFG["c0"][0]) * e; cy = CFG["c0"][1] + (CFG["c1"][1] - CFG["c0"][1]) * e
+    hw, hh = pw / (2 * s), ph_ / (2 * s)
+    cx = min(max(cx, hw), pw - hw); cy = min(max(cy, hh), ph_ - hh)        # never crop past the plate
+    img = PL[state(t)]
+    if RAIN:
+        bb, lay = RAIN.layer(t); img = img.copy()
+        img.paste(Image.alpha_composite(img.crop(bb).convert("RGBA"), lay).convert("RGB"), bb[:2])
+    ff.stdin.write(img.resize((W, H), Image.LANCZOS, box=(cx - hw, cy - hh, cx + hw, cy + hh), reducing_gap=2.0).tobytes())
 ff.stdin.close(); ff.wait()
 if ff.returncode: sys.exit("ffmpeg failed")
 print(f"{out.name} written ({dur:.1f}s, {len(ev)} caption events)")
