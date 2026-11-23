@@ -10,7 +10,7 @@ import { google } from 'googleapis';
 import db from '../database.js';
 import { requireAuth, requireRole } from '../middleware.js';
 import { logActivity } from '../lib/activity.js';
-import { draftReport, cleanDraft, buildReportPdf, reportFileName, metricoolBrands } from '../lib/report.js';
+import { draftReport, cleanDraft, buildReportPdf, reportFileName, metricoolBrands, pulseCodeOk } from '../lib/report.js';
 import { gmailClientForUser } from './gmail.js';
 
 const router = Router();
@@ -25,6 +25,14 @@ const loadReport = id => {
 };
 const summary = r => ({ id: r.id, client_id: r.client_id, period: r.period, created_by: r.created_by,
   created_at: r.created_at, sent_at: r.sent_at, sent_to: r.sent_to });
+
+// Pulse checks Console's one-time code here before it sends the clients'
+// dashboard links (lib/report.js#linkPulseSites). No login: the code is the proof.
+router.get('/pulse/verify/:code', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!pulseCodeOk(String(req.params.code || ''))) return res.status(404).json({ ok: false });
+  res.json({ ok: true });
+});
 
 router.get('/api/reports', ...ownerOnly, (req, res) => {
   const cid = +req.query.client_id;

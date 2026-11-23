@@ -220,19 +220,26 @@ everywhere in the UI. `progress` / `priority` are kept as **synced shadow values
   (retainer, linked, Xero's name kept as an alias if you rename it).
 - **Claude relay (hourly):** Norton's Claude connectors (Gmail, Periskope = personal WhatsApp, Granola,
   Metricool) can't be handed to Console, so Claude sessions do the reading, woken by scheduled tasks:
-  "North Bear Console relay (lean)" hourly Mon–Fri 08:23–17:23 UK, and "North Bear Console relay — monthly
-  social" on the 1st at 07:37 (created with its Metricool tools pre-approved — without that, an unattended
-  run stops at a permission prompt). Each wake runs one throwaway subagent (keeps the session's context,
-  and cost, small); each session's first message holds its full job text. (Scheduled tasks can't carry
-  connectors on this account, so the work runs inside sessions that have them.) The hourly job posts new
-  messages and Claude-session summaries to `POST /relay/items`; `GET /relay/status` says where to pick up
-  from, which sources Console already reads itself (skip), robot health counts and the Metricool-linked
-  brands. The monthly job posts last month's per-network social figures to `POST /relay/social`
-  (`report_social` table), which the monthly report uses when there's no Metricool key. Auth:
-  `Authorization: Bearer <capture-link secret>` (the whole link is accepted) — saved as a network
-  secret for nbmconsole.pro on the cloud environment, injected by the proxy. Items land in
-  `intake_relay` in the robot's item shape and go through the same robot (seen-tracking, who's-who,
-  dedupe). Gmail refs match the robot's own reader.
+  "North Bear Console relay — hourly" (Mon–Fri 08:23–17:23 UK) and "North Bear Console relay — monthly
+  social" (the 1st, 07:37). Each wake runs one throwaway subagent (keeps the session's context, and cost,
+  small). The hourly wake message carries the whole job; the monthly one says "do the job from your first
+  message". Both sessions were created with their tools pre-approved (`extra_allowed_tools`) — without that
+  an unattended run stops at a permission prompt. (Scheduled tasks can't carry connectors on this account,
+  so the work runs inside sessions that have them.) The hourly job posts new messages and Claude-session
+  summaries to `POST /relay/items`; `GET /relay/status` says where to pick up from, which sources Console
+  already reads itself (skip), robot health counts and the Metricool-linked brands. The monthly job posts
+  last month's per-network figures for the linked brands to `POST /relay/social` (`report_social` table),
+  which the monthly report uses when there's no Metricool key. `POST /relay/brands` (brand list → links
+  unlinked clients by name, `lib/report.js#linkMetricoolBrands`) exists for a future monthly job; today's
+  brands were linked at boot from `scripts/fix-clients-2026-11.js`. Auth: `Authorization: Bearer
+  <capture-link secret>` (the whole link is accepted) — saved as a network secret for nbmconsole.pro on the
+  cloud environment, injected by the proxy. Items land in `intake_relay` in the robot's item shape and go
+  through the same robot (seen-tracking, who's-who, dedupe). Gmail refs match the robot's own reader.
+  **Lessons (Nov 2026):** never interrupt a relay session — the first hourly session read an interrupt as
+  "Norton paused the relay" and answered every wake for 3 days with "on hold, run hourly or monthly?". Its
+  replacement is told it can never ask, hold or skip. A schedule's prompt can only be changed from inside
+  the session it posts into (and delete + recreate needs Norton's OK), so get it right when creating it.
+  The Robot & sources page and the Inbox line warn the same day if a source stops coming in.
 - **Claude connector (MCP):** `POST /mcp/<capture token>` — a stateless Streamable-HTTP MCP server with one
   write-only tool, `send_to_console`, which drops text into the capture queue (→ robot suggestions). Added in
   claude.ai as a custom connector (Settings → Connectors) or `claude mcp add --transport http`, so any Claude
@@ -245,6 +252,16 @@ everywhere in the UI. `progress` / `priority` are kept as **synced shadow values
   that month + Pulse website figures (client's dashboard link → `/api/client/<token>/data?range=30`, a rolling
   30 days to yesterday, so draft early in the following month) + Metricool posts per network (brand id), Claude
   words it, owner edits, PDF preview, email from the owner's Gmail with the PDF attached.
+- **Pulse links found automatically (Nov 2026):** Pulse (`analytics/`, the website-analytics app, deployed
+  separately from the same repo) answers `POST /api/console/sites` with every active site's dashboard link —
+  only after checking the one-time code Console sent at `GET /pulse/verify/:code` (no shared key on either
+  app). `lib/report.js#linkPulseSites` gives a client with no `pulse_link` the dashboard whose client name or
+  website fits its name / aliases / contact emails / notes — only when exactly one fits, both ways; logged.
+  Runs 90 s after boot then daily (retries every 15 min if Pulse is down), and when a report is drafted for
+  a client with no link (max every 10 min). `PULSE_URL` / Pulse's `CONSOLE_URL` override the addresses (tests).
+- **Robot & sources page:** sources the relay brings in show as connected ("Read for you by Claude — nothing to
+  set up") with their key forms folded away; Pulse / Metricool show how many clients are linked; a source
+  that stops coming in (3 h on a weekday from 11:00, 3½ days otherwise) is flagged there and in the Inbox.
 
 ## Conventions
 
@@ -271,6 +288,7 @@ everywhere in the UI. `progress` / `priority` are kept as **synced shadow values
 | `PERISKOPE_API_KEY` / `PERISKOPE_PHONE` | No | — | Personal WhatsApp for the robot (can be set in the UI instead) |
 | `GRANOLA_API_KEY` | No | — | Granola meeting notes for the robot (or set in the UI) |
 | `METRICOOL_TOKEN` / `METRICOOL_USER_ID` | No | — | Social figures for monthly reports (or set in the UI) |
+| `PULSE_URL` | No | `https://nbm-production-604e.up.railway.app` | Where Console asks Pulse for dashboard links (tests) |
 
 ## Testing notes
 
@@ -280,6 +298,10 @@ everywhere in the UI. `progress` / `priority` are kept as **synced shadow values
 - The robot and report writer take an injected client (`runIntake({ claude, sources })`,
   `draftReport(id, period, { claude })`) so they can be tested without network or an API key.
   `METRICOOL_API_BASE` overrides the Metricool host for tests only.
+- Never start Pulse (`analytics/`) with the cloud environment's variables: its boot jobs act on the real
+  Hostinger account (`HOSTINGER_API_TOKEN` is set there). Test a copy with an empty environment, e.g.
+  `env -i PATH="$PATH" HOME="$HOME" DATA_DIR=/tmp/pulse-data PORT=3002 CONSOLE_URL=http://localhost:3001 node server.js`
+  (no keys, no proxy — and start Console on 3001 first: Pulse also grabs 3000/3001/5000/8080 if free).
 
 ## How to run locally
 

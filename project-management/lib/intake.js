@@ -557,6 +557,8 @@ export function relayStatus() {
     relayWaiting: db.prepare("SELECT COUNT(*) AS n FROM intake_relay WHERE processed_at = ''").get().n,
     relayRead24h: db.prepare("SELECT COUNT(*) AS n FROM intake_relay WHERE processed_at >= datetime('now', '-1 day')").get().n,
     pendingSuggestions: db.prepare("SELECT COUNT(*) AS n FROM suggestions WHERE status = 'pending'").get().n,
+    // Report wiring: active clients whose Pulse dashboard link is set (lib/report.js#linkPulseSites).
+    pulseLinked: db.prepare("SELECT COUNT(*) AS n FROM clients WHERE archived = 0 AND is_system = 0 AND COALESCE(pulse_link, '') <> ''").get().n,
   };
   const skip = [];
   if (mailbox) skip.push('gmail');

@@ -16,7 +16,7 @@ import {
   acceptRelayItems, relayStatus,
 } from '../lib/intake.js';
 import { getClaude, currentModel } from '../lib/claude.js';
-import { metricoolBrands } from '../lib/report.js';
+import { metricoolBrands, linkMetricoolBrands } from '../lib/report.js';
 
 const router = Router();
 // The robot reads ONE person's messages (the first owner account — whose
@@ -239,6 +239,10 @@ router.get('/api/intake/status', ...ownerOnly, (req, res) => {
       fromEnv: !!process.env.METRICOOL_TOKEN,
       userId: getSecret('metricool_user_id', 'METRICOOL_USER_ID'),
     },
+    // The latest month of social figures relayed in by Claude (no key needed).
+    social: db.prepare(`SELECT period, COUNT(*) AS clients FROM report_social
+      WHERE period = (SELECT MAX(period) FROM report_social)`).get(),
+    pulseLinked: db.prepare("SELECT COUNT(*) AS n FROM clients WHERE is_system = 0 AND archived = 0 AND COALESCE(pulse_link, '') <> ''").get().n,
     captureUrl: `${originOf(req)}/capture/${captureToken()}`,
     connectorUrl: `${originOf(req)}/mcp/${captureToken()}`,
     relay: Object.fromEntries(['gmail', 'periskope', 'granola', 'claude'].map(src => [src, {
@@ -384,6 +388,17 @@ router.post('/relay/items', (req, res) => {
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   }
+});
+
+// Monthly, before the figures: the brands in Norton's Metricool. A client not
+// yet linked to a brand gets linked when exactly one brand fits its name or an
+// "also known as" name ("Ivy House" → Ivy House Residential Home) and that
+// brand fits no other client — logged. Replies with every linked brand, so
+// Claude only fetches figures for clients Console has.
+router.post('/relay/brands', (req, res) => {
+  if (!relayKeyOk(req)) return res.status(401).json({ error: 'Key needed' });
+  const r = linkMetricoolBrands(Array.isArray(req.body?.brands) ? req.body.brands : []);
+  res.json({ ok: true, ...r });
 });
 
 // Monthly: last month's social figures per Metricool brand, read through

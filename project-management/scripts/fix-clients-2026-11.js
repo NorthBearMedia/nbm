@@ -126,6 +126,17 @@ export function amendClientsNov2026v2(db) {
   return { updated: [c.name] };
 }
 
+// v3 (23 Nov): the brands in Norton's Metricool (read through Claude). At boot,
+// server.js links each client to the one brand its name fits
+// (lib/report.js#linkMetricoolBrands — unambiguous only, logged), so the
+// monthly relay fetches their social figures too.
+export const METRICOOL_BRANDS_2026_11 = [
+  ['5434511', 'North Bear Media Ltd'], ['5434626', 'Richford Motors'], ['5494877', 'Smartmove Homes'],
+  ['5499454', 'Willis Cooper'], ['5513644', 'Wildflower Lodge'], ['6239933', 'Ivy House'], ['6453817', "Alpha's Hunt"],
+  ['6562751', 'wherethepathnarrows'], ['7057405', 'Ginger Butchers at New Close Farm'], ['7537089', 'By Design'],
+  ['7689647', 'Isis Rescue'], ['8153720', 'Keto & Clarity'],
+].map(([blog_id, label]) => ({ blog_id, label }));
+
 // CLI
 if (import.meta.url === `file://${process.argv[1]}`) {
   const { default: db } = await import('../database.js');

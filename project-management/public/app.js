@@ -1564,7 +1564,8 @@ function robotStatusLine(s) {
   if (!s) return '';
   if (!s.hasApiKey) return '<span class="robot-warn">⚠ The robot needs ANTHROPIC_API_KEY set on Railway before it can read anything.</span>';
   const src = s.sources;
-  const anySource = src.gmail || src.mailboxes.some(m => m.status === 'ok') || src.whatsappNumbers || src.periskope.configured || src.granola.configured;
+  const anySource = src.gmail || src.mailboxes.some(m => m.status === 'ok') || src.whatsappNumbers || src.periskope.configured || src.granola.configured
+    || Object.keys(RELAY_NAMES).some(k => relayFresh(s.relay || {}, k));
   const parts = [];
   if (robot.running || s.busy) parts.push('<span class="robot-busy">Reading your messages now…</span>');
   else if (!s.enabled) parts.push('<span class="robot-warn">Paused — switch it back on in ⚙ Sources.</span>');
@@ -1575,6 +1576,8 @@ function robotStatusLine(s) {
     else parts.push(`Last checked ${timeAgo(lr.started_at)} — read ${lr.items} new, suggested ${lr.suggestions}`);
   }
   if (s.enabled && anySource && !(robot.running || s.busy)) parts.push(s.inOfficeHours ? 'checks every hour' : 'next check in office hours (Mon–Fri 8–6)');
+  const stalled = relayStalled(s);
+  if (stalled.length) parts.push(`<span class="robot-warn">⚠ ${stalled.map(k => RELAY_NAMES[k]).join(', ')} not coming in through Claude since ${relayAgo(s, stalled[0])} — <a href="#" onclick="openRobotSettings();return false">⚙ Sources</a></span>`);
   const needs = src.mailboxes.filter(m => m.status !== 'ok').map(m => m.email);
   if (needs.length) parts.push(`<span class="robot-warn">${esc(needs.join(', '))} needs reconnecting</span>`);
   return parts.join(' · ');
@@ -2204,6 +2207,16 @@ function renderRobotSettings() {
   const s = robot.status;
   const src = s.sources;
   const dot = on => `<span class="rs-dot ${on ? 'on' : ''}"></span>`;
+  // Sources Claude reads for Norton (the hourly relay) count as connected while
+  // it keeps bringing them in (4 days covers a weekend) — no key needed here.
+  const r = s.relay || {};
+  const relayed = k => relayFresh(r, k);
+  const viaClaude = '<div class="rs-sub rs-ok">✓ Read for you by Claude every hour — nothing to set up.</div>';
+  const orOwn = (covered, label, html) => covered ? `<details class="rs-alt"><summary>${label}</summary>${html}</details>` : html;
+  const periRelay = !src.periskope.configured && relayed('periskope');
+  const granRelay = !src.granola.configured && relayed('granola');
+  const socialRelay = !s.metricool.configured && s.social?.clients > 0;
+  const socialMonth = socialRelay ? new Date(`${s.social.period}-15T12:00:00Z`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : '';
   const mailboxRows = src.mailboxes.map(m => `<div class="rs-src">
       ${dot(m.status === 'ok')}
       <div class="rs-src-main"><strong>${esc(m.email)}</strong><div class="rs-sub">${m.status === 'ok' ? 'Extra mailbox — read-only' : '⚠ Google stopped letting us read this — reconnect it'}</div></div>
@@ -2245,31 +2258,43 @@ function renderRobotSettings() {
         <div class="rs-src-main"><strong>Another Gmail</strong><div class="rs-sub">e.g. your personal email — read-only, nothing is ever sent from it</div></div>
         <a class="btn btn-ghost btn-sm" href="/auth/gmail/connect?purpose=intake">+ Connect</a>
       </div>` : ''}
-      <div class="rs-src">
+      ${src.whatsappNumbers > 0 || !(src.periskope.configured || periRelay) ? `<div class="rs-src">
         ${dot(src.whatsappNumbers > 0)}
         <div class="rs-src-main"><strong>WhatsApp Business</strong><div class="rs-sub">${src.whatsappNumbers ? `${src.whatsappNumbers} number${src.whatsappNumbers > 1 ? 's' : ''} connected` : 'Not connected — set it up from the WhatsApp panel on the dashboard'}</div></div>
-      </div>
+      </div>` : ''}
       <div class="rs-src rs-src-form">
-        ${dot(src.periskope.configured)}
-        <div class="rs-src-main"><strong>Personal WhatsApp</strong> <span class="rs-sub-inline">via Periskope</span>
+        ${dot(src.periskope.configured || periRelay)}
+        <div class="rs-src-main"><strong>WhatsApp</strong> <span class="rs-sub-inline">via Periskope</span>
+          ${periRelay ? viaClaude : ''}
+          ${relayStalled(s).includes('periskope') ? `<div class="rs-sub robot-warn">⚠ Not coming in since ${relayAgo(s, 'periskope')} — the Claude relay may need its Periskope connection signed in again (claude.ai → Settings → Connectors).</div>` : ''}
+          ${orOwn(periRelay, 'Or use your own Periskope key', `
           <div class="rs-sub">Periskope → Settings → API → copy your key. Your number is the one linked in Periskope.</div>
           <div class="rs-fields">
             ${rsKeyInput('rsPeriKey', src.periskope.configured, src.periskope.fromEnv, 'Periskope API key')}
             <input type="tel" id="rsPeriPhone" value="${esc(src.periskope.phone || '')}" placeholder="Your number, e.g. 447700900123">
             <button class="btn btn-ghost btn-sm" onclick="robotSaveSource('periskope')">Save &amp; test</button>
           </div>
-          <div class="rs-test" id="rsTest-periskope"></div>
+          <div class="rs-test" id="rsTest-periskope"></div>`)}
         </div>
       </div>
       <div class="rs-src rs-src-form">
-        ${dot(src.granola.configured)}
+        ${dot(src.granola.configured || granRelay)}
         <div class="rs-src-main"><strong>Meeting notes</strong> <span class="rs-sub-inline">via Granola</span>
+          ${granRelay ? viaClaude : ''}
+          ${relayStalled(s).includes('granola') ? `<div class="rs-sub robot-warn">⚠ Not coming in since ${relayAgo(s, 'granola')} — the Claude relay may need its Granola connection signed in again (claude.ai → Settings → Connectors).</div>` : ''}
+          ${orOwn(granRelay, 'Or use your own Granola key', `
           <div class="rs-sub">Granola → Settings → API → create a key. Action points from meetings become suggestions.</div>
           <div class="rs-fields">
             ${rsKeyInput('rsGranolaKey', src.granola.configured, src.granola.fromEnv, 'Granola API key')}
             <button class="btn btn-ghost btn-sm" onclick="robotSaveSource('granola')">Save &amp; test</button>
           </div>
-          <div class="rs-test" id="rsTest-granola"></div>
+          <div class="rs-test" id="rsTest-granola"></div>`)}
+        </div>
+      </div>
+      <div class="rs-src">
+        ${dot(relayed('claude'))}
+        <div class="rs-src-main"><strong>Claude sessions</strong> <span class="rs-sub-inline">what you're working on with Claude</span>
+          ${relayed('claude') ? viaClaude : relayStalled(s).includes('claude') ? `<div class="rs-sub robot-warn">⚠ Not coming in since ${relayAgo(s, 'claude')} — the hourly Claude relay has stopped.</div>` : '<div class="rs-sub">Not coming in yet — the hourly Claude relay brings these in.</div>'}
         </div>
       </div>
     </section>
@@ -2277,18 +2302,25 @@ function renderRobotSettings() {
     <section class="rs-sec">
       <h4>Monthly reports</h4>
       <div class="rs-src rs-src-form">
-        ${dot(s.metricool.configured && !!s.metricool.userId)}
+        ${dot((s.metricool.configured && !!s.metricool.userId) || socialRelay)}
         <div class="rs-src-main"><strong>Social media figures</strong> <span class="rs-sub-inline">via Metricool</span>
+          ${socialRelay ? `<div class="rs-sub rs-ok">✓ Read for you by Claude on the 1st of each month — ${esc(socialMonth)} is in for ${s.social.clients} client${s.social.clients === 1 ? '' : 's'}. Clients are matched to their Metricool brand by name. Nothing to set up.</div>` : ''}
+          ${orOwn(socialRelay, 'Or use your own Metricool key', `
           <div class="rs-sub">Metricool → Account settings → API: copy the token and your user ID. Then link each client to its brand in Edit client.</div>
           <div class="rs-fields">
             ${rsKeyInput('rsMcToken', s.metricool.configured, s.metricool.fromEnv, 'Metricool API token')}
             <input type="text" id="rsMcUser" value="${esc(s.metricool.userId || '')}" placeholder="User ID, e.g. 3883072" inputmode="numeric">
             <button class="btn btn-ghost btn-sm" onclick="robotSaveSource('metricool')">Save &amp; test</button>
           </div>
-          <div class="rs-test" id="rsTest-metricool"></div>
+          <div class="rs-test" id="rsTest-metricool"></div>`)}
         </div>
       </div>
-      <div class="rs-sub">Website figures come from each client’s Pulse dashboard link — paste it in Edit client.</div>
+      <div class="rs-src">
+        ${dot(s.pulseLinked > 0)}
+        <div class="rs-src-main"><strong>Website figures</strong> <span class="rs-sub-inline">via Pulse</span>
+          <div class="rs-sub ${s.pulseLinked ? 'rs-ok' : ''}">${s.pulseLinked ? `✓ ${s.pulseLinked} client${s.pulseLinked === 1 ? '' : 's'} linked to ${s.pulseLinked === 1 ? 'its' : 'their'} Pulse dashboard. ` : ''}Console finds each client’s dashboard in Pulse itself, daily — by name or website. One it can’t match: paste its link in Edit client.</div>
+        </div>
+      </div>
     </section>
 
     <section class="rs-sec">
@@ -2302,8 +2334,9 @@ function renderRobotSettings() {
     </section>
 
     <section class="rs-sec">
-      <h4>Claude — your conversations into Console</h4>
-      <div class="rs-sub rs-block-sub">Claude can't share your chat history with other apps, so Console plugs into Claude instead: once connected, any Claude conversation can send its tasks, decisions and updates here (they arrive as suggestions for your yes).</div>
+      <h4>Claude chats on claude.ai <span class="rs-sub-inline">— optional</span></h4>
+      <div class="rs-sub rs-block-sub">${relayed('claude') ? 'Your Claude sessions already come in every hour (above). ' : ''}Plain claude.ai chats can't be read by any app, so for those, Console can plug into Claude instead — then any chat can send its tasks and decisions here (as suggestions for your yes).</div>
+      ${orOwn(relayed('claude'), 'Show the one-time setup', `
       <div class="rs-capture">
         <input type="text" readonly value="${esc(s.connectorUrl || '')}" onclick="this.select()" id="rsConnectorUrl">
         <button class="btn btn-ghost btn-sm" onclick="robotCopy('rsConnectorUrl')">Copy</button>
@@ -2313,7 +2346,7 @@ function renderRobotSettings() {
         <li>In Claude: <b>Settings → Profile</b>, add to your preferences: <i>“When a conversation produces tasks, decisions, deadlines or updates for a North Bear client, send them to North Bear Console.”</i></li>
         <li>In Claude Code (optional): <code>claude mcp add --transport http north-bear-console &lt;address&gt;</code></li>
       </ol>
-      <div class="rs-sub">Same secret as the Send to Console link — “New link” above changes both.</div>
+      <div class="rs-sub">Same secret as the Send to Console link — “New link” above changes both.</div>`)}
     </section>
 
     <section class="rs-sec">
@@ -2324,14 +2357,35 @@ function renderRobotSettings() {
 }
 
 // The hourly Claude relay (Gmail / WhatsApp / Granola / Claude sessions read
-// through Norton's own Claude connectors) — when each last came in.
+// through Norton's own Claude connectors) — when each last came in. Quiet for
+// over 4 days (longer than a weekend) means it has stopped: say so.
+// It runs hourly 08:23–17:23 Mon–Fri UK: from 11:00 on a weekday it should have
+// come in within 3 hours; evenings and weekends, within 3½ days (Fri → Mon).
+const relayFresh = (r, k) => {
+  if (!r[k]?.last) return false;
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'short', hour: 'numeric', hourCycle: 'h23' })
+    .formatToParts(new Date()).map(x => [x.type, x.value]));
+  const workday = !['Sat', 'Sun'].includes(p.weekday) && +p.hour >= 11 && +p.hour < 19;
+  return Date.now() - Date.parse(r[k].last) < (workday ? 3 * 3600e3 : 3.5 * 864e5);
+};
+const RELAY_NAMES = { gmail: 'Email', periskope: 'WhatsApp', granola: 'Meetings', claude: 'Claude sessions' };
+// Sources the relay brought in within the last fortnight that have gone quiet.
+const relayStalled = s => Object.keys(RELAY_NAMES).filter(k => {
+  const r = s?.relay || {};
+  return r[k]?.last && Date.now() - Date.parse(r[k].last) < 14 * 864e5 && !relayFresh(r, k);
+});
+const relayAgo = (s, k) => timeAgo(s.relay[k].last.replace('T', ' ').slice(0, 19));
 function robotRelayLine(s) {
   const r = s.relay || {};
-  const names = { gmail: 'Email', periskope: 'WhatsApp', granola: 'Meetings', claude: 'Claude sessions' };
-  const live = Object.entries(names).filter(([k]) => r[k]?.last);
-  if (!live.length) return '<div class="rs-relay rs-relay-off">Claude relay: not running yet — it reads your Gmail, WhatsApp, Granola and Claude sessions every hour once it is.</div>';
+  const seen = Object.entries(RELAY_NAMES).filter(([k]) => r[k]?.last);
+  const live = seen.filter(([k]) => relayFresh(r, k));
+  if (!seen.length) return '<div class="rs-relay rs-relay-off">Claude relay: not running yet — it reads your Gmail, WhatsApp, Granola and Claude sessions every hour once it is.</div>';
+  if (!live.length) {
+    const latest = seen.map(([k]) => r[k].last).sort().pop();
+    return `<div class="robot-warn rs-block">⚠ The Claude relay has stopped — nothing since ${timeAgo(latest.replace('T', ' ').slice(0, 19))}. It normally brings in your WhatsApp, meetings and Claude sessions every hour, Mon–Fri. Ask Claude to check the “North Bear Console relay” session.</div>`;
+  }
   return `<div class="rs-relay"><span class="rs-dot on"></span> Read for you by Claude every hour: ${live.map(([k, n]) =>
-    `<b>${n}</b> ${timeAgo(r[k].last.replace('T', ' ').slice(0, 19))} (${r[k].week} this week)`).join(' · ')}</div>`;
+    `<span><b>${n}</b> ${timeAgo(r[k].last.replace('T', ' ').slice(0, 19))} (${r[k].week} this week)</span>`).join(' · ')}</div>`;
 }
 
 async function robotSaveSettings(body, okMsg) {

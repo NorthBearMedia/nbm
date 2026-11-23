@@ -23,6 +23,7 @@ import whatsappRoutes from './routes/whatsapp.js';
 import intakeRoutes from './routes/intake.js';
 import reportRoutes from './routes/reports.js';
 import { startIntakeScheduler } from './lib/intake.js';
+import { linkPulseSites, linkMetricoolBrands } from './lib/report.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -280,6 +281,20 @@ try {
   console.error('[Seed] Client fix Nov 2026 v2 error:', err.message);
 }
 
+// ─── One-time: clients ↔ their Metricool brands (23 Nov 2026) ───
+// So the monthly relay fetches social figures for every client that has a
+// brand, not just the three linked by hand. Unambiguous name matches only.
+try {
+  if (!db.prepare("SELECT value FROM app_meta WHERE key='metricool_brands_2026_11'").get()) {
+    const { METRICOOL_BRANDS_2026_11 } = await import('./scripts/fix-clients-2026-11.js');
+    const r = linkMetricoolBrands(METRICOOL_BRANDS_2026_11);
+    db.prepare("INSERT INTO app_meta (key, value) VALUES ('metricool_brands_2026_11', ?)").run(new Date().toISOString());
+    console.log(`[Seed] Metricool brands: linked ${r.newlyLinked.join(', ') || 'none new'}; ${r.linked.length} clients have a brand.`);
+  }
+} catch (err) {
+  console.error('[Seed] Metricool brands error:', err.message);
+}
+
 // ─── Error Handler ──────────────────────────────────────
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err.message);
@@ -293,6 +308,20 @@ app.use((err, req, res, next) => {
 // ─── Start ──────────────────────────────────────────────
 // The intake robot: hourly in office hours (see lib/intake.js).
 startIntakeScheduler();
+
+// Pulse dashboard links for clients that have none yet — shortly after boot,
+// then daily; if Pulse can't be reached (e.g. it is redeploying too), again in
+// 15 minutes, up to 6 times (see lib/report.js#linkPulseSites).
+const linkPulse = (tries = 0) => linkPulseSites()
+  .then(r => {
+    console.log(`[Pulse] ${r.sites} dashboards; linked: ${r.linked.join(', ') || 'none new'}`);
+    setTimeout(linkPulse, 24 * 60 * 60 * 1000);
+  })
+  .catch(err => {
+    console.warn('[Pulse] link check failed:', err.message);
+    setTimeout(() => linkPulse(tries + 1), tries < 6 ? 15 * 60 * 1000 : 24 * 60 * 60 * 1000);
+  });
+setTimeout(linkPulse, 90 * 1000);
 
 app.listen(PORT, () => {
   console.log(`North Bear Console running at http://localhost:${PORT}`);
