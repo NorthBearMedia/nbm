@@ -47,7 +47,8 @@ for k in (sys.argv[1:] or [l["id"] for l in S["lines"]]):
     if last.endswith("—") and hw:
         heard = re.sub(r"[^\w']", "", hw[-1][0]).lower()
         if heard != frag and heard.startswith(frag):       # the take finished the word: cut inside it
-            s0, e0 = times[-1]; times[-1] = (s0, s0 + (e0 - s0) * len(frag) / len(heard))
+            s0, e0 = times[-1]   # land in the vowel, before the final consonant: 'fac' of 'face' must read as cut
+            times[-1] = (s0, s0 + (e0 - s0) * max(0.45, (len(frag) - 0.8) / len(heard)))
     ch, st, en = [], [], []
     for i, (w, (a, b)) in enumerate(zip(sw, times)):
         if i:

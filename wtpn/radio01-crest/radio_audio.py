@@ -7,6 +7,7 @@ stays keyed with nobody speaking (open carrier), then drops. The final transmiss
 and a signal that is slightly too clean for someone on a ridge.
 Writes stations/*.wav, mix.wav, master.wav and timeline.json (for the video stage)."""
 import json, pathlib, subprocess, re, sys
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
 D = pathlib.Path(__file__).parent
 S = json.loads((D / "script.json").read_text())
@@ -44,20 +45,9 @@ def words(al):
 
 # ---------- synthesised sound effects ------------------------------------------------
 def sfx():
-    # squelch tail: the "kssh" when the far end unkeys
-    run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", f"anoisesrc=color=white:d=0.24:a=0.5:r={SR}",
-         "-af", "bandpass=f=1700:width_type=h:w=2600,afade=t=out:st=0:d=0.24:curve=exp,volume=0.30",
-         "-ac", "1", "-c:a", "pcm_s16le", str(ST / "sq_tail.wav")])
-    # squelch open: short burst as the carrier arrives
-    run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", f"anoisesrc=color=white:d=0.06:a=0.5:r={SR}",
-         "-af", "bandpass=f=1900:width_type=h:w=2400,afade=t=in:d=0.008,afade=t=out:st=0.015:d=0.045,volume=0.14",
-         "-ac", "1", "-c:a", "pcm_s16le", str(ST / "sq_open.wav")])
-    # PTT click: a hard transient plus a little body, for Base keying the desk radio
-    run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", f"anoisesrc=color=white:d=0.014:a=0.9:r={SR}",
-         "-f", "lavfi", "-i", f"sine=f=190:d=0.03:r={SR}",
-         "-filter_complex", "[0:a]highpass=f=1800,afade=t=out:st=0.002:d=0.012[a];"
-                            "[1:a]afade=t=out:st=0:d=0.03,volume=0.5[b];[a][b]amix=inputs=2:normalize=0,volume=0.7",
-         "-ac", "1", "-c:a", "pcm_s16le", str(ST / "ptt.wav")])
+    import radio_sfx; radio_sfx.build(ST)      # click, static burst, kssshhh, PTT
+    run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", f"anullsrc=r={SR}:cl=mono", "-t", "0.08",
+         "-c:a", "pcm_s16le", str(ST / "gap80.wav")])
 
 RADIO = ("highpass=f=380,lowpass=f=2700,"
          "acompressor=threshold=-24dB:ratio=4:attack=6:release=220:makeup=2,"
@@ -152,7 +142,12 @@ def station(ln, dry, cutoff):
          f"[v][w]amix=inputs=2:normalize=0:duration=longest,alimiter=level=0:limit=0.85,afade=t=in:d=0.03"
          + ("" if cutoff else ",areverse,afade=t=in:d=0.04,areverse") + "[r]",
          "-map", "[r]", "-c:a", "pcm_s16le", str(ST / f"{k}_r.wav")])
-    parts = [ST / "sq_open.wav", ST / f"{k}_r.wav"] + ([] if cutoff else [ST / "sq_tail.wav"])
+    # every transmission ends on the squelch: a real radio still kssshes when a cut-off carrier drops.
+    # Only l23 does not, because the channel is held open after it (the carrier).
+    # A cut-off voice is followed by 80 ms of nothing before its kssh: static straight after a cut
+    # reads as the missing consonant ("fa" + hiss = "face"), so the cut stops sounding like a cut.
+    tail = [] if k == "l23" else ([ST / "gap80.wav", ST / "sq_tail_short.wav"] if cutoff else [ST / "sq_tail.wav"])
+    parts = [ST / "sq_open.wav", ST / f"{k}_r.wav"] + tail
     ins = sum((["-i", str(p)] for p in parts), [])
     run(["ffmpeg", "-y", "-v", "error"] + ins + ["-filter_complex",
          "".join(f"[{i}:a]" for i in range(len(parts))) + f"concat=n={len(parts)}:v=0:a=1[o]",
