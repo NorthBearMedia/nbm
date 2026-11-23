@@ -1,0 +1,14 @@
+# derived: rebuilt by radio_audio.py / radio_video.py from vo/ + script.json
+stations/
+*.wav
+body.mp4
+bumper.mp4
+bumper.ass
+final-*.mp4
+# review scratch
+fr_*.jpg
+g_*.jpg
+sheet*.jpg
+plate_check.jpg
+plate_lit.png
+bump_chk.jpg

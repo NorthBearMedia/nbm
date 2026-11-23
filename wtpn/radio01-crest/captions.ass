@@ -1,0 +1,66 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 0
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: T,DejaVu Sans Mono,46,H00DCE5E8,&H000000FF,&H00000000,&H96000000,0,0,0,0,100,100,0,0,1,0,2,2,90,90,400,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.61,0:00:01.74,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}—ver the crest now.
+Dialogue: 0,0:00:01.74,0:00:06.19,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}Visibility's shocking, maybe ten metres.
+Dialogue: 0,0:00:06.19,0:00:09.91,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}Mind that cornice on your left as you come round.
+Dialogue: 0,0:00:10.20,0:00:11.32,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}CAT{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}Aye, roger.
+Dialogue: 0,0:00:11.32,0:00:13.62,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}CAT{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}I cannae see you at all.
+Dialogue: 0,0:00:13.91,0:00:15.37,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}I'm thirty metres ahead of you.
+Dialogue: 0,0:00:15.37,0:00:17.16,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}Just keep coming.
+Dialogue: 0,0:00:17.50,0:00:18.70,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}BASE\N{\fs52\c&H00DCE5E8&\fsp0}Base, roger.
+Dialogue: 0,0:00:18.70,0:00:21.61,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}BASE\N{\fs52\c&H00DCE5E8&\fsp0}Ewan, give me a grid when you can.
+Dialogue: 0,0:00:21.82,0:00:26.18,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}Base, Ewan — 975 035.
+Dialogue: 0,0:00:26.18,0:00:29.71,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}On the crest, heading east.
+Dialogue: 0,0:00:30.28,0:00:32.08,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}Base — standby.
+Dialogue: 0,0:00:35.05,0:00:36.90,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}Base, I've got a casualty.
+Dialogue: 0,0:00:36.90,0:00:38.58,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}He's sat in the lee of a boulder,
+Dialogue: 0,0:00:38.58,0:00:40.56,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}about ten metres off the line.
+Dialogue: 0,0:00:40.56,0:00:41.86,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}No jacket.
+Dialogue: 0,0:00:42.21,0:00:44.40,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}BASE\N{\fs52\c&H00DCE5E8&\fsp0}Say again — no jacket?
+Dialogue: 0,0:00:44.61,0:00:46.34,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}No jacket, no pack, nothing.
+Dialogue: 0,0:00:46.34,0:00:48.22,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}He's soaking wet.
+Dialogue: 0,0:00:48.57,0:00:51.74,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}BASE\N{\fs52\c&H00DCE5E8&\fsp0}Ewan, we've no other parties logged on the hill tonight.
+Dialogue: 0,0:00:51.74,0:00:53.85,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}BASE\N{\fs52\c&H00DCE5E8&\fsp0}Nobody's called in.
+Dialogue: 0,0:00:54.06,0:00:55.35,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}Well, he's here.
+Dialogue: 0,0:00:56.49,0:00:56.78,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}Hello?
+Dialogue: 0,0:00:56.78,0:00:57.94,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}Mate?
+Dialogue: 0,0:00:57.94,0:01:00.31,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}Can you hear me?
+Dialogue: 0,0:01:01.66,0:01:04.54,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}— can you hear my voice?
+Dialogue: 0,0:01:05.09,0:01:07.76,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}Base, he's not shivering.
+Dialogue: 0,0:01:08.16,0:01:10.47,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}BASE\N{\fs52\c&H00DCE5E8&\fsp0}Say again, Ewan.
+Dialogue: 0,0:01:10.68,0:01:12.13,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}He's not shivering.
+Dialogue: 0,0:01:12.13,0:01:14.01,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}He should be shivering.
+Dialogue: 0,0:01:14.57,0:01:14.75,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}Base.
+Dialogue: 0,0:01:14.75,0:01:16.58,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}He's wearing our kit.
+Dialogue: 0,0:01:16.93,0:01:18.64,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}BASE\N{\fs52\c&H00DCE5E8&\fsp0}Ewan—
+Dialogue: 0,0:01:18.50,0:01:19.52,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}He's wearing my jacket.
+Dialogue: 0,0:01:19.52,0:01:21.38,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}Base, he's got my—
+Dialogue: 0,0:01:21.38,0:01:25.07,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}he's got my face, he's got my fac—
+Dialogue: 0,0:01:24.93,0:01:25.95,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}CAT{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}Ewan!
+Dialogue: 0,0:01:25.95,0:01:28.72,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}CAT{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}Oh, there you are, you absolute clown,
+Dialogue: 0,0:01:28.72,0:01:31.05,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}CAT{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}I've been shouting myself hoarse—
+Dialogue: 0,0:01:30.91,0:01:31.29,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}Cat.
+Dialogue: 0,0:01:31.29,0:01:32.39,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}Cat, that's not me.
+Dialogue: 0,0:01:32.39,0:01:33.67,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}That is not—
+Dialogue: 0,0:01:33.53,0:01:34.21,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}CAT{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}What?
+Dialogue: 0,0:01:34.21,0:01:36.03,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}CAT{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}You're stood right in front of—
+Dialogue: 0,0:01:35.95,0:01:38.11,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN{\fs28\c&H0080838A&\fsp2}   [wind]\N{\fs52\c&H00DCE5E8&\fsp0}Don't let it—
+Dialogue: 0,0:01:38.21,0:01:41.46,T,,0,0,0,,{\fs33\c&H0080838A&\fsp3}[CARRIER — NO VOICE]
+Dialogue: 0,0:01:43.93,0:01:44.35,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}BASE\N{\fs52\c&H00DCE5E8&\fsp0}Cat.
+Dialogue: 0,0:01:44.35,0:01:45.43,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}BASE\N{\fs52\c&H00DCE5E8&\fsp0}Ewan.
+Dialogue: 0,0:01:45.43,0:01:48.42,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}BASE\N{\fs52\c&H00DCE5E8&\fsp0}Radio check, over.
+Dialogue: 0,0:01:50.83,0:01:51.86,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN\N{\fs52\c&H00DCE5E8&\fsp0}Base, this is Ewan.
+Dialogue: 0,0:01:51.86,0:01:52.82,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN\N{\fs52\c&H00DCE5E8&\fsp0}All fine.
+Dialogue: 0,0:01:52.82,0:01:54.12,T,,0,0,0,,{\fs33\c&H009EA0A0&\fsp5}EWAN\N{\fs52\c&H00DCE5E8&\fsp0}We're coming down.
+Dialogue: 0,0:00:00.10,0:00:02.40,T,,0,0,0,,{\an8\pos(540,150)\fad(220,320)\fs50\c&H00DCE5E8&\fsp2}Watch the light.
+Dialogue: 0,0:00:02.40,0:01:53.92,T,,0,0,0,,{\an8\pos(540,92)\fad(450,0)\fs30\c&H009EA0A0&\fsp9}TRANSMISSION 01\N{\fs25\c&H0080838A&\fsp4}MOUNTAIN RESCUE CHANNEL · CAIRNGORMS
