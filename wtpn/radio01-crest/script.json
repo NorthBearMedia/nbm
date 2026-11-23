@@ -4,19 +4,22 @@
  "setting": "Cairngorms, winter, last light. We are sitting at the team's base radio.",
  "voices": {
   "BASE": {
-   "name": "WTPN A-adam",
-   "id": "U5UjeJMsOvyhYhXfZdvZ",
-   "note": "older Scottish male, base controller, procedural and calm"
+   "name": "WTPN D-hector",
+   "id": "dgkKQcJqyy5AP0dqleUU",
+   "model": "eleven_multilingual_v2",
+   "note": "middle-aged Scottish male, base controller. Steadier model: v3 drifted his accent between lines"
   },
   "EWAN": {
    "name": "Ally - Soft Scottish Glaswegian",
    "id": "v2zbX16tJNtRIx8rSHDM",
-   "note": "late 20s Scottish male, ahead on the ridge"
+   "note": "late 20s Scottish male, ahead on the ridge",
+   "model": "eleven_v3"
   },
   "CAT": {
    "name": "WTPN Isla - Scottish",
    "id": "TVmbglAk3F1GkiCoOq47",
-   "note": "30s Scottish female, thirty metres behind him"
+   "note": "30s Scottish female, thirty metres behind him",
+   "model": "eleven_v3"
   }
  },
  "dead_air": 5.5,
@@ -27,8 +30,8 @@
    "who": "EWAN",
    "wind": true,
    "clip": true,
-   "text": "—ver the crest now. Visibility's shocking, maybe ten metres. Mind that cornice on your left as you come round.",
-   "say": "Over the crest now. Visibility's shocking, maybe ten metres. Mind that cornice on your left as you come round.",
+   "text": "—ver the crest now. Visibility's shocking, maybe ten metres. Keep off the edge on your left, it's a long way down.",
+   "say": "Over the crest now. Visibility's shocking, maybe ten metres. Keep off the edge on your left, it's a long way down.",
    "trim_to": "v"
   },
   {
@@ -53,7 +56,7 @@
    "who": "BASE",
    "wind": false,
    "clip": false,
-   "text": "Base, roger. Ewan, give me a grid when you can."
+   "text": "Base, roger. Ewan, give me your position when you can."
   },
   {
    "id": "l05",
@@ -77,7 +80,7 @@
    "who": "EWAN",
    "wind": true,
    "clip": true,
-   "text": "Base, I've got a casualty. He's sat in the lee of a boulder, about ten metres off the line. No jacket."
+   "text": "Base, I've got a casualty. He's sat against a rock, out of the wind, ten metres off the path. No jacket."
   },
   {
    "id": "l08",
@@ -93,7 +96,7 @@
    "who": "EWAN",
    "wind": true,
    "clip": true,
-   "text": "No jacket, no pack, nothing. He's soaking wet."
+   "text": "No jacket, no bag, nothing. He's soaking wet."
   },
   {
    "id": "l10",
@@ -101,7 +104,7 @@
    "who": "BASE",
    "wind": false,
    "clip": false,
-   "text": "Ewan, we've no other parties logged on the hill tonight. Nobody's called in."
+   "text": "Ewan, there's no one else up there tonight. Nobody's been reported missing."
   },
   {
    "id": "l11",
@@ -231,5 +234,6 @@
   "payoff": "l25 is the only hill transmission with no wind behind it. That is the whole video.",
   "ptt": "clip=true trims the first 90ms, so the opening syllable is lost to the push-to-talk delay.",
   "off_mic": "l12/l13 are shouted at the figure, not into the mic: drier, more distant, more wind."
- }
+ },
+ "generation": "one take per character, sliced by alignment, so the accent cannot wander between lines"
 }

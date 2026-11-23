@@ -12,9 +12,9 @@ D = pathlib.Path(__file__).parent
 S = json.loads((D / "script.json").read_text())
 ST = D / "stations"; ST.mkdir(exist_ok=True)
 SR = 48000
-TEMPO = {"EWAN": 1.10, "CAT": 1.10, "BASE": 1.03}
-PAUSE_CAP = 0.34                       # radio traffic is clipped; v3 leaves theatrical pauses
-PAUSE_CAP_SLOW = {"l15": 0.7, "l16": 0.6, "l17": 0.7, "l24": 0.55}
+TEMPO = {"EWAN": 1.04, "CAT": 1.04, "BASE": 1.0}
+PAUSE_CAP = 0.6                        # one-take delivery pauses like a person; only trim the long ones
+PAUSE_CAP_SLOW = {"l14": 0.8, "l15": 0.8, "l16": 0.8, "l17": 0.9, "l24": 0.8}
 
 def run(c): subprocess.run(c, check=True, capture_output=True)
 def dur(p):
@@ -46,11 +46,11 @@ def words(al):
 def sfx():
     # squelch tail: the "kssh" when the far end unkeys
     run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", f"anoisesrc=color=white:d=0.24:a=0.5:r={SR}",
-         "-af", "bandpass=f=1700:width_type=h:w=2600,afade=t=out:st=0:d=0.24:curve=exp,volume=0.55",
+         "-af", "bandpass=f=1700:width_type=h:w=2600,afade=t=out:st=0:d=0.24:curve=exp,volume=0.30",
          "-ac", "1", "-c:a", "pcm_s16le", str(ST / "sq_tail.wav")])
     # squelch open: short burst as the carrier arrives
     run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", f"anoisesrc=color=white:d=0.06:a=0.5:r={SR}",
-         "-af", "bandpass=f=1900:width_type=h:w=2400,afade=t=out:st=0.015:d=0.045,volume=0.32",
+         "-af", "bandpass=f=1900:width_type=h:w=2400,afade=t=in:d=0.008,afade=t=out:st=0.015:d=0.045,volume=0.14",
          "-ac", "1", "-c:a", "pcm_s16le", str(ST / "sq_open.wav")])
     # PTT click: a hard transient plus a little body, for Base keying the desk radio
     run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", f"anoisesrc=color=white:d=0.014:a=0.9:r={SR}",
@@ -60,7 +60,7 @@ def sfx():
          "-ac", "1", "-c:a", "pcm_s16le", str(ST / "ptt.wav")])
 
 RADIO = ("highpass=f=380,lowpass=f=2700,"
-         "acompressor=threshold=-27dB:ratio=9:attack=3:release=80:makeup=4,"
+         "acompressor=threshold=-24dB:ratio=4:attack=6:release=220:makeup=2,"
          "asoftclip=type=tanh,aresample=11025,aresample=48000,"
          "highpass=f=330,lowpass=f=3000,equalizer=f=1800:t=q:w=1.2:g=5")
 CLEAN = ("highpass=f=240,lowpass=f=3900,"
@@ -78,7 +78,7 @@ def prep(ln):
         idx = next(i for i, c in enumerate(ch) if c == ln["trim_to"])
         a = st[idx] - 0.008
     elif ln.get("clip"):
-        a = first + 0.07                           # PTT delay eats the attack of the first word
+        a = first + 0.025                          # PTT delay: just the attack of the first word
     else:
         a = max(0.0, first - 0.06)
     cutoff = ln["text"].rstrip().endswith("—")
@@ -104,7 +104,7 @@ def prep(ln):
          "-map", "[o]", "-ar", str(SR), "-ac", "1", "-c:a", "pcm_s16le", str(out)])
     # normalise the dry voice so every chain sees the same input level
     g = -21.0 - lufs(out)
-    run(["ffmpeg", "-y", "-v", "error", "-i", str(out), "-af", f"volume={g:.2f}dB,alimiter=limit=0.9",
+    run(["ffmpeg", "-y", "-v", "error", "-i", str(out), "-af", f"volume={g:.2f}dB,alimiter=level=0:limit=0.9",
          "-c:a", "pcm_s16le", str(ST / f"{k}_n.wav")])
     def remap(t):
         return max(0.0, t - a - sum(r for p, r in cuts if p < t)) / tempo
@@ -123,20 +123,34 @@ def station(ln, dry, cutoff):
         return out, 0.114, dur(out), "tx"
     hold = 2.4 if k == "l06" else 0.0                 # 'standby': keeps the key down, wind only
     if ln.get("calm"):                                 # the last line: no wind, too clean a signal
-        run(["ffmpeg", "-y", "-v", "error", "-i", str(ST / "sq_open.wav"), "-i", str(dry),
-             "-filter_complex", f"[1:a]{CLEAN},volume=1.15[v];[0:a][v]concat=n=2:v=0:a=1[o]",
+        # levelled to the same voice target as every other transmission, so the ONLY difference
+        # is the missing wind. (Unlevelled it arrived 6.5 dB quiet, which read as distant.)
+        run(["ffmpeg", "-y", "-v", "error", "-i", str(dry), "-af", CLEAN, "-c:a", "pcm_s16le", str(ST / f"{k}_rv.wav")])
+        g = -18.0 - lufs(ST / f"{k}_rv.wav")
+        run(["ffmpeg", "-y", "-v", "error", "-i", str(ST / "sq_open.wav"), "-i", str(ST / f"{k}_rv.wav"),
+             "-filter_complex", f"[1:a]volume={g:.2f}dB,alimiter=level=0:limit=0.85[v];[0:a][v]concat=n=2:v=0:a=1[o]",
              "-map", "[o]", "-c:a", "pcm_s16le", str(out)])
         return out, dur(ST / "sq_open.wav"), dur(out), "rx"
+    # Voice and wind are processed apart and levelled apart. Sharing one compressor made the wind
+    # surge in every pause (pumping) and let a soft, bassy voice sink under it. Like a receiver's AGC,
+    # every transmission's voice lands at the same level; the wind sits a fixed margin beneath it.
     off = ln.get("off_mic")
-    vlev, wlev = (0.62, 0.95) if off else (1.0, 0.62)
-    vpre = ",lowpass=f=2600" if off else ""
+    VOICE_T = -24.0 if off else -18.0          # shouted away from the handset arrives quieter
+    WIND_T = -32.0                             # same storm either way: 14 dB under a normal voice
+    run(["ffmpeg", "-y", "-v", "error", "-i", str(dry), "-af",
+         ("lowpass=f=2600," if off else "") + RADIO, "-c:a", "pcm_s16le", str(ST / f"{k}_rv.wav")])
+    gv = VOICE_T - lufs(ST / f"{k}_rv.wav")
     wl = d + hold + 0.08
-    run(["ffmpeg", "-y", "-v", "error",
-         "-i", str(dry), "-f", "lavfi", "-i", f"anoisesrc=color=brown:d={wl:.3f}:a=0.6:r={SR}:seed={int(k[1:]) * 7919}",
+    run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi",
+         "-i", f"anoisesrc=color=brown:d={wl:.3f}:a=0.6:r={SR}:seed={int(k[1:]) * 7919}",
+         "-af", "lowpass=f=950,highpass=f=60,tremolo=f=0.22:d=0.28,highpass=f=380,lowpass=f=2700,"
+                "aresample=11025,aresample=48000", "-c:a", "pcm_s16le", str(ST / f"{k}_w.wav")])
+    gw = WIND_T - lufs(ST / f"{k}_w.wav")
+    run(["ffmpeg", "-y", "-v", "error", "-i", str(ST / f"{k}_rv.wav"), "-i", str(ST / f"{k}_w.wav"),
          "-filter_complex",
-         f"[0:a]volume={vlev}{vpre},apad=pad_dur={hold+0.08:.3f}[v];"
-         f"[1:a]lowpass=f=950,highpass=f=60,tremolo=f=0.33:d=0.55,volume={wlev}[w];"
-         f"[v][w]amix=inputs=2:normalize=0:duration=longest,{RADIO}[r]",
+         f"[0:a]volume={gv:.2f}dB,apad=pad_dur={hold+0.08:.3f}[v];[1:a]volume={gw:.2f}dB[w];"
+         f"[v][w]amix=inputs=2:normalize=0:duration=longest,alimiter=level=0:limit=0.85,afade=t=in:d=0.03"
+         + ("" if cutoff else ",areverse,afade=t=in:d=0.04,areverse") + "[r]",
          "-map", "[r]", "-c:a", "pcm_s16le", str(ST / f"{k}_r.wav")])
     parts = [ST / "sq_open.wav", ST / f"{k}_r.wav"] + ([] if cutoff else [ST / "sq_tail.wav"])
     ins = sum((["-i", str(p)] for p in parts), [])
@@ -186,9 +200,11 @@ def main():
     run(["ffmpeg", "-y", "-v", "error",
          "-f", "lavfi", "-i", f"anoisesrc=color=brown:d={total:.3f}:a=0.5:r={SR}",
          "-f", "lavfi", "-i", f"anoisesrc=color=white:d={total:.3f}:a=0.5:r={SR}",
-         "-filter_complex", "[0:a]lowpass=f=180,volume=0.06[a];"
-                            "[1:a]bandpass=f=1600:width_type=h:w=2400,volume=0.010[b];"
-                            "[a][b]amix=inputs=2:normalize=0",
+         "-f", "lavfi", "-i", f"anoisesrc=color=brown:d={total:.3f}:a=0.5:r={SR}:seed=4242",
+         "-filter_complex", "[0:a]lowpass=f=180,volume=0.27[a];"
+                            "[1:a]bandpass=f=1600:width_type=h:w=2400,volume=0.036[b];"
+                            "[2:a]lowpass=f=320,highpass=f=40,tremolo=f=0.11:d=0.55,volume=0.45[c];"
+                            "[a][b][c]amix=inputs=3:normalize=0",
          "-ac", "1", "-c:a", "pcm_s16le", str(ST / "bed.wav")])
     ins, fc = ["-i", str(ST / "bed.wav")], []
     for i, e in enumerate(tl, 1):
@@ -199,9 +215,17 @@ def main():
               f"amix=inputs={len(tl)+1}:normalize=0:duration=first[m]")
     run(["ffmpeg", "-y", "-v", "error"] + ins + ["-filter_complex", ";".join(fc), "-map", "[m]",
          "-t", f"{total:.3f}", "-c:a", "pcm_s16le", str(D / "mix.wav")])
+    # master: -15 LUFS, true peak <= -1 dBTP. Limited at 4x so inter-sample peaks (the squelch
+    # transients) are caught. Two passes, because a limiter that is really limiting lowers the
+    # loudness it was given; the second pass corrects for exactly that.
+    def master(g):
+        run(["ffmpeg", "-y", "-v", "error", "-i", str(D / "mix.wav"), "-af",
+             f"volume={g:.2f}dB,aresample=192000,alimiter=level=0:limit=0.84:attack=5:release=50,aresample=48000",
+             "-c:a", "pcm_s16le", str(D / "master.wav")])
+        return lufs(D / "master.wav")
     g = -15.0 - lufs(D / "mix.wav")
-    run(["ffmpeg", "-y", "-v", "error", "-i", str(D / "mix.wav"),
-         "-af", f"volume={g:.2f}dB,alimiter=limit=0.89", "-c:a", "pcm_s16le", str(D / "master.wav")])
+    g += -15.0 - master(g)
+    master(g)
     json.dump({"total": round(total, 3), "lines": tl}, open(D / "timeline.json", "w"), indent=1)
     print(f"master.wav  {total:.1f}s  (mix gain {g:+.2f} dB, master {lufs(D/'master.wav'):.1f} LUFS)")
     for e in tl:
