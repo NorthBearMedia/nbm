@@ -1564,7 +1564,8 @@ function robotStatusLine(s) {
   if (!s) return '';
   if (!s.hasApiKey) return '<span class="robot-warn">⚠ The robot needs ANTHROPIC_API_KEY set on Railway before it can read anything.</span>';
   const src = s.sources;
-  const anySource = src.gmail || src.mailboxes.some(m => m.status === 'ok') || src.whatsappNumbers || src.periskope.configured || src.granola.configured;
+  const anySource = src.gmail || src.mailboxes.some(m => m.status === 'ok') || src.whatsappNumbers || src.periskope.configured || src.granola.configured
+    || Object.keys(RELAY_NAMES).some(k => relayFresh(s.relay || {}, k));
   const parts = [];
   if (robot.running || s.busy) parts.push('<span class="robot-busy">Reading your messages now…</span>');
   else if (!s.enabled) parts.push('<span class="robot-warn">Paused — switch it back on in ⚙ Sources.</span>');
@@ -1575,6 +1576,8 @@ function robotStatusLine(s) {
     else parts.push(`Last checked ${timeAgo(lr.started_at)} — read ${lr.items} new, suggested ${lr.suggestions}`);
   }
   if (s.enabled && anySource && !(robot.running || s.busy)) parts.push(s.inOfficeHours ? 'checks every hour' : 'next check in office hours (Mon–Fri 8–6)');
+  const stalled = relayStalled(s);
+  if (stalled.length) parts.push(`<span class="robot-warn">⚠ ${stalled.map(k => RELAY_NAMES[k]).join(', ')} not coming in through Claude since ${relayAgo(s, stalled[0])} — <a href="#" onclick="openRobotSettings();return false">⚙ Sources</a></span>`);
   const needs = src.mailboxes.filter(m => m.status !== 'ok').map(m => m.email);
   if (needs.length) parts.push(`<span class="robot-warn">${esc(needs.join(', '))} needs reconnecting</span>`);
   return parts.join(' · ');
@@ -2263,6 +2266,7 @@ function renderRobotSettings() {
         ${dot(src.periskope.configured || periRelay)}
         <div class="rs-src-main"><strong>WhatsApp</strong> <span class="rs-sub-inline">via Periskope</span>
           ${periRelay ? viaClaude : ''}
+          ${relayStalled(s).includes('periskope') ? `<div class="rs-sub robot-warn">⚠ Not coming in since ${relayAgo(s, 'periskope')} — the Claude relay may need its Periskope connection signed in again (claude.ai → Settings → Connectors).</div>` : ''}
           ${orOwn(periRelay, 'Or use your own Periskope key', `
           <div class="rs-sub">Periskope → Settings → API → copy your key. Your number is the one linked in Periskope.</div>
           <div class="rs-fields">
@@ -2277,6 +2281,7 @@ function renderRobotSettings() {
         ${dot(src.granola.configured || granRelay)}
         <div class="rs-src-main"><strong>Meeting notes</strong> <span class="rs-sub-inline">via Granola</span>
           ${granRelay ? viaClaude : ''}
+          ${relayStalled(s).includes('granola') ? `<div class="rs-sub robot-warn">⚠ Not coming in since ${relayAgo(s, 'granola')} — the Claude relay may need its Granola connection signed in again (claude.ai → Settings → Connectors).</div>` : ''}
           ${orOwn(granRelay, 'Or use your own Granola key', `
           <div class="rs-sub">Granola → Settings → API → create a key. Action points from meetings become suggestions.</div>
           <div class="rs-fields">
@@ -2289,7 +2294,7 @@ function renderRobotSettings() {
       <div class="rs-src">
         ${dot(relayed('claude'))}
         <div class="rs-src-main"><strong>Claude sessions</strong> <span class="rs-sub-inline">what you're working on with Claude</span>
-          ${relayed('claude') ? viaClaude : '<div class="rs-sub">Not coming in yet — the hourly Claude relay brings these in.</div>'}
+          ${relayed('claude') ? viaClaude : relayStalled(s).includes('claude') ? `<div class="rs-sub robot-warn">⚠ Not coming in since ${relayAgo(s, 'claude')} — the hourly Claude relay has stopped.</div>` : '<div class="rs-sub">Not coming in yet — the hourly Claude relay brings these in.</div>'}
         </div>
       </div>
     </section>
@@ -2354,11 +2359,25 @@ function renderRobotSettings() {
 // The hourly Claude relay (Gmail / WhatsApp / Granola / Claude sessions read
 // through Norton's own Claude connectors) — when each last came in. Quiet for
 // over 4 days (longer than a weekend) means it has stopped: say so.
-const relayFresh = (r, k) => !!r[k]?.last && Date.now() - Date.parse(r[k].last) < 4 * 864e5;
+// It runs hourly 08:23–17:23 Mon–Fri UK: from 11:00 on a weekday it should have
+// come in within 3 hours; evenings and weekends, within 3½ days (Fri → Mon).
+const relayFresh = (r, k) => {
+  if (!r[k]?.last) return false;
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'short', hour: 'numeric', hourCycle: 'h23' })
+    .formatToParts(new Date()).map(x => [x.type, x.value]));
+  const workday = !['Sat', 'Sun'].includes(p.weekday) && +p.hour >= 11 && +p.hour < 19;
+  return Date.now() - Date.parse(r[k].last) < (workday ? 3 * 3600e3 : 3.5 * 864e5);
+};
+const RELAY_NAMES = { gmail: 'Email', periskope: 'WhatsApp', granola: 'Meetings', claude: 'Claude sessions' };
+// Sources the relay brought in within the last fortnight that have gone quiet.
+const relayStalled = s => Object.keys(RELAY_NAMES).filter(k => {
+  const r = s?.relay || {};
+  return r[k]?.last && Date.now() - Date.parse(r[k].last) < 14 * 864e5 && !relayFresh(r, k);
+});
+const relayAgo = (s, k) => timeAgo(s.relay[k].last.replace('T', ' ').slice(0, 19));
 function robotRelayLine(s) {
   const r = s.relay || {};
-  const names = { gmail: 'Email', periskope: 'WhatsApp', granola: 'Meetings', claude: 'Claude sessions' };
-  const seen = Object.entries(names).filter(([k]) => r[k]?.last);
+  const seen = Object.entries(RELAY_NAMES).filter(([k]) => r[k]?.last);
   const live = seen.filter(([k]) => relayFresh(r, k));
   if (!seen.length) return '<div class="rs-relay rs-relay-off">Claude relay: not running yet — it reads your Gmail, WhatsApp, Granola and Claude sessions every hour once it is.</div>';
   if (!live.length) {
