@@ -29,6 +29,25 @@ RAIN = None
 if CFG.get("rain"):
     sys.path.insert(0, str(D)); from radio_rain import Rain; RAIN = Rain(CFG["rain"])
 def run(c): subprocess.run(c, check=True, capture_output=True)
+def lufs(p):
+    r = subprocess.run(["ffmpeg", "-v", "info", "-i", str(p), "-af", "ebur128=framelog=quiet", "-f", "null", "-"],
+                       capture_output=True, text=True)
+    return float(re.findall(r"I:\s*(-?[\d.]+)\s*LUFS", r.stderr)[-1])
+# Social master: phones play quiet content quietly, so -14 LUFS (master.wav stays the -15 reference).
+# Same 4x-oversampled limiter and two-pass correction as radio_audio.py; stereo for every platform.
+AUDIO = D / "master_social.wav"
+def social_master(target=-14.0):
+    def go(g):
+        run(["ffmpeg", "-y", "-v", "error", "-i", str(D / "mix.wav"), "-af",
+             f"volume={g:.2f}dB,aresample=192000,alimiter=level=0:limit=0.87:attack=5:release=50,aresample=48000",
+             "-ac", "2", "-c:a", "pcm_s16le", str(AUDIO)])
+        return lufs(AUDIO)
+    g = target - lufs(D / "mix.wav")
+    for _ in range(6):                     # a limiter that is working lowers what it is given: iterate
+        err = target - go(g)
+        if abs(err) < 0.15: break
+        g += err
+    return lufs(AUDIO)
 
 # ---------- plates: dark, receiving (green), transmitting (red) ----------------------------
 base = Image.open(PLATE).convert("RGB")
@@ -121,25 +140,26 @@ for e in TL["lines"]:
         start = p[0][1] - 0.05
         stop = ph[i+1][0][1] - 0.05 if i + 1 < len(ph) else min(p[-1][2] + 0.5, e["end"] + 0.25)
         ev.append((start, stop, head + txt))
-ev.append((0.10, 2.40, f"{{\\an8\\pos(540,150)\\fad(220,320)\\fn{FM}\\fs56\\c{TEXT}\\fsp2}}Watch the light."))
-ev.append((2.40, T, f"{{\\an8\\pos(540,78)\\fad(450,0)\\fn{FS}\\fs30\\c{TEXT}\\fsp10\\alpha&H30&}}TRANSMISSION 01"
+ev.append((0.10, 2.40, f"{{\\an8\\pos(540,350)\\fad(220,320)\\fn{FM}\\fs56\\c{TEXT}\\fsp2}}Watch the light."))
+ev.append((0.10, T, f"{{\\an8\\pos(540,236)\\fad(220,0)\\fn{FS}\\fs30\\c{TEXT}\\fsp10\\alpha&H30&}}TRANSMISSION 01 · PART 1"
                     f"\\N{{\\fn{FM}\\fs22\\c{DIM}\\fsp5}}MOUNTAIN RESCUE CHANNEL · CAIRNGORMS"))
 (D / "captions2.ass").write_text(
     "[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 0\n\n[V4+ Styles]\n"
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, "
     "Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, "
     "MarginR, MarginV, Encoding\n"
-    f"Style: T,{FM},50,{TEXT.rstrip('&')},&H000000FF,&H00000000,&H60000000,0,0,0,0,100,100,0,0,1,0,2,2,100,100,400,1\n\n"
+    f"Style: T,{FM},50,{TEXT.rstrip('&')},&H000000FF,&H00000000,&H60000000,0,0,0,0,100,100,0,0,1,0,2,2,100,150,520,1\n\n"
     "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n" +
     "\n".join(f"Dialogue: 0,{ts(a)},{ts(b)},T,,0,0,0,,{t}" for a, b, t in ev) + "\n")
 
+print(f"master_social.wav at {social_master():.1f} LUFS")
 # ---------- render -----------------------------------------------------------------------------
 test = "--test" in sys.argv
 t0, dur = (float(sys.argv[sys.argv.index("--test")+1]), float(sys.argv[sys.argv.index("--test")+2])) if test else (0.0, T)
 out = D / ("test2.mp4" if test else "body2.mp4")
 ff = subprocess.Popen(["ffmpeg", "-y", "-v", "error",
     "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
-    "-loop", "1", "-i", str(D / "grad.png"), "-ss", f"{t0:.3f}", "-i", str(D / "master.wav"),
+    "-loop", "1", "-i", str(D / "grad.png"), "-ss", f"{t0:.3f}", "-i", str(AUDIO),
     "-filter_complex", f"[0:v][1:v]overlay=0:0,eq=saturation=0.9:contrast=1.04,noise=alls=10:allf=t,"
                        f"vignette=PI/5,setpts=PTS+{t0:.3f}/TB,ass=captions2.ass,setpts=PTS-STARTPTS,format=yuv420p[v]",
     "-map", "[v]", "-map", "2:a", "-t", f"{dur:.3f}", "-c:v", "libx264", "-preset", "medium", "-crf", "19",
@@ -167,9 +187,10 @@ if not test:
         "MarginR, MarginV, Encoding\n"
         f"Style: T,{FS},58,{TEXT.rstrip('&')},&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,12,0,1,0,0,5,0,0,0,1\n\n"
         "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
-        f"Dialogue: 0,0:00:01.10,0:00:03.40,T,,0,0,0,,{{\\fad(700,0)}}TRANSMISSION 01\\N{{\\fn{FM}\\fs26\\c{DIM}\\fsp9}}CREST\n")
+        f"Dialogue: 0,0:00:01.10,0:00:03.90,T,,0,0,0,,{{\\fad(700,0)}}TRANSMISSION 01\\N{{\\fn{FM}\\fs26\\c{DIM}\\fsp9}}PART 1 · CREST\n"
+        f"Dialogue: 0,0:00:02.10,0:00:03.90,T,,0,0,0,,{{\\an2\\pos(540,1180)\\fad(500,0)\\fn{FM}\\fs28\\c{TEXT}\\fsp6}}FOLLOW FOR PART 2\n")
     run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", f"color=c=0x050505:s={W}x{H}:r={FPS}",
-         "-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono", "-t", "3.4", "-vf", "ass=bumper2.ass,format=yuv420p",
+         "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", "3.9", "-vf", "ass=bumper2.ass,format=yuv420p",
          "-c:v", "libx264", "-preset", "medium", "-crf", "19", "-c:a", "aac", "-b:a", "192k", "-shortest",
          str(D / "bumper2.mp4")])
     run(["ffmpeg", "-y", "-v", "error", "-i", str(D / "body2.mp4"), "-i", str(D / "bumper2.mp4"),
