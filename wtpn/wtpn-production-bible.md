@@ -231,3 +231,6 @@ and their ask: first-person, interview, feels real.
   tabs, the right-hand buttons and the description strip); stereo social master at -14 LUFS (a mono
   file measures 3 LU quieter once duplicated to stereo); H.264 High 4.2, 30 fps, crf 20 capped 10 Mbps,
   faststart, bt709 tags; "PART n" on screen from frame 1 and on the end card.
+
+## 24 NOV — TRANSMISSION 02 "CORNER" ARMED
+- Post **440507769**: **Wed 25 Nov 22:30 Europe/London**, TikTok + IG Reel + FB Reel + YT Short, ingested, AI flags on, cover 2400 ms (the HILL FARM title). Built in wtpn/radio02-corner (corner_audio.py, corner_video.py, publish.py). Every TRANSMISSION story is a Part 1; a Part 2 only for the one that takes off (user).
