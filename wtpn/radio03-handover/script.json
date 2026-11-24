@@ -1,0 +1,425 @@
+{
+ "series": "TRANSMISSION",
+ "episode": "03 — HANDOVER",
+ "setting": "Haulage yard off the M62, West Yorkshire, 3 a.m., rain. We are in the transport office: the base radio is on Mick's desk.",
+ "voices": {
+  "MICK": {
+   "name": "Paul - Deep & Warm - Yorkshire",
+   "id": "oCXdm5WkYoKVEdlbPLev",
+   "model": "eleven_multilingual_v2",
+   "settings": {
+    "stability": 0.5,
+    "similarity_boost": 0.85,
+    "use_speaker_boost": true
+   },
+   "note": "user's pick of five (24 Nov). Night planner, 50s. In the office with us (room voice) until he leaves."
+  },
+  "ASH": {
+   "name": "Ashley - Bright, Yorkshire",
+   "id": "jIIwKmgS6dN9eWEJEvMJ",
+   "model": "eleven_multilingual_v2",
+   "settings": {
+    "stability": 0.5,
+    "similarity_boost": 0.85,
+    "use_speaker_boost": true
+   },
+   "note": "user's pick of five; the gate man, renamed Ash (was Dave). Always on the radio."
+  },
+  "KAREN": {
+   "name": "Kirsty - Yorkshire",
+   "id": "3HCsOhirtjbPmdcSOPBt",
+   "model": "eleven_multilingual_v2",
+   "settings": {
+    "stability": 0.5,
+    "similarity_boost": 0.85,
+    "use_speaker_boost": true
+   },
+   "note": "user's pick of four. Steve's wife, on Mick's mobile on speaker."
+  },
+  "STEVE": {
+   "name": "Tony - Middle-aged, Northern",
+   "id": "v9I7auPeR1xGKYRPwQGG",
+   "model": "eleven_multilingual_v2",
+   "settings": {
+    "stability": 0.5,
+    "similarity_boost": 0.85,
+    "use_speaker_boost": true
+   },
+   "note": "the Mick option not taken; only ever faint, behind the gatehouse glass, under Ash's open radio."
+  }
+ },
+ "lines": [
+  {
+   "id": "h01",
+   "who": "ASH",
+   "text": "That's the last one in. Barrier's down.",
+   "bg": "gatehouse_barrier",
+   "pre": 1.8
+  },
+  {
+   "id": "h02",
+   "who": "MICK",
+   "text": "Champion. That's thirty home. Keys are on the board.",
+   "fx_before": [
+    [
+     "keys",
+     -29,
+     0.35
+    ]
+   ]
+  },
+  {
+   "id": "h03",
+   "who": "ASH",
+   "text": "What's Steve left you?",
+   "bg": "gatehouse"
+  },
+  {
+   "id": "h04",
+   "who": "MICK",
+   "text": "Usual. OEU has an AdBlue fault, for a change. Wakefield's moved to half five.",
+   "say": "Usual. O. E. U. has an AdBlue fault, for a change. Wakefield's moved to half five.",
+   "fx_before": [
+    [
+     "paper",
+     -33,
+     0.2
+    ]
+   ],
+   "ptt_close": false
+  },
+  {
+   "id": "h05",
+   "who": "MICK",
+   "text": "\"Don't let anyone in after three.\" Underlined. \"Not even me.\" Underlined twice.",
+   "say": "Don't let anyone in after three. Underlined. Not even me. Underlined twice.",
+   "ptt_open": false,
+   "pause_cap": 0.9
+  },
+  {
+   "id": "h06",
+   "who": "ASH",
+   "text": "He's on a wind-up.",
+   "bg": "gatehouse"
+  },
+  {
+   "id": "h07",
+   "who": "MICK",
+   "text": "Daft sod's left his phone an' all.",
+   "fx_after": [
+    [
+     "buzz",
+     -31,
+     0.4
+    ]
+   ]
+  },
+  {
+   "id": "h08",
+   "who": "MICK",
+   "text": "Fourteen missed calls. No number."
+  },
+  {
+   "id": "h09",
+   "who": "ASH",
+   "text": "Bookies.",
+   "bg": "gatehouse"
+  },
+  {
+   "id": "h10",
+   "who": "ASH",
+   "text": "Three o'clock. Gate's locked, barrier's down, it's siling it down and I'm frozen. All quiet.",
+   "bg": "gatehouse"
+  },
+  {
+   "id": "h11",
+   "who": "MICK",
+   "text": "Nobody in after three, Ash."
+  },
+  {
+   "id": "h12",
+   "who": "ASH",
+   "text": "Not even Steve.",
+   "bg": "gatehouse"
+  },
+  {
+   "id": "h13",
+   "who": "ASH",
+   "text": "Mick. You'll not believe this. Steve's at the gate.",
+   "bg": "gate_barrier",
+   "note": "the barrier motor is buried under this line (the re-listen): it opened at 3:20"
+  },
+  {
+   "id": "h14",
+   "who": "MICK",
+   "text": "You what?"
+  },
+  {
+   "id": "h15",
+   "who": "ASH",
+   "text": "On foot. Says he's left his phone.",
+   "bg": "gate"
+  },
+  {
+   "id": "h16",
+   "who": "MICK",
+   "text": "He has. It's here."
+  },
+  {
+   "id": "h17",
+   "who": "ASH",
+   "text": "So I'll let him in, then.",
+   "bg": "gate"
+  },
+  {
+   "id": "h18",
+   "who": "MICK",
+   "text": "What's the note say?"
+  },
+  {
+   "id": "h19",
+   "who": "ASH",
+   "text": "Oh, give over. He's wet through.",
+   "bg": "gate"
+  },
+  {
+   "id": "h20",
+   "who": "MICK",
+   "text": "Where's his car?"
+  },
+  {
+   "id": "h21",
+   "who": "ASH",
+   "text": "... He's walked.",
+   "say": "He's walked.",
+   "bg": "gate",
+   "pre": 0.9
+  },
+  {
+   "id": "h22",
+   "who": "MICK",
+   "text": "He lives out Holmfirth. That's twenty mile.",
+   "say": "He lives out Homfirth. That's twenty mile."
+  },
+  {
+   "id": "h23",
+   "who": "ASH",
+   "text": "He'll not look up at the camera. He keeps looking up the lane.",
+   "bg": "gate"
+  },
+  {
+   "id": "h24",
+   "who": "STEVE",
+   "text": "Is he coming down?",
+   "bg": "gate",
+   "cont": true
+  },
+  {
+   "id": "h25",
+   "who": "ASH",
+   "text": "He's asking for you. Not the phone. You.",
+   "bg": "gate",
+   "cont": true
+  },
+  {
+   "id": "h26",
+   "who": "STEVE",
+   "text": "Please, Ash.",
+   "bg": "gate",
+   "cont": true
+  },
+  {
+   "id": "h27",
+   "who": "MICK",
+   "text": "Steve's never said please in his life.",
+   "ptt_open": false,
+   "ptt_close": false,
+   "aside": true,
+   "fx_after": [
+    [
+     "ringback",
+     -30,
+     0.15
+    ]
+   ],
+   "note": "to himself, not on the radio; then he rings Steve's house"
+  },
+  {
+   "id": "h28",
+   "who": "KAREN",
+   "text": "Hello?"
+  },
+  {
+   "id": "h29",
+   "who": "MICK",
+   "text": "Karen, it's Mick at the yard. Is Steve there?",
+   "ptt_open": false,
+   "ptt_close": false
+  },
+  {
+   "id": "h30",
+   "who": "KAREN",
+   "text": "No, love. Someone rang the house about half two. He went white. Went straight out. Wouldn't say who."
+  },
+  {
+   "id": "h31",
+   "who": "KAREN",
+   "text": "He said if you rang, I've to tell you to read his note again."
+  },
+  {
+   "id": "h32",
+   "who": "MICK",
+   "text": "Not even me.",
+   "ptt_open": false,
+   "ptt_close": false,
+   "aside": true
+  },
+  {
+   "id": "h33",
+   "who": "KAREN",
+   "text": "Mick? Is he with you? Is he all right?"
+  },
+  {
+   "id": "h34",
+   "who": "MICK",
+   "text": "I'll ring you back, love.",
+   "ptt_open": false,
+   "ptt_close": false,
+   "fx_after": [
+    [
+     "hangup",
+     -32,
+     0.3
+    ]
+   ]
+  },
+  {
+   "id": "h35",
+   "who": "ASH",
+   "text": "Mick. There's summat up the lane.",
+   "bg": "gate_engine"
+  },
+  {
+   "id": "h36",
+   "who": "MICK",
+   "text": "What?"
+  },
+  {
+   "id": "h37",
+   "who": "ASH",
+   "text": "An engine. Just ticking over. No lights. I never heard it come.",
+   "bg": "gate_engine"
+  },
+  {
+   "id": "h38",
+   "who": "STEVE",
+   "text": "Please.",
+   "bg": "gate_engine",
+   "cont": true
+  },
+  {
+   "id": "h39",
+   "who": "ASH",
+   "text": "I'm letting him in.",
+   "bg": "gate_engine",
+   "cont": true
+  },
+  {
+   "id": "h40",
+   "who": "MICK",
+   "text": "Don't you dare."
+  },
+  {
+   "id": "h41",
+   "who": "ASH",
+   "text": "He's stood in the rain, Mick. It's Steve!",
+   "bg": "gate_engine"
+  },
+  {
+   "id": "h42",
+   "who": "MICK",
+   "text": "Don't open it. I'm coming down.",
+   "fx_after": [
+    [
+     "charger",
+     -30,
+     0.0
+    ],
+    [
+     "door",
+     -27,
+     0.0
+    ],
+    [
+     "EMPTY",
+     0,
+     5.0
+    ]
+   ]
+  },
+  {
+   "id": "h43",
+   "who": "MICK",
+   "text": "Ash. Where is he?",
+   "radio": true,
+   "bg": "outside_run",
+   "pre": 1.5
+  },
+  {
+   "id": "h44",
+   "who": "ASH",
+   "text": "Where's who?",
+   "bg": "outside",
+   "offmic": true,
+   "cont": true
+  },
+  {
+   "id": "h45",
+   "who": "MICK",
+   "text": "Steve.",
+   "radio": true,
+   "bg": "outside",
+   "cont": true
+  },
+  {
+   "id": "h46",
+   "who": "ASH",
+   "text": "Steve's not been here, mate. Radio's been quiet all night.",
+   "bg": "outside",
+   "offmic": true,
+   "cont": true
+  },
+  {
+   "id": "h47",
+   "who": "MICK",
+   "text": "Why's the barrier up?",
+   "radio": true,
+   "bg": "outside",
+   "cont": true
+  },
+  {
+   "id": "h48",
+   "who": "ASH",
+   "text": "It's not, it's... It says it's been up since twenty past three.",
+   "bg": "outside",
+   "offmic": true,
+   "cont": true,
+   "pause_cap": 1.1
+  },
+  {
+   "id": "h49",
+   "who": "MICK",
+   "text": "Ash... who's that in my office?",
+   "radio": true,
+   "bg": "outside",
+   "cont": true,
+   "hold_after": 1.4,
+   "pause_cap": 1.0
+  }
+ ],
+ "notes": {
+  "ending": "After h49 the transmission drops; the office: rain, hiss; then keys lifted off the board, close; cut.",
+  "room": "Mick is a room voice (PTT clicks when he talks to Ash) until he leaves at h42; aside lines have no PTT.",
+  "plants": "barrier (h01, full; h13, buried) and keys (h02, hung; the end, lifted)."
+ }
+}

@@ -1,3 +1,7 @@
 aud/*.mp3
 aud/*.words.json
 __pycache__/
+stations/
+*.wav
+transmission03-*.mp3
+transmission03-*.mp4
