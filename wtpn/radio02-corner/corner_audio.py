@@ -225,6 +225,22 @@ def main():
     for j, (off, g) in enumerate([(0.0, 0.0), (0.68, -0.6), (1.36, 0.4)]):
         n = len(ins) // 2; ins += ["-i", str(knock)]; ms = int((t_knock + off) * 1000)
         fc.append(f"[{n}:a]volume={gk + g:.2f}dB,aecho=0.8:0.5:23|41:0.2|0.12,adelay={ms}|{ms}[k{j}]")
+    # the kitchen clock: a quiet tick every second, in time with the second hand drawn in the video
+    # (3:00:00 lands on the first knock), and it stops there (user: a clock you can hear)
+    import numpy as np, wave
+    rng = np.random.default_rng(1695); n = int(0.04 * SR); tt = np.arange(n) / SR
+    def one(f):
+        noise = np.fft.irfft(np.fft.rfft(rng.standard_normal(n)) * ((np.fft.rfftfreq(n, 1 / SR) > 2200) & (np.fft.rfftfreq(n, 1 / SR) < 7000)), n)
+        return (0.7 * noise / (np.abs(noise).max() + 1e-9) * np.exp(-tt / 0.0035) + 0.35 * np.sin(2 * np.pi * f * tt) * np.exp(-tt / 0.007))
+    TK, TO = one(2350), one(1950)
+    trk = np.zeros(int(total * SR) + n)
+    k = 1
+    while t_knock - k > 0.3:
+        s0 = int((t_knock - k) * SR); trk[s0:s0 + n] += (TK if k % 2 else TO); k += 1
+    w = wave.open(str(ST / "ticks.wav"), "wb"); w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR)
+    w.writeframes((np.clip(trk * 0.18, -1, 1) * 32767).astype(np.int16).tobytes()); w.close()
+    n_ = len(ins) // 2; ins += ["-i", str(ST / "ticks.wav")]
+    fc.append(f"[{n_}:a]highpass=f=600,aecho=0.8:0.4:19|31:0.18|0.1,volume=-14dB[t0]")
     for e in tl:
         n = len(ins) // 2; ins += ["-i", str(ST / e["wav"])]; ms = int(e["start"] * 1000)
         fc.append(f"[{n}:a]adelay={ms}|{ms}[d{n}]")

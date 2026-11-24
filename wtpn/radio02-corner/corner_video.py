@@ -19,6 +19,8 @@ AUDIO = D / "master_social.wav"
 # source is ChatGPT's 2:3 still; crop to 9:16 at x0 and scale to a 2160x3840 plate (2x the frame).
 # Positions are measured on each source image (source pixels).
 PLATES = {
+ "kitchen_green_nohands.png": {"x0": 90, "clock": (894, 462), "clock_r": 62, "led": (213, 1386), "hands_erased": True,
+                       "window": ((322, 505), (628, 930)), "candle": (775, 940), "flame": (775, 945, 24, 44)},   # dial centre from the numerals
  "kitchen_green.png": {"x0": 90, "clock": (886.5, 465), "clock_r": 65, "led": (213, 1386),
                        "window": ((322, 505), (628, 930)), "candle": (775, 945)},     # user's final (green range), 1342x2000
  "kitchen_gpt.png":   {"x0": 40, "clock": (457.5, 235), "clock_r": 31, "led": (111, 709),
@@ -37,8 +39,9 @@ def build_plate():
     src = Image.open(SRC).convert("RGB")
     big = src.crop((X0, 0, X0 + CROP_W, _sh)).resize((2160, 3840), Image.LANCZOS)
     big = big.filter(ImageFilter.UnsharpMask(radius=1.6, percent=30 if K < 2.5 else 45, threshold=2))
-    # paint out the plate's own clock hands (we draw ours)
     from scipy.ndimage import gaussian_filter, binary_dilation
+    if PC.get("hands_erased"): return big          # done on the source, along the hands themselves
+    # paint out the plate's own clock hands (we draw ours)
     a = np.asarray(big).astype(np.float32); cx, cy = CLOCK_C; R = int(CLOCK_R * 0.9)
     y0, y1, x0, x1 = int(cy - R - 20), int(cy + R + 20), int(cx - R - 20), int(cx + R + 20)
     sub = a[y0:y1, x0:x1]; yy, xx = np.mgrid[y0:y1, x0:x1]
@@ -59,6 +62,21 @@ def lit(glow, core, gain=1.0):
     lay = lay.filter(ImageFilter.GaussianBlur(11))
     ImageDraw.Draw(lay).ellipse([x - 9, y - 6, x + 9, y + 6], fill=core + (255,))
     return Image.alpha_composite(im, lay).convert("RGB")
+def candle_out(im):
+    """The same kitchen with the lamp out: flame and chimney glow gone, its warm wash off the wall."""
+    from scipy.ndimage import gaussian_filter
+    a = np.asarray(im).astype(np.float32); fx, fy, rx, ry = PC["flame"]; (cx, cy), rx, ry = P(fx, fy), rx * K, ry * K
+    yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]]
+    # the glow on the wall and sill: a broad warm falloff around the lamp
+    g = np.exp(-(((xx - cx) / (rx * 7.5)) ** 2 + ((yy - cy) / (ry * 4.0)) ** 2))
+    a *= (1 - np.stack([0.58 * g, 0.63 * g, 0.66 * g], -1))
+    # the flame and chimney: replaced by the dim glass and wall around them
+    core = np.exp(-(((xx - cx) / rx) ** 2 + ((yy - cy) / ry) ** 2) * 1.6)
+    ring = (np.abs(((xx - cx) / (rx * 1.9)) ** 2 + ((yy - cy) / (ry * 1.5)) ** 2 - 1) < 0.25).astype(np.float32)
+    tone = np.array([(a[..., k] * ring).sum() / max(ring.sum(), 1) for k in range(3)], np.float32) * 0.93
+    a = a * (1 - core[..., None]) + tone * core[..., None]
+    return Image.fromarray(a.clip(0, 255).astype(np.uint8))
+base_out = candle_out(base) if PC.get("flame") else base
 PL = {"off": base, "rx": lit((70, 240, 120), (205, 255, 215)), "tx": lit((255, 70, 45), (255, 190, 165), gain=1.7)}   # red reads weaker than green on a black radio
 IV = [(e["led_on"], e["led_off"], e["kind"]) for e in TL["lines"]]
 def state(t):
@@ -69,13 +87,14 @@ def state(t):
 # ---------- time: the clock, the dip, the cut -----------------------------------------------------
 K0, K3 = TL["knocks"][0], TL["knocks"][-1]
 T_CUT = K3 + 0.12                                   # hard cut to black on the third knock
-def clock_secs(t): return 3 * 3600 - (K0 - t)        # 3:00:00 exactly on the first knock
+def clock_secs(t): return 3 * 3600 - (K0 - min(t, K0))   # 3:00:00 exactly on the first knock, and there it stops
 LN = {e["id"]: e for e in TL["lines"]}
 T_TURN = LN["l12"]["start"]                          # the sheep go silent: from here the room slowly loses its warmth
 T_FLICK = LN["l20"]["start"] - 1.1                   # the yard light stutters as the shed goes dark (user)
 FLICK_PAT = [1, .35, .95, .18, .8, 1, .55, 1]        # yard-light brightness per 1/16 s
 T_PASS, PASS_LEN = K0 - 1.35, 0.42                   # something passes the window just before the knocks (user)
 T_DIP = T_PASS                                       # (kept for the log line)
+T_OUT, OUT_LEN = T_PASS + 0.12, 0.5                  # the lamp gutters and dies as it passes (user: more change in the kitchen)
 rng = np.random.default_rng(1695)
 from scipy.ndimage import gaussian_filter as _gf
 _f = _gf(rng.standard_normal((96, 160)), 5); FIELD = _f / _f.std()   # lumpy, so it reads as no shape at all
@@ -184,7 +203,14 @@ for i in range(int(round(dur * FPS))):
     cx = C0[0] + (C1[0] - C0[0]) * e; cy = C0[1] + (C1[1] - C0[1]) * e
     hw, hh = PW / (2 * s), PH / (2 * s); cx = min(max(cx, hw), PW - hw); cy = min(max(cy, hh), PH - hh)
     bx, by, sc = cx - hw, cy - hh, W / (2 * hw)
-    fr = PL[state(t)].resize((W, H), Image.LANCZOS, box=(bx, by, cx + hw, cy + hh), reducing_gap=2.0)
+    box = (bx, by, cx + hw, cy + hh)
+    k_out = 0.0 if t < T_OUT else min((t - T_OUT) / OUT_LEN, 1.0)
+    if k_out >= 1.0: fr = base_out.resize((W, H), Image.LANCZOS, box=box, reducing_gap=2.0)
+    else:
+        fr = PL[state(t)].resize((W, H), Image.LANCZOS, box=box, reducing_gap=2.0)
+        if k_out > 0:
+            dying = k_out * (0.75 + 0.25 * math.sin(t * 47))                       # it gutters on the way out
+            fr = Image.blend(fr, base_out.resize((W, H), Image.LANCZOS, box=box, reducing_gap=2.0), min(dying, 1.0))
     def F(p): return ((p[0] - bx) * sc, (p[1] - by) * sc)
     a = np.asarray(fr).astype(np.float32)
     # candle: a slow, small flicker of its glow
@@ -193,7 +219,7 @@ for i in range(int(round(dur * FPS))):
     ys_, xs_ = np.ogrid[py0:py1, px0:px1]; g = np.exp(-((xs_ - qx) ** 2 + (ys_ - qy) ** 2) / (2 * (rr * 0.5) ** 2))
     k_turn = min(max((t - T_TURN) / (T_CUT - T_TURN), 0.0), 1.0) ** 1.2
     gutter = 0.45 * math.exp(-((t - (T_PASS + 0.2)) / 0.25) ** 2)            # the flame ducks as it passes
-    a[py0:py1, px0:px1] *= (1 + (0.07 + 0.07 * k_turn) * flicker(t) * g - gutter * g)[..., None]
+    if k_out < 1.0: a[py0:py1, px0:px1] *= (1 + (1 - k_out) * ((0.07 + 0.07 * k_turn) * flicker(t) - gutter) * g)[..., None]
     (wx0, wy0), (wx1, wy1) = F(WINDOW[0]), F(WINDOW[1]); ww, wh = wx1 - wx0, wy1 - wy0
     ix0, ix1, iy0, iy1 = int(max(0, wx0 - 40)), int(min(W, wx1 + 40)), int(max(0, wy0 - 40)), int(min(H, wy1 + 40))
     # the yard light stutters (power hiccup as the shed goes dark)
