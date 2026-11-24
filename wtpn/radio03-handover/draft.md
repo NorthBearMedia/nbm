@@ -1,4 +1,7 @@
-# TRANSMISSION 03 — "HANDOVER"  (Part 1)  — DRAFT v1, 24 Nov
+# TRANSMISSION 03 — "HANDOVER"  (Part 1)  — DRAFT v2, 24 Nov
+v2 (user): 'Twelve's tacho' -> 'OEU has an AdBlue fault, for a change' (wagons go by the last three letters
+of the reg; TTS must spell it O-E-U); the 'cold' dialect word cut (not known locally) -> 'frozen';
+'siling it down' stays. Names stay: Mick, Dave, Steve, Karen.
 v1: hybrid of the user's twist (the planner goes down to the gate: no Steve, and the gate man remembers
 nothing) with the note build (the rule from line one, false relief at 3:00, it really is Steve's call at
 home). Fixes: the barrier log proves something came in at 3:20; the keys plant pays off in the office.
@@ -17,14 +20,14 @@ DAVE: That's the last one in. Barrier's down.
 MICK: Champion. (keys onto a hook on the board: a soft jingle)                [PLANT 2: the keys]
 MICK: That's thirty home. Keys are on the board.
 DAVE: What's Steve left you?
-MICK: (paper) Usual. Twelve's tacho's playing up again. Wakefield's moved to half five.
+MICK: (paper) Usual. OEU has an AdBlue fault, for a change. Wakefield's moved to half five.
 MICK: "Don't let anyone in after three." Underlined. "Not even me." Underlined twice.
 DAVE: He's on a wind-up.
 MICK: Daft sod's left his phone an' all. (it buzzes on the desk) ... Fourteen missed calls. No number.
 DAVE: Bookies.
 
 0:32  Rain.
-DAVE: Three o'clock. Gate's locked, barrier's down, it's siling down and I'm nithered. All quiet.
+DAVE: Three o'clock. Gate's locked, barrier's down, it's siling it down and I'm frozen. All quiet.
 MICK: Nobody in after three, Dave.
 DAVE: Not even Steve.
 

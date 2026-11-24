@@ -1,0 +1,3 @@
+aud/*.mp3
+aud/*.words.json
+__pycache__/

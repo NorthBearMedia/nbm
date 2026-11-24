@@ -1,0 +1,1060 @@
+{
+ "DAVE_ashley_v2": {
+  "acc": 1.0,
+  "england": 0.522,
+  "us": 0.219,
+  "top": [
+   [
+    "england",
+    0.5220165252685547
+   ],
+   [
+    "scotland",
+    0.3741300106048584
+   ],
+   [
+    "wales",
+    0.3145189583301544
+   ]
+  ],
+  "f0": 147.0,
+  "dur": 15.1,
+  "wps": 2.89,
+  "heard": "Three o'clock. Gate's locked, barrier's down. It's siling it down and I'm frozen. All quiet. Mick, you'll not believe this. Steve's at the gate. He's stood in the rain, Mick. It's Steve. Steve's not been here, mate. Radio's been quiet all night"
+ },
+ "DAVE_ashley_v3": {
+  "acc": 1.0,
+  "england": 0.791,
+  "us": 0.191,
+  "top": [
+   [
+    "england",
+    0.7913926839828491
+   ],
+   [
+    "wales",
+    0.3119317591190338
+   ],
+   [
+    "ireland",
+    0.2825920879840851
+   ]
+  ],
+  "f0": 140.8,
+  "dur": 23.4,
+  "wps": 1.82,
+  "heard": "Three o'clock. Gate's locked, barrier's down, it's siling it down, and I'm frozen. All quiet. Mick, you'll not believe this. Steve's at the gate. He's stood in the rain, Mick. It's Steve. Steve's not been here, mate. Radio's been quiet all night"
+ },
+ "DAVE_ben_v2": {
+  "acc": 1.0,
+  "england": 0.637,
+  "us": 0.15,
+  "top": [
+   [
+    "england",
+    0.6367788910865784
+   ],
+   [
+    "australia",
+    0.3133586347103119
+   ],
+   [
+    "wales",
+    0.2989441752433777
+   ]
+  ],
+  "f0": 101.9,
+  "dur": 21.2,
+  "wps": 2.03,
+  "heard": "Three o'clock. Gates locked, barriers down. It's siling it down, and I'm frozen. All quiet. Mick, you'll not believe this. Steve's at the gate. He's stood in the rain. Mick, it's Steve. Steve's not been here, mate. Radio's been quiet all night"
+ },
+ "DAVE_ben_v3": {
+  "acc": 0.976,
+  "england": 0.666,
+  "us": 0.136,
+  "top": [
+   [
+    "england",
+    0.6662803888320923
+   ],
+   [
+    "australia",
+    0.373813658952713
+   ],
+   [
+    "wales",
+    0.3061663508415222
+   ]
+  ],
+  "f0": 105.0,
+  "dur": 19.9,
+  "wps": 2.12,
+  "heard": "Three o'clock. Gate's locked, barrier's down, it's sillling it down, and I'm frozen. All quiet. Mick, you'll not believe this. Steve's at the gate. He's stood in the rain, Mick. It's Steve. Steve's not been here, mate. Radio's been quiet all night"
+ },
+ "DAVE_chris_v2": {
+  "acc": 1.0,
+  "england": 0.62,
+  "us": 0.183,
+  "top": [
+   [
+    "england",
+    0.6204679012298584
+   ],
+   [
+    "scotland",
+    0.3923806846141815
+   ],
+   [
+    "wales",
+    0.2825877070426941
+   ]
+  ],
+  "f0": 127.2,
+  "dur": 15.2,
+  "wps": 2.85,
+  "heard": "Three o'clock. Gate's locked, barrier's down, it's siling it down and I'm frozen. All quiet. Mick, you'll not believe this. Steve's at the gate. He's stood in the rain, Mick. It's Steve. Steve's not been here, mate. Radio's been quiet all night"
+ },
+ "DAVE_chris_v3": {
+  "acc": 1.0,
+  "england": 0.775,
+  "us": 0.164,
+  "top": [
+   [
+    "england",
+    0.7747194766998291
+   ],
+   [
+    "australia",
+    0.31196847558021545
+   ],
+   [
+    "hongkong",
+    0.278375506401062
+   ]
+  ],
+  "f0": 140.0,
+  "dur": 24.8,
+  "wps": 1.7,
+  "heard": "Three o'clock. Gate's locked, barrier's down, it's siling it down, and I'm frozen. All quiet. Mick, you'll not believe this. Steve's at the gate. He's stood in the rain, Mick. It's Steve. Steve's not been here, mate. Radio's been quiet all night"
+ },
+ "DAVE_danleeds_v2": {
+  "acc": 1.0,
+  "england": 0.384,
+  "us": -0.245,
+  "top": [
+   [
+    "england",
+    0.38416269421577454
+   ],
+   [
+    "australia",
+    0.1347881704568863
+   ],
+   [
+    "newzealand",
+    0.12858664989471436
+   ]
+  ],
+  "f0": 117.8,
+  "dur": 16.7,
+  "wps": 2.59,
+  "heard": "Three o'clock, gate's locked, barrier's down, it's siling it down, and I'm frozen. All quiet. Mick, you'll not believe this. Steve's at the gate. He's stood in the rain, Mick. It's Steve. Steve's not been here, mate. Radio's been quiet all night"
+ },
+ "DAVE_danleeds_v3": {
+  "acc": 0.976,
+  "england": 0.64,
+  "us": 0.04,
+  "top": [
+   [
+    "england",
+    0.6401406526565552
+   ],
+   [
+    "australia",
+    0.21933870017528534
+   ],
+   [
+    "newzealand",
+    0.1946801245212555
+   ]
+  ],
+  "f0": 129.2,
+  "dur": 22.1,
+  "wps": 1.92,
+  "heard": "Three o'clock. Gates locked, barriers down, it's sillying it down, and I'm frozen. All quiet. Mick, you'll not believe this. Steve's at the gate. He's stood in the rain, Mick. It's Steve. Steve's not been here, mate. Radio's been quiet all night"
+ },
+ "DAVE_ellis_v2": {
+  "acc": 1.0,
+  "england": 0.562,
+  "us": 0.291,
+  "top": [
+   [
+    "england",
+    0.5619959831237793
+   ],
+   [
+    "wales",
+    0.40257152915000916
+   ],
+   [
+    "scotland",
+    0.3886326253414154
+   ]
+  ],
+  "f0": 86.3,
+  "dur": 17.5,
+  "wps": 2.46,
+  "heard": "Three o'clock. Gate's locked, barrier's down, it's siling it down, and I'm frozen. All quiet. Mick, you'll not believe this. Steve's at the gate. He's stood in the rain, Mick. It's Steve. Steve's not been here, mate. Radio's been quiet all night"
+ },
+ "DAVE_ellis_v3": {
+  "acc": 0.976,
+  "england": 0.7,
+  "us": 0.306,
+  "top": [
+   [
+    "england",
+    0.7004189491271973
+   ],
+   [
+    "australia",
+    0.394930362701416
+   ],
+   [
+    "us",
+    0.30619385838508606
+   ]
+  ],
+  "f0": 95.4,
+  "dur": 19.1,
+  "wps": 2.21,
+  "heard": "Three o'clock. Gate's locked, barrier's down, it's siling it down, and I'm frozen. All quiet. Mick, you'll not believe this. Steve's at the gate. He stood in the rain, Mick. It's Steve. Steve's not been here, mate. Radio's been quiet all night"
+ },
+ "DAVE_noah_v2": {
+  "acc": 1.0,
+  "england": 0.624,
+  "us": 0.223,
+  "top": [
+   [
+    "england",
+    0.623957633972168
+   ],
+   [
+    "australia",
+    0.3712964951992035
+   ],
+   [
+    "wales",
+    0.29413214325904846
+   ]
+  ],
+  "f0": 119.4,
+  "dur": 16.7,
+  "wps": 2.58,
+  "heard": "Three o'clock. Gate's locked, barrier's down, it's siling it down, and I'm frozen. All quiet, Mick. You'll not believe this. Steve's at the gate. He's stood in the rain, Mick. It's Steve. Steve's not been here, mate. Radio's been quiet all night"
+ },
+ "DAVE_noah_v3": {
+  "acc": 1.0,
+  "england": 0.675,
+  "us": 0.179,
+  "top": [
+   [
+    "england",
+    0.674852192401886
+   ],
+   [
+    "scotland",
+    0.3562791049480438
+   ],
+   [
+    "wales",
+    0.32811710238456726
+   ]
+  ],
+  "f0": 141.4,
+  "dur": 21.5,
+  "wps": 1.97,
+  "heard": "Three o'clock. Gates locked, barriers down, it's siling it down, and I'm frozen. All quiet. Mick, you'll not believe this. Steve's at the gate. He's stood in the rain, Mick. It's Steve. Steve's not been here, mate. Radio's been quiet all night"
+ },
+ "DAVE_owens_v2": {
+  "acc": 0.976,
+  "england": 0.681,
+  "us": 0.211,
+  "top": [
+   [
+    "england",
+    0.681424081325531
+   ],
+   [
+    "indian",
+    0.28366705775260925
+   ],
+   [
+    "scotland",
+    0.28106504678726196
+   ]
+  ],
+  "f0": 100.7,
+  "dur": 16.1,
+  "wps": 2.69,
+  "heard": "Three o'clock, gate's locked, barrier's down, it's selling it down, and I'm frozen. All quiet. Mick, you'll not believe this. Steve's at the gate. He's stood in the rain. Mick, it's Steve. Steve's not been here, mate. Radio's been quiet all night"
+ },
+ "DAVE_owens_v3": {
+  "acc": 0.976,
+  "england": 0.724,
+  "us": 0.182,
+  "top": [
+   [
+    "england",
+    0.7241625189781189
+   ],
+   [
+    "wales",
+    0.3093862533569336
+   ],
+   [
+    "indian",
+    0.22315320372581482
+   ]
+  ],
+  "f0": 106.1,
+  "dur": 16.3,
+  "wps": 2.63,
+  "heard": "Three o'clock. Gate's locked, barrier's down, it's siling it down, and I'm frozen. All quiet. Mick, you'll not believe this. Steve's at the gate. He stood in the rain, Mick. It's Steve. Steve's not been here, mate. Radio's been quiet all night"
+ },
+ "DAVE_phil_v2": {
+  "acc": 1.0,
+  "england": 0.619,
+  "us": 0.227,
+  "top": [
+   [
+    "england",
+    0.6194067001342773
+   ],
+   [
+    "scotland",
+    0.36419060826301575
+   ],
+   [
+    "australia",
+    0.31350237131118774
+   ]
+  ],
+  "f0": 105.2,
+  "dur": 20.3,
+  "wps": 2.12,
+  "heard": "Three o'clock, gate's locked, barrier's down. It's siling it down, and I'm frozen. All quiet. Mick, you'll not believe this. Steve's at the gate. He's stood in the rain, Mick. It's Steve. Steve's not been here, mate. Radio's been quiet all night"
+ },
+ "DAVE_phil_v3": {
+  "acc": 0.929,
+  "england": -0.07,
+  "us": 0.121,
+  "top": [
+   [
+    "australia",
+    0.7305202484130859
+   ],
+   [
+    "scotland",
+    0.2163449376821518
+   ],
+   [
+    "newzealand",
+    0.21481165289878845
+   ]
+  ],
+  "f0": 105.0,
+  "dur": 19.1,
+  "wps": 2.24,
+  "heard": "3:00. Gates are locked, barrier's down, it's soiling it down, and I'm frozen. All quiet. Mick, you'll not believe this. Steve's at the gate. He's stood in the rain, Mick. It's Steve. Steve's not been here, mate. Radio's been quiet all night"
+ },
+ "DAVE_ryan_v2": {
+  "acc": 1.0,
+  "england": 0.578,
+  "us": 0.33,
+  "top": [
+   [
+    "england",
+    0.5784122943878174
+   ],
+   [
+    "australia",
+    0.4207051694393158
+   ],
+   [
+    "scotland",
+    0.3613050878047943
+   ]
+  ],
+  "f0": 94.5,
+  "dur": 17.4,
+  "wps": 2.49,
+  "heard": "Three o'clock. Gates locked, barriers down. It's siling it down, and I'm frozen. All quiet. Mick, you'll not believe this. Steve's at the gate. He's stood in the rain, Mick. It's Steve. Steve's not been here, mate. Radio's been quiet all night"
+ },
+ "DAVE_ryan_v3": {
+  "acc": 1.0,
+  "england": 0.67,
+  "us": 0.239,
+  "top": [
+   [
+    "england",
+    0.6704127788543701
+   ],
+   [
+    "us",
+    0.23853354156017303
+   ],
+   [
+    "wales",
+    0.23367786407470703
+   ]
+  ],
+  "f0": 99.3,
+  "dur": 16.2,
+  "wps": 2.63,
+  "heard": "Three o'clock. Gates locked, barriers down. It's siling it down, and I'm frozen. All quiet. Mick, you'll not believe this. Steve's at the gate. He's stood in the rain, Mick. It's Steve. Steve's not been here, mate. Radio's been quiet all night"
+ },
+ "KAREN_chazza_v2": {
+  "acc": 0.965,
+  "england": 0.648,
+  "us": 0.204,
+  "top": [
+   [
+    "england",
+    0.6479395031929016
+   ],
+   [
+    "singapore",
+    0.2920469343662262
+   ],
+   [
+    "hongkong",
+    0.25081542134284973
+   ]
+  ],
+  "f0": 200.5,
+  "dur": 21.7,
+  "wps": 2.02,
+  "heard": "Hello. No, love. Someone rang the house about half two. He went white. Went straight out. Wouldn't say who. He said if you rang, I have to tell you to read his note again. Mick? Is he with you? Is he all right?"
+ },
+ "KAREN_chazza_v3": {
+  "acc": 0.976,
+  "england": 0.396,
+  "us": 0.447,
+  "top": [
+   [
+    "us",
+    0.4468573331832886
+   ],
+   [
+    "england",
+    0.39578935503959656
+   ],
+   [
+    "african",
+    0.3806115388870239
+   ]
+  ],
+  "f0": 227.3,
+  "dur": 20.5,
+  "wps": 2.07,
+  "heard": "Hello? No, love. Someone rang the house about half two. He went white, went straight out, wouldn't say who. He said if you ran, I've to tell you to read his note again. Mick? Is he with you? Is he all right?"
+ },
+ "KAREN_kirsty_v2": {
+  "acc": 0.965,
+  "england": 0.74,
+  "us": 0.215,
+  "top": [
+   [
+    "england",
+    0.740479588508606
+   ],
+   [
+    "us",
+    0.21464726328849792
+   ],
+   [
+    "newzealand",
+    0.19975963234901428
+   ]
+  ],
+  "f0": 194.2,
+  "dur": 17.2,
+  "wps": 2.55,
+  "heard": "Hello? No, love. Someone rang the house about half two. He went white, went straight out. Wouldn't say who. [laughs] He said, \"If you rang, I have to tell you to read his note again.\" [laughs] Mick, is he with you? Is he all right?"
+ },
+ "KAREN_kirsty_v3": {
+  "acc": 0.965,
+  "england": 0.728,
+  "us": 0.157,
+  "top": [
+   [
+    "england",
+    0.7277194261550903
+   ],
+   [
+    "african",
+    0.33390966057777405
+   ],
+   [
+    "scotland",
+    0.2256995439529419
+   ]
+  ],
+  "f0": 193.1,
+  "dur": 12.6,
+  "wps": 3.48,
+  "heard": "Hello? No, love. Someone rang the house about half two. He went white, went straight out. Wouldn't say who. He said if you rang, I have to tell you to read his note again. Mick, is he with you? Is he all right?"
+ },
+ "KAREN_miri_v2": {
+  "acc": 0.965,
+  "england": 0.554,
+  "us": 0.041,
+  "top": [
+   [
+    "england",
+    0.5543129444122314
+   ],
+   [
+    "scotland",
+    0.28569117188453674
+   ],
+   [
+    "wales",
+    0.19332025945186615
+   ]
+  ],
+  "f0": 187.6,
+  "dur": 11.9,
+  "wps": 3.78,
+  "heard": "Hello? No, love. Someone rang the house about half two. He went white, went straight out. Wouldn't say who. He said if you rang, I have to tell you to read his note again. Mick, is he with you? Is he all right?"
+ },
+ "KAREN_miri_v3": {
+  "acc": 1.0,
+  "england": 0.792,
+  "us": 0.188,
+  "top": [
+   [
+    "england",
+    0.7924870252609253
+   ],
+   [
+    "australia",
+    0.25537315011024475
+   ],
+   [
+    "indian",
+    0.23653274774551392
+   ]
+  ],
+  "f0": 157.0,
+  "dur": 18.4,
+  "wps": 2.31,
+  "heard": "Hello? No, love. Someone rang the house about half two. He went white, went straight out, wouldn't say who. He said if you rang, I've to tell you to read his note again. Mick, is he with you? Is he all right?"
+ },
+ "KAREN_wilshi_v2": {
+  "acc": 0.965,
+  "england": 0.509,
+  "us": 0.157,
+  "top": [
+   [
+    "england",
+    0.5087528824806213
+   ],
+   [
+    "indian",
+    0.41773444414138794
+   ],
+   [
+    "wales",
+    0.2737842798233032
+   ]
+  ],
+  "f0": 183.7,
+  "dur": 15.2,
+  "wps": 2.91,
+  "heard": "Hello. No, love, someone rang the house about half two. He went white, went straight out. Wouldn't say who. He said if you rang, I have to tell you to read his note again. Mick, is he with you? Is he all right?"
+ },
+ "KAREN_wilshi_v3": {
+  "acc": 1.0,
+  "england": 0.587,
+  "us": 0.141,
+  "top": [
+   [
+    "england",
+    0.5867887139320374
+   ],
+   [
+    "indian",
+    0.22250564396381378
+   ],
+   [
+    "hongkong",
+    0.178445965051651
+   ]
+  ],
+  "f0": 204.1,
+  "dur": 16.1,
+  "wps": 2.63,
+  "heard": "Hello? No, love. Someone rang the house about half two. He went white, went straight out. Wouldn't say who. He said if you rang, I've to tell you to read his note again. Mick, is he with you? Is he all right?"
+ },
+ "MICK_darren_v2": {
+  "acc": 0.955,
+  "england": 0.67,
+  "us": 0.283,
+  "top": [
+   [
+    "england",
+    0.6697598695755005
+   ],
+   [
+    "scotland",
+    0.41870415210723877
+   ],
+   [
+    "canada",
+    0.3101741373538971
+   ]
+  ],
+  "f0": 88.2,
+  "dur": 14.3,
+  "wps": 2.45,
+  "heard": "Usual. Oh, EU has an AdBlue fault for a change. Wakefield's moved to half five. Steve's never said please in his life. Don't open it. I'm coming down. Dave, who's that in my office?"
+ },
+ "MICK_darren_v3": {
+  "acc": 1.0,
+  "england": 0.723,
+  "us": 0.013,
+  "top": [
+   [
+    "england",
+    0.7234761714935303
+   ],
+   [
+    "australia",
+    0.28604620695114136
+   ],
+   [
+    "wales",
+    0.22022771835327148
+   ]
+  ],
+  "f0": 85.2,
+  "dur": 19.5,
+  "wps": 1.72,
+  "heard": "Usual, O-E-U, has an AdBlue fault for a change. Wakefield's moved to half five. Steve's never said please in his life. Don't open it. I'm coming down. Dave, who's that in my office?"
+ },
+ "MICK_david_v2": {
+  "acc": 1.0,
+  "england": 0.612,
+  "us": 0.3,
+  "top": [
+   [
+    "england",
+    0.6117578744888306
+   ],
+   [
+    "wales",
+    0.3573427200317383
+   ],
+   [
+    "indian",
+    0.32992056012153625
+   ]
+  ],
+  "f0": 168.9,
+  "dur": 12.0,
+  "wps": 3.01,
+  "heard": "Usual. O E U. Has an AdBlue fault. For a change. Wakefield's moved to half five. Steve's never said please in his life. Don't open it. I'm coming down. Dave, who's that in my office?"
+ },
+ "MICK_david_v3": {
+  "acc": 1.0,
+  "england": 0.645,
+  "us": 0.195,
+  "top": [
+   [
+    "england",
+    0.6453426480293274
+   ],
+   [
+    "wales",
+    0.31127655506134033
+   ],
+   [
+    "newzealand",
+    0.30865219235420227
+   ]
+  ],
+  "f0": 155.3,
+  "dur": 17.1,
+  "wps": 1.95,
+  "heard": "Usual. OEU has an AdBlue fault for a change. Wakefield's moved to half five. Steve's never said please in his life. Don't open it. I'm coming down. Dave, who's that in my office?"
+ },
+ "MICK_gideon_v2": {
+  "acc": 1.0,
+  "england": 0.455,
+  "us": 0.309,
+  "top": [
+   [
+    "wales",
+    0.47316840291023254
+   ],
+   [
+    "england",
+    0.4548739194869995
+   ],
+   [
+    "canada",
+    0.3293672502040863
+   ]
+  ],
+  "f0": 103.8,
+  "dur": 13.9,
+  "wps": 2.47,
+  "heard": "Usual. OEU has an AdBlue fault for a change. Wakefield's moved to half five. Steve's never said please in his life. Don't open it. I'm coming down. Dave, who's that in my office?"
+ },
+ "MICK_gideon_v3": {
+  "acc": 0.925,
+  "england": 0.566,
+  "us": 0.137,
+  "top": [
+   [
+    "england",
+    0.5663290619850159
+   ],
+   [
+    "wales",
+    0.3582707345485687
+   ],
+   [
+    "us",
+    0.13744133710861206
+   ]
+  ],
+  "f0": 102.9,
+  "dur": 18.1,
+  "wps": 1.89,
+  "heard": "The usual. OEU has an AdBlue fault for a change. Wakefield's moved to half five. Steve's never said please in his life. Don't open it. I'm coming down. Dave, who sat in my office?"
+ },
+ "MICK_heath_v2": {
+  "acc": 1.0,
+  "england": 0.684,
+  "us": 0.262,
+  "top": [
+   [
+    "england",
+    0.6836737990379333
+   ],
+   [
+    "wales",
+    0.33309945464134216
+   ],
+   [
+    "us",
+    0.2624594271183014
+   ]
+  ],
+  "f0": 143.4,
+  "dur": 9.8,
+  "wps": 3.52,
+  "heard": "Usual. OEU has an AdBlue fault for a change. Wakefield's moved to half five. Steve's never said please in his life. Don't open it. I'm coming down. Dave, who's that in my office?"
+ },
+ "MICK_heath_v3": {
+  "acc": 0.955,
+  "england": 0.563,
+  "us": 0.137,
+  "top": [
+   [
+    "england",
+    0.5629985928535461
+   ],
+   [
+    "wales",
+    0.26388785243034363
+   ],
+   [
+    "newzealand",
+    0.26224464178085327
+   ]
+  ],
+  "f0": 140.5,
+  "dur": 18.5,
+  "wps": 1.97,
+  "heard": "Usual. O E U. Has an ad blue fault for a change. Wakefield's moved to half five. Steve's never said please in his life. Don't open it. I'm coming down. Dave, who's that in my office?"
+ },
+ "MICK_johnnorth_v2": {
+  "acc": 0.985,
+  "england": 0.536,
+  "us": 0.251,
+  "top": [
+   [
+    "england",
+    0.5361438393592834
+   ],
+   [
+    "wales",
+    0.3794427812099457
+   ],
+   [
+    "us",
+    0.2509033977985382
+   ]
+  ],
+  "f0": 116.6,
+  "dur": 17.1,
+  "wps": 2.02,
+  "heard": "The usual. OEU has an AdBlue fault for a change. Wakefield's moved to half five. Steve's never said please in his life. Don't open it. I'm coming down. Dave, who's that in my office?"
+ },
+ "MICK_johnnorth_v3": {
+  "acc": 0.985,
+  "england": 0.511,
+  "us": 0.098,
+  "top": [
+   [
+    "england",
+    0.5111415386199951
+   ],
+   [
+    "wales",
+    0.30132779479026794
+   ],
+   [
+    "newzealand",
+    0.2161591500043869
+   ]
+  ],
+  "f0": 115.3,
+  "dur": 18.7,
+  "wps": 1.82,
+  "heard": "The usual. O-E-U has an AdBlue fault for a change. Wakefield's moved to half five. Steve's never said please in his life. Don't open it. I'm coming down. Dave, who's that in my office?"
+ },
+ "MICK_luke_v2": {
+  "acc": 0.955,
+  "england": 0.539,
+  "us": 0.337,
+  "top": [
+   [
+    "england",
+    0.5390800833702087
+   ],
+   [
+    "scotland",
+    0.3906106650829315
+   ],
+   [
+    "us",
+    0.3368334174156189
+   ]
+  ],
+  "f0": 120.5,
+  "dur": 10.6,
+  "wps": 3.33,
+  "heard": "Usual. Oh, EU has an AdBlue fault for a change. Wakefield's moved to half five. Steve's never said please in his life. Don't open it. I'm coming down. Dave, who's that in my office?"
+ },
+ "MICK_luke_v3": {
+  "acc": 0.955,
+  "england": 0.709,
+  "us": 0.17,
+  "top": [
+   [
+    "england",
+    0.7091577649116516
+   ],
+   [
+    "newzealand",
+    0.37792909145355225
+   ],
+   [
+    "wales",
+    0.18836843967437744
+   ]
+  ],
+  "f0": 119.4,
+  "dur": 15.3,
+  "wps": 2.25,
+  "heard": "Usual. OEU has an ad blue fault for a change. Wakefield's moved to half five. Steve's never said please in his life. Don't open it. I'm coming down. Dave, who's that in my office?"
+ },
+ "MICK_mike_v2": {
+  "acc": 0.955,
+  "england": 0.666,
+  "us": 0.24,
+  "top": [
+   [
+    "england",
+    0.6662356853485107
+   ],
+   [
+    "wales",
+    0.3914165198802948
+   ],
+   [
+    "ireland",
+    0.3228161036968231
+   ]
+  ],
+  "f0": 86.0,
+  "dur": 13.8,
+  "wps": 2.69,
+  "heard": "Usual. O E U. Has an ad blue fault for a change. Wakefield's moved to half five. Steve's never said please in his life. Don't open it, I'm coming down. Dave, who's that in my office?"
+ },
+ "MICK_mike_v3": {
+  "acc": 1.0,
+  "england": 0.605,
+  "us": 0.159,
+  "top": [
+   [
+    "england",
+    0.6052038669586182
+   ],
+   [
+    "scotland",
+    0.3795226812362671
+   ],
+   [
+    "wales",
+    0.24571384489536285
+   ]
+  ],
+  "f0": 81.8,
+  "dur": 18.3,
+  "wps": 1.95,
+  "heard": "Usual O E U has an AdBlue fault for a change. Wakefield's moved to half five. Steve's never said please in his life. Don't open it. I'm coming down. Dave, who's that in my office?"
+ },
+ "MICK_nige_v2": {
+  "acc": 1.0,
+  "england": 0.398,
+  "us": 0.192,
+  "top": [
+   [
+    "england",
+    0.39834722876548767
+   ],
+   [
+    "scotland",
+    0.3707226812839508
+   ],
+   [
+    "wales",
+    0.2508874833583832
+   ]
+  ],
+  "f0": 99.5,
+  "dur": 14.4,
+  "wps": 2.38,
+  "heard": "Usual. OEU has an AdBlue fault, for a change. Wakefield's moved to half five. Steve's never said please in his life. Don't open it. I'm coming down. Dave, who's that in my office?"
+ },
+ "MICK_nige_v3": {
+  "acc": 0.955,
+  "england": -0.046,
+  "us": 0.067,
+  "top": [
+   [
+    "scotland",
+    0.29754137992858887
+   ],
+   [
+    "wales",
+    0.15934643149375916
+   ],
+   [
+    "newzealand",
+    0.15535488724708557
+   ]
+  ],
+  "f0": 98.4,
+  "dur": 21.1,
+  "wps": 1.74,
+  "heard": "Usual. O E U has an ad blue fault for a change. Wakefield's moved to half five. Steve's never said please in his life. Don't open it. I'm coming down. Dave, who's that in my office?"
+ },
+ "MICK_paul_v2": {
+  "acc": 1.0,
+  "england": 0.599,
+  "us": 0.49,
+  "top": [
+   [
+    "england",
+    0.5985241532325745
+   ],
+   [
+    "us",
+    0.49039173126220703
+   ],
+   [
+    "scotland",
+    0.40279677510261536
+   ]
+  ],
+  "f0": 81.3,
+  "dur": 10.8,
+  "wps": 3.19,
+  "heard": "Usual. OEU has an AdBlue fault for a change. Wakefield's moved to half five. Steve's never said please in his life. Don't open it. I'm coming down. Dave, who's that in my office?"
+ },
+ "MICK_paul_v3": {
+  "acc": 1.0,
+  "england": 0.152,
+  "us": 0.01,
+  "top": [
+   [
+    "australia",
+    0.5545493364334106
+   ],
+   [
+    "newzealand",
+    0.3924905061721802
+   ],
+   [
+    "southatlandtic",
+    0.16881932318210602
+   ]
+  ],
+  "f0": 75.1,
+  "dur": 16.0,
+  "wps": 2.08,
+  "heard": "Usual. OEU has an AdBlue fault for a change. Wakefield's moved to half five. Steve's never said please in his life. Don't open it. I'm coming down. Dave, who's that in my office?"
+ },
+ "MICK_tony_v2": {
+  "acc": 1.0,
+  "england": 0.723,
+  "us": 0.322,
+  "top": [
+   [
+    "england",
+    0.7232198119163513
+   ],
+   [
+    "wales",
+    0.4170877933502197
+   ],
+   [
+    "us",
+    0.32181939482688904
+   ]
+  ],
+  "f0": 100.9,
+  "dur": 12.5,
+  "wps": 2.73,
+  "heard": "Usual. OEU has an AdBlue fault for a change. Wakefield's moved to half five. Steve's never said please in his life. Don't open it. I'm coming down. Dave, who's that in my office?"
+ },
+ "MICK_tony_v3": {
+  "acc": 1.0,
+  "england": 0.767,
+  "us": 0.25,
+  "top": [
+   [
+    "england",
+    0.7674430012702942
+   ],
+   [
+    "wales",
+    0.38861575722694397
+   ],
+   [
+    "us",
+    0.2504900097846985
+   ]
+  ],
+  "f0": 92.2,
+  "dur": 17.1,
+  "wps": 1.96,
+  "heard": "Usual. OEU has an AdBlue fault for a change. Wakefield's moved to half five. Steve's never said please in his life. Don't open it. I'm coming down. Dave, who's that in my office?"
+ }
+}
