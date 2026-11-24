@@ -217,7 +217,7 @@ and their ask: first-person, interview, feels real.
   — copy them forward rather than rebuilding the audio chain from memory each night.
 
 ## ★★★★★ 24 NOV — TRANSMISSION 01 "CREST" (new radio format) ARMED ★★★★★
-- Post **440117853** (uuid -7445221511484915538): **Wed 25 Nov 18:00 Europe/London**, TikTok + Instagram
+- Post **440173239** (uuid -7445221511484915538): **Tue 24 Nov 22:30 Europe/London** (user moved it from Wed 18:00), TikTok + Instagram
   Reel + Facebook Reel + YouTube Short, media ingested to static.metricool.com, isAigc / isAiGenerated /
   isAiGeneratedContent all true, cover at 1200 ms. Built in wtpn/radio01-crest (radio_audio.py,
   radio_video2.py, publish.py). Original fiction: caption says "an original radio horror series";
