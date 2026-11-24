@@ -47,21 +47,22 @@ Dialogue: 0,0:01:18.60,0:01:19.41,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H0
 Dialogue: 0,0:01:19.36,0:01:21.29,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}EWAN{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}He's wearing my jacket.
 Dialogue: 0,0:01:21.29,0:01:23.62,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}EWAN{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}Base, he's got my—
 Dialogue: 0,0:01:23.62,0:01:27.11,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}EWAN{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}he's got my face, he's got my fac—
-Dialogue: 0,0:01:27.13,0:01:28.13,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}CAT{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}Ewan!
-Dialogue: 0,0:01:28.13,0:01:31.19,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}CAT{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}Oh, there you are, you absolute clown,
-Dialogue: 0,0:01:31.19,0:01:33.51,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}CAT{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}I've been shouting myself hoarse—
-Dialogue: 0,0:01:33.54,0:01:34.47,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}EWAN{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}Cat.
-Dialogue: 0,0:01:34.47,0:01:36.78,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}EWAN{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}Cat, that's not me.
-Dialogue: 0,0:01:36.78,0:01:38.66,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}EWAN{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}That is not—
-Dialogue: 0,0:01:38.69,0:01:39.72,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}CAT{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}What?
-Dialogue: 0,0:01:39.72,0:01:42.04,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}CAT{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}You're stood right in front of—
-Dialogue: 0,0:01:42.13,0:01:43.53,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}EWAN{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}Don't let it—
-Dialogue: 0,0:01:43.63,0:01:46.88,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs32\c&H00A0E87C&\fsp4\alpha&H40&}[CARRIER — NO VOICE]
-Dialogue: 0,0:01:49.44,0:01:50.20,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H005C7AFF&\fsp6}BASE\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}Cat.
-Dialogue: 0,0:01:50.20,0:01:50.78,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H005C7AFF&\fsp6}BASE\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}Ewan.
-Dialogue: 0,0:01:50.78,0:01:52.31,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H005C7AFF&\fsp6}BASE\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}Radio check, over.
-Dialogue: 0,0:01:55.01,0:01:56.61,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}EWAN\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}Base, this is Ewan.
-Dialogue: 0,0:01:56.61,0:01:57.57,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}EWAN\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}All fine.
-Dialogue: 0,0:01:57.57,0:01:58.73,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}EWAN\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}We're coming down.
+Dialogue: 0,0:01:27.13,0:01:28.17,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}CAT{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}Base, Cat.
+Dialogue: 0,0:01:28.17,0:01:29.26,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}CAT{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}I've got him.
+Dialogue: 0,0:01:29.26,0:01:31.57,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}CAT{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}Ewan's right here, he's fine.
+Dialogue: 0,0:01:31.57,0:01:33.62,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}CAT{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}No sign of anyone else.
+Dialogue: 0,0:01:34.29,0:01:35.23,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}EWAN{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}Cat.
+Dialogue: 0,0:01:35.23,0:01:37.54,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}EWAN{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}Cat, that's not me.
+Dialogue: 0,0:01:37.54,0:01:39.41,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}EWAN{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}That is not—
+Dialogue: 0,0:01:39.44,0:01:40.48,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}CAT{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}What?
+Dialogue: 0,0:01:40.48,0:01:42.80,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}CAT{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}You're stood right in front of—
+Dialogue: 0,0:01:42.88,0:01:44.28,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}EWAN{\fnIBM Plex Mono Medium\fs27\c&H0084888C&\fsp2}   [wind]\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}Don't let it—
+Dialogue: 0,0:01:44.38,0:01:47.63,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs32\c&H00A0E87C&\fsp4\alpha&H40&}[CARRIER — NO VOICE]
+Dialogue: 0,0:01:50.20,0:01:50.96,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H005C7AFF&\fsp6}BASE\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}Cat.
+Dialogue: 0,0:01:50.96,0:01:51.54,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H005C7AFF&\fsp6}BASE\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}Ewan.
+Dialogue: 0,0:01:51.54,0:01:53.07,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H005C7AFF&\fsp6}BASE\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}Radio check, over.
+Dialogue: 0,0:01:55.77,0:01:57.37,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}EWAN\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}Base, this is Ewan.
+Dialogue: 0,0:01:57.37,0:01:58.33,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}EWAN\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}All fine.
+Dialogue: 0,0:01:58.33,0:01:59.49,T,,0,0,0,,{\fnIBM Plex Mono SemiBold\fs31\c&H00A0E87C&\fsp6}EWAN\N{\fnIBM Plex Mono Medium\fs50\c&H00E8EFF2&\fsp0}We're coming down.
 Dialogue: 0,0:00:00.10,0:00:02.40,T,,0,0,0,,{\an8\pos(540,150)\fad(220,320)\fnIBM Plex Mono Medium\fs56\c&H00E8EFF2&\fsp2}Watch the light.
-Dialogue: 0,0:00:02.40,0:01:58.53,T,,0,0,0,,{\an8\pos(540,78)\fad(450,0)\fnIBM Plex Mono SemiBold\fs30\c&H00E8EFF2&\fsp10\alpha&H30&}TRANSMISSION 01\N{\fnIBM Plex Mono Medium\fs22\c&H00A8ACB0&\fsp5}MOUNTAIN RESCUE CHANNEL · CAIRNGORMS
+Dialogue: 0,0:00:02.40,0:01:59.29,T,,0,0,0,,{\an8\pos(540,78)\fad(450,0)\fnIBM Plex Mono SemiBold\fs30\c&H00E8EFF2&\fsp10\alpha&H30&}TRANSMISSION 01\N{\fnIBM Plex Mono Medium\fs22\c&H00A8ACB0&\fsp5}MOUNTAIN RESCUE CHANNEL · CAIRNGORMS

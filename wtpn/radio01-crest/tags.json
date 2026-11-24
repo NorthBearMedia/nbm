@@ -1,5 +1,13 @@
 {
- "l12": "[shouting]", "l13": "[shouting]", "l14": "[shaken]", "l16": "[shaken]", "l17": "[quietly]",
- "l19": "[frightened] [breathing hard]", "l20": "[laughing]", "l21": "[urgently]", "l22": "[laughs]",
- "l23": "[desperate]", "l25": "[calm]"
+ "l12": "[shouting]",
+ "l13": "[shouting]",
+ "l14": "[shaken]",
+ "l16": "[shaken]",
+ "l17": "[quietly]",
+ "l19": "[frightened] [breathing hard]",
+ "l20": "[relieved] [out of breath]",
+ "l21": "[urgently]",
+ "l22": "[laughs]",
+ "l23": "[desperate]",
+ "l25": "[calm]"
 }

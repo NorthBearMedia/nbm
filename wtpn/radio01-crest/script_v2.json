@@ -1,0 +1,239 @@
+{
+ "series": "TRANSMISSION",
+ "episode": "01 — CREST",
+ "setting": "Cairngorms, winter, last light. We are sitting at the team's base radio.",
+ "voices": {
+  "BASE": {
+   "name": "WTPN D-hector",
+   "id": "dgkKQcJqyy5AP0dqleUU",
+   "model": "eleven_multilingual_v2",
+   "note": "middle-aged Scottish male, base controller. Steadier model: v3 drifted his accent between lines"
+  },
+  "EWAN": {
+   "name": "Ally - Soft Scottish Glaswegian",
+   "id": "v2zbX16tJNtRIx8rSHDM",
+   "note": "late 20s Scottish male, ahead on the ridge",
+   "model": "eleven_v3"
+  },
+  "CAT": {
+   "name": "WTPN Isla - Scottish",
+   "id": "TVmbglAk3F1GkiCoOq47",
+   "note": "30s Scottish female, thirty metres behind him",
+   "model": "eleven_v3"
+  }
+ },
+ "dead_air": 5.5,
+ "lines": [
+  {
+   "id": "l01",
+   "at": 0.5,
+   "who": "EWAN",
+   "wind": true,
+   "clip": true,
+   "text": "—ver the crest now. Visibility's shocking, maybe ten metres. Keep off the edge on your left, it's a long way down.",
+   "say": "Over the crest now. Visibility's shocking, maybe ten metres. Keep off the edge on your left, it's a long way down.",
+   "trim_to": "v"
+  },
+  {
+   "id": "l02",
+   "at": 7.0,
+   "who": "CAT",
+   "wind": true,
+   "clip": true,
+   "text": "Aye, roger. I cannae see you at all."
+  },
+  {
+   "id": "l03",
+   "at": 9.8,
+   "who": "EWAN",
+   "wind": true,
+   "clip": true,
+   "text": "I'm thirty metres ahead of you. Just keep coming."
+  },
+  {
+   "id": "l04",
+   "at": 13.4,
+   "who": "BASE",
+   "wind": false,
+   "clip": false,
+   "text": "Base, roger. Ewan, give me your position when you can."
+  },
+  {
+   "id": "l05",
+   "at": 17.0,
+   "who": "EWAN",
+   "wind": true,
+   "clip": true,
+   "text": "Base, Ewan — nine seven five, oh three five. On the crest, heading east."
+  },
+  {
+   "id": "l06",
+   "at": 22.6,
+   "who": "EWAN",
+   "wind": true,
+   "clip": true,
+   "text": "Base — standby."
+  },
+  {
+   "id": "l07",
+   "at": 27.0,
+   "who": "EWAN",
+   "wind": true,
+   "clip": true,
+   "text": "Base, I've found someone. He's sat against a rock, out of the wind, ten metres off the path. No jacket."
+  },
+  {
+   "id": "l08",
+   "at": 34.2,
+   "who": "BASE",
+   "wind": false,
+   "clip": false,
+   "text": "Say again — no jacket?"
+  },
+  {
+   "id": "l09",
+   "at": 36.8,
+   "who": "EWAN",
+   "wind": true,
+   "clip": true,
+   "text": "No jacket, no bag, nothing. He's soaking wet."
+  },
+  {
+   "id": "l10",
+   "at": 41.2,
+   "who": "BASE",
+   "wind": false,
+   "clip": false,
+   "text": "Ewan, there's no one else up there tonight. Nobody's been reported missing."
+  },
+  {
+   "id": "l11",
+   "at": 46.4,
+   "who": "EWAN",
+   "wind": true,
+   "clip": true,
+   "text": "Well, he's here."
+  },
+  {
+   "id": "l12",
+   "at": 49.0,
+   "who": "EWAN",
+   "wind": true,
+   "clip": true,
+   "off_mic": true,
+   "text": "Hello? Mate? Can you hear me?"
+  },
+  {
+   "id": "l13",
+   "at": 53.0,
+   "who": "EWAN",
+   "wind": true,
+   "clip": true,
+   "off_mic": true,
+   "text": "Hello — can you hear my voice?"
+  },
+  {
+   "id": "l14",
+   "at": 56.6,
+   "who": "EWAN",
+   "wind": true,
+   "clip": true,
+   "text": "Base, he's not shivering."
+  },
+  {
+   "id": "l15",
+   "at": 60.2,
+   "who": "BASE",
+   "wind": false,
+   "clip": false,
+   "text": "Say again, Ewan."
+  },
+  {
+   "id": "l16",
+   "at": 62.6,
+   "who": "EWAN",
+   "wind": true,
+   "clip": true,
+   "text": "He's not shivering. He should be shivering."
+  },
+  {
+   "id": "l17",
+   "at": 67.0,
+   "who": "EWAN",
+   "wind": true,
+   "clip": true,
+   "text": "Base. He's wearing our kit."
+  },
+  {
+   "id": "l18",
+   "at": 70.0,
+   "who": "BASE",
+   "wind": false,
+   "clip": false,
+   "text": "Ewan—"
+  },
+  {
+   "id": "l19",
+   "at": 71.2,
+   "who": "EWAN",
+   "wind": true,
+   "clip": true,
+   "text": "He's wearing my jacket. Base, he's got my— he's got my face, he's got my fac—"
+  },
+  {
+   "id": "l20",
+   "at": 77.6,
+   "who": "CAT",
+   "wind": true,
+   "clip": true,
+   "text": "Ewan! Oh, there you are, you absolute clown, I've been shouting myself hoarse—"
+  },
+  {
+   "id": "l21",
+   "at": 82.2,
+   "who": "EWAN",
+   "wind": true,
+   "clip": true,
+   "text": "Cat. Cat, that's not me. That is not—"
+  },
+  {
+   "id": "l22",
+   "at": 85.8,
+   "who": "CAT",
+   "wind": true,
+   "clip": true,
+   "text": "What? You're stood right in front of—"
+  },
+  {
+   "id": "l23",
+   "at": 88.3,
+   "who": "EWAN",
+   "wind": true,
+   "clip": false,
+   "text": "Don't let it—"
+  },
+  {
+   "id": "l24",
+   "at": 95.8,
+   "who": "BASE",
+   "wind": false,
+   "clip": false,
+   "text": "Cat. Ewan. Radio check, over."
+  },
+  {
+   "id": "l25",
+   "at": 100.4,
+   "who": "EWAN",
+   "wind": false,
+   "clip": false,
+   "calm": true,
+   "text": "Base, this is Ewan. All fine. We're coming down."
+  }
+ ],
+ "notes": {
+  "payoff": "l25 is the only hill transmission with no wind behind it. That is the whole video.",
+  "ptt": "clip=true trims the first 90ms, so the opening syllable is lost to the push-to-talk delay.",
+  "off_mic": "l12/l13 are shouted at the figure, not into the mic: drier, more distant, more wind."
+ },
+ "generation": "one take per character, sliced by alignment, so the accent cannot wander between lines"
+}
