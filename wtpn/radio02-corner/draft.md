@@ -1,4 +1,6 @@
-# TRANSMISSION 02 — "CORNER"  (Part 2)  — DRAFT v5, 24 Nov
+# TRANSMISSION 02 — "CORNER"  (Part 2)  — DRAFT v6 (as recorded, audio draft 4), 24 Nov
+v6 (user, on audio draft 3): the fox is never stated as fact before 'It's not a fox'; Gerry opens on where he is;
+Jo says she's across the valley. Cast: Gerry = Dan (Cork, v2), May = Clare, Jo = Michelle.
 v5 (user): names are GERRY (farmer), MAY (wife), JO (neighbour, a woman). Not Nora / Bridie.
 v4 (user note): simple Irish names, and the neighbour is a woman farming across the valley.
   Farmer Conor -> GERRY (the name the user liked), wife Maeve -> NORA, neighbour -> BRIDIE.
@@ -16,9 +18,9 @@ red light) · JO (60s, farms on her own across the valley, also up lambing).
 No phone signal in the valley; both farms keep the handhelds on the same channel through lambing.
 
 0:00  Rain and wind. An open-sided hay shed: a ewe complaining close by. Squelch.
-GERRY: —ill in the hay shed with the lame one. Her foot's in a terrible state. I'll do the lambing shed after this.
-MAY: Grand. This one's taking the bottle now. Bit of fight in her.        (the lamb bleats, in the room)
-JO: That you two still up? I've had three since midnight, and all of them backwards.
+GERRY: May, I'm still up in the hay shed with the lame ewe. Her foot's in a terrible state. I'll do the lambing shed after this.
+MAY: Ah, grand. This one's taking the bottle now. Bit of fight in her.        (the lamb bleats, in the room)
+JO: That you two still up? I can see your lights from across the valley. I've had three since midnight, and all of them backwards.
 GERRY: Go to bed, Jo.
 JO: Go to bed yourself.
 
@@ -35,7 +37,7 @@ GERRY: May. They've gone quiet.
 MAY: Can you see it?
 GERRY: No. Sixty ewes and not a sound. They're all stood facing the back corner. Every one of them. Same corner.
 JO: Gerry. Come out of there.
-GERRY: It's a fox, Jo. I've got the torch.
+GERRY: It'll be a fox, Jo. I've got the torch.
 
 0:58  Straw underfoot. His breathing. He keeps the button down.
 GERRY: Right. I'm at the back pen. There's—
@@ -43,7 +45,7 @@ GERRY: Right. I'm at the back pen. There's—
 GERRY: It's not a fox.
        (he doesn't let go of the button: rain on the roof, nothing else, four seconds; then the transmission drops)
 MAY: Gerry? ... Gerry, what is it?
-JO: May. His shed lights have gone. I can see your place from here. The whole shed's gone dark.
+JO: May. His shed lights have gone. The whole shed's gone dark.
 MAY: Gerry, answer me.
 
 1:22  Squelch. Gerry. Rain on the tin roof behind him. Very calm.

@@ -33,10 +33,8 @@
    "id": "l01",
    "who": "GERRY",
    "bg": "hay",
-   "clip": true,
-   "trim_to": "i",
-   "text": "—ill in the hay shed with the lame one. Her foot's in a terrible state. I'll do the lambing shed after this.",
-   "say": "Still in the hay shed with the lame one. Her foot's in a terrible state. I'll do the lambing shed after this.",
+   "clip": false,
+   "text": "May, I'm still up in the hay shed with the lame ewe. Her foot's in a terrible state. I'll do the lambing shed after this.",
    "tag": "[tired]"
   },
   {
@@ -50,7 +48,7 @@
    "who": "JO",
    "bg": "fire",
    "clip": true,
-   "text": "That you two still up? I've had three since midnight, and all of them backwards.",
+   "text": "That you two still up? I can see your lights from across the valley. I've had three since midnight, and all of them backwards.",
    "tag": "[amused]"
   },
   {
@@ -149,7 +147,7 @@
    "who": "GERRY",
    "bg": "shed",
    "clip": true,
-   "text": "It's a fox, Jo. I've got the torch."
+   "text": "It'll be a fox, Jo. I've got the torch."
   },
   {
    "id": "l17",
@@ -182,7 +180,7 @@
    "who": "JO",
    "bg": "fire",
    "clip": false,
-   "text": "May. His shed lights have gone. I can see your place from here. The whole shed's gone dark.",
+   "text": "May. His shed lights have gone. The whole shed's gone dark.",
    "tag": "[urgent]"
   },
   {
@@ -235,6 +233,7 @@
  "notes": {
   "ending": "After l26 nothing on the radio; the lamb stops; three slow knocks on the back door, in the room; cut.",
   "calm": "l22 and l24 are the same calm 'May.' with the tin roof behind: he is still in the shed when the knocks come.",
-  "clip": "PTT clip only on lines whose first word can be lost; it turned 'May' into 'Hey' and 'Gerry' into 'Sherry'."
+  "clip": "PTT clip only on lines whose first word can be lost; it turned 'May' into 'Hey' and 'Gerry' into 'Sherry'.",
+  "v_draft4": "user: Gerry never states 'fox' as fact until 'It's not a fox'; open on where he is (no mid-word cut-in); Jo is across the valley at her own farm (said in her first line)."
  }
 }
