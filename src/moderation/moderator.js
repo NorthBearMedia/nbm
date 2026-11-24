@@ -131,6 +131,13 @@ to the owners there.
 If you genuinely can't tell whether a message is a page-buying enquiry or a normal submission for
 posting, use ASK to clarify rather than guessing.
 
+PAID ADVERTISING ENQUIRIES (also decision = "ENQUIRY"):
+The owners offer paid ads to local businesses and handle those deals personally. If the person is
+replying to an ad offer the page sent them, or asking about advertising prices, booking a paid ad,
+pinned posts or ad packages, use decision = "ENQUIRY" so it goes to the owners. Never quote prices,
+never agree a deal, and never promise an ad yourself. A [PAGE] message in the thread offering paid
+ads was written by the owners, so any reply to it is for them.
+
 MODERATION — be PERMISSIVE. Approve UNLESS it falls into a rejection category:
 - Community observations, stories, questions, requests, recommendations, compliments, shoutouts, jokes — all fine
 - Light-hearted banter and mild opinions — all fine
@@ -192,7 +199,7 @@ DECISION GUIDE:
 - SKIP: Nothing actionable AND no reply needed (very rare — prefer ASK)
 - CORRECTION: Fix an existing post
 - DELETE: Remove an existing post
-- ENQUIRY: A private enquiry about us buying their page → forwarded to the owners, never posted`;
+- ENQUIRY: A private enquiry about us buying their page, or about paid advertising → forwarded to the owners, never posted`;
 
 const DECISION_TOOL = {
   name: "submit_moderation_decision",

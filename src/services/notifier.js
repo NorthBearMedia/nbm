@@ -102,7 +102,7 @@ export async function sendEnquiryNotification(enquiry, moderation) {
   }
 
   const preview = (enquiry.latestText || "").substring(0, 60);
-  const subject = `💼 PAGE ENQUIRY: ${enquiry.senderName} — "${preview}..."`;
+  const subject = `💼 ENQUIRY: ${enquiry.senderName} — "${preview}..."`;
 
   // Include the whole conversation so far — context matters for a negotiation
   const transcript = (enquiry.thread || [])
@@ -117,8 +117,8 @@ export async function sendEnquiryNotification(enquiry, moderation) {
   await send(
     subject,
     `
-    <h2>💼 Someone wants to talk about their page</h2>
-    <p>This looks like a reply to the "we're interested in buying dormant Spotted pages" post.
+    <h2>💼 Business enquiry for you</h2>
+    <p>This looks like an enquiry about selling us a page or about paid advertising.
        <strong>It has NOT been posted publicly</strong>, and the bot has not replied, so you can
        message them yourself.</p>
     <hr>
