@@ -96,13 +96,25 @@ def place(kind, d, k):
     seed = int(k[1:]); parts = []                         # (wav, dB relative to the bed target)
     def L(name, off, rel, extra=""):
         p = ST / f"{k}_{name}.wav"; loop(FX / f"{name}.mp3", d, off, p, extra); parts.append((p, rel))
+    def flock(rel, extra):
+        """Sixty ewes in a panic (user: 'just sounds like sheep in a field'): three generated flocks layered,
+        then compressed so the screaming never lets up, gates and all."""
+        layers = []
+        for j, name in enumerate(["panic", "panic2", "panic3"]):
+            q = ST / f"{k}_fl{j}.wav"; loop(FX / f"{name}.mp3", d, (seed * 1.9 + j * 3.3) % 9, q, extra); layers.append(q)
+        q = ST / f"{k}_flock.wav"
+        run(["ffmpeg", "-y", "-v", "error"] + sum((["-i", str(x)] for x in layers), []) + ["-filter_complex",
+             "".join(f"[{j}:a]volume={-30 - lufs(x):.2f}dB[f{j}];" for j, x in enumerate(layers)) +
+             "[f0][f1][f2]amix=inputs=3:normalize=0,acompressor=threshold=-34dB:ratio=6:attack=4:release=90:makeup=6[o]",
+             "-map", "[o]", "-c:a", "pcm_s16le", str(q)])
+        parts.append((q, rel))
     if kind.startswith("hay"):
         L("hayshed", (seed * 3.7) % 14, 0)
-        L("ewe", (seed * 2.3) % 8, -3)
-        if kind == "hay_panic": L("panic", (seed * 1.9) % 9, +1, "lowpass=f=1300,aecho=0.8:0.6:90|160:0.35|0.2")
+        L("ewe", (seed * 2.3) % 8, -3 if kind == "hay" else -12)
+        if kind == "hay_panic": flock(+7, "lowpass=f=1900,aecho=0.8:0.55:80|150:0.3|0.18")
     elif kind == "yard":
-        L("yardwalk", (seed * 1.3) % 6, +1)
-        L("panic", (seed * 2.9) % 9, +2, "lowpass=f=1800,aecho=0.8:0.5:70:0.3")
+        L("yardwalk", (seed * 1.3) % 6, 0)
+        flock(+4, "lowpass=f=2600,aecho=0.8:0.5:60:0.25")
     elif kind.startswith("shed"):
         L("tinroof", (seed * 4.1) % 14, 0)
         if kind == "shed_straw": L("straw", 0.0, -2)
@@ -123,7 +135,7 @@ def place(kind, d, k):
         run(["ffmpeg", "-y", "-v", "error"] + ins + ["-filter_complex", fc, "-map", "[o]", "-c:a", "pcm_s16le", str(out)])
     return out
 
-BED_T = {"hay": -40.0, "hay_panic": -37.0, "yard": -37.0, "shed": -41.0, "shed_door": -38.0,
+BED_T = {"hay": -40.0, "hay_panic": -31.5, "yard": -32.5, "shed": -41.0, "shed_door": -38.0,
          "shed_straw": -40.0, "fire": -44.0}
 
 def station(ln, dry, cutoff, opening=True, closing=True):

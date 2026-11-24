@@ -72,7 +72,8 @@
    "bg": "hay_panic",
    "clip": true,
    "text": "Ah, for God's sake. Would you listen to them. Something's got in with the ewes.",
-   "tag": "[annoyed]"
+   "tag": "[annoyed]",
+   "pre": 1.0
   },
   {
    "id": "l07",
@@ -166,8 +167,9 @@
    "bg": "shed",
    "cont": true,
    "text": "It's not a fox.",
-   "tag": "[very quietly]",
-   "hold_after": 4.0
+   "tag": "[whispering]",
+   "hold_after": 4.0,
+   "note": "user's pick of four deliveries (24 Nov): whispered, so it can't hear him. Dan on eleven_v3 for this one line."
   },
   {
    "id": "l19",

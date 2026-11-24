@@ -1,0 +1,91 @@
+{
+ "clock": {
+  "c": [
+   235,
+   352
+  ],
+  "r": 84
+ },
+ "led": [
+  314,
+  1031
+ ],
+ "window": [
+  [
+   658,
+   262
+  ],
+  [
+   1000,
+   262
+  ],
+  [
+   1000,
+   835
+  ],
+  [
+   658,
+   835
+  ]
+ ],
+ "frames": [
+  {
+   "time": [
+    2,
+    57,
+    59
+   ],
+   "led": "rx",
+   "marker": true,
+   "hook": true,
+   "cap": [
+    "GERRY",
+    "[hay shed]",
+    "May, I'm still up in the hay shed"
+   ],
+   "note": "0:01  location marker + hook"
+  },
+  {
+   "time": [
+    2,
+    58,
+    44
+   ],
+   "led": "tx",
+   "cap": [
+    "MAY",
+    "",
+    "Is it a fox?"
+   ],
+   "note": "0:45  May keys her radio: red"
+  },
+  {
+   "time": [
+    2,
+    59,
+    50
+   ],
+   "led": "rx",
+   "shadow": 0.42,
+   "cap": [
+    "JO",
+    "[across the valley]",
+    "There's someone crossing your yard."
+   ],
+   "note": "1:51  the shadow passes the window"
+  },
+  {
+   "time": [
+    3,
+    0,
+    0
+   ],
+   "cap": [
+    "",
+    "",
+    "[ KNOCKING ]"
+   ],
+   "note": "2:00  3:00 a.m. on the first knock"
+  }
+ ]
+}
