@@ -1,4 +1,6 @@
-# TRANSMISSION 02 — "CORNER"  (Part 2)  — DRAFT v2, 24 Nov
+# TRANSMISSION 02 — "CORNER"  (Part 2)  — DRAFT v3, 24 Nov
+v3 (user note): open with Conor somewhere else (hay shed, lame ewe), so the audience knows where he
+is; the commotion starts down the yard and he charges over annoyed; arriving is when it turns.
 v2 (user notes): Wales -> Co. Mayo, Ireland (Welsh voices are scarce on ElevenLabs; Irish are well
 covered and Cillian is already proven); names Conor / Maeve / Gerry; Aga -> the range. "What do you
 mean, quiet?" cut as AI-speak -> "Can you see it?". Ending is just the knocks: no whisper, no voice at
@@ -10,22 +12,22 @@ farmhouse kitchen with a weak lamb by the range; OUR radio is hers, on the kitch
 red light) · GERRY (60s, neighbour across the valley, also up lambing).
 No phone signal in the valley; both farms keep the handhelds on the same channel through lambing.
 
-0:00  Rain on a tin roof. A shed full of sheep, the low constant noise of it. Squelch.
-CONOR: —uple more in the big pen, then that's me done. The one with the bad foot's had twins. Both up and feeding.
-MAEVE: Ah, good girl. This one's taking the bottle now. Bit of fight in her.        (the lamb bleats, in the room)
+0:00  Rain and wind. An open-sided hay shed: a ewe complaining close by. Squelch.
+CONOR: —ill in the hay shed with the lame one. Her foot's in a terrible state. I'll do the lambing shed after this.
+MAEVE: Grand. This one's taking the bottle now. Bit of fight in her.        (the lamb bleats, in the room)
 GERRY: That you two still up? I've had three since midnight, and all of them backwards.
 CONOR: Go to bed, Gerry.
 GERRY: Go to bed yourself.
 
-0:22  Gates rattle. The ewes scramble.
-CONOR: Hang on. Something's set them off. They're all piled up at the gate end.
-CONOR: Gerry, if that's your bloody dog again, I swear.
+0:20  Under Conor's next transmission, far off down the yard: the lambing shed. Gates crashing. Sixty ewes panicking.
+CONOR: Ah, for God's sake. Would you listen to them. Something's got in with the ewes.
+CONOR: Gerry, if that's your bloody dog again, I swear to God.
 GERRY: Both my dogs are in. They're lying here by the fire.
-CONOR: Well, something's in here with them.
+CONOR: (moving now: boots in mud, rain on his hood, breathing hard) Well, something's in there. I'm going down.
 MAEVE: Fox?
-CONOR: Probably. I'll have a look.
+CONOR: If it's a fox, it's a dead fox.
 
-0:40  The sheep stop. Not fade: stop. Rain on the tin roof, nothing else.
+0:38  A shed door dragged open. Rain on a tin roof. And no sheep. None.
 CONOR: Maeve. They've gone quiet.
 MAEVE: Can you see it?
 CONOR: No. Sixty ewes and not a sound. They're all stood facing the back corner. Every one of them. Same corner.
@@ -53,7 +55,8 @@ GERRY: Conor, is that you?
 Cut to black.
 
 ## Production notes
-- Sheep bed under every shed transmission; it stops dead at 0:40. The silence is the scare.
+- Three acoustic spaces for Conor: open hay shed (wind, one ewe), the yard (boots in mud, rain on
+  his hood, the distant panic), the lambing shed (tin roof, and silence). The silence is the scare.
 - Conor's two calm "Maeve."s carry the tin roof behind them: he is still in the shed, 300 m away,
   when the knocks come. The knocks are dry and close, in the room; the radio light is dark.
 - Kitchen: range hum, the lamb's soft bleats under Maeve; they stop before the knocks.
