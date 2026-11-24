@@ -1,0 +1,653 @@
+{
+ "r01_0": {
+  "acc": 1.0,
+  "heard": "Last one's in, Mick. Barrier's down",
+  "dur": 2.78,
+  "lm": 0.2537996172904968,
+  "rng": 3.33
+ },
+ "r01_1": {
+  "acc": 1.0,
+  "heard": "Last one's in, Mick. Barrier's down",
+  "dur": 2.86,
+  "lm": 0.09213778376579285,
+  "rng": 3.47
+ },
+ "r01_2": {
+  "acc": 1.0,
+  "heard": "Last one's in, Mick. Barrier's down",
+  "dur": 2.83,
+  "lm": -0.01805514097213745,
+  "rng": 3.54
+ },
+ "r02_0": {
+  "acc": 0.941,
+  "heard": "Champion. Right, Steve's handover. OEU has an AdBlue fault for a change. Wakefields move to half five",
+  "dur": 9.65,
+  "lm": 0.3398759067058563,
+  "rng": 6.96
+ },
+ "r02_1": {
+  "acc": 0.824,
+  "heard": "Champion. Right, Steve's handover. OEU hasn't had blue fault for a change. Wakefield's moved to half five",
+  "dur": 8.87,
+  "lm": 0.28328821063041687,
+  "rng": 5.47
+ },
+ "r02_2": {
+  "acc": 1.0,
+  "heard": "Champion. Right, Steve's handover. OEU has an AdBlue fault for a change. Wakefield's moved to half five",
+  "dur": 8.61,
+  "lm": 0.34304916858673096,
+  "rng": 8.69
+ },
+ "r03_0": {
+  "acc": 1.0,
+  "heard": "And don't let anyone in after three. Not even me. Underlined twice",
+  "dur": 9.15,
+  "lm": 0.1803644299507141,
+  "rng": 5.51
+ },
+ "r03_1": {
+  "acc": 1.0,
+  "heard": "And don't let anyone in after three, not even me, underlined twice",
+  "dur": 7.22,
+  "lm": 0.15928754210472107,
+  "rng": 4.91
+ },
+ "r03_2": {
+  "acc": 1.0,
+  "heard": "And don't let anyone in after three. Not even me. Underlined twice.",
+  "dur": 9.13,
+  "lm": 0.17425018548965454,
+  "rng": 7.1
+ },
+ "r04_0": {
+  "acc": 1.0,
+  "heard": "He's on a wind-up",
+  "dur": 1.92,
+  "lm": 0.3215447962284088,
+  "rng": 4.98
+ },
+ "r04_1": {
+  "acc": 1.0,
+  "heard": "He's on a wind-up",
+  "dur": 2.08,
+  "lm": 0.08641350269317627,
+  "rng": 18.12
+ },
+ "r04_2": {
+  "acc": 1.0,
+  "heard": "He's on a wind-up",
+  "dur": 1.97,
+  "lm": 0.20650902390480042,
+  "rng": 18.73
+ },
+ "r05_0": {
+  "acc": 0.714,
+  "heard": "Tough sod's left his phone and all",
+  "dur": 2.96,
+  "lm": 0.16627949476242065,
+  "rng": 3.02
+ },
+ "r05_1": {
+  "acc": 0.857,
+  "heard": "Daft sod's left his phone and all",
+  "dur": 2.36,
+  "lm": 0.17764312028884888,
+  "rng": 3.74
+ },
+ "r05_2": {
+  "acc": 0.857,
+  "heard": "Daft sod's left his phone and all",
+  "dur": 2.47,
+  "lm": 0.28181858360767365,
+  "rng": 8.96
+ },
+ "r06_0": {
+  "acc": 1.0,
+  "heard": "Three o'clock, gates locked, all quiet",
+  "dur": 3.54,
+  "lm": 0.11846652626991272,
+  "rng": 6.19
+ },
+ "r06_1": {
+  "acc": 1.0,
+  "heard": "Three o'clock, gates locked, all quiet.",
+  "dur": 3.54,
+  "lm": -0.09972932934761047,
+  "rng": 7.89
+ },
+ "r06_2": {
+  "acc": 1.0,
+  "heard": "Three o'clock, gates locked, all quiet",
+  "dur": 3.83,
+  "lm": -0.172740176320076,
+  "rng": 5.1
+ },
+ "r07_0": {
+  "acc": 1.0,
+  "heard": "Nobody in after three, Ash",
+  "dur": 2.15,
+  "lm": 0.22259515523910522,
+  "rng": 5.9
+ },
+ "r07_1": {
+  "acc": 1.0,
+  "heard": "Nobody in after three, Ash",
+  "dur": 2.21,
+  "lm": 0.13828063011169434,
+  "rng": 4.72
+ },
+ "r07_2": {
+  "acc": 1.0,
+  "heard": "Nobody in after three, Ash?",
+  "dur": 2.26,
+  "lm": 0.4095425307750702,
+  "rng": 6.24
+ },
+ "r08_0": {
+  "acc": 1.0,
+  "heard": "Not even Steve",
+  "dur": 2.13,
+  "lm": 0.20304802060127258,
+  "rng": 4.98
+ },
+ "r08_1": {
+  "acc": 1.0,
+  "heard": "Not even Steve",
+  "dur": 1.89,
+  "lm": -0.12370863556861877,
+  "rng": 4.85
+ },
+ "r08_2": {
+  "acc": 1.0,
+  "heard": "Not even Steve?",
+  "dur": 1.89,
+  "lm": -0.15853597223758698,
+  "rng": 5.35
+ },
+ "r09_0": {
+  "acc": 1.0,
+  "heard": "Mick, Steve's at the gate",
+  "dur": 2.34,
+  "lm": 0.2202816903591156,
+  "rng": 12.91
+ },
+ "r09_1": {
+  "acc": 0.8,
+  "heard": "Mac, Steve's at the gate",
+  "dur": 2.28,
+  "lm": 0.14849627017974854,
+  "rng": 18.91
+ },
+ "r09_2": {
+  "acc": 1.0,
+  "heard": "Mick, Steve's at the gate",
+  "dur": 2.34,
+  "lm": 0.204975426197052,
+  "rng": 16.49
+ },
+ "r10_0": {
+  "acc": 1.0,
+  "heard": "You what?",
+  "dur": 1.29,
+  "lm": null,
+  "rng": 17.2
+ },
+ "r10_1": {
+  "acc": 1.0,
+  "heard": "You what?",
+  "dur": 1.27,
+  "lm": null,
+  "rng": 24.52
+ },
+ "r10_2": {
+  "acc": 1.0,
+  "heard": "You what?",
+  "dur": 1.29,
+  "lm": null,
+  "rng": 19.62
+ },
+ "r11_0": {
+  "acc": 1.0,
+  "heard": "He's on foot, says he's left his phone",
+  "dur": 3.12,
+  "lm": 0.23207861185073853,
+  "rng": 6.16
+ },
+ "r11_1": {
+  "acc": 1.0,
+  "heard": "He's on foot, says he's left his phone",
+  "dur": 3.12,
+  "lm": -0.6077463440597057,
+  "rng": 6.62
+ },
+ "r11_2": {
+  "acc": 1.0,
+  "heard": "He's on foot. Says he's left his phone",
+  "dur": 3.2,
+  "lm": -0.707072302699089,
+  "rng": 6.36
+ },
+ "r12_0": {
+  "acc": 1.0,
+  "heard": "He has. It's here on my desk",
+  "dur": 3.36,
+  "lm": -0.0015964210033416748,
+  "rng": 5.45
+ },
+ "r12_1": {
+  "acc": 1.0,
+  "heard": "He has. It's here on my desk",
+  "dur": 2.81,
+  "lm": 0.28239789605140686,
+  "rng": 4.59
+ },
+ "r12_2": {
+  "acc": 1.0,
+  "heard": "He has. It's here on my desk",
+  "dur": 2.81,
+  "lm": 0.2601083219051361,
+  "rng": 5.62
+ },
+ "r13_0": {
+  "acc": 1.0,
+  "heard": "So I'll let him in then",
+  "dur": 1.84,
+  "lm": -0.13147225975990295,
+  "rng": 17.72
+ },
+ "r13_1": {
+  "acc": 0.833,
+  "heard": "So I let him in then",
+  "dur": 1.61,
+  "lm": 0.12726598978042603,
+  "rng": 17.71
+ },
+ "r13_2": {
+  "acc": 0.833,
+  "heard": "So I let him in then",
+  "dur": 1.84,
+  "lm": 0.09674984216690063,
+  "rng": 5.34
+ },
+ "r14_0": {
+  "acc": 1.0,
+  "heard": "Read the note, Ash",
+  "dur": 2.1,
+  "lm": 0.35063594579696655,
+  "rng": 7.37
+ },
+ "r14_1": {
+  "acc": 1.0,
+  "heard": "Read the note, Ash",
+  "dur": 2.0,
+  "lm": 0.22442984580993652,
+  "rng": 5.03
+ },
+ "r14_2": {
+  "acc": 1.0,
+  "heard": "Read the note, Ash",
+  "dur": 1.95,
+  "lm": 0.3154674172401428,
+  "rng": 3.63
+ },
+ "r15_0": {
+  "acc": 1.0,
+  "heard": "Oh, give over. He's wet through",
+  "dur": 2.96,
+  "lm": 0.21801906824111938,
+  "rng": 8.39
+ },
+ "r15_1": {
+  "acc": 1.0,
+  "heard": "Oh, give over. He's wet through",
+  "dur": 2.75,
+  "lm": -0.20292875170707703,
+  "rng": 5.45
+ },
+ "r15_2": {
+  "acc": 1.0,
+  "heard": "Oh, give over. He's wet through",
+  "dur": 2.94,
+  "lm": -0.3287425935268402,
+  "rng": 6.47
+ },
+ "r16_0": {
+  "acc": 1.0,
+  "heard": "Where's his car?",
+  "dur": 1.61,
+  "lm": 0.3133150339126587,
+  "rng": 16.18
+ },
+ "r16_1": {
+  "acc": 1.0,
+  "heard": "Where's his car?",
+  "dur": 1.55,
+  "lm": 0.13556554913520813,
+  "rng": 16.74
+ },
+ "r16_2": {
+  "acc": 1.0,
+  "heard": "Where's his car?",
+  "dur": 1.63,
+  "lm": 0.15232697129249573,
+  "rng": 12.95
+ },
+ "r17_0": {
+  "acc": 1.0,
+  "heard": "He's walked",
+  "dur": 1.66,
+  "lm": -0.03843492269515991,
+  "rng": 4.32
+ },
+ "r17_1": {
+  "acc": 1.0,
+  "heard": "He's walked",
+  "dur": 1.58,
+  "lm": 0.19647115468978882,
+  "rng": 9.35
+ },
+ "r17_2": {
+  "acc": 1.0,
+  "heard": "He's walked",
+  "dur": 1.66,
+  "lm": -0.09470522403717041,
+  "rng": 4.49
+ },
+ "r18_0": {
+  "acc": 0.6,
+  "heard": "From Humferth as twenty mile",
+  "dur": 3.17,
+  "lm": 0.2943582534790039,
+  "rng": 18.91
+ },
+ "r18_1": {
+  "acc": 0.8,
+  "heard": "From Holmfirth? That's twenty mile",
+  "dur": 3.04,
+  "lm": 0.216697096824646,
+  "rng": 20.39
+ },
+ "r18_2": {
+  "acc": 0.6,
+  "heard": "From Holmfirth? That's 20 mile",
+  "dur": 3.28,
+  "lm": 0.35590970516204834,
+  "rng": 20.58
+ },
+ "r19_0": {
+  "acc": 1.0,
+  "heard": "He'll not look up at the camera. He just keeps asking for you",
+  "dur": 3.75,
+  "lm": 0.24566978216171265,
+  "rng": 7.72
+ },
+ "r19_1": {
+  "acc": 1.0,
+  "heard": "He'll not look up at the camera. He just keeps asking for you",
+  "dur": 4.06,
+  "lm": 0.2751244604587555,
+  "rng": 5.86
+ },
+ "r19_2": {
+  "acc": 1.0,
+  "heard": "He'll not look up at the camera. He just keeps asking for you",
+  "dur": 4.32,
+  "lm": 0.13774695992469788,
+  "rng": 7.9
+ },
+ "r20_0": {
+  "acc": 1.0,
+  "heard": "Is he coming down? Please",
+  "dur": 2.89,
+  "lm": 0.2565692961215973,
+  "rng": 12.61
+ },
+ "r20_1": {
+  "acc": 1.0,
+  "heard": "Is he coming down? Please",
+  "dur": 2.57,
+  "lm": 0.31384944915771484,
+  "rng": 11.39
+ },
+ "r20_2": {
+  "acc": 1.0,
+  "heard": "Is he coming down, please?",
+  "dur": 2.52,
+  "lm": 0.22770598530769348,
+  "rng": 10.02
+ },
+ "r20_3": {
+  "acc": 1.0,
+  "heard": "Is he coming down? Please",
+  "dur": 2.73,
+  "lm": 0.14025622606277466,
+  "rng": 6.34
+ },
+ "r21_0": {
+  "acc": 1.0,
+  "heard": "Steves never said please in his life",
+  "dur": 2.81,
+  "lm": 0.21725016832351685,
+  "rng": 5.62
+ },
+ "r21_1": {
+  "acc": 0.857,
+  "heard": "Stu's never said please in his life",
+  "dur": 2.55,
+  "lm": 0.32931190729141235,
+  "rng": 4.6
+ },
+ "r21_2": {
+  "acc": 1.0,
+  "heard": "Steve's never said please in his life",
+  "dur": 2.91,
+  "lm": 0.3543003499507904,
+  "rng": 3.71
+ },
+ "r22_0": {
+  "acc": 1.0,
+  "heard": "Mick, I'm not leaving him out there",
+  "dur": 2.44,
+  "lm": 0.3107347786426544,
+  "rng": 7.25
+ },
+ "r22_1": {
+  "acc": 1.0,
+  "heard": "Mick, I'm not leaving him out there",
+  "dur": 2.34,
+  "lm": -0.1465238630771637,
+  "rng": 6.19
+ },
+ "r22_2": {
+  "acc": 1.0,
+  "heard": "Mick, I'm not leaving him out there",
+  "dur": 2.42,
+  "lm": -0.30764439702033997,
+  "rng": 7.81
+ },
+ "r23_0": {
+  "acc": 1.0,
+  "heard": "Don't you open that gate. I'm coming down",
+  "dur": 3.38,
+  "lm": -0.24902798235416412,
+  "rng": 8.81
+ },
+ "r23_1": {
+  "acc": 1.0,
+  "heard": "Don't you open that gate. I'm coming down",
+  "dur": 2.89,
+  "lm": -0.014259874820709229,
+  "rng": 10.3
+ },
+ "r23_2": {
+  "acc": 1.0,
+  "heard": "Don't you open that gate. I'm coming down",
+  "dur": 3.46,
+  "lm": 0.1672702133655548,
+  "rng": 9.35
+ },
+ "r24_0": {
+  "acc": 1.0,
+  "heard": "Ash, keep him talking",
+  "dur": 2.13,
+  "lm": 0.28656864166259766,
+  "rng": 6.59
+ },
+ "r24_1": {
+  "acc": 1.0,
+  "heard": "Ash, keep him talking",
+  "dur": 1.97,
+  "lm": 0.20492282509803772,
+  "rng": 9.63
+ },
+ "r24_2": {
+  "acc": 1.0,
+  "heard": "Ash, keep him talking.",
+  "dur": 2.08,
+  "lm": -0.019279032945632935,
+  "rng": 23.28
+ },
+ "r25_0": {
+  "acc": 1.0,
+  "heard": "Mick, he's gone. Soon as you came out, he walked off along the fence",
+  "dur": 5.11,
+  "lm": 0.39088958501815796,
+  "rng": 6.6
+ },
+ "r25_1": {
+  "acc": 0.929,
+  "heard": "\"Mac, he's gone. Soon as you came out, he walked off along the fence.\"",
+  "dur": 5.11,
+  "lm": 0.022161155939102173,
+  "rng": 5.21
+ },
+ "r25_2": {
+  "acc": 1.0,
+  "heard": "\"Mick, he's gone. Soon as you came out, he walked off along the fence.\"",
+  "dur": 5.65,
+  "lm": 0.12938952445983887,
+  "rng": 8.14
+ },
+ "r26_0": {
+  "acc": 1.0,
+  "heard": "Which way?",
+  "dur": 1.27,
+  "lm": null,
+  "rng": 7.59
+ },
+ "r26_1": {
+  "acc": 1.0,
+  "heard": "Which way?",
+  "dur": 1.14,
+  "lm": null,
+  "rng": 9.35
+ },
+ "r26_2": {
+  "acc": 1.0,
+  "heard": "Which way?",
+  "dur": 1.21,
+  "lm": null,
+  "rng": 7.54
+ },
+ "r27_0": {
+  "acc": 1.0,
+  "heard": "Yours",
+  "dur": 1.45,
+  "lm": -0.23387309908866882,
+  "rng": 1.59
+ },
+ "r27_1": {
+  "acc": 1.0,
+  "heard": "Yours",
+  "dur": 1.4,
+  "lm": -0.14922785758972168,
+  "rng": 1.17
+ },
+ "r27_2": {
+  "acc": 1.0,
+  "heard": "Yours",
+  "dur": 1.27,
+  "lm": null,
+  "rng": 3.07
+ },
+ "r28_0": {
+  "acc": 0.8,
+  "heard": "Mick, I found my phone",
+  "dur": 2.39,
+  "lm": -0.0006358027458190918,
+  "rng": 6.46
+ },
+ "r28_1": {
+  "acc": 0.0,
+  "heard": "Make a famaphone",
+  "dur": 2.31,
+  "lm": -0.15814995765686035,
+  "rng": 12.99
+ },
+ "r28_2": {
+  "acc": 0.8,
+  "heard": "Mick, I found my phone",
+  "dur": 2.31,
+  "lm": -0.14159360527992249,
+  "rng": 11.96
+ },
+ "r28_3": {
+  "acc": 0.222,
+  "heard": "Make a phone call",
+  "dur": 2.42,
+  "lm": -0.07778039574623108,
+  "rng": 6.04
+ },
+ "r28_10": {
+  "acc": 0.8,
+  "heard": "Mick, I found my phone",
+  "dur": 2.34,
+  "lm": -0.0973019003868103,
+  "rng": 5.29
+ },
+ "r28_11": {
+  "acc": 0.8,
+  "heard": "Mick, I found my phone",
+  "dur": 2.31,
+  "lm": -0.049354344606399536,
+  "rng": 16.72
+ },
+ "r28_12": {
+  "acc": 0.0,
+  "heard": "Make a famophone",
+  "dur": 2.31,
+  "lm": 0.10780605673789978,
+  "rng": 5.21
+ },
+ "r28_13": {
+  "acc": 0.8,
+  "heard": "Mick, I found my phone",
+  "dur": 2.47,
+  "lm": -0.11614009737968445,
+  "rng": 10.44
+ },
+ "r28_20": {
+  "acc": 0.727,
+  "heard": "Mick, I found my phone. Right",
+  "dur": 2.05,
+  "lm": 0.18161511421203613,
+  "rng": 5.06
+ },
+ "r28_21": {
+  "acc": 0.8,
+  "heard": "Mick, I found my phone",
+  "dur": 2.39,
+  "lm": 0.1136046051979065,
+  "rng": 3.94
+ },
+ "r28_22": {
+  "acc": 0.8,
+  "heard": "Mick, I found my phone.",
+  "dur": 2.15,
+  "lm": 0.021981120109558105,
+  "rng": 6.46
+ }
+}

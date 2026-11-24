@@ -5,7 +5,8 @@ voice; PTT clicks when he talks to Ash; no clicks for asides or the phone) until
 and leaves at h42; after that he comes back through the radio, from the gate. Ash is always on the
 radio from the gatehouse; Steve is only ever faint, behind the gatehouse glass, under Ash's open
 channel. Karen is on Mick's mobile, on speaker on the desk.
-Plants: the barrier (h01 full; buried under h13 at 3:20) and the keys (hung before h02; lifted at the end).
+v4 (rethink): one thread. Steve is faint behind the gatehouse glass until the last line, when he is in the
+office with us (room_close), keying Mick's base radio. The barrier comes down under r01 and is buried under r09.
 Writes stations/*.wav, mix.wav, master.wav (-15 LUFS mono), master_social.wav (-14 LUFS stereo),
 timeline.json."""
 import json, pathlib, subprocess, re, sys
@@ -56,7 +57,8 @@ OFFMIC = "highpass=f=150,lowpass=f=3200,aecho=0.75:0.45:16|31:0.28|0.16"        
 PHONE = ("highpass=f=320,lowpass=f=3300,acompressor=threshold=-22dB:ratio=3:attack=5:release=150:makeup=2,"
          "aresample=8000,aresample=48000,equalizer=f=1500:t=q:w=1.0:g=4,highpass=f=380,lowpass=f=3600")
 VOICE_T = {"ASH": -17.5, "MICK": -17.0, "STEVE": -28.0, "ASH_OFF": -24.0}
-ROOM_T, ASIDE_T, PHONE_T = -17.5, -21.5, -20.5
+ROOM_T, ASIDE_T, PHONE_T, CLOSE_T = -17.5, -21.5, -20.5, -18.5
+ROOM_CLOSE = "highpass=f=80,lowpass=f=9000,aecho=0.8:0.4:19|37:0.08|0.04,acompressor=threshold=-24dB:ratio=2.5:attack=10:release=150"
 
 def prep(ln):
     """Trim, tighten long pauses, normalise. -> wav, words, remap"""
@@ -123,7 +125,7 @@ def place(kind, d, k):
 BED_T = {"gatehouse": -40.0, "gatehouse_barrier": -32.0, "gate": -37.0, "gate_barrier": -37.0, "gate_engine": -35.5,
          "outside_run": -31.0, "outside": -36.0}
 
-def is_radio(ln): return ln["who"] in ("ASH", "STEVE") or ln.get("radio")
+def is_radio(ln): return (ln["who"] in ("ASH", "STEVE") and not ln.get("room_close")) or bool(ln.get("radio"))
 
 def station(ln, dry, opening=True, closing=True):
     """-> (wav, voice_offset, keyed_dur, kind)"""
@@ -135,10 +137,11 @@ def station(ln, dry, opening=True, closing=True):
              "-c:a", "pcm_s16le", str(out)])
         return out, 0.0, dur(out), "phone"
     if not is_radio(ln):                                 # Mick, in the room with us
-        run(["ffmpeg", "-y", "-v", "error", "-i", str(dry), "-af", ROOM, "-c:a", "pcm_s16le", str(ST / f"{k}_room.wav")])
-        gm = (ASIDE_T if ln.get("aside") else ROOM_T) - lufs(ST / f"{k}_room.wav")
+        close = ln.get("room_close")
+        run(["ffmpeg", "-y", "-v", "error", "-i", str(dry), "-af", ROOM_CLOSE if close else ROOM, "-c:a", "pcm_s16le", str(ST / f"{k}_room.wav")])
+        gm = (CLOSE_T if close else ASIDE_T if ln.get("aside") else ROOM_T) - lufs(ST / f"{k}_room.wav")
         po = ln.get("ptt_open", True) and not ln.get("aside")
-        pc = ln.get("ptt_close", True) and not ln.get("aside")
+        pc = ln.get("ptt_close", True) and not ln.get("aside") and not ln.get("room_close")   # the last line: cut, no release
         ins = (["-i", str(ST / "ptt.wav")] if po else []) + ["-i", str(ST / f"{k}_room.wav")] + (["-i", str(ST / "ptt.wav")] if pc else [])
         vi = 1 if po else 0
         fc = f"[{vi}:a]volume={gm:.2f}dB,alimiter=level=0:limit=0.9" + (",apad=pad_dur=0.12" if pc else "") + "[v];"
@@ -211,8 +214,7 @@ def room_fx(name, target):
          "-c:a", "pcm_s16le", str(out)])
     return out
 
-GAP = {"h02": 0.2, "h04": 0.15, "h08": 0.3, "h10": 2.6, "h13": 3.6, "h27": 0.8, "h28": 0.1, "h29": 0.25,
-       "h32": 0.9, "h33": 0.7, "h35": 1.0, "h43": 0.0}
+GAP = {"r02": 0.25, "r03": 0.5, "r06": 2.4, "r09": 3.2, "r21": 0.7, "r24": 0.0, "r28": 2.6}
 def gap_before(prev, ln):
     if prev is None: return 1.0                         # the air brakes, far off, first
     if ln.get("cont"): return 0.0
@@ -242,9 +244,7 @@ def main():
                 ev.append({"name": "empty", "at": round(t, 3), "dur": g}); t += g; continue
             w = room_fx(name, target); ev.append({"name": name, "at": round(t, 3), "wav": w.name}); t += dur(w) + g
     # the ending: the transmission has dropped; the office; then, close, keys lifted off the board; cut
-    t_keys = t + 2.2
-    wk = room_fx("keys_end", -27.0); ev.append({"name": "keys_end", "at": round(t_keys, 3), "wav": wk.name})
-    total = t_keys + dur(wk) + 0.9
+    total = t + 0.35                                    # cut on Steve's last word
     # ---- the office bed: rain on the cabin, the PC fan and tube, reefers droning across the yard, radio hiss ----
     loop(FX / "office.mp3", total, 0.0, ST / "office.wav")
     loop(FX / "reefers.mp3", total, 0.0, ST / "reefers.wav", "lowpass=f=700")
@@ -276,8 +276,8 @@ def main():
             err = target - master(g, out, ch)
             if abs(err) < 0.15: break
             g += err
-    h13 = next(e for e in tl if e["id"] == "h13")
-    json.dump({"total": round(total, 3), "events": ev, "barrier_open": round(h13["remap"]["off"] - L["h13"].get("pre", 0.0) + 0.5, 3),
+    r09 = next(e for e in tl if e["id"] == "r09")
+    json.dump({"total": round(total, 3), "events": ev, "barrier_open": round(r09["remap"]["off"] - L["r09"].get("pre", 0.0) + 0.5, 3),
                "lines": tl}, open(D / "timeline.json", "w"), indent=1)
     print(f"master.wav {total:.1f}s  {lufs(D / 'master.wav'):.1f} LUFS | social {lufs(D / 'master_social.wav'):.1f} LUFS")
     for e in tl:
