@@ -7,7 +7,7 @@ mean, quiet?" cut as AI-speak -> "Can you see it?". Ending is just the knocks: n
 the door; his name-twice beat moves onto the radio. Repeated "every one of them" removed.
 Runtime ~1:45. Three voices. Hill farm, Co. Mayo, lambing, 2 a.m., rain.
 
-Voices: CONOR (40s, farmer, in the lambing shed 300 m down the track) · MAEVE (his wife, in the
+Voices: CONOR (40s, farmer; starts in the hay shed by the house, the lambing shed is 300 m down the track) · MAEVE (his wife, in the
 farmhouse kitchen with a weak lamb by the range; OUR radio is hers, on the kitchen table: room voice,
 red light) · GERRY (60s, neighbour across the valley, also up lambing).
 No phone signal in the valley; both farms keep the handhelds on the same channel through lambing.
@@ -19,7 +19,7 @@ GERRY: That you two still up? I've had three since midnight, and all of them bac
 CONOR: Go to bed, Gerry.
 GERRY: Go to bed yourself.
 
-0:20  Under Conor's next transmission, far off down the yard: the lambing shed. Gates crashing. Sixty ewes panicking.
+0:20  Under Conor's next transmission, far off down the track: the lambing shed. Gates crashing. Sixty ewes panicking.
 CONOR: Ah, for God's sake. Would you listen to them. Something's got in with the ewes.
 CONOR: Gerry, if that's your bloody dog again, I swear to God.
 GERRY: Both my dogs are in. They're lying here by the fire.
