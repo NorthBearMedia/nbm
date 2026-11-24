@@ -67,7 +67,7 @@ Cut to black.
   lamb); Jo can see the farm (shed lights, yard light); no jargon; no contradictions; "It's not a
   fox" is a stop, not a cut; one take per character with a long lead-in; accent-gated (CommonAccent
   'ireland').
-- Voices: Irish x3 (Cillian B5jEZPqk2OJ2vkPw3wBM is proven Ire/NI; candidate for Gerry or Jo).
+- Voices: Irish x3 (Cillian B5jEZPqk2OJ2vkPw3wBM is proven Ire/NI; candidate for Gerry. May and Jo need two Irish women, clearly different ages).
 - On-screen label: TRANSMISSION 02 · PART 2 / FARM CHANNEL · CO. MAYO.
 - Visual: farmhouse kitchen table at night, radio, range glow, lamb in a box under a towel, back door
   with a rain-streaked window; reuse rain and light compositing from Crest.
