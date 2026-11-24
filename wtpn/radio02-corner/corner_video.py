@@ -16,20 +16,27 @@ W, H, FPS = 1080, 1920, 30
 AUDIO = D / "master_social.wav"
 
 # ---------- the plate ------------------------------------------------------------------------------
-# source is ChatGPT's 2:3 still; crop to 9:16 at x0, upscale x3.75 to a 2160x3840 plate (2x the frame)
-SRC = next(p for p in [D / "plates" / "kitchen_green.png", D / "plates" / "kitchen_gpt.png"] if p.exists())
-X0, K = 40, 3.75
+# source is ChatGPT's 2:3 still; crop to 9:16 at x0 and scale to a 2160x3840 plate (2x the frame).
+# Positions are measured on each source image (source pixels).
+PLATES = {
+ "kitchen_green.png": {"x0": 90, "clock": (886.5, 465), "clock_r": 65, "led": (213, 1386),
+                       "window": ((322, 505), (628, 930)), "candle": (775, 945)},     # user's final (green range), 1342x2000
+ "kitchen_gpt.png":   {"x0": 40, "clock": (457.5, 235), "clock_r": 31, "led": (111, 709),
+                       "window": ((169, 262), (317, 468)), "candle": (397, 482)},     # cream-range stand-in, 687x1024
+}
+SRC = next(D / "plates" / n for n in PLATES if (D / "plates" / n).exists()); PC = PLATES[SRC.name]
+_sw, _sh = Image.open(SRC).size; X0, K, CROP_W = PC["x0"], 3840 / _sh, round(_sh * 9 / 16)
 def P(sx, sy): return ((sx - X0) * K, sy * K)                  # source pixel -> plate pixel
-CLOCK_C, CLOCK_R = P(457.5, 235), 31 * K                       # centre, numeral radius
-LED = P(111, 709)                                              # top face of the radio, beside the antenna
-WINDOW = (P(169, 262), P(317, 468))                            # glass and bars, top-left / bottom-right
-CANDLE = P(397, 482)
+CLOCK_C, CLOCK_R = P(*PC["clock"]), PC["clock_r"] * K          # centre, numeral radius
+LED = P(*PC["led"])                                            # top face of the radio, beside the antenna
+WINDOW = (P(*PC["window"][0]), P(*PC["window"][1]))            # glass and bars, top-left / bottom-right
+CANDLE = P(*PC["candle"])
 def run(c): subprocess.run(c, check=True, capture_output=True)
 
 def build_plate():
     src = Image.open(SRC).convert("RGB")
-    big = src.crop((X0, 0, X0 + 576, 1024)).resize((2160, 3840), Image.LANCZOS)
-    big = big.filter(ImageFilter.UnsharpMask(radius=2.2, percent=45, threshold=2))
+    big = src.crop((X0, 0, X0 + CROP_W, _sh)).resize((2160, 3840), Image.LANCZOS)
+    big = big.filter(ImageFilter.UnsharpMask(radius=1.6, percent=30 if K < 2.5 else 45, threshold=2))
     # paint out the plate's own clock hands (we draw ours)
     from scipy.ndimage import gaussian_filter, binary_dilation
     a = np.asarray(big).astype(np.float32); cx, cy = CLOCK_C; R = int(CLOCK_R * 0.9)
@@ -45,14 +52,14 @@ def build_plate():
     return Image.fromarray(a.clip(0, 255).astype(np.uint8))
 
 base = build_plate()
-def lit(glow, core):
+def lit(glow, core, gain=1.0):
     im = base.convert("RGBA"); lay = Image.new("RGBA", im.size, (0, 0, 0, 0)); d = ImageDraw.Draw(lay)
     x, y = LED
-    for r, a in ((96, 20), (58, 38), (30, 80), (14, 170)): d.ellipse([x - r, y - r * 0.75, x + r, y + r * 0.75], fill=glow + (a,))
+    for r, a in ((96, 20), (58, 38), (30, 80), (14, 170)): d.ellipse([x - r, y - r * 0.75, x + r, y + r * 0.75], fill=glow + (min(255, int(a * gain)),))
     lay = lay.filter(ImageFilter.GaussianBlur(11))
-    ImageDraw.Draw(lay).ellipse([x - 7, y - 5, x + 7, y + 5], fill=core + (255,))
+    ImageDraw.Draw(lay).ellipse([x - 9, y - 6, x + 9, y + 6], fill=core + (255,))
     return Image.alpha_composite(im, lay).convert("RGB")
-PL = {"off": base, "rx": lit((70, 240, 120), (205, 255, 215)), "tx": lit((255, 70, 45), (255, 190, 165))}
+PL = {"off": base, "rx": lit((70, 240, 120), (205, 255, 215)), "tx": lit((255, 70, 45), (255, 190, 165), gain=1.7)}   # red reads weaker than green on a black radio
 IV = [(e["led_on"], e["led_off"], e["kind"]) for e in TL["lines"]]
 def state(t):
     for a, b, k in IV:
@@ -152,7 +159,7 @@ ev.append((4.2, T_CUT, f"{{\\an8\\pos(540,250)\\fad(800,0)\\fn{FS}\\fs26\\c{TEXT
     "Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, "
     "MarginR, MarginV, Encoding\n"
     # top-left block under the label: plain wall, clear of the clock (right) and the radio (bottom left)
-    f"Style: T,{FM},44,{TEXT.rstrip('&')},&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,2,1,8,90,390,318,1\n\n"
+    f"Style: T,{FM},44,{TEXT.rstrip('&')},&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,2,1,8,90,410,318,1\n\n"
     "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n" +
     "\n".join(f"Dialogue: 0,{ts(a)},{ts(b)},T,,0,0,0,,{t}" for a, b, t in ev if b > a) + "\n")
 
