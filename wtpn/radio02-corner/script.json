@@ -4,10 +4,10 @@
  "setting": "Hill farm, Co. Mayo, lambing, 2 a.m., rain. We are in the farmhouse kitchen: May's handheld is on the table.",
  "voices": {
   "GERRY": {
-   "name": "Cillian",
-   "id": "B5jEZPqk2OJ2vkPw3wBM",
-   "model": "eleven_v3",
-   "note": "farmer, 40s; hay shed, then yard, then the lambing shed"
+   "name": "Ted - Deep and Calm (Galway)",
+   "id": "4AgX6Piqqh5KT4pSisZQ",
+   "model": "eleven_multilingual_v2",
+   "note": "farmer, 40s. Ted (Galway) on eleven_multilingual_v2: Cillian went American on v3 (user); Ted on v3 said 'May' as 'Me' (8/8 takes); on v2 he holds the accent and says May/Jo cleanly. v2 speaks [tags], so Gerry gets none."
   },
   "MAY": {
    "name": "Clare - Soft and Warm (West of Ireland)",
@@ -113,7 +113,8 @@
    "bg": "shed_door",
    "clip": false,
    "text": "May. They've gone quiet.",
-   "tag": "[quietly]"
+   "tag": "[quietly]",
+   "pre": 2.3
   },
   {
    "id": "l13",
@@ -133,7 +134,7 @@
    "id": "l15",
    "who": "JO",
    "bg": "fire",
-   "clip": true,
+   "clip": false,
    "text": "Gerry. Come out of there.",
    "tag": "[serious]"
   },
@@ -151,7 +152,8 @@
    "clip": false,
    "text": "Right. I'm at the back pen. There's—",
    "tag": "[whispering]",
-   "hold_after": 3.0
+   "hold_after": 3.0,
+   "say": "Right... I'm at the back pen. There's—"
   },
   {
    "id": "l18",
@@ -189,7 +191,8 @@
    "bg": "shed",
    "clip": false,
    "text": "May.",
-   "tag": "[calm]"
+   "tag": "[calm]",
+   "tail_gap": 0.35
   },
   {
    "id": "l23",
@@ -203,7 +206,8 @@
    "bg": "shed",
    "clip": false,
    "text": "May.",
-   "tag": "[calm]"
+   "tag": "[calm]",
+   "tail_gap": 0.35
   },
   {
    "id": "l25",

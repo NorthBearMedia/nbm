@@ -15,9 +15,12 @@ def norm(s):
 def run(c): subprocess.run(c, check=True, capture_output=True)
 for who in (sys.argv[1:] or ["GERRY", "MAY", "JO"]):
     lines = [l for l in S["lines"] if l["who"] == who]; v = V[who]
-    passage = "\n\n".join([(l["tag"] + " " if l.get("tag") else "") + say(l) for l in lines] + [SAC])
-    body = {"text": passage, "model_id": v["model"],
-            "voice_settings": {"stability": 0.5, "similarity_boost": 0.85, "use_speaker_boost": True}}
+    v3 = v["model"] == "eleven_v3"          # v2 would SPEAK a [tag], so it gets none
+    passage = "\n\n".join([(l["tag"] + " " if (v3 and l.get("tag")) else "") + say(l) for l in lines]
+                          + [SAC if v3 else SAC.replace("[calm] ", "")])
+    vs = {"stability": 0.5, "similarity_boost": 0.85, "use_speaker_boost": True}
+    if not v3: vs.update(stability=0.4, style=0.35)
+    body = {"text": passage, "model_id": v["model"], "voice_settings": vs}
     r = urllib.request.Request(f"https://api.elevenlabs.io/v1/text-to-speech/{v['id']}/with-timestamps",
         data=json.dumps(body).encode(), method="POST", headers={"xi-api-key": "proxy-injected", "Content-Type": "application/json"})
     d = json.load(urllib.request.urlopen(r, timeout=300))
@@ -30,7 +33,8 @@ for who in (sys.argv[1:] or ["GERRY", "MAY", "JO"]):
         i0, i1 = idx[f], idx[f + len(nl) - 1]
         while i1 + 1 < len(ch) and not ch[i1 + 1].isalnum() and ch[i1 + 1] not in "\n[": i1 += 1
         spans.append((l, i0, i1, st[i0], en[i1])); pos = f + len(nl)
-    sac0 = st[idx[nal.find(norm(SAC)[0], pos)]] if nal.find(norm(SAC)[0], pos) >= 0 else en[-1]
+    sn = norm(SAC.replace("[calm] ", ""))[0]; f_s = nal.find(sn, pos)
+    sac0 = st[idx[f_s]] if f_s >= 0 else en[-1]
     for n, (l, i0, i1, t0, t1) in enumerate(spans):
         prev_end = spans[n-1][4] if n else 0.0
         next_st = spans[n+1][3] if n + 1 < len(spans) else sac0

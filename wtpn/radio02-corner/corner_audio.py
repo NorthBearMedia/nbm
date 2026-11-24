@@ -105,7 +105,7 @@ def place(kind, d, k):
         if kind == "shed_door":
             p = ST / f"{k}_door.wav"
             run(["ffmpeg", "-y", "-v", "error", "-i", str(FX / "doordrag.mp3"), "-af", f"aresample={SR},atrim=0:2.3,apad=whole_dur={d:.3f}",
-                 "-ac", "1", "-c:a", "pcm_s16le", str(p)]); parts.append((p, +4))
+                 "-ac", "1", "-c:a", "pcm_s16le", str(p)]); parts.append((p, +11))   # a story beat: he walks in
     elif kind == "fire":
         L("fire", (seed * 1.7) % 10, 0)
     out = ST / f"{k}_place.wav"
@@ -119,8 +119,8 @@ def place(kind, d, k):
         run(["ffmpeg", "-y", "-v", "error"] + ins + ["-filter_complex", fc, "-map", "[o]", "-c:a", "pcm_s16le", str(out)])
     return out
 
-BED_T = {"hay": -32.0, "hay_panic": -29.0, "yard": -29.0, "shed": -34.0, "shed_door": -31.0,
-         "shed_straw": -33.0, "fire": -36.0}
+BED_T = {"hay": -40.0, "hay_panic": -37.0, "yard": -37.0, "shed": -41.0, "shed_door": -38.0,
+         "shed_straw": -40.0, "fire": -44.0}
 
 def station(ln, dry, cutoff, opening=True, closing=True):
     """-> (wav, voice_offset, keyed_dur, kind)"""
@@ -130,16 +130,17 @@ def station(ln, dry, cutoff, opening=True, closing=True):
              "-filter_complex", f"[1:a]{ROOM},apad=pad_dur=0.12[v];[0:a]apad=pad_dur=0.10[p1];[p1][v][2:a]concat=n=3:v=0:a=1[o]",
              "-map", "[o]", "-c:a", "pcm_s16le", str(out)])
         return out, 0.114, dur(out), "tx"
-    hold = ln.get("hold_after", 0.0)
+    hold = ln.get("hold_after", 0.0) + ln.get("tail_gap", 0.0)
+    pre = ln.get("pre", 0.0)            # place sound before the voice (the shed door)
     run(["ffmpeg", "-y", "-v", "error", "-i", str(dry), "-af", RADIO, "-c:a", "pcm_s16le", str(ST / f"{k}_rv.wav")])
     gv = -18.0 - lufs(ST / f"{k}_rv.wav")
-    bl = d + hold + 0.08
+    bl = pre + d + hold + 0.08
     pl = place(ln["bg"], bl, k)
     run(["ffmpeg", "-y", "-v", "error", "-i", str(pl), "-af", BAND, "-c:a", "pcm_s16le", str(ST / f"{k}_b.wav")])
     gb = BED_T[ln["bg"]] - lufs(ST / f"{k}_b.wav")
     run(["ffmpeg", "-y", "-v", "error", "-i", str(ST / f"{k}_rv.wav"), "-i", str(ST / f"{k}_b.wav"),
          "-filter_complex",
-         f"[0:a]volume={gv:.2f}dB,apad=pad_dur={hold + 0.08:.3f}[v];[1:a]volume={gb:.2f}dB[w];"
+         f"[0:a]volume={gv:.2f}dB,adelay={int(pre * 1000)}|{int(pre * 1000)},apad=pad_dur={hold + 0.08:.3f}[v];[1:a]volume={gb:.2f}dB[w];"
          f"[v][w]amix=inputs=2:normalize=0:duration=longest,alimiter=level=0:limit=0.85"
          + (",afade=t=in:d=0.03" if opening else "") + "[r]",
          "-map", "[r]", "-c:a", "pcm_s16le", str(ST / f"{k}_r.wav")])
@@ -149,8 +150,8 @@ def station(ln, dry, cutoff, opening=True, closing=True):
     run(["ffmpeg", "-y", "-v", "error"] + ins + ["-filter_complex",
          "".join(f"[{i}:a]" for i in range(len(parts))) + f"concat=n={len(parts)}:v=0:a=1[o]",
          "-map", "[o]", "-c:a", "pcm_s16le", str(out)])
-    voff = dur(ST / "sq_open.wav") if opening else 0.0
-    return out, voff, voff + dur(ST / f"{k}_r.wav"), "rx"
+    voff = (dur(ST / "sq_open.wav") if opening else 0.0) + pre
+    return out, voff, voff - pre + dur(ST / f"{k}_r.wav"), "rx"
 
 GAP = {"l06": 0.9, "l09": 0.6, "l12": 2.4, "l17": 1.3, "l18": 0.0, "l19": 1.3, "l22": 2.6, "l24": 1.3, "l25": 0.9}
 def gap_before(prev, ln):
@@ -174,12 +175,12 @@ def main():
         t += dur(wav); prev = ln
     # the ending: nothing on the radio; the lamb has stopped; three slow knocks; a breath of room; cut
     t_knock = t + 2.8
-    total = t_knock + 2.3 + 1.6
+    total = t_knock + 1.36 + 1.8
     # ---- the kitchen: range + rain on the window, the radio's idle hiss, the lamb ----
     loop(FX / "kitchen.mp3", total, 0.0, ST / "kitchen.wav")
     run(["ffmpeg", "-y", "-v", "error", "-i", str(ST / "kitchen.wav"), "-f", "lavfi",
          "-i", f"anoisesrc=color=white:d={total:.3f}:a=0.5:r={SR}",
-         "-filter_complex", f"[0:a]volume={-40 - lufs(ST / 'kitchen.wav'):.2f}dB[k];"
+         "-filter_complex", f"[0:a]volume={-47 - lufs(ST / 'kitchen.wav'):.2f}dB[k];"
                             "[1:a]bandpass=f=1600:width_type=h:w=2400,volume=0.02[h];[k][h]amix=inputs=2:normalize=0",
          "-ac", "1", "-c:a", "pcm_s16le", str(ST / "bed.wav")])
     # lamb: a soft bleat in the gaps after some of May's lines and between transmissions; none after l23
@@ -190,7 +191,7 @@ def main():
     ins, fc = ["-i", str(ST / "bed.wav")], []
     lamb_raw = ST / "lamb_raw.wav"
     run(["ffmpeg", "-y", "-v", "error", "-i", str(FX / "lamb.mp3"), "-af", f"aresample={SR}", "-ac", "1", "-c:a", "pcm_s16le", str(lamb_raw)])
-    gl = -33.0 - lufs(lamb_raw)
+    gl = -39.0 - lufs(lamb_raw)
     for j, at in enumerate(lamb_at):
         a, b = segs[j % 3]; n = len(ins) // 2
         ins += ["-i", str(lamb_raw)]
@@ -201,8 +202,8 @@ def main():
     knock = ST / "knock.wav"
     run(["ffmpeg", "-y", "-v", "error", "-i", str(FX / "knocks.mp3"), "-af", f"aresample={SR},atrim=0.17:0.75,asetpts=N/SR/TB,afade=t=out:st=0.45:d=0.13",
          "-ac", "1", "-c:a", "pcm_s16le", str(knock)])
-    gk = -22.5 - lufs(knock)
-    for j, (off, g) in enumerate([(0.0, 0.0), (1.15, -0.8), (2.3, 0.4)]):
+    gk = -18.5 - lufs(knock)
+    for j, (off, g) in enumerate([(0.0, 0.0), (0.68, -0.6), (1.36, 0.4)]):
         n = len(ins) // 2; ins += ["-i", str(knock)]; ms = int((t_knock + off) * 1000)
         fc.append(f"[{n}:a]volume={gk + g:.2f}dB,aecho=0.8:0.5:23|41:0.2|0.12,adelay={ms}|{ms}[k{j}]")
     for e in tl:
@@ -223,7 +224,7 @@ def main():
             err = target - master(g, out, target, ch)
             if abs(err) < 0.15: break
             g += err
-    json.dump({"total": round(total, 3), "knocks": [round(t_knock + o, 3) for o in (0, 1.15, 2.3)],
+    json.dump({"total": round(total, 3), "knocks": [round(t_knock + o, 3) for o in (0, 0.68, 1.36)],
                "lines": tl}, open(D / "timeline.json", "w"), indent=1)
     print(f"master.wav {total:.1f}s  {lufs(D / 'master.wav'):.1f} LUFS | social {lufs(D / 'master_social.wav'):.1f} LUFS")
     for e in tl:
