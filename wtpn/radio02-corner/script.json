@@ -4,10 +4,16 @@
  "setting": "Hill farm, Co. Mayo, lambing, 2 a.m., rain. We are in the farmhouse kitchen: May's handheld is on the table.",
  "voices": {
   "GERRY": {
-   "name": "Ted - Deep and Calm (Galway)",
-   "id": "4AgX6Piqqh5KT4pSisZQ",
+   "name": "Dan (Cork)",
+   "id": "thYWTC3ObLUgoeN0sEv3",
    "model": "eleven_multilingual_v2",
-   "note": "farmer, 40s. Ted (Galway) on eleven_multilingual_v2: Cillian went American on v3 (user); Ted on v3 said 'May' as 'Me' (8/8 takes); on v2 he holds the accent and says May/Jo cleanly. v2 speaks [tags], so Gerry gets none."
+   "settings": {
+    "stability": 0.45,
+    "similarity_boost": 0.85,
+    "style": 0.3,
+    "use_speaker_boost": true
+   },
+   "note": "user's pick from five (24 Nov). History: Cillian went American on v3; Ted (v2) not right / hard to hear."
   },
   "MAY": {
    "name": "Clare - Soft and Warm (West of Ireland)",
@@ -51,7 +57,7 @@
    "id": "l04",
    "who": "GERRY",
    "bg": "hay",
-   "clip": true,
+   "clip": false,
    "text": "Go to bed, Jo."
   },
   {

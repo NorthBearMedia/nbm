@@ -46,7 +46,11 @@ RADIO = ("highpass=f=380,lowpass=f=2700,"
          "acompressor=threshold=-24dB:ratio=4:attack=6:release=220:makeup=2,"
          "asoftclip=type=tanh,aresample=11025,aresample=48000,"
          "highpass=f=330,lowpass=f=3000,equalizer=f=1800:t=q:w=1.2:g=5")
-BAND = "highpass=f=380,lowpass=f=2700,aresample=11025,aresample=48000"     # the bg gets the band, not the AGC
+BAND = "highpass=f=380,lowpass=f=2700,aresample=11025,aresample=48000"
+# Gerry: a cleaner handset (user: struggling to hear him). Wider band, gentler compression, no hard clip.
+RADIO_CLEAR = ("highpass=f=300,lowpass=f=3400,acompressor=threshold=-24dB:ratio=3.5:attack=6:release=200:makeup=2,"
+               "aresample=16000,aresample=48000,highpass=f=280,lowpass=f=3600,equalizer=f=2200:t=q:w=1.2:g=3")
+VOICE_T = {"GERRY": -16.5, "JO": -18.0}     # the bg gets the band, not the AGC
 ROOM = "highpass=f=90,lowpass=f=7500,aecho=0.8:0.55:38|67:0.16|0.09,acompressor=threshold=-22dB:ratio=3:attack=10:release=150"
 
 def prep(ln):
@@ -126,14 +130,17 @@ def station(ln, dry, cutoff, opening=True, closing=True):
     """-> (wav, voice_offset, keyed_dur, kind)"""
     k, who = ln["id"], ln["who"]; d = dur(dry); out = ST / f"{k}_st.wav"
     if who == "MAY":                                  # in the room with us, keying the handheld
-        run(["ffmpeg", "-y", "-v", "error", "-i", str(ST / "ptt.wav"), "-i", str(dry), "-i", str(ST / "ptt.wav"),
-             "-filter_complex", f"[1:a]{ROOM},apad=pad_dur=0.12[v];[0:a]apad=pad_dur=0.10[p1];[p1][v][2:a]concat=n=3:v=0:a=1[o]",
+        # the room chain's echo costs ~7 dB; level her AFTER it, to sit with the radio voices (was 11 LU under them)
+        run(["ffmpeg", "-y", "-v", "error", "-i", str(dry), "-af", ROOM, "-c:a", "pcm_s16le", str(ST / f"{k}_room.wav")])
+        gm = -17.5 - lufs(ST / f"{k}_room.wav")
+        run(["ffmpeg", "-y", "-v", "error", "-i", str(ST / "ptt.wav"), "-i", str(ST / f"{k}_room.wav"), "-i", str(ST / "ptt.wav"),
+             "-filter_complex", f"[1:a]volume={gm:.2f}dB,alimiter=level=0:limit=0.9,apad=pad_dur=0.12[v];[0:a]apad=pad_dur=0.10[p1];[p1][v][2:a]concat=n=3:v=0:a=1[o]",
              "-map", "[o]", "-c:a", "pcm_s16le", str(out)])
         return out, 0.114, dur(out), "tx"
     hold = ln.get("hold_after", 0.0) + ln.get("tail_gap", 0.0)
     pre = ln.get("pre", 0.0)            # place sound before the voice (the shed door)
-    run(["ffmpeg", "-y", "-v", "error", "-i", str(dry), "-af", RADIO, "-c:a", "pcm_s16le", str(ST / f"{k}_rv.wav")])
-    gv = -18.0 - lufs(ST / f"{k}_rv.wav")
+    run(["ffmpeg", "-y", "-v", "error", "-i", str(dry), "-af", RADIO_CLEAR if who == "GERRY" else RADIO, "-c:a", "pcm_s16le", str(ST / f"{k}_rv.wav")])
+    gv = VOICE_T[who] - lufs(ST / f"{k}_rv.wav")
     bl = pre + d + hold + 0.08
     pl = place(ln["bg"], bl, k)
     run(["ffmpeg", "-y", "-v", "error", "-i", str(pl), "-af", BAND, "-c:a", "pcm_s16le", str(ST / f"{k}_b.wav")])

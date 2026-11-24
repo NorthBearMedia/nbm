@@ -20,6 +20,7 @@ for who in (sys.argv[1:] or ["GERRY", "MAY", "JO"]):
                           + [SAC if v3 else SAC.replace("[calm] ", "")])
     vs = {"stability": 0.5, "similarity_boost": 0.85, "use_speaker_boost": True}
     if not v3: vs.update(stability=0.4, style=0.35)
+    vs.update(v.get("settings", {}))
     body = {"text": passage, "model_id": v["model"], "voice_settings": vs}
     r = urllib.request.Request(f"https://api.elevenlabs.io/v1/text-to-speech/{v['id']}/with-timestamps",
         data=json.dumps(body).encode(), method="POST", headers={"xi-api-key": "proxy-injected", "Content-Type": "application/json"})
