@@ -9,7 +9,9 @@ import numpy as np
 from resemblyzer import VoiceEncoder
 D = pathlib.Path(__file__).parent
 ap = argparse.ArgumentParser(); ap.add_argument("--targets", nargs="+"); ap.add_argument("--primers", nargs="*", default=[])
-ap.add_argument("--ref", nargs="+"); ap.add_argument("--n", type=int, default=3); a = ap.parse_args()
+ap.add_argument("--ref", nargs="+"); ap.add_argument("--n", type=int, default=3)
+ap.add_argument("--question", action="store_true", help="require a rising pitch at the end (a real question)")
+a = ap.parse_args()
 S = json.loads((D / "script.json").read_text()); L = {l["id"]: l for l in S["lines"]}
 who = L[a.targets[0]]["who"]; v = S["voices"][who]; v3 = v["model"] == "eleven_v3"
 def say(l): return l.get("say", l["text"]).lstrip("—")
@@ -63,7 +65,16 @@ for n in range(a.n):
         subprocess.run(["ffmpeg","-y","-v","error","-i",str(take),"-af",f"atrim={x0:.4f}:{x1:.4f},asetpts=N/SR/TB","-c:a","libmp3lame","-q:a","2",str(out)], check=True)
         h = scribe(out); r_ = difflib.SequenceMatcher(None, w(say(L[k])), w(h), autojunk=False).ratio()
         e_ = enc.embed_utterance(pcm(out)); s_ = float(np.dot(e_, ref) / (np.linalg.norm(e_) * np.linalg.norm(ref)))
-        ok &= r_ >= 0.92; sims.append(s_); rep.append(f"{k} {r_*100:3.0f}% sim {s_:.3f} {h!r}")
+        rise = ""
+        if a.question:
+            import librosa
+            y_, sr_ = librosa.load(out, sr=16000); f0, vf, _ = librosa.pyin(y_, fmin=80, fmax=500, sr=sr_, hop_length=160)
+            f0 = f0[~np.isnan(f0)]
+            if len(f0) > 10:
+                n4 = max(3, len(f0) // 4); up = 12 * np.log2(np.median(f0[-n4:]) / np.median(f0[:-n4]))
+            else: up = -9
+            ok &= up > 1.5; rise = f" rise {up:+.1f}st"; s_ += 0.01 * up
+        ok &= r_ >= 0.92; sims.append(s_); rep.append(f"{k} {r_*100:3.0f}% sim {s_:.3f}{rise} {h!r}")
         sl[k] = (out, {"characters": ch[i0:i1+1], "character_start_times_seconds": [round(t - x0, 4) for t in st[i0:i1+1]],
                        "character_end_times_seconds": [round(t - x0, 4) for t in en[i0:i1+1]]})
     score = float(np.mean(sims)) if ok else -1

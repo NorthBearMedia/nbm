@@ -78,7 +78,7 @@
    "id": "l07",
    "who": "GERRY",
    "bg": "hay_panic",
-   "clip": true,
+   "clip": false,
    "text": "Jo, if that's your bloody dog again, I swear to God.",
    "tag": "[angry]"
   },
@@ -101,13 +101,14 @@
   {
    "id": "l10",
    "who": "MAY",
-   "text": "A fox?"
+   "text": "Is it a fox?",
+   "tag": "[curious]"
   },
   {
    "id": "l11",
    "who": "GERRY",
    "bg": "yard",
-   "clip": true,
+   "clip": false,
    "text": "If it's a fox, it's a dead fox.",
    "tag": "[grimly]"
   },
@@ -130,7 +131,7 @@
    "id": "l14",
    "who": "GERRY",
    "bg": "shed",
-   "clip": true,
+   "clip": false,
    "text": "No. Sixty ewes and not a sound. They're all stood facing the back corner. Every one of them. Same corner.",
    "tag": "[quietly]"
   },
