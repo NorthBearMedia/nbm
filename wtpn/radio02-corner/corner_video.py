@@ -93,9 +93,9 @@ LN = {e["id"]: e for e in TL["lines"]}
 T_TURN = LN["l12"]["start"]                          # the sheep go silent: from here the room slowly loses its warmth
 T_FLICK = LN["l20"]["start"] - 1.1                   # the yard light stutters as the shed goes dark (user)
 FLICK_PAT = [1, .35, .95, .18, .8, 1, .55, 1]        # yard-light brightness per 1/16 s
-T_PASS, PASS_LEN = K0 - 1.35, 0.42                   # something passes the window just before the knocks (user)
+T_PASS, PASS_LEN = K0 - 1.75, 0.8                    # something passes the window just before the knocks (user): walking pace
 T_DIP = T_PASS                                       # (kept for the log line)
-T_OUT, OUT_LEN = T_PASS + 0.12, 0.5                  # the lamp gutters and dies as it passes (user: more change in the kitchen)
+T_OUT, OUT_LEN = T_PASS + 0.35, 0.5                  # the lamp gutters and dies as it passes (user: more change in the kitchen)
 rng = np.random.default_rng(1695)
 from scipy.ndimage import gaussian_filter as _gf
 _f = _gf(rng.standard_normal((96, 160)), 5); FIELD = _f / _f.std()   # lumpy, so it reads as no shape at all
@@ -228,17 +228,26 @@ for i in range(int(round(dur * FPS))):
         v = FLICK_PAT[int((t - T_FLICK) * 16)]
         a[iy0:iy1, ix0:ix1] *= v
         a *= 1 - 0.03 * (1 - v)                                                # a breath of it in the room
-    # something passes the window: a lumpy dark mass crosses the light, too fast and too close to read
+    # something passes the window (user: must move like a real body, not a projector shadow). A body close to the
+    # glass, between the window and the yard light: constant size, taller than the window so only its edges show,
+    # out of focus, steady walking pace. It sits BEHIND the rain on the glass: it blocks the glow of the light
+    # beyond (and the light's bright core), while the droplets on the glass stay lit.
     if T_PASS <= t <= T_PASS + PASS_LEN:
         u = (t - T_PASS) / PASS_LEN
-        ys_, xs_ = np.mgrid[iy0:iy1, ix0:ix1].astype(np.float32)
-        xl = (xs_ - wx0) / ww - (-0.7 + 2.4 * u); yl = np.clip((ys_ - wy0) / wh, 0, 0.999)
-        fx = np.clip(((xl + 1) / 2 * 159).astype(int), 0, 159); fy = (yl * 95).astype(int)
-        env = np.exp(-(xl / 0.42) ** 2) * np.clip(yl * 6, 0, 1)
-        m = np.clip((1.25 * env + 0.55 * FIELD[fy, fx] - 0.55) * 2.6, 0, 1)
-        m = _gf(m, 6) * np.clip((xs_ - wx0 + 25) / 25, 0, 1) * np.clip((wx1 + 25 - xs_) / 25, 0, 1)
-        a[iy0:iy1, ix0:ix1] *= (1 - 0.8 * m)[..., None]
-        a *= 1 - 0.03 * math.sin(math.pi * u)
+        reg = a[iy0:iy1, ix0:ix1]
+        LF = np.stack([_gf(reg[..., c], 14) for c in range(3)], -1); HF = reg - LF
+        xs_ = np.arange(ix0, ix1, dtype=np.float32)[None, :]
+        bc = wx0 - 0.42 * ww + u * 1.84 * ww; half, soft = 0.27 * ww, 0.16 * ww          # constant width, constant speed
+        m = np.clip((half + soft - np.abs(xs_ - bc)) / soft, 0, 1) ** 1.5
+        m = np.repeat(m, iy1 - iy0, axis=0)
+        m = _gf(m, (3, ww * 0.05))                                                       # out of focus, a little motion blur
+        ys2 = np.arange(iy0, iy1, dtype=np.float32)[:, None]
+        (lx, ly), (rx_, ry_) = F(P(538, 762)), F(P(566, 578))                            # the yard light's core; the lamp's reflection
+        core = np.exp(-((xs_ - lx) ** 2 + (ys2 - ly) ** 2) / (2 * (0.11 * ww) ** 2))      # the light itself: blocked outright
+        refl = np.exp(-(((xs_ - rx_) / (0.30 * ww)) ** 2 + ((ys2 - ry_) / (0.16 * wh)) ** 2))   # on our side of the glass: untouched
+        mk = m * (1 - refl)
+        a[iy0:iy1, ix0:ix1] = LF * (1 - 0.86 * mk)[..., None] + HF * (1 - (0.30 + 0.62 * core) * mk)[..., None]
+        a *= 1 - 0.02 * math.sin(math.pi * u)
     # the room cools as the night turns: a touch darker, a touch less amber
     if k_turn > 0: a *= np.array([1 - 0.075 * k_turn, 1 - 0.055 * k_turn, 1 - 0.015 * k_turn], np.float32)
     # lights out: only the faint grey of the night through the glass, enough to know it's the same room
