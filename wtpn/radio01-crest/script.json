@@ -170,7 +170,8 @@
    "who": "BASE",
    "wind": false,
    "clip": false,
-   "text": "Ewan—"
+   "text": "Ewan, lis—",
+   "say": "Ewan, listen to me. Stay where you are."
   },
   {
    "id": "l19",
@@ -178,7 +179,9 @@
    "who": "EWAN",
    "wind": true,
    "clip": true,
-   "text": "He's wearing my jacket. Base, he's got my— he's got my face, he's got my fac—"
+   "text": "He's wearing my jacket. Base, he's got my— he's got my face, he's got my fac—",
+   "say": "He's wearing my jacket. Base... he's got my— he's got my face, he's got my face and he's looking right at me.",
+   "note": "Generated past the cut so the voice is mid-sentence when the transmission is stepped on."
   },
   {
    "id": "l20",
@@ -195,7 +198,8 @@
    "who": "EWAN",
    "wind": true,
    "clip": true,
-   "text": "Cat. Cat, that's not me. That is not—"
+   "text": "Cat. Cat, that's not me. That is not me. Get aw—",
+   "say": "Cat. Cat... that's not me. That is not me. Get away from it, Cat."
   },
   {
    "id": "l22",
@@ -203,7 +207,8 @@
    "who": "CAT",
    "wind": true,
    "clip": true,
-   "text": "What? You're stood right in front of—"
+   "text": "What? You're stood right in front of m—",
+   "say": "What? You're stood right in front of me with your hood up."
   },
   {
    "id": "l23",
@@ -211,7 +216,8 @@
    "who": "EWAN",
    "wind": true,
    "clip": false,
-   "text": "Don't let it—"
+   "text": "Don't let it tou—",
+   "say": "Don't let it touch you, Cat, run."
   },
   {
    "id": "l24",

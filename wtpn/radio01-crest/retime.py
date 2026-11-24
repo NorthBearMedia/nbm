@@ -43,8 +43,14 @@ for k in (sys.argv[1:] or [l["id"] for l in S["lines"]]):
             prv = next((times[j][1] for j in range(i - 1, -1, -1) if times[j]), 0.0)
             nxt = next((times[j][0] for j in range(i + 1, len(sw)) if times[j]), prv + 0.3)
             times[i] = (prv, max(prv + 0.05, nxt))
+    tw = ln["text"].lstrip("—").split()
+    runon = ln["text"].rstrip().endswith("—") and len(sw) > len(tw)
+    if runon:   # generated past the cut, so the voice is mid-sentence: keep up to the cut word, cut inside it
+        n = len(tw); full = re.sub(r"[^\w']", "", sw[n - 1]).lower(); frag = re.sub(r"[^\w']", "", tw[-1]).lower()
+        s0, e0 = times[n - 1]; sw, times = sw[:n - 1] + [tw[-1]], times[:n]
+        if full != frag: times[-1] = (s0, s0 + (e0 - s0) * max(0.45, (len(frag) - 0.8) / len(full)))
     last = sw[-1]; frag = re.sub(r"[^\w']", "", last).lower()
-    if last.endswith("—") and hw:
+    if last.endswith("—") and hw and not runon:
         heard = re.sub(r"[^\w']", "", hw[-1][0]).lower()
         if heard != frag and heard.startswith(frag):       # the take finished the word: cut inside it
             s0, e0 = times[-1]   # land in the vowel, before the final consonant: 'fac' of 'face' must read as cut
