@@ -202,6 +202,11 @@ def main():
          "-filter_complex", f"[0:a]volume={-47 - lufs(ST / 'kitchen.wav'):.2f}dB[k];"
                             "[1:a]bandpass=f=1600:width_type=h:w=2400,volume=0.02[h];[k][h]amix=inputs=2:normalize=0",
          "-ac", "1", "-c:a", "pcm_s16le", str(ST / "bed.wav")])
+    # third knock: the power goes (the video's lights go out) -> the room's hum drops away, rain remains
+    k3 = t_knock + 1.36
+    run(["ffmpeg", "-y", "-v", "error", "-i", str(ST / "bed.wav"), "-af",
+         f"volume='if(lt(t,{k3:.3f}),1,max(0.28,1-(t-{k3:.3f})*12))':eval=frame", "-c:a", "pcm_s16le", str(ST / "bed_out.wav")])
+    (ST / "bed_out.wav").replace(ST / "bed.wav")
     # lamb: a soft bleat in the gaps after some of May's lines and between transmissions; none after l23
     starts = {e["id"]: e for e in tl}
     lamb_at = [starts["l02"]["end"] + 0.2, starts["l05"]["end"] + 0.3, starts["l10"]["end"] + 0.25,

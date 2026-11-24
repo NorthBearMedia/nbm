@@ -86,7 +86,8 @@ def state(t):
 
 # ---------- time: the clock, the dip, the cut -----------------------------------------------------
 K0, K3 = TL["knocks"][0], TL["knocks"][-1]
-T_CUT = K3 + 0.12                                   # hard cut to black on the third knock
+T_DARK = K3 + 0.02                                  # third knock: every light in the kitchen goes off (user)
+T_CUT = K3 + 0.85                                   # the dark room holds for under a second, then black
 def clock_secs(t): return 3 * 3600 - (K0 - min(t, K0))   # 3:00:00 exactly on the first knock, and there it stops
 LN = {e["id"]: e for e in TL["lines"]}
 T_TURN = LN["l12"]["start"]                          # the sheep go silent: from here the room slowly loses its warmth
@@ -159,8 +160,8 @@ for e in TL["lines"]:
     for i, p in enumerate(ph):
         start = p[0][1] - 0.05
         stop = ph[i + 1][0][1] - 0.05 if i + 1 < len(ph) else min(p[-1][2] + 0.6, e["end"] + 0.25)
-        ev.append((start, min(stop, T_CUT), head + " ".join(w[0] for w in p).replace("— —", "—")))
-ev.append((K0 - 0.05, T_CUT, f"{{\\fn{FM}\\fs40\\c{DIM}\\fsp3}}[ KNOCKING ]"))
+        ev.append((start, min(stop, T_DARK), head + " ".join(w[0] for w in p).replace("— —", "—")))
+ev.append((K0 - 0.05, T_DARK, f"{{\\fn{FM}\\fs40\\c{DIM}\\fsp3}}[ KNOCKING ]"))
 # opening title (user: stylish, no hook): letters settle from wide tracking, a hairline rule draws out from
 # the centre, the place and the season follow; all of it leaves together. Then just "TRANSMISSION 02".
 SH = "\\bord0\\shad0\\4a&H60&\\blur0.6"
@@ -171,7 +172,7 @@ ev.append((0.70, 3.9, f"{{\\an5\\pos(540,{TY + 52})\\fad(300,600)\\c{TEXT}\\alph
 ev.append((0.95, 3.9, f"{{\\an5\\pos(540,{TY + 100})\\fad(700,600)\\fn{FM}\\fs30\\c{TEXT}\\fsp16{SH}}}CO. MAYO"))
 ev.append((1.40, 3.9, f"{{\\an5\\pos(540,{TY + 146})\\fad(700,600)\\fn{FM}\\fs21\\c{TEXT}\\alpha&H28&\\fsp22{SH}}}LAMBING SEASON"))
 # the label sits below every app's top bar (TikTok tabs, Reels header, Shorts icons)
-ev.append((4.2, T_CUT, f"{{\\an8\\pos(540,250)\\fad(800,0)\\fn{FS}\\fs26\\c{TEXT}\\fsp12\\alpha&H40&}}TRANSMISSION 02"))
+ev.append((4.2, T_DARK, f"{{\\an8\\pos(540,250)\\fad(800,0)\\fn{FS}\\fs26\\c{TEXT}\\fsp12\\alpha&H40&}}TRANSMISSION 02"))
 (D / "captions.ass").write_text(
     "[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 0\n\n[V4+ Styles]\n"
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, "
@@ -240,6 +241,13 @@ for i in range(int(round(dur * FPS))):
         a *= 1 - 0.03 * math.sin(math.pi * u)
     # the room cools as the night turns: a touch darker, a touch less amber
     if k_turn > 0: a *= np.array([1 - 0.075 * k_turn, 1 - 0.055 * k_turn, 1 - 0.015 * k_turn], np.float32)
+    # lights out: only the faint grey of the night through the glass, enough to know it's the same room
+    if t >= T_DARK:
+        (wx0, wy0), (wx1, wy1) = F(WINDOW[0]), F(WINDOW[1])
+        iy0, iy1, ix0, ix1 = int(max(0, wy0)), int(min(H, wy1)), int(max(0, wx0)), int(min(W, wx1))
+        win = a[iy0:iy1, ix0:ix1].mean(axis=2, keepdims=True)                  # the yard light is dead too: cold grey night
+        a *= np.array([0.10, 0.115, 0.145], np.float32)
+        a[iy0:iy1, ix0:ix1] = win * np.array([0.16, 0.19, 0.25], np.float32)
     fr = Image.fromarray(a.clip(0, 255).astype(np.uint8))
     # the clock: hour and minute sweep, the second hand ticks; drawn soft to sit in the plate's focus
     (kx, ky), kr = F(CLOCK_C), CLOCK_R * sc
