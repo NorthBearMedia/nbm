@@ -1,0 +1,4 @@
+# derived: rebuilt by corner_audio.py from vo/ + sfx/ + script.json
+stations/
+*.wav
+transmission02-*.mp3

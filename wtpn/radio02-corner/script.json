@@ -1,0 +1,230 @@
+{
+ "series": "TRANSMISSION",
+ "episode": "02 — CORNER",
+ "setting": "Hill farm, Co. Mayo, lambing, 2 a.m., rain. We are in the farmhouse kitchen: May's handheld is on the table.",
+ "voices": {
+  "GERRY": {
+   "name": "Cillian",
+   "id": "B5jEZPqk2OJ2vkPw3wBM",
+   "model": "eleven_v3",
+   "note": "farmer, 40s; hay shed, then yard, then the lambing shed"
+  },
+  "MAY": {
+   "name": "Clare - Soft and Warm (West of Ireland)",
+   "id": "3Q0HiHNecynsdqicntLT",
+   "model": "eleven_v3",
+   "note": "his wife, in the kitchen with us: room voice, red light"
+  },
+  "JO": {
+   "name": "Michelle - Direct and Natural",
+   "id": "C92s6vssSLlabgIln1iY",
+   "model": "eleven_v3",
+   "note": "60s, farms on her own across the valley"
+  }
+ },
+ "lines": [
+  {
+   "id": "l01",
+   "who": "GERRY",
+   "bg": "hay",
+   "clip": true,
+   "trim_to": "i",
+   "text": "—ill in the hay shed with the lame one. Her foot's in a terrible state. I'll do the lambing shed after this.",
+   "say": "Still in the hay shed with the lame one. Her foot's in a terrible state. I'll do the lambing shed after this.",
+   "tag": "[tired]"
+  },
+  {
+   "id": "l02",
+   "who": "MAY",
+   "text": "Ah, grand. This one's taking the bottle now. Bit of fight in her.",
+   "tag": "[warmly]"
+  },
+  {
+   "id": "l03",
+   "who": "JO",
+   "bg": "fire",
+   "clip": true,
+   "text": "That you two still up? I've had three since midnight, and all of them backwards.",
+   "tag": "[amused]"
+  },
+  {
+   "id": "l04",
+   "who": "GERRY",
+   "bg": "hay",
+   "clip": true,
+   "text": "Go to bed, Jo."
+  },
+  {
+   "id": "l05",
+   "who": "JO",
+   "bg": "fire",
+   "clip": true,
+   "text": "Go to bed yourself.",
+   "tag": "[laughs]"
+  },
+  {
+   "id": "l06",
+   "who": "GERRY",
+   "bg": "hay_panic",
+   "clip": true,
+   "text": "Ah, for God's sake. Would you listen to them. Something's got in with the ewes.",
+   "tag": "[annoyed]"
+  },
+  {
+   "id": "l07",
+   "who": "GERRY",
+   "bg": "hay_panic",
+   "clip": true,
+   "text": "Jo, if that's your bloody dog again, I swear to God.",
+   "tag": "[angry]"
+  },
+  {
+   "id": "l08",
+   "who": "JO",
+   "bg": "fire",
+   "clip": true,
+   "text": "Both my dogs are in. They're lying here by the fire.",
+   "tag": "[flatly]"
+  },
+  {
+   "id": "l09",
+   "who": "GERRY",
+   "bg": "yard",
+   "clip": true,
+   "text": "Well, something's in there. I'm going down.",
+   "tag": "[breathing hard]"
+  },
+  {
+   "id": "l10",
+   "who": "MAY",
+   "text": "A fox?"
+  },
+  {
+   "id": "l11",
+   "who": "GERRY",
+   "bg": "yard",
+   "clip": true,
+   "text": "If it's a fox, it's a dead fox.",
+   "tag": "[grimly]"
+  },
+  {
+   "id": "l12",
+   "who": "GERRY",
+   "bg": "shed_door",
+   "clip": false,
+   "text": "May. They've gone quiet.",
+   "tag": "[quietly]"
+  },
+  {
+   "id": "l13",
+   "who": "MAY",
+   "text": "Can you see it?",
+   "tag": "[uneasy]"
+  },
+  {
+   "id": "l14",
+   "who": "GERRY",
+   "bg": "shed",
+   "clip": true,
+   "text": "No. Sixty ewes and not a sound. They're all stood facing the back corner. Every one of them. Same corner.",
+   "tag": "[quietly]"
+  },
+  {
+   "id": "l15",
+   "who": "JO",
+   "bg": "fire",
+   "clip": true,
+   "text": "Gerry. Come out of there.",
+   "tag": "[serious]"
+  },
+  {
+   "id": "l16",
+   "who": "GERRY",
+   "bg": "shed",
+   "clip": true,
+   "text": "It's a fox, Jo. I've got the torch."
+  },
+  {
+   "id": "l17",
+   "who": "GERRY",
+   "bg": "shed_straw",
+   "clip": false,
+   "text": "Right. I'm at the back pen. There's—",
+   "tag": "[whispering]",
+   "hold_after": 3.0
+  },
+  {
+   "id": "l18",
+   "who": "GERRY",
+   "bg": "shed",
+   "cont": true,
+   "text": "It's not a fox.",
+   "tag": "[very quietly]",
+   "hold_after": 4.0
+  },
+  {
+   "id": "l19",
+   "who": "MAY",
+   "text": "Gerry? ... Gerry, what is it?",
+   "tag": "[worried]",
+   "pause_cap": 1.3
+  },
+  {
+   "id": "l20",
+   "who": "JO",
+   "bg": "fire",
+   "clip": false,
+   "text": "May. His shed lights have gone. I can see your place from here. The whole shed's gone dark.",
+   "tag": "[urgent]"
+  },
+  {
+   "id": "l21",
+   "who": "MAY",
+   "text": "Gerry, answer me.",
+   "tag": "[scared]"
+  },
+  {
+   "id": "l22",
+   "who": "GERRY",
+   "bg": "shed",
+   "clip": false,
+   "text": "May.",
+   "tag": "[calm]"
+  },
+  {
+   "id": "l23",
+   "who": "MAY",
+   "text": "I'm here. What's in the corner?",
+   "tag": "[frightened]"
+  },
+  {
+   "id": "l24",
+   "who": "GERRY",
+   "bg": "shed",
+   "clip": false,
+   "text": "May.",
+   "tag": "[calm]"
+  },
+  {
+   "id": "l25",
+   "who": "JO",
+   "bg": "fire",
+   "clip": false,
+   "text": "May, there's someone crossing your yard. Under the light. Coming up to the house.",
+   "tag": "[urgent]"
+  },
+  {
+   "id": "l26",
+   "who": "JO",
+   "bg": "fire",
+   "clip": false,
+   "text": "Gerry, is that you?",
+   "tag": "[fearful]"
+  }
+ ],
+ "notes": {
+  "ending": "After l26 nothing on the radio; the lamb stops; three slow knocks on the back door, in the room; cut.",
+  "calm": "l22 and l24 are the same calm 'May.' with the tin roof behind: he is still in the shed when the knocks come.",
+  "clip": "PTT clip only on lines whose first word can be lost; it turned 'May' into 'Hey' and 'Gerry' into 'Sherry'."
+ }
+}
