@@ -31,6 +31,8 @@ APPROACHES["long_panicked"] = ("eleven_v3", 0.5, {"l19": ("[panicked] ", None), 
 # run-on: each line is generated past its cut (script "say"), so the voice is still mid-sentence
 # when retime.py/radio_audio.py cut it inside the word
 APPROACHES["long_runon"] = ("eleven_v3", 0.5, {"l19": ("", None), "l21": ("", None), "l23": ("", None)})
+# boots: same as long_runon, separate name so the locked long_runon_* takes are not overwritten
+APPROACHES["long_boots"] = APPROACHES["long_runon"]
 N = int(sys.argv[1]) if len(sys.argv) > 1 else 3
 ONLY = sys.argv[2].split(",") if len(sys.argv) > 2 else list(APPROACHES)
 APPROACHES = {k: v for k, v in APPROACHES.items() if k in ONLY}

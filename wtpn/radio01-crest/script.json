@@ -179,9 +179,9 @@
    "who": "EWAN",
    "wind": true,
    "clip": true,
-   "text": "He's wearing my jacket. Base, he's got my— he's got my face, he's got my fac—",
-   "say": "He's wearing my jacket. Base... he's got my— he's got my face, he's got my face and he's looking right at me.",
-   "note": "Generated past the cut so the voice is mid-sentence when the transmission is stepped on."
+   "text": "He's wearing my boots. Base, he's got my— he's got my face, he's got my fac—",
+   "say": "He's wearing my boots. Base... he's got my— he's got my face, he's got my face and he's looking right at me.",
+   "note": "Boots, not jacket: he was reported with no jacket (l07-l09). Escalation: our kit (l17) -> my boots -> my face. Generated past the cut so the voice is mid-sentence when the transmission is stepped on."
   },
   {
    "id": "l20",
