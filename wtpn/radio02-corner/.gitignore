@@ -2,3 +2,5 @@
 stations/
 *.wav
 transmission02-*.mp3
+
+*.mp3.n.wav
