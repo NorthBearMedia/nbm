@@ -30,8 +30,9 @@ body = {
     "tiktokData": {"disableComment": False, "disableDuet": False, "disableStitch": False,
                    "privacyOption": "PUBLIC_TO_EVERYONE", "isAigc": True,
                    "isBrandContent": False, "isBrandOrganic": False},
-    "instagramData": {"postType": "REEL", "showReelInFeed": True, "isAiGenerated": True},
-    "facebookData": {"postType": "REEL"},
+    # the v2 API reads "type" / "showReelOnFeed"; the old "postType" was silently ignored and stored POST
+    "instagramData": {"type": "REEL", "showReelOnFeed": True, "isAiGenerated": True},
+    "facebookData": {"type": "REEL"},
     "youtubeData": {"title": "Mountain Rescue Radio: Nobody Was Reported Missing | Transmission Part 1",
                     "type": "SHORT", "privacy": "public", "madeForKids": False, "isAiGeneratedContent": True,
                     "tags": ["mountain rescue", "radio horror", "audio drama", "cairngorms", "scary story",

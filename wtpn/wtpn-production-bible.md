@@ -215,3 +215,19 @@ and their ask: first-person, interview, feels real.
   road-ghost stories, real mass-casualty tragedies.
 - Per-episode pipeline scripts are now SAVED with each episode (process.py, mix.py, build.py)
   — copy them forward rather than rebuilding the audio chain from memory each night.
+
+## ★★★★★ 24 NOV — TRANSMISSION 01 "CREST" (new radio format) ARMED ★★★★★
+- Post **440117853** (uuid -7445221511484915538): **Wed 25 Nov 18:00 Europe/London**, TikTok + Instagram
+  Reel + Facebook Reel + YouTube Short, media ingested to static.metricool.com, isAigc / isAiGenerated /
+  isAiGeneratedContent all true, cover at 1200 ms. Built in wtpn/radio01-crest (radio_audio.py,
+  radio_video2.py, publish.py). Original fiction: caption says "an original radio horror series";
+  no "real ghost stories" end card on this format.
+- **Metricool API (verified 24 Nov):** token is now a proxy-injected network secret for app.metricool.com
+  (header X-Mc-Auth) — scripts send `proxy-injected`, never a real value. The v2 scheduler reads
+  `instagramData.type` / `facebookData.type` = "REEL" and `showReelOnFeed`; the old `postType` key is
+  SILENTLY IGNORED and stores POST — so earlier "REEL" bodies may have gone out as feed posts. Always
+  GET the post after create and check type, media host and AI flags.
+- **TikTok optimisation standard (radio format):** text inside x 100-930, y 200-1400 (clear of the top
+  tabs, the right-hand buttons and the description strip); stereo social master at -14 LUFS (a mono
+  file measures 3 LU quieter once duplicated to stereo); H.264 High 4.2, 30 fps, crf 20 capped 10 Mbps,
+  faststart, bt709 tags; "PART n" on screen from frame 1 and on the end card.
