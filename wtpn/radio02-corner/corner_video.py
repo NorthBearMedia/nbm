@@ -185,9 +185,10 @@ ev.append((4.2, T_DARK, f"{{\\an8\\pos(540,250)\\fad(800,0)\\fn{FS}\\fs26\\c{TEX
 
 # ---------- render -----------------------------------------------------------------------------------
 test = "--test" in sys.argv
+ENDCARD_ONLY = "--endcard" in sys.argv
 t0, dur = (float(sys.argv[sys.argv.index("--test") + 1]), float(sys.argv[sys.argv.index("--test") + 2])) if test else (0.0, T)
 out = D / ("test.mp4" if test else "body.mp4")
-ff = subprocess.Popen(["ffmpeg", "-y", "-v", "error",
+ff = None if ENDCARD_ONLY else subprocess.Popen(["ffmpeg", "-y", "-v", "error",
     "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
     "-ss", f"{t0:.3f}", "-i", str(AUDIO),
     "-filter_complex", f"[0:v]eq=saturation=0.95:contrast=1.03,noise=alls=7:allf=t,vignette=PI/5,"
@@ -197,7 +198,7 @@ ff = subprocess.Popen(["ffmpeg", "-y", "-v", "error",
 PW, PH = base.size; ZOOM, EASE = 0.08, 1.3
 C0, C1 = (PW / 2, PH / 2), (PW / 2 - 90, PH / 2 + 110)       # drift gently towards the radio and table
 black = bytes(W * H * 3)
-for i in range(int(round(dur * FPS))):
+for i in range(0 if ENDCARD_ONLY else int(round(dur * FPS))):
     t = t0 + i / FPS
     if t >= T_CUT: ff.stdin.write(black); continue
     e = (t / T) ** EASE; s = 1 + ZOOM * e
@@ -270,8 +271,9 @@ for i in range(int(round(dur * FPS))):
     lay = lay.resize((pad * 2, pad * 2), Image.LANCZOS).filter(ImageFilter.GaussianBlur(max(0.6, 1.1 * sc / 0.5)))
     fr.paste(lay, (int(kx - pad), int(ky - pad)), lay)
     ff.stdin.write(fr.tobytes())
-ff.stdin.close(); ff.wait()
-if ff.returncode: sys.exit("ffmpeg failed")
+if ff:
+    ff.stdin.close(); ff.wait()
+    if ff.returncode: sys.exit("ffmpeg failed")
 print(f"{out.name} written ({dur:.1f}s, {len(ev)} caption events, cut to black at {T_CUT:.2f}s, dip at {T_DIP:.2f}s)")
 if not test:
     (D / "bumper.ass").write_text(
@@ -281,8 +283,8 @@ if not test:
         "MarginR, MarginV, Encoding\n"
         f"Style: T,{FS},58,{TEXT.rstrip('&')},&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,12,0,1,0,0,5,0,0,0,1\n\n"
         "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
-        f"Dialogue: 0,0:00:00.50,0:00:03.90,T,,0,0,0,,{{\\fad(700,0)}}TRANSMISSION 02\\N{{\\fn{FM}\\fs26\\c{DIM}\\fsp9}}CORNER\n"
-        f"Dialogue: 0,0:00:01.50,0:00:03.90,T,,0,0,0,,{{\\an2\\pos(540,1180)\\fad(500,0)\\fn{FM}\\fs28\\c{TEXT}\\fsp6}}FOLLOW FOR PART 3\n")
+        f"Dialogue: 0,0:00:00.50,0:00:03.90,T,,0,0,0,,{{\\fad(700,0)}}TRANSMISSION 02 · PART 1\\N{{\\fn{FM}\\fs26\\c{DIM}\\fsp9}}CORNER\n"
+        f"Dialogue: 0,0:00:01.50,0:00:03.90,T,,0,0,0,,{{\\an2\\pos(540,1180)\\fad(500,0)\\fn{FM}\\fs28\\c{TEXT}\\fsp6}}FOLLOW FOR PART 2\n")
     run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", f"color=c=0x050505:s={W}x{H}:r={FPS}",
          "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", "3.9", "-vf", "ass=bumper.ass,format=yuv420p",
          "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-c:a", "aac", "-b:a", "192k", "-shortest", str(D / "bumper.mp4")])
