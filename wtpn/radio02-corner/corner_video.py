@@ -63,9 +63,15 @@ def state(t):
 K0, K3 = TL["knocks"][0], TL["knocks"][-1]
 T_CUT = K3 + 0.12                                   # hard cut to black on the third knock
 def clock_secs(t): return 3 * 3600 - (K0 - t)        # 3:00:00 exactly on the first knock
-e25 = next(e for e in TL["lines"] if e["id"] == "l25")
-w_cross = next(w for w in e25["words"] if w[0].lower().startswith("crossing"))
-T_DIP, DIP_LEN = w_cross[1] - 0.25, 0.55             # something passes the yard light, left to right
+LN = {e["id"]: e for e in TL["lines"]}
+T_TURN = LN["l12"]["start"]                          # the sheep go silent: from here the room slowly loses its warmth
+T_FLICK = LN["l20"]["start"] - 1.1                   # the yard light stutters as the shed goes dark (user)
+FLICK_PAT = [1, .35, .95, .18, .8, 1, .55, 1]        # yard-light brightness per 1/16 s
+T_PASS, PASS_LEN = K0 - 1.35, 0.42                   # something passes the window just before the knocks (user)
+T_DIP = T_PASS                                       # (kept for the log line)
+rng = np.random.default_rng(1695)
+from scipy.ndimage import gaussian_filter as _gf
+_f = _gf(rng.standard_normal((96, 160)), 5); FIELD = _f / _f.std()   # lumpy, so it reads as no shape at all
 random.seed(1695); FLICK = [random.uniform(-1, 1) for _ in range(int(T * 12) + 50)]
 def flicker(t):                                      # smooth candle noise, ~12 Hz control points
     i = t * 12; a = int(i); f = i - a; f = f * f * (3 - 2 * f)
@@ -129,22 +135,24 @@ for e in TL["lines"]:
         stop = ph[i + 1][0][1] - 0.05 if i + 1 < len(ph) else min(p[-1][2] + 0.6, e["end"] + 0.25)
         ev.append((start, min(stop, T_CUT), head + " ".join(w[0] for w in p).replace("— —", "—")))
 ev.append((K0 - 0.05, T_CUT, f"{{\\fn{FM}\\fs40\\c{DIM}\\fsp3}}[ KNOCKING ]"))
-# location marker, typed on; then the hook; then the series label for the rest
-MK1, MK2 = "HILL FARM · CO. MAYO", "LAMBING SEASON"
-for i in range(1, len(MK1) + 1):
-    ev.append((0.10 + i * 0.045, 0.10 + (i + 1) * 0.045 if i < len(MK1) else 3.2,
-               f"{{\\an5\\pos(540,600)\\fn{FS}\\fs40\\c{TEXT}\\fsp3\\bord2\\3c&H000000&}}{MK1[:i]}"))
-ev.append((1.15, 3.2, f"{{\\an5\\pos(540,652)\\fad(300,0)\\fn{FM}\\fs24\\c{TEXT}\\fsp9\\bord2\\3c&H000000&}}{MK2}"))
-ev.append((0.9, 3.2, f"{{\\an5\\pos(540,770)\\fad(350,300)\\fn{FM}\\fs54\\c{TEXT}\\fsp2\\bord2\\3c&H000000&}}Watch the light."))
-ev.append((3.2, T_CUT, f"{{\\an8\\pos(540,192)\\fad(500,0)\\fn{FS}\\fs28\\c{TEXT}\\fsp10\\alpha&H30&\\bord1\\3c&H000000&}}TRANSMISSION 02 · PART 2"
-                       f"\\N{{\\fn{FM}\\fs20\\c{DIM}\\fsp5}}FARM CHANNEL · CO. MAYO"))
+# opening title (user: stylish, no hook): letters settle from wide tracking, a hairline rule draws out from
+# the centre, the place and the season follow; all of it leaves together. Then just "TRANSMISSION 02".
+SH = "\\bord0\\shad0\\4a&H60&\\blur0.6"
+TY = 660
+ev.append((0.15, 3.9, f"{{\\an5\\pos(540,{TY + 70})\\fad(900,700)\\c&H000000&\\alpha&H78&\\blur38\\bord0\\p1}}m -330 -120 l 330 -120 l 330 120 l -330 120{{\\p0}}"))   # soft dark wash behind the title
+ev.append((0.25, 3.9, f"{{\\an5\\pos(540,{TY})\\fad(900,600)\\fn{FS}\\fs66\\c{TEXT}\\fsp30\\t(0,1800,0.5,\\fsp14){SH}}}HILL FARM"))
+ev.append((0.70, 3.9, f"{{\\an5\\pos(540,{TY + 52})\\fad(300,600)\\c{TEXT}\\alpha&H70&\\fscx0\\t(0,900,0.6,\\fscx100)\\p1}}m 0 0 l 360 0 l 360 2 l 0 2{{\\p0}}"))
+ev.append((0.95, 3.9, f"{{\\an5\\pos(540,{TY + 100})\\fad(700,600)\\fn{FM}\\fs30\\c{TEXT}\\fsp16{SH}}}CO. MAYO"))
+ev.append((1.40, 3.9, f"{{\\an5\\pos(540,{TY + 146})\\fad(700,600)\\fn{FM}\\fs21\\c{TEXT}\\alpha&H28&\\fsp22{SH}}}LAMBING SEASON"))
+# the label sits below every app's top bar (TikTok tabs, Reels header, Shorts icons)
+ev.append((4.2, T_CUT, f"{{\\an8\\pos(540,250)\\fad(800,0)\\fn{FS}\\fs26\\c{TEXT}\\fsp12\\alpha&H40&}}TRANSMISSION 02"))
 (D / "captions.ass").write_text(
     "[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 0\n\n[V4+ Styles]\n"
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, "
     "Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, "
     "MarginR, MarginV, Encoding\n"
     # top-left block under the label: plain wall, clear of the clock (right) and the radio (bottom left)
-    f"Style: T,{FM},44,{TEXT.rstrip('&')},&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,2,1,8,90,390,300,1\n\n"
+    f"Style: T,{FM},44,{TEXT.rstrip('&')},&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,2,1,8,90,390,318,1\n\n"
     "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n" +
     "\n".join(f"Dialogue: 0,{ts(a)},{ts(b)},T,,0,0,0,,{t}" for a, b, t in ev if b > a) + "\n")
 
@@ -176,16 +184,29 @@ for i in range(int(round(dur * FPS))):
     (qx, qy), rr = F(CANDLE), 110 * sc
     px0, px1, py0, py1 = int(max(0, qx - rr)), int(min(W, qx + rr)), int(max(0, qy - rr)), int(min(H, qy + rr))
     ys_, xs_ = np.ogrid[py0:py1, px0:px1]; g = np.exp(-((xs_ - qx) ** 2 + (ys_ - qy) ** 2) / (2 * (rr * 0.5) ** 2))
-    a[py0:py1, px0:px1] *= (1 + 0.07 * flicker(t) * g)[..., None]
-    # the dip: a soft dark band crosses the window's light, left to right, in about half a second
-    if T_DIP <= t <= T_DIP + DIP_LEN:
-        ys, xs = np.ogrid[0:H, 0:W]
-        (wx0, wy0), (wx1, wy1) = F(WINDOW[0]), F(WINDOW[1]); u = (t - T_DIP) / DIP_LEN
-        bc = wx0 - 0.3 * (wx1 - wx0) + u * 1.6 * (wx1 - wx0); bw = 0.38 * (wx1 - wx0)
-        band = np.exp(-((xs - bc) / bw) ** 2) * (np.clip((ys - wy0) / 30, 0, 1) * np.clip((wy1 - ys) / 30, 0, 1))
-        inwin = (xs >= wx0 - 30) & (xs <= wx1 + 30)
-        a *= (1 - 0.62 * band * inwin)[..., None]
-        a *= 1 - 0.035 * math.sin(math.pi * u)                 # the room loses a breath of light with it
+    k_turn = min(max((t - T_TURN) / (T_CUT - T_TURN), 0.0), 1.0) ** 1.2
+    gutter = 0.45 * math.exp(-((t - (T_PASS + 0.2)) / 0.25) ** 2)            # the flame ducks as it passes
+    a[py0:py1, px0:px1] *= (1 + (0.07 + 0.07 * k_turn) * flicker(t) * g - gutter * g)[..., None]
+    (wx0, wy0), (wx1, wy1) = F(WINDOW[0]), F(WINDOW[1]); ww, wh = wx1 - wx0, wy1 - wy0
+    ix0, ix1, iy0, iy1 = int(max(0, wx0 - 40)), int(min(W, wx1 + 40)), int(max(0, wy0 - 40)), int(min(H, wy1 + 40))
+    # the yard light stutters (power hiccup as the shed goes dark)
+    if T_FLICK <= t < T_FLICK + len(FLICK_PAT) / 16:
+        v = FLICK_PAT[int((t - T_FLICK) * 16)]
+        a[iy0:iy1, ix0:ix1] *= v
+        a *= 1 - 0.03 * (1 - v)                                                # a breath of it in the room
+    # something passes the window: a lumpy dark mass crosses the light, too fast and too close to read
+    if T_PASS <= t <= T_PASS + PASS_LEN:
+        u = (t - T_PASS) / PASS_LEN
+        ys_, xs_ = np.mgrid[iy0:iy1, ix0:ix1].astype(np.float32)
+        xl = (xs_ - wx0) / ww - (-0.7 + 2.4 * u); yl = np.clip((ys_ - wy0) / wh, 0, 0.999)
+        fx = np.clip(((xl + 1) / 2 * 159).astype(int), 0, 159); fy = (yl * 95).astype(int)
+        env = np.exp(-(xl / 0.42) ** 2) * np.clip(yl * 6, 0, 1)
+        m = np.clip((1.25 * env + 0.55 * FIELD[fy, fx] - 0.55) * 2.6, 0, 1)
+        m = _gf(m, 6) * np.clip((xs_ - wx0 + 25) / 25, 0, 1) * np.clip((wx1 + 25 - xs_) / 25, 0, 1)
+        a[iy0:iy1, ix0:ix1] *= (1 - 0.8 * m)[..., None]
+        a *= 1 - 0.03 * math.sin(math.pi * u)
+    # the room cools as the night turns: a touch darker, a touch less amber
+    if k_turn > 0: a *= np.array([1 - 0.075 * k_turn, 1 - 0.055 * k_turn, 1 - 0.015 * k_turn], np.float32)
     fr = Image.fromarray(a.clip(0, 255).astype(np.uint8))
     # the clock: hour and minute sweep, the second hand ticks; drawn soft to sit in the plate's focus
     (kx, ky), kr = F(CLOCK_C), CLOCK_R * sc
@@ -210,7 +231,7 @@ if not test:
         "MarginR, MarginV, Encoding\n"
         f"Style: T,{FS},58,{TEXT.rstrip('&')},&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,12,0,1,0,0,5,0,0,0,1\n\n"
         "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
-        f"Dialogue: 0,0:00:00.50,0:00:03.90,T,,0,0,0,,{{\\fad(700,0)}}TRANSMISSION 02\\N{{\\fn{FM}\\fs26\\c{DIM}\\fsp9}}PART 2 · CORNER\n"
+        f"Dialogue: 0,0:00:00.50,0:00:03.90,T,,0,0,0,,{{\\fad(700,0)}}TRANSMISSION 02\\N{{\\fn{FM}\\fs26\\c{DIM}\\fsp9}}CORNER\n"
         f"Dialogue: 0,0:00:01.50,0:00:03.90,T,,0,0,0,,{{\\an2\\pos(540,1180)\\fad(500,0)\\fn{FM}\\fs28\\c{TEXT}\\fsp6}}FOLLOW FOR PART 3\n")
     run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", f"color=c=0x050505:s={W}x{H}:r={FPS}",
          "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", "3.9", "-vf", "ass=bumper.ass,format=yuv420p",
