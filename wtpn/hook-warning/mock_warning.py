@@ -26,9 +26,9 @@ V = {
  "D": dict(voice="C5rG2JoeFeqEgocBWvLg", model="eleven_multilingual_v2", text=PUNCH,                      # WTPN Jay - Gravelly British
            vs={"stability": 0.5, "similarity_boost": 0.85, "style": 0.35, "use_speaker_boost": True, "speed": 1.1}, tempo=1.04),
  # user (25 Nov): D's punch and length, shorter still, C's whisper, and a picture that looks like a whisper
- "E": dict(voice="AeRdCCKzvd23BpJoofzx", model="eleven_v3", text="[whispering quickly] " + PUNCH, vs=WVS, tempo=1.18, caps=(0.10, 0.02)),
- "F": dict(voice="AeRdCCKzvd23BpJoofzx", model="eleven_v3", text="[whispering quickly] " + SHORT, vs=WVS, tempo=1.18, caps=(0.10, 0.02)),
- "G": dict(voice="GsjQ0ydx7QzhDLqInGtT", model="eleven_v3", text="[whispering quickly] " + PUNCH, vs=WVS, tempo=1.18, caps=(0.10, 0.02)),
+ "E": dict(voice="AeRdCCKzvd23BpJoofzx", model="eleven_v3", text="[whispering quickly] " + PUNCH, vs=WVS, tempo=1.12, caps=(0.16, 0.06)),
+ "F": dict(voice="AeRdCCKzvd23BpJoofzx", model="eleven_v3", text="[whispering quickly] " + SHORT, vs=WVS, tempo=1.12, caps=(0.16, 0.06)),
+ "G": dict(voice="GsjQ0ydx7QzhDLqInGtT", model="eleven_v3", text="[whispering quickly] " + PUNCH, vs=WVS, tempo=1.12, caps=(0.16, 0.06)),
 }
 WHISPERED = ("E", "F", "G")
 RADIO = ("highpass=f=300,lowpass=f=3400,acompressor=threshold=-24dB:ratio=3.5:attack=6:release=200:makeup=2,"
@@ -146,13 +146,20 @@ def events(k, ws, t0, t_end):
 
 def build(k):
     vo, al = tts(k); ws = words(al)
-    lead = 0.08; radio = k == "B"; tempo = V[k]["tempo"]
-    a0 = max(0.0, ws[0][1] - 0.04); keeps, pos, cut = [], a0, []
+    if k in WHISPERED:     # v3's own timings run late on a whisper (cut 'Easily' to 'silly'): use the heard ones
+        sc = B / f"{k}_scribe.json"
+        if not sc.exists():
+            sys.path.insert(0, str(D.parent / "radio03-handover")); from phon import scribe
+            json.dump(scribe(vo), open(sc, "w"))
+        sw = json.load(open(sc))
+        if len(sw) == len(ws): ws = [[w[0], h["start"], h["end"]] for w, h in zip(ws, sw)]
+    lead = 0.35 if k in WHISPERED else 0.08; radio = k == "B"; tempo = V[k]["tempo"]   # user: E started too soon
+    a0 = max(0.0, ws[0][1] - 0.12); keeps, pos, cut = [], a0, []
     for w1, w2 in zip(ws, ws[1:]):
         cp, ci = V[k].get("caps", (0.22, 0.06)); cap = cp if w1[0].endswith((".", "?", ",")) else ci
         g = w2[1] - w1[2]
         if g > cap: keeps.append((pos, w1[2] + cap / 2)); pos = w2[1] - cap / 2; cut.append((w1[2] + cap / 2, g - cap))
-    keeps.append((pos, ws[-1][2] + 0.12))
+    keeps.append((pos, ws[-1][2] + (0.25 if k in WHISPERED else 0.12)))
     fc = "".join(f"[0:a]atrim={x:.4f}:{y:.4f},asetpts=N/SR/TB[k{i}];" for i, (x, y) in enumerate(keeps))
     fc += "".join(f"[k{i}]" for i in range(len(keeps))) + f"concat=n={len(keeps)}:v=0:a=1,atempo={tempo}[o]"
     run(["ffmpeg", "-y", "-v", "error", "-i", str(vo), "-filter_complex", fc, "-map", "[o]", "-c:a", "libmp3lame", "-q:a", "2", str(B / f"{k}_tight.mp3")])
