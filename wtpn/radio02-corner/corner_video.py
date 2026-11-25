@@ -154,14 +154,20 @@ FS, FM = "IBM Plex Mono SemiBold", "IBM Plex Mono Medium"
 ev = []
 for e in TL["lines"]:
     ln = LINES[e["id"]]; who = ln["who"]; tag = tag_for(e["id"], who)
-    head = (f"{{\\fn{FS}\\fs30\\c{TXC if who == 'MAY' else RXC}\\fsp6}}{who}"
-            + (f"{{\\fn{FM}\\fs24\\c{TAGC}\\fsp1}}   {tag}" if tag else "") + f"\\N{{\\fn{FM}\\fs44\\c{TEXT}\\fsp0}}")
+    # user (25 Nov): readable on every app, centred, cool: speaker + place as a small tracked label, the line
+    # in big SemiBold under it, both with a soft dark halo; a blurred dark band sits behind the whole block
+    head = (f"{{\\fn{FS}\\fs29\\c{TXC if who == 'MAY' else RXC}\\fsp7\\bord3\\blur4}}{who}"
+            + (f"{{\\fn{FM}\\fs24\\c{TAGC}\\fsp4}}  ·  {tag.strip('[]').upper()}" if tag else "")
+            + f"\\N{{\\fn{FS}\\fs56\\c{TEXT}\\fsp0\\bord3\\blur4}}")
     ph = phrases(disp_words(e["id"], e["remap"]))
     for i, p in enumerate(ph):
         start = p[0][1] - 0.05
         stop = ph[i + 1][0][1] - 0.05 if i + 1 < len(ph) else min(p[-1][2] + 0.6, e["end"] + 0.25)
         ev.append((start, min(stop, T_DARK), head + " ".join(w[0] for w in p).replace("— —", "—")))
-ev.append((K0 - 0.05, T_DARK, f"{{\\fn{FM}\\fs40\\c{DIM}\\fsp3}}[ KNOCKING ]"))
+ev.append((K0 - 0.05, T_DARK, f"{{\\fn{FS}\\fs44\\c{DIM}\\fsp8\\bord3\\blur4}}[ KNOCKING ]"))
+first = min(a for a, b, t in ev)
+ev.insert(0, (first - 0.4, T_DARK, "{\\an7\\pos(0,0)\\fad(700,0)\\c&H000000&\\alpha&H70&\\blur48\\bord0\\shad0\\p1}"
+           "m 175 1085 l 905 1085 l 905 1450 l 175 1450{\\p0}"))
 # opening title (user: stylish, no hook): letters settle from wide tracking, a hairline rule draws out from
 # the centre, the place and the season follow; all of it leaves together. Then just "TRANSMISSION 02".
 SH = "\\bord0\\shad0\\4a&H60&\\blur0.6"
@@ -178,8 +184,9 @@ ev.append((4.2, T_DARK, f"{{\\an8\\pos(540,250)\\fad(800,0)\\fn{FS}\\fs26\\c{TEX
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, "
     "Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, "
     "MarginR, MarginV, Encoding\n"
-    # top-left block under the label: plain wall, clear of the clock (right) and the radio (bottom left)
-    f"Style: T,{FM},44,{TEXT.rstrip('&')},&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,2,1,8,90,410,318,1\n\n"
+    # bottom-centre block, its last line at y=1400: above every app's caption/description area (~480 px),
+    # 170 px in from both sides so it clears the right-hand buttons and leaves the radio (bottom left) in view
+    f"Style: T,{FS},56,{TEXT.rstrip('&')},&H000000FF,&H8C000000,&H00000000,0,0,0,0,100,100,0,0,1,3,0,2,170,170,520,1\n\n"
     "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n" +
     "\n".join(f"Dialogue: 0,{ts(a)},{ts(b)},T,,0,0,0,,{t}" for a, b, t in ev if b > a) + "\n")
 

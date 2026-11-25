@@ -84,7 +84,7 @@ HEAD = ("[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrap
         "Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
         "Style: W,IBM Plex Mono SemiBold,70,&H00E8EFF2,&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,2,2,5,95,150,0,1\n"
         "Style: P,IBM Plex Mono SemiBold,92,&H00F2F2F2,&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,2,0,1,2,2,5,100,160,0,1\n"
-        "Style: H,IBM Plex Mono,62,&H00B8BEC2,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,1,0,1,0,0,5,95,150,0,1\n"
+        "Style: H,IBM Plex Mono,72,&H00D6DCE0,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,1,0,1,0,0,5,95,150,0,1\n"
         "Style: S,IBM Plex Mono Medium,64,&H00C8CED2,&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,0,0,5,95,150,0,1\n\n"
         "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
 
@@ -129,7 +129,7 @@ def events(k, ws, t0, t_end):
         for pi, ph in enumerate(phrases):
             a = ph[0][1] + t0 - 0.03; b = phrases[pi + 1][0][1] + t0 - 0.03 if pi + 1 < len(phrases) else t_end
             ms = int((b - a) * 1000); txt = " ".join(w[0] for w in ph).lower()
-            mv = f"\\move(512,972,512,960,0,{min(ms, 320)})"
+            mv = f"\\move(540,974,540,960,0,{min(ms, 320)})"       # true centre (user: it looked off-centre)
             ev.append(f"Dialogue: 0,{ass_time(a)},{ass_time(b)},H,,0,0,0,,{{\\blur9\\alpha&H98&\\fad(70,110){mv}\\fsp1\\t(0,{ms},\\fsp4)}}{txt}")
             ev.append(f"Dialogue: 1,{ass_time(a)},{ass_time(b)},H,,0,0,0,,{{\\blur0.7\\fad(70,110){mv}\\fsp1\\t(0,{ms},\\fsp4)}}{txt}")
     else:                                               # D: phrase by phrase, stamped
