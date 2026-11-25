@@ -125,32 +125,47 @@ def phrases(ws, maxw=10):
 def ts(t): t = max(0.0, t); return f"{int(t//3600)}:{int(t%3600//60):02d}:{t%60:05.2f}"
 
 TEXT, DIM, WIND = "&H00E8EFF2&", "&H00A8ACB0&", "&H0084888C&"
+TAGC = "&H00B8BCC0&"
 RXC, TXC = "&H00A0E87C&", "&H005C7AFF&"          # speaker names match the light: green radio, red room
 FS, FM = "IBM Plex Mono SemiBold", "IBM Plex Mono Medium"
+# 25 Nov re-cut (user: apply Corner's changes): centred, readable captions with a soft dark halo over a
+# blurred band; speaker + place label; a title card spelt out for international viewers; the label and
+# "Watch the light." after the title.
 ev = []
 for e in TL["lines"]:
     if e["id"] == "carrier":
-        ev.append((e["led_on"] + 0.35, e["led_off"], f"{{\\fn{FS}\\fs32\\c{RXC}\\fsp4\\alpha&H40&}}[CARRIER — NO VOICE]")); continue
+        ev.append((e["led_on"] + 0.35, e["led_off"], f"{{\\fn{FS}\\fs40\\c{RXC}\\fsp6\\bord3\\blur4}}[ CARRIER — NO VOICE ]")); continue
     ln = LINES[e["id"]]; hill = ln["who"] != "BASE"
-    tag = f"{{\\fn{FM}\\fs27\\c{WIND}\\fsp2}}   [wind]" if (hill and ln.get("wind")) else ""
-    head = f"{{\\fn{FS}\\fs31\\c{RXC if hill else TXC}\\fsp6}}{ln['who']}{tag}\\N{{\\fn{FM}\\fs50\\c{TEXT}\\fsp0}}"
-    ph = phrases(merge(e["id"], disp_words(e["id"], e["remap"])))
+    head = (f"{{\\fn{FS}\\fs29\\c{RXC if hill else TXC}\\fsp7\\bord3\\blur4}}{ln['who']}"
+            + (f"{{\\fn{FM}\\fs24\\c{TAGC}\\fsp4}}  ·  ON THE HILL" if hill else "")
+            + f"\\N{{\\fn{FS}\\fs56\\c{TEXT}\\fsp0\\bord3\\blur4}}")
+    ph = phrases(merge(e["id"], disp_words(e["id"], e["remap"])), maxw=7)
     for i, p in enumerate(ph):
         txt = " ".join(w[0] for w in p).replace("— —", "—")
         start = p[0][1] - 0.05
         stop = ph[i+1][0][1] - 0.05 if i + 1 < len(ph) else min(p[-1][2] + 0.5, e["end"] + 0.25)
         ev.append((start, stop, head + txt))
-ev.append((0.10, 2.40, f"{{\\an8\\pos(540,350)\\fad(220,320)\\fn{FM}\\fs56\\c{TEXT}\\fsp2}}Watch the light."))
-ev.append((0.10, T, f"{{\\an8\\pos(540,236)\\fad(220,0)\\fn{FS}\\fs30\\c{TEXT}\\fsp10\\alpha&H30&}}TRANSMISSION 01 · PART 1"
-                    f"\\N{{\\fn{FM}\\fs22\\c{DIM}\\fsp5}}MOUNTAIN RESCUE CHANNEL · CAIRNGORMS"))
+first = min(a for a, b, t in ev)
+ev.insert(0, (first - 0.4, T, "{\\an7\\pos(0,0)\\fad(700,0)\\c&H000000&\\alpha&H70&\\blur48\\bord0\\shad0\\p1}"
+              "m 175 1085 l 905 1085 l 905 1450 l 175 1450{\\p0}"))
+SH = "\\bord3\\shad0\\3c&H000000&\\3a&H70&\\blur4"
+TY = 500                                          # over the map: clear of the radio and its light
+ev.append((0.15, 3.9, f"{{\\an5\\pos(540,{TY + 80})\\fad(700,700)\\c&H000000&\\alpha&H3C&\\blur60\\bord0\\shad0\\p1}}m -420 -175 l 420 -175 l 420 175 l -420 175{{\\p0}}"))
+ev.append((0.25, 3.9, f"{{\\an5\\pos(540,{TY})\\fad(900,600)\\fn{FS}\\fs70\\c{TEXT}\\fsp24\\t(0,1800,0.5,\\fsp10){SH}}}MOUNTAIN RESCUE"))
+ev.append((0.70, 3.9, f"{{\\an5\\pos(540,{TY + 56})\\fad(300,600)\\c{TEXT}\\alpha&H40&\\bord0\\shad0\\fscx0\\t(0,900,0.6,\\fscx100)\\p1}}m 0 0 l 460 0 l 460 3 l 0 3{{\\p0}}"))
+ev.append((0.95, 3.9, f"{{\\an5\\pos(540,{TY + 112})\\fad(700,600)\\fn{FS}\\fs40\\c{TEXT}\\fsp9{SH}}}CAIRNGORMS, SCOTLAND"))
+ev.append((1.40, 3.9, f"{{\\an5\\pos(540,{TY + 168})\\fad(700,600)\\fn{FS}\\fs33\\c{TEXT}\\fsp10{SH}}}ZERO VISIBILITY"))
+ev.append((3.95, 6.6, f"{{\\an5\\pos(540,{TY + 80})\\fad(300,400)\\fn{FS}\\fs60\\c{TEXT}\\fsp2{SH}}}Watch the light."))
+ev.append((4.2, T, f"{{\\an8\\pos(540,236)\\fad(800,0)\\fn{FS}\\fs30\\c{TEXT}\\fsp10\\alpha&H20&{SH}}}TRANSMISSION 01 · PART 1"
+                   f"\\N{{\\fn{FM}\\fs24\\c{TAGC}\\fsp4}}MOUNTAIN RESCUE CHANNEL · CAIRNGORMS, SCOTLAND"))
 (D / "captions2.ass").write_text(
     "[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 0\n\n[V4+ Styles]\n"
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, "
     "Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, "
     "MarginR, MarginV, Encoding\n"
-    f"Style: T,{FM},50,{TEXT.rstrip('&')},&H000000FF,&H00000000,&H60000000,0,0,0,0,100,100,0,0,1,0,2,2,100,150,520,1\n\n"
+    f"Style: T,{FS},56,{TEXT.rstrip('&')},&H000000FF,&H8C000000,&H00000000,0,0,0,0,100,100,0,0,1,3,0,2,170,170,520,1\n\n"
     "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n" +
-    "\n".join(f"Dialogue: 0,{ts(a)},{ts(b)},T,,0,0,0,,{t}" for a, b, t in ev) + "\n")
+    "\n".join(f"Dialogue: 0,{ts(a)},{ts(b)},T,,0,0,0,,{t}" for a, b, t in ev if b > a) + "\n")
 
 print(f"master_social.wav at {social_master():.1f} LUFS")
 # ---------- render -----------------------------------------------------------------------------
