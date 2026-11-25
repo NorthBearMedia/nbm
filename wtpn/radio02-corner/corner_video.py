@@ -170,13 +170,14 @@ ev.insert(0, (first - 0.4, T_DARK, "{\\an7\\pos(0,0)\\fad(700,0)\\c&H000000&\\al
            "m 175 1085 l 905 1085 l 905 1450 l 175 1450{\\p0}"))
 # opening title (user: stylish, no hook): letters settle from wide tracking, a hairline rule draws out from
 # the centre, the place and the season follow; all of it leaves together. Then just "TRANSMISSION 02".
-SH = "\\bord0\\shad0\\4a&H60&\\blur0.6"
+SH = "\\bord3\\shad0\\3c&H000000&\\3a&H70&\\blur4"            # the captions' soft dark halo (user: title not clear enough)
 TY = 660
-ev.append((0.15, 3.9, f"{{\\an5\\pos(540,{TY + 70})\\fad(900,700)\\c&H000000&\\alpha&H78&\\blur38\\bord0\\p1}}m -330 -120 l 330 -120 l 330 120 l -330 120{{\\p0}}"))   # soft dark wash behind the title
-ev.append((0.25, 3.9, f"{{\\an5\\pos(540,{TY})\\fad(900,600)\\fn{FS}\\fs66\\c{TEXT}\\fsp30\\t(0,1800,0.5,\\fsp14){SH}}}HILL FARM"))
-ev.append((0.70, 3.9, f"{{\\an5\\pos(540,{TY + 52})\\fad(300,600)\\c{TEXT}\\alpha&H70&\\fscx0\\t(0,900,0.6,\\fscx100)\\p1}}m 0 0 l 360 0 l 360 2 l 0 2{{\\p0}}"))
-ev.append((0.95, 3.9, f"{{\\an5\\pos(540,{TY + 100})\\fad(700,600)\\fn{FM}\\fs30\\c{TEXT}\\fsp16{SH}}}CO. MAYO"))
-ev.append((1.40, 3.9, f"{{\\an5\\pos(540,{TY + 146})\\fad(700,600)\\fn{FM}\\fs21\\c{TEXT}\\alpha&H28&\\fsp22{SH}}}LAMBING SEASON"))
+# a deeper, wider wash so the lit window can't eat the small lines
+ev.append((0.15, 3.9, f"{{\\an5\\pos(540,{TY + 80})\\fad(700,700)\\c&H000000&\\alpha&H3C&\\blur60\\bord0\\shad0\\p1}}m -400 -175 l 400 -175 l 400 175 l -400 175{{\\p0}}"))
+ev.append((0.25, 3.9, f"{{\\an5\\pos(540,{TY})\\fad(900,600)\\fn{FS}\\fs74\\c{TEXT}\\fsp28\\t(0,1800,0.5,\\fsp14){SH}}}HILL FARM"))
+ev.append((0.70, 3.9, f"{{\\an5\\pos(540,{TY + 56})\\fad(300,600)\\c{TEXT}\\alpha&H40&\\bord0\\shad0\\fscx0\\t(0,900,0.6,\\fscx100)\\p1}}m 0 0 l 420 0 l 420 3 l 0 3{{\\p0}}"))
+ev.append((0.95, 3.9, f"{{\\an5\\pos(540,{TY + 112})\\fad(700,600)\\fn{FS}\\fs42\\c{TEXT}\\fsp12{SH}}}CO. MAYO"))
+ev.append((1.40, 3.9, f"{{\\an5\\pos(540,{TY + 168})\\fad(700,600)\\fn{FS}\\fs33\\c{TEXT}\\fsp10{SH}}}LAMBING SEASON"))
 # the label sits below every app's top bar (TikTok tabs, Reels header, Shorts icons)
 ev.append((4.2, T_DARK, f"{{\\an8\\pos(540,250)\\fad(800,0)\\fn{FS}\\fs26\\c{TEXT}\\fsp12\\alpha&H40&}}TRANSMISSION 02"))
 (D / "captions.ass").write_text(
