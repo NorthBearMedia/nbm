@@ -1,0 +1,23 @@
+{
+ "note": "Acting test: the key moment only. Dad in the kitchen at 3am, phone on speaker on the table next to the baby monitor (our radio). Mum on a night shift.",
+ "voices": {
+  "DAD": {"name": "Harry (East London, 20s)", "id": "kOVqQImaJYcrUxZmjqgl"},
+  "MUM": {"name": "Ruby B (Cockney)", "id": "jUPSOpRcPt8GMPsWx5fy"},
+  "SHUSH": {"name": "Samantha (Essex)", "id": "125VaT82UBJoVCbJxSya"}
+ },
+ "lead": [
+  ["DAD", "[tired] Alright, babe. She's only just gone off. It's been chucking it down all night out there."],
+  ["MUM", "[warm] Ah, bless her. It's been mental in here, babe, I ain't even had me break yet."]
+ ],
+ "lines": [
+  {"id": "d1", "who": "DAD", "tag": "[quietly]", "text": "Kel. Did you come home?"},
+  {"id": "m1", "who": "MUM", "tag": "", "text": "What? No, I'm at work. Why?"},
+  {"id": "d2", "who": "DAD", "tag": "[quietly]", "text": "Someone's in with her."},
+  {"id": "m2", "who": "MUM", "tag": "", "text": "What?"},
+  {"id": "d3", "who": "DAD", "tag": "[whispering]", "text": "Listen."},
+  {"id": "m3", "who": "MUM", "tag": "[quietly]", "text": "That's how I do it."},
+  {"id": "m4", "who": "MUM", "tag": "[scared]", "text": "Danny. Get up there."},
+  {"id": "d4", "who": "DAD", "tag": "[whispering]", "text": "Kel. Someone's on the stairs."}
+ ],
+ "sac": ["MUM", "[scared] Danny? Danny, talk to me."]
+}

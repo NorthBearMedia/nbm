@@ -1,0 +1,338 @@
+{
+ "A0_d1": {
+  "acc": 0.8,
+  "st": 21.7,
+  "dur": 2.23,
+  "heard": "Cal, did you come home?"
+ },
+ "A0_d2": {
+  "acc": 0.0,
+  "st": 2.4,
+  "dur": 1.87,
+  "heard": "Sammanzimmuva."
+ },
+ "A0_d3": {
+  "acc": 1.0,
+  "st": 3.1,
+  "dur": 0.9,
+  "heard": "Listen."
+ },
+ "A0_d4": {
+  "acc": 1.0,
+  "st": 4.8,
+  "dur": 2.36,
+  "heard": "Kel, someone's on the stairs."
+ },
+ "A0_m1": {
+  "acc": 1.0,
+  "st": 11.1,
+  "dur": 2.89,
+  "heard": "What? No, I'm at work. Why?"
+ },
+ "A0_m2": {
+  "acc": 1.0,
+  "st": 13.1,
+  "dur": 0.77,
+  "heard": "What?"
+ },
+ "A0_m3": {
+  "acc": 1.0,
+  "st": 8.7,
+  "dur": 1.66,
+  "heard": "That's how I do it."
+ },
+ "A0_m4": {
+  "acc": 1.0,
+  "st": 11.0,
+  "dur": 1.87,
+  "heard": "Danny, get up there."
+ },
+ "A1_d1": {
+  "acc": 0.8,
+  "st": 14.1,
+  "dur": 2.42,
+  "heard": "Cal, did you come home?"
+ },
+ "A1_d2": {
+  "acc": 1.0,
+  "st": 2.7,
+  "dur": 1.55,
+  "heard": "Someone's in with her."
+ },
+ "A1_d3": {
+  "acc": 1.0,
+  "st": 0.0,
+  "dur": 0.8,
+  "heard": "Listen."
+ },
+ "A1_d4": {
+  "acc": 1.0,
+  "st": 13.7,
+  "dur": 2.34,
+  "heard": "Kel, someone's on the stairs."
+ },
+ "A1_m1": {
+  "acc": 1.0,
+  "st": 10.3,
+  "dur": 2.86,
+  "heard": "What? No, I'm at work. Why?"
+ },
+ "A1_m2": {
+  "acc": 1.0,
+  "st": 12.7,
+  "dur": 0.69,
+  "heard": "What?"
+ },
+ "A1_m3": {
+  "acc": 1.0,
+  "st": 3.3,
+  "dur": 1.61,
+  "heard": "That's how I do it."
+ },
+ "A1_m4": {
+  "acc": 1.0,
+  "st": 9.7,
+  "dur": 2.0,
+  "heard": "Danny, get up there."
+ },
+ "A2_d1": {
+  "acc": 1.0,
+  "st": 7.1,
+  "dur": 2.62,
+  "heard": "Kel, did you come home?"
+ },
+ "A2_d2": {
+  "acc": 1.0,
+  "st": 5.0,
+  "dur": 1.76,
+  "heard": "Someone's in with her."
+ },
+ "A2_d3": {
+  "acc": 1.0,
+  "st": 3.5,
+  "dur": 0.9,
+  "heard": "Listen."
+ },
+ "A2_d4": {
+  "acc": 1.0,
+  "st": 4.1,
+  "dur": 2.23,
+  "heard": "Kel, someone's on the stairs."
+ },
+ "A2_m1": {
+  "acc": 1.0,
+  "st": 12.3,
+  "dur": 2.78,
+  "heard": "What? No, I'm at work. Why?"
+ },
+ "A2_m2": {
+  "acc": 1.0,
+  "st": 13.2,
+  "dur": 0.85,
+  "heard": "What?"
+ },
+ "A2_m3": {
+  "acc": 1.0,
+  "st": 2.9,
+  "dur": 1.58,
+  "heard": "That's how I do it."
+ },
+ "A2_m4": {
+  "acc": 1.0,
+  "st": 11.9,
+  "dur": 1.87,
+  "heard": "Danny, get up there."
+ },
+ "A3_d1": {
+  "acc": 0.8,
+  "st": 7.3,
+  "dur": 2.68,
+  "heard": "Cal, did you come home?"
+ },
+ "A3_d2": {
+  "acc": 1.0,
+  "st": 19.4,
+  "dur": 1.71,
+  "heard": "Someone's in with her."
+ },
+ "A3_d3": {
+  "acc": 1.0,
+  "st": 2.0,
+  "dur": 0.85,
+  "heard": "Listen."
+ },
+ "A3_d4": {
+  "acc": 1.0,
+  "st": 12.9,
+  "dur": 2.21,
+  "heard": "Kel, someone's on the stairs."
+ },
+ "A3_m1": {
+  "acc": 1.0,
+  "st": 9.6,
+  "dur": 2.57,
+  "heard": "What? No, I'm at work. Why?"
+ },
+ "A3_m2": {
+  "acc": 1.0,
+  "st": 11.2,
+  "dur": 0.77,
+  "heard": "What?"
+ },
+ "A3_m3": {
+  "acc": 1.0,
+  "st": 4.2,
+  "dur": 2.02,
+  "heard": "That's how I do it."
+ },
+ "A3_m4": {
+  "acc": 1.0,
+  "st": 10.4,
+  "dur": 1.76,
+  "heard": "Danny, get up there."
+ },
+ "B0_d1": {
+  "acc": 0.8,
+  "st": 16.4,
+  "dur": 1.66,
+  "heard": "Cal, did you come home?"
+ },
+ "B0_d2": {
+  "acc": 1.0,
+  "st": 1.9,
+  "dur": 1.0,
+  "heard": "Someone's in with her."
+ },
+ "B0_d3": {
+  "acc": 1.0,
+  "st": 0.8,
+  "dur": 0.43,
+  "heard": "Listen."
+ },
+ "B0_d4": {
+  "acc": 1.0,
+  "st": 3.0,
+  "dur": 1.55,
+  "heard": "Kel, someone's on the stairs."
+ },
+ "B0_m1": {
+  "acc": 1.0,
+  "st": 8.2,
+  "dur": 3.09,
+  "heard": "What? No, I'm at work. Why?"
+ },
+ "B0_m2": {
+  "acc": 1.0,
+  "st": 9.0,
+  "dur": 0.67,
+  "heard": "What?"
+ },
+ "B0_m3": {
+  "acc": 1.0,
+  "st": 10.5,
+  "dur": 0.9,
+  "heard": "That's how I do it."
+ },
+ "B0_m4": {
+  "acc": 1.0,
+  "st": 6.1,
+  "dur": 1.68,
+  "heard": "Danny, get up there."
+ },
+ "B1_d1": {
+  "acc": 0.8,
+  "st": 17.5,
+  "dur": 1.42,
+  "heard": "Cal, did you come home?"
+ },
+ "B1_d2": {
+  "acc": 1.0,
+  "st": 2.6,
+  "dur": 0.9,
+  "heard": "Someone's in with her."
+ },
+ "B1_d3": {
+  "acc": 0.0,
+  "st": 21.4,
+  "dur": 0.48,
+  "heard": "S\u00ed, s\u00ed."
+ },
+ "B1_d4": {
+  "acc": 1.0,
+  "st": 3.6,
+  "dur": 1.55,
+  "heard": "Kel, someone's on the stairs."
+ },
+ "B1_m1": {
+  "acc": 1.0,
+  "st": 9.8,
+  "dur": 2.68,
+  "heard": "What? No, I'm at work. Why?"
+ },
+ "B1_m2": {
+  "acc": 1.0,
+  "st": 2.6,
+  "dur": 0.48,
+  "heard": "What?"
+ },
+ "B1_m3": {
+  "acc": 1.0,
+  "st": 6.8,
+  "dur": 1.47,
+  "heard": "That's how I do it."
+ },
+ "B1_m4": {
+  "acc": 1.0,
+  "st": 9.0,
+  "dur": 1.89,
+  "heard": "Danny, get up there."
+ },
+ "B2_d1": {
+  "acc": 0.8,
+  "st": 9.9,
+  "dur": 1.32,
+  "heard": "Cal, did you come home?"
+ },
+ "B2_d2": {
+  "acc": 1.0,
+  "st": 2.5,
+  "dur": 1.14,
+  "heard": "Someone's in with her."
+ },
+ "B2_d3": {
+  "acc": 1.0,
+  "st": 20.2,
+  "dur": 0.59,
+  "heard": "listen."
+ },
+ "B2_d4": {
+  "acc": 1.0,
+  "st": 4.9,
+  "dur": 1.61,
+  "heard": "Kel, someone's on the stairs."
+ },
+ "B2_m1": {
+  "acc": 1.0,
+  "st": 11.2,
+  "dur": 2.68,
+  "heard": "What? No, I'm at work. Why?"
+ },
+ "B2_m2": {
+  "acc": 1.0,
+  "st": 10.9,
+  "dur": 0.53,
+  "heard": "What?"
+ },
+ "B2_m3": {
+  "acc": 1.0,
+  "st": 4.8,
+  "dur": 1.55,
+  "heard": "That's how I do it."
+ },
+ "B2_m4": {
+  "acc": 1.0,
+  "st": 8.0,
+  "dur": 1.61,
+  "heard": "Danny, get up there."
+ }
+}
