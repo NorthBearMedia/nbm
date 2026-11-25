@@ -1,0 +1,34 @@
+{
+ "voices": {
+  "DANNY": {"name": "Harry (East London, 20s)", "id": "kOVqQImaJYcrUxZmjqgl"},
+  "KEL": {"name": "Ruby B (Cockney)", "id": "jUPSOpRcPt8GMPsWx5fy"}
+ },
+ "lead": [
+  ["DANNY", "[tired] Alright, babe. It's been chucking it down all night out here, and I ain't sat down since ten."],
+  ["KEL", "[warm] Ah, bless you. It's been mental in here, babe, I ain't even had me break yet."]
+ ],
+ "lines": [
+  {"id": "k01", "who": "KEL",   "tag": "", "text": "Did you do the shush? Three long and a short one."},
+  {"id": "d01", "who": "DANNY", "tag": "", "text": "I did, like... two long ones."},
+  {"id": "k02", "who": "KEL",   "tag": "[laughs]", "text": "Dan."},
+  {"id": "d02", "who": "DANNY", "tag": "[quietly]", "text": "She's stopped."},
+  {"id": "k03", "who": "KEL",   "tag": "", "text": "See? Told you she'd settle."},
+  {"id": "d03", "who": "DANNY", "tag": "", "text": "Just like that?"},
+  {"id": "k04", "who": "KEL",   "tag": "", "text": "Just like that. Go put the kettle on, you've earned it."},
+  {"id": "d04", "who": "DANNY", "tag": "", "text": "What's that?"},
+  {"id": "k05", "who": "KEL",   "tag": "", "text": "What's what?"},
+  {"id": "d05", "who": "DANNY", "tag": "", "text": "That creaking. On the monitor."},
+  {"id": "k06", "who": "KEL",   "tag": "", "text": "That's the chair. The feeding chair does that when you rock it."},
+  {"id": "d06", "who": "DANNY", "tag": "[quietly]", "text": "Kel... nobody's in the chair."},
+  {"id": "d07", "who": "DANNY", "tag": "[quietly]", "text": "Kel. Did you come home?"},
+  {"id": "k07", "who": "KEL",   "tag": "", "text": "What? No, I'm at work. Why?"},
+  {"id": "d08", "who": "DANNY", "tag": "[quietly]", "text": "Someone's in with her."},
+  {"id": "k08", "who": "KEL",   "tag": "", "text": "What?"},
+  {"id": "d09", "who": "DANNY", "tag": "[whispering]", "text": "Listen."},
+  {"id": "k09", "who": "KEL",   "tag": "[quietly]", "text": "That's how I do it."},
+  {"id": "k10", "who": "KEL",   "tag": "[scared]", "text": "Danny. Get up there."},
+  {"id": "d10", "who": "DANNY", "tag": "[whispering]", "text": "Kel. Someone's on the stairs."},
+  {"id": "k11", "who": "KEL",   "tag": "[whispering]", "text": "Danny... she's on her own."}
+ ],
+ "sac": ["DANNY", "[whispering] Kel, I can't. I can't."]
+}

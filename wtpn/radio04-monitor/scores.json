@@ -1,0 +1,506 @@
+{
+ "A0_d01": {
+  "acc": 1.0,
+  "st": 20.5,
+  "dur": 3.02,
+  "heard": "I did like two long ones."
+ },
+ "A0_d02": {
+  "acc": 0.5,
+  "st": 32.3,
+  "dur": 1.08,
+  "heard": "She stopped."
+ },
+ "A0_d03": {
+  "acc": 1.0,
+  "st": 13.5,
+  "dur": 1.14,
+  "heard": "Just like that."
+ },
+ "A0_d04": {
+  "acc": 1.0,
+  "st": 10.1,
+  "dur": 0.67,
+  "heard": "What's that?"
+ },
+ "A0_d05": {
+  "acc": 1.0,
+  "st": 12.0,
+  "dur": 2.26,
+  "heard": "That creaking on the monitor."
+ },
+ "A0_d06": {
+  "acc": 1.0,
+  "st": 4.2,
+  "dur": 2.89,
+  "heard": "Kel, nobody's in the chair."
+ },
+ "A0_d07": {
+  "acc": 1.0,
+  "st": 6.5,
+  "dur": 2.15,
+  "heard": "Kel, did you come home?"
+ },
+ "A0_d08": {
+  "acc": 1.0,
+  "st": 6.0,
+  "dur": 1.58,
+  "heard": "Someone's in with her."
+ },
+ "A0_d09": {
+  "acc": 1.0,
+  "st": 7.0,
+  "dur": 0.64,
+  "heard": "Listen."
+ },
+ "A0_d10": {
+  "acc": 1.0,
+  "st": 5.1,
+  "dur": 2.26,
+  "heard": "Kel, someone's on the stairs."
+ },
+ "A0_k01": {
+  "acc": 0.96,
+  "st": 8.2,
+  "dur": 3.62,
+  "heard": "yet? Did you do the shush? Three long and a short one."
+ },
+ "A0_k02": {
+  "acc": 0.0,
+  "st": 4.6,
+  "dur": 0.82,
+  "heard": "Done."
+ },
+ "A0_k03": {
+  "acc": 1.0,
+  "st": 7.7,
+  "dur": 1.87,
+  "heard": "See? Told you she'd settle."
+ },
+ "A0_k04": {
+  "acc": 1.0,
+  "st": 7.1,
+  "dur": 3.3,
+  "heard": "Just like that. Go put the kettle on. You've earned it."
+ },
+ "A0_k05": {
+  "acc": 1.0,
+  "st": 11.5,
+  "dur": 0.77,
+  "heard": "What's what?"
+ },
+ "A0_k06": {
+  "acc": 1.0,
+  "st": 8.8,
+  "dur": 3.75,
+  "heard": "That's the chair. The feeding chair does that when you rock it."
+ },
+ "A0_k07": {
+  "acc": 1.0,
+  "st": 10.9,
+  "dur": 2.78,
+  "heard": "What? No, I'm at work. Why?"
+ },
+ "A0_k08": {
+  "acc": 1.0,
+  "st": 6.9,
+  "dur": 0.77,
+  "heard": "What?"
+ },
+ "A0_k09": {
+  "acc": 1.0,
+  "st": 6.9,
+  "dur": 1.79,
+  "heard": "That's how I do it."
+ },
+ "A0_k10": {
+  "acc": 1.0,
+  "st": 5.9,
+  "dur": 2.0,
+  "heard": "Danny, get up there."
+ },
+ "A0_k11": {
+  "acc": 1.0,
+  "st": 5.5,
+  "dur": 2.08,
+  "heard": "Danny, she's on her own."
+ },
+ "A1_d01": {
+  "acc": 1.0,
+  "st": 21.3,
+  "dur": 3.51,
+  "heard": "I did like two long ones."
+ },
+ "A1_d02": {
+  "acc": 0.5,
+  "st": 30.3,
+  "dur": 0.98,
+  "heard": "She stopped."
+ },
+ "A1_d03": {
+  "acc": 1.0,
+  "st": 5.9,
+  "dur": 0.67,
+  "heard": "Just like that."
+ },
+ "A1_d04": {
+  "acc": 1.0,
+  "st": 3.1,
+  "dur": 0.51,
+  "heard": "What's that?"
+ },
+ "A1_d05": {
+  "acc": 1.0,
+  "st": 4.0,
+  "dur": 2.18,
+  "heard": "That creaking on the monitor."
+ },
+ "A1_d06": {
+  "acc": 1.0,
+  "st": 19.5,
+  "dur": 3.67,
+  "heard": "Kel, nobody's in the chair."
+ },
+ "A1_d07": {
+  "acc": 0.8,
+  "st": 11.0,
+  "dur": 2.1,
+  "heard": "Cal, did you come home?"
+ },
+ "A1_d08": {
+  "acc": 1.0,
+  "st": 19.2,
+  "dur": 1.37,
+  "heard": "Someone's in with her."
+ },
+ "A1_d09": {
+  "acc": 1.0,
+  "st": 1.4,
+  "dur": 0.61,
+  "heard": "Listen."
+ },
+ "A1_d10": {
+  "acc": 1.0,
+  "st": 3.4,
+  "dur": 2.1,
+  "heard": "Kel, someone's on the stairs."
+ },
+ "A1_k01": {
+  "acc": 0.96,
+  "st": 11.0,
+  "dur": 4.24,
+  "heard": "yet? Did you do the shush? Three long and a short one."
+ },
+ "A1_k02": {
+  "acc": 1.0,
+  "st": 7.4,
+  "dur": 1.08,
+  "heard": "Dan."
+ },
+ "A1_k03": {
+  "acc": 1.0,
+  "st": 9.1,
+  "dur": 2.26,
+  "heard": "See? Told you she'd settle."
+ },
+ "A1_k04": {
+  "acc": 1.0,
+  "st": 9.9,
+  "dur": 3.46,
+  "heard": "Just like that. Go put the kettle on. You've earned it."
+ },
+ "A1_k05": {
+  "acc": 1.0,
+  "st": 11.9,
+  "dur": 1.21,
+  "heard": "What's what?"
+ },
+ "A1_k06": {
+  "acc": 1.0,
+  "st": 11.6,
+  "dur": 3.75,
+  "heard": "That's the chair. The feeding chair does that when you rock it."
+ },
+ "A1_k07": {
+  "acc": 1.0,
+  "st": 11.0,
+  "dur": 2.57,
+  "heard": "What? No, I'm at work. Why?"
+ },
+ "A1_k08": {
+  "acc": 1.0,
+  "st": 14.9,
+  "dur": 1.16,
+  "heard": "What?"
+ },
+ "A1_k09": {
+  "acc": 1.0,
+  "st": 8.7,
+  "dur": 1.95,
+  "heard": "That's how I do it."
+ },
+ "A1_k10": {
+  "acc": 0.75,
+  "st": 11.7,
+  "dur": 2.0,
+  "heard": "Bunny, get up there."
+ },
+ "A1_k11": {
+  "acc": 1.0,
+  "st": 8.7,
+  "dur": 1.84,
+  "heard": "Danny, she's on her own."
+ },
+ "A2_d01": {
+  "acc": 1.0,
+  "st": 4.7,
+  "dur": 3.41,
+  "heard": "I did like two long ones."
+ },
+ "A2_d02": {
+  "acc": 0.5,
+  "st": 11.4,
+  "dur": 1.24,
+  "heard": "She stopped."
+ },
+ "A2_d03": {
+  "acc": 1.0,
+  "st": 19.6,
+  "dur": 0.9,
+  "heard": "Just like that."
+ },
+ "A2_d04": {
+  "acc": 1.0,
+  "st": 4.7,
+  "dur": 0.67,
+  "heard": "What's that?"
+ },
+ "A2_d05": {
+  "acc": 1.0,
+  "st": 7.7,
+  "dur": 2.1,
+  "heard": "That creaking on the monitor."
+ },
+ "A2_d06": {
+  "acc": 1.0,
+  "st": 5.0,
+  "dur": 2.68,
+  "heard": "Kel, nobody's in the chair."
+ },
+ "A2_d07": {
+  "acc": 0.0,
+  "st": 5.6,
+  "dur": 2.28,
+  "heard": "Cow."
+ },
+ "A2_d08": {
+  "acc": 0.0,
+  "st": 11.2,
+  "dur": 1.58,
+  "heard": "Why?"
+ },
+ "A2_d09": {
+  "acc": 0.0,
+  "st": 12.0,
+  "dur": 0.77,
+  "heard": "What?"
+ },
+ "A2_d10": {
+  "acc": 0.22,
+  "st": 16.6,
+  "dur": 2.36,
+  "heard": "Get up there. Kel,"
+ },
+ "A2_k01": {
+  "acc": 0.96,
+  "st": 7.2,
+  "dur": 4.01,
+  "heard": "yet? Did you do the shush? Three long and a short one."
+ },
+ "A2_k02": {
+  "acc": 1.0,
+  "st": 5.8,
+  "dur": 1.27,
+  "heard": "Dan."
+ },
+ "A2_k03": {
+  "acc": 1.0,
+  "st": 8.9,
+  "dur": 1.87,
+  "heard": "See? Told you she'd settle."
+ },
+ "A2_k04": {
+  "acc": 1.0,
+  "st": 9.1,
+  "dur": 4.11,
+  "heard": "Just like that. Go put the kettle on. You've earned it."
+ },
+ "A2_k05": {
+  "acc": 1.0,
+  "st": 6.1,
+  "dur": 0.82,
+  "heard": "What's what?"
+ },
+ "A2_k06": {
+  "acc": 1.0,
+  "st": 9.1,
+  "dur": 3.9,
+  "heard": "That's the chair. The feeding chair does that when you rock it."
+ },
+ "A2_k07": {
+  "acc": 0.67,
+  "st": 18.4,
+  "dur": 3.28,
+  "heard": "Did you come home? What? No, I'm at work."
+ },
+ "A2_k08": {
+  "acc": 0.0,
+  "st": 3.3,
+  "dur": 0.9,
+  "heard": "on Zoom with her."
+ },
+ "A2_k09": {
+  "acc": 0.67,
+  "st": 11.5,
+  "dur": 2.13,
+  "heard": "Listen. That's how I-"
+ },
+ "A2_k10": {
+  "acc": 0.29,
+  "st": 8.3,
+  "dur": 1.58,
+  "heard": "do it. Danny."
+ },
+ "A2_k11": {
+  "acc": 0.22,
+  "st": 12.1,
+  "dur": 2.21,
+  "heard": "on the stairs. Danny,"
+ },
+ "A3_d01": {
+  "acc": 1.0,
+  "st": 15.0,
+  "dur": 3.41,
+  "heard": "I did like two long ones."
+ },
+ "A3_d02": {
+  "acc": 0.5,
+  "st": 1.4,
+  "dur": 1.16,
+  "heard": "She stopped."
+ },
+ "A3_d03": {
+  "acc": 1.0,
+  "st": 19.6,
+  "dur": 0.9,
+  "heard": "Just like that."
+ },
+ "A3_d04": {
+  "acc": 1.0,
+  "st": 1.4,
+  "dur": 0.51,
+  "heard": "What's that?"
+ },
+ "A3_d05": {
+  "acc": 1.0,
+  "st": 13.0,
+  "dur": 2.1,
+  "heard": "That creaking on the monitor."
+ },
+ "A3_d06": {
+  "acc": 1.0,
+  "st": 3.9,
+  "dur": 2.81,
+  "heard": "Kel, nobody's in the chair."
+ },
+ "A3_d07": {
+  "acc": 1.0,
+  "st": 4.9,
+  "dur": 1.97,
+  "heard": "Kel, did you come home?"
+ },
+ "A3_d08": {
+  "acc": 0.29,
+  "st": 2.1,
+  "dur": 0.98,
+  "heard": "someone's email for"
+ },
+ "A3_d09": {
+  "acc": 1.0,
+  "st": 22.2,
+  "dur": 0.53,
+  "heard": "Listen."
+ },
+ "A3_d10": {
+  "acc": 0.8,
+  "st": 3.2,
+  "dur": 1.92,
+  "heard": "Cal, someone's on the stairs."
+ },
+ "A3_k01": {
+  "acc": 0.96,
+  "st": 7.6,
+  "dur": 3.85,
+  "heard": "Yeah. Did you do the shush? Three long and a short one."
+ },
+ "A3_k02": {
+  "acc": 1.0,
+  "st": 6.6,
+  "dur": 0.95,
+  "heard": "Dan."
+ },
+ "A3_k03": {
+  "acc": 1.0,
+  "st": 5.2,
+  "dur": 1.87,
+  "heard": "See? Told you she'd settle."
+ },
+ "A3_k04": {
+  "acc": 1.0,
+  "st": 8.5,
+  "dur": 3.23,
+  "heard": "Just like that. Go put the kettle on. You've earned it."
+ },
+ "A3_k05": {
+  "acc": 1.0,
+  "st": 4.6,
+  "dur": 0.82,
+  "heard": "What's what?"
+ },
+ "A3_k06": {
+  "acc": 1.0,
+  "st": 8.2,
+  "dur": 3.59,
+  "heard": "That's the chair. The feeding chair does that when you rock it."
+ },
+ "A3_k07": {
+  "acc": 1.0,
+  "st": 9.9,
+  "dur": 3.2,
+  "heard": "What? No, I'm at work. Why?"
+ },
+ "A3_k08": {
+  "acc": 1.0,
+  "st": 10.9,
+  "dur": 1.11,
+  "heard": "What?"
+ },
+ "A3_k09": {
+  "acc": 1.0,
+  "st": 9.1,
+  "dur": 1.32,
+  "heard": "That's how I do it."
+ },
+ "A3_k10": {
+  "acc": 1.0,
+  "st": 7.1,
+  "dur": 1.68,
+  "heard": "Danny, get up there."
+ },
+ "A3_k11": {
+  "acc": 1.0,
+  "st": 6.9,
+  "dur": 1.95,
+  "heard": "Danny, she's on her own."
+ }
+}
