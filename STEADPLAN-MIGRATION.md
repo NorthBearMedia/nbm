@@ -1108,3 +1108,31 @@ they can decide on ICO reporting.
   with the inactive main file only.
 - Still open: delete_posts_not_in_api_response() is never called, so a van that
   leaves the AutoTrader feed stays on the site. Same root cause as this duplicate.
+
+## 25 Nov — Health fixes: page cache, icons, public leftovers, prune sold vans (theme 1.2.11-nbm)
+
+- Full sweep first: all 95 sitemap URLs 200, no PHP errors; uptime 20 days clean.
+- Theme 1.2.9 to 1.2.11 (deployed in place via hostinger-hosting hosting_deploy,
+  type wordpress-theme, slug holdens; times out at 60s, live ~2.5 min later):
+  - nbm_autotrader_prune_missing(): after each full reconcile, trash published vans
+    whose vehicle_id is not in the feed. Skips if fewer than 10 records, any record
+    lacks a stockId, totalResults != results (paging), or more than max(3, 20%)
+    would go. Result in option nbm_autotrader_last_prune + audit log 'stock_prune'.
+    First real run: next daily reconcile (~13:41 UTC).
+  - Cache rules: guest GET pages send X-LiteSpeed-Cache-Control public,max-age=3600;
+    showroom, single vehicle, vehicle taxonomies, search, 404, preview, logged-in and
+    non-GET send no-cache. save_post (published or vehicle), trashed_post and
+    deleted_post send X-LiteSpeed-Purge: *. A X-LiteSpeed-Vary logged-in cookie was
+    tried in 1.2.10 and removed in 1.2.11.
+  - header.php: removed hard-coded /apple-touch-icon.png, /favicon-*.png,
+    /site.webmanifest, /safari-pinned-tab.svg (all 404); WP Site Icon covers it.
+- Hostinger server cache switched ON (hosting_websites_update-settings cache:true).
+  Before: no x-litespeed-cache header. After: guest pages report "miss", stock pages
+  none. Every request from the sandbox shows miss (the agent proxy likely forces a
+  refresh), so hits are unconfirmed from here; check UptimeRobot response times
+  (baseline ~400-430 ms) and a browser.
+- steadplan-tools/nbm-hygiene-nov2026 run.php (token-gated, self-deleting) moved
+  readme.html, readme.html.nbmbak, license.txt, wp-content/.DS_Store to
+  /home/u275789987/domains/steadplan.co.uk/nbm-private-files/2026-11-25/. All now
+  404. readme.html and license.txt come back with core updates.
+- Still open: .htaccess Holdens SetEnv secrets (needs WP login to confirm options).

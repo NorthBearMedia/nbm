@@ -1590,8 +1590,6 @@ add_action( 'template_redirect', function () {
     if ( headers_sent() ) {
         return;
     }
-    // Logged-in visitors get their own cache key, so they never see a cached guest page.
-    header( 'X-LiteSpeed-Vary: cookie=' . LOGGED_IN_COOKIE );
     $method = isset( $_SERVER['REQUEST_METHOD'] ) ? $_SERVER['REQUEST_METHOD'] : 'GET';
     if ( is_user_logged_in() || is_search() || is_404() || is_preview() || ! in_array( $method, array( 'GET', 'HEAD' ), true )
         || is_post_type_archive( 'vehicle' ) || is_singular( 'vehicle' )
