@@ -1089,3 +1089,22 @@ skipped none. Cache cleared; sql/zip/readme/.DS_Store/"wp-config copy.php" all
 404, home 200. Plugin left active (admin-only report route). Next: reset
 wp-admin passwords, confirm old host closed, Steadplan (controller) told so
 they can decide on ICO reporting.
+
+## 25 Nov — Duplicate Maxus eDeliver 7 listing removed
+
+- /vehicle/88-5kwh-auto-l1-h1-5dr/ (post 2620, GBP 24,000, Holdens-era, last
+  synced 26 Jun) was the same van as the live AutoTrader listing
+  /vehicle/88-5kwh-auto-l1-h1-5dr-2/ (post 2700, GBP 23,000, same 24 atcdn images,
+  synced daily). Not sold: re-listed on AutoTrader in Sept, sync made a new post.
+- steadplan-tools/nbm-maxus-dupe-nov2026: trashed 2620 (restorable from
+  Vehicles > Trash) and added _wp_old_slug to 2700, so the old URL 301s to the live
+  listing. Stored vehicle titles are the derivative only ("88.5kWh Auto L1 H1 5dr").
+- hostinger-hosting hosting_deploy uploads plugins but cannot activate them, so the
+  plugin ships a token-gated run.php (POST t=<token>, SHA-256 in file) that calls
+  the same function and deletes itself. First run stopped on the title check
+  (changed nothing); v1.1.0 ran OK. Result options nbm_maxus_dupe_v2_*.
+- Verified: old URL 301 -> -2 (200, GBP 23,000); showroom 42 vans with one Maxus;
+  vehicle sitemap lists only -2; run.php gone; cache cleared. Plugin folder left
+  with the inactive main file only.
+- Still open: delete_posts_not_in_api_response() is never called, so a van that
+  leaves the AutoTrader feed stays on the site. Same root cause as this duplicate.
