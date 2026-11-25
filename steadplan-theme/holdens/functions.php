@@ -1447,11 +1447,52 @@ function nbm_autotrader_sync_run( $dry = false, $sandbox = false ) {
 
     handle_vehicle_data( $data );
 
+    $pruned = nbm_autotrader_prune_missing( $data );
+    nbm_at_audit_log( 'stock_prune', $pruned );
+    update_option( 'nbm_autotrader_last_prune', $pruned + array( 'at' => current_time( 'mysql' ) ), false );
+
     nbm_at_audit_log( 'stock_pull', array( 'host' => $host, 'count' => $count ) );
     update_option( 'nbm_autotrader_last_sync', current_time( 'mysql' ) );
     update_option( 'nbm_autotrader_last_count', $count );
     delete_option( 'nbm_autotrader_last_error' );
     return $count;
+}
+
+// NBM: after a full reconcile, move vans AutoTrader no longer lists to the Trash.
+// handle_vehicle_data() only removes vans the feed still reports as sold or
+// unpublished, so a van that left the feed altogether stayed on the site for good
+// (the Holdens-era Maxus duplicate, Nov 2026). Trash, not delete, so a mistake can
+// be restored from Vehicles > Trash. Vans with no AutoTrader stock id are left alone.
+function nbm_autotrader_prune_missing( $data ) {
+    $total = isset( $data['totalResults'] ) ? (int) $data['totalResults'] : -1;
+    $feed  = array();
+    foreach ( $data['results'] as $r ) {
+        if ( ! empty( $r['metadata']['stockId'] ) ) {
+            $feed[] = (string) $r['metadata']['stockId'];
+        }
+    }
+    // Only act on a complete feed: every record has a stock id and nothing was cut off by paging.
+    if ( count( $feed ) < 10 || count( $feed ) !== count( $data['results'] ) || ( $total >= 0 && $total !== count( $data['results'] ) ) ) {
+        return array( 'skipped' => 'incomplete feed', 'feed' => count( $feed ), 'total' => $total );
+    }
+
+    $published = get_posts( array( 'post_type' => 'vehicle', 'post_status' => 'publish', 'numberposts' => -1, 'fields' => 'ids' ) );
+    $missing   = array();
+    foreach ( $published as $id ) {
+        $sid = (string) get_post_meta( $id, 'vehicle_id', true );
+        if ( '' !== $sid && ! in_array( $sid, $feed, true ) ) {
+            $missing[] = $id;
+        }
+    }
+    // A big drop means something is wrong with the feed, not that the stock sold overnight.
+    if ( count( $missing ) > max( 3, (int) floor( count( $published ) * 0.2 ) ) ) {
+        return array( 'skipped' => 'too many missing', 'missing' => count( $missing ), 'published' => count( $published ) );
+    }
+
+    foreach ( $missing as $id ) {
+        wp_trash_post( $id );
+    }
+    return array( 'trashed' => $missing );
 }
 
 add_action( 'nbm_autotrader_sync', 'nbm_autotrader_sync_run' );
@@ -1538,3 +1579,33 @@ add_action( 'rest_api_init', function () {
         ),
     ) );
 } );
+
+// NBM: Hostinger server (LiteSpeed) page cache rules. Stock changes with every
+// AutoTrader webhook, so the showroom, van pages, vehicle filters and search are
+// never cached, nor is anything a logged-in user sees. Other pages are cached, and
+// any content change (including the AutoTrader sync) sends a purge.
+add_action( 'template_redirect', function () {
+    if ( headers_sent() ) {
+        return;
+    }
+    if ( is_user_logged_in() || is_search() || is_post_type_archive( 'vehicle' ) || is_singular( 'vehicle' )
+        || is_tax( array( 'fuel_type', 'wheelbase_type', 'cab_type', 'body_type', 'colour' ) ) ) {
+        header( 'X-LiteSpeed-Cache-Control: no-cache' );
+    }
+}, 0 );
+
+function nbm_purge_page_cache() {
+    if ( ! headers_sent() ) {
+        header( 'X-LiteSpeed-Purge: *' );
+    }
+}
+add_action( 'save_post', function ( $id, $post ) {
+    if ( wp_is_post_revision( $id ) || wp_is_post_autosave( $id ) ) {
+        return;
+    }
+    if ( 'publish' === $post->post_status || 'vehicle' === $post->post_type ) {
+        nbm_purge_page_cache();
+    }
+}, 10, 2 );
+add_action( 'trashed_post', 'nbm_purge_page_cache' );
+add_action( 'deleted_post', 'nbm_purge_page_cache' );
