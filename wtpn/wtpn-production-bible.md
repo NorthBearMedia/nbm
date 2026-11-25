@@ -234,3 +234,9 @@ and their ask: first-person, interview, feels real.
 
 ## 24 NOV — TRANSMISSION 02 "CORNER" ARMED
 - Post **440507769**: **Wed 25 Nov 22:30 Europe/London**, TikTok + IG Reel + FB Reel + YT Short, ingested, AI flags on, cover 2400 ms (the HILL FARM title). Built in wtpn/radio02-corner (corner_audio.py, corner_video.py, publish.py). Every TRANSMISSION story is a Part 1; a Part 2 only for the one that takes off (user).
+
+## 25 NOV — METRICOOL: SWAPPING MEDIA, AND COVERS
+- **PUT /v2/scheduler/posts/{id} re-creates the post under a NEW id** (old id 404s). Find it again by listing the day's posts; never assume the id survives an edit.
+- **videoThumbnailUrl is NOT ingested** by saveExternalMediaFiles (it stayed on metricool-temp, which expires). Pin it: post the image as `media` on a throwaway draft with saveExternalMediaFiles, take its static.metricool.com URL, PUT that as videoThumbnailUrl, delete the draft (radio02-corner/pin_cover.py). Also set videoCoverMilliseconds to a good frame as the fallback.
+- Videos that open on black (the series warning) need an explicit cover, or the grid shows a black tile (user).
+- tools/mc_upload.py now takes .jpg/.png as well as .mp4.
