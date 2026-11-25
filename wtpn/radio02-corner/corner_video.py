@@ -176,7 +176,7 @@ TY = 660
 ev.append((0.15, 3.9, f"{{\\an5\\pos(540,{TY + 80})\\fad(700,700)\\c&H000000&\\alpha&H3C&\\blur60\\bord0\\shad0\\p1}}m -400 -175 l 400 -175 l 400 175 l -400 175{{\\p0}}"))
 ev.append((0.25, 3.9, f"{{\\an5\\pos(540,{TY})\\fad(900,600)\\fn{FS}\\fs74\\c{TEXT}\\fsp28\\t(0,1800,0.5,\\fsp14){SH}}}HILL FARM"))
 ev.append((0.70, 3.9, f"{{\\an5\\pos(540,{TY + 56})\\fad(300,600)\\c{TEXT}\\alpha&H40&\\bord0\\shad0\\fscx0\\t(0,900,0.6,\\fscx100)\\p1}}m 0 0 l 420 0 l 420 3 l 0 3{{\\p0}}"))
-ev.append((0.95, 3.9, f"{{\\an5\\pos(540,{TY + 112})\\fad(700,600)\\fn{FS}\\fs42\\c{TEXT}\\fsp12{SH}}}CO. MAYO"))
+ev.append((0.95, 3.9, f"{{\\an5\\pos(540,{TY + 112})\\fad(700,600)\\fn{FS}\\fs40\\c{TEXT}\\fsp9{SH}}}COUNTY MAYO, IRELAND"))      # user: spelt out for international viewers
 ev.append((1.40, 3.9, f"{{\\an5\\pos(540,{TY + 168})\\fad(700,600)\\fn{FS}\\fs33\\c{TEXT}\\fsp10{SH}}}LAMBING SEASON"))
 # the label sits below every app's top bar (TikTok tabs, Reels header, Shorts icons)
 ev.append((4.2, T_DARK, f"{{\\an8\\pos(540,250)\\fad(800,0)\\fn{FS}\\fs26\\c{TEXT}\\fsp12\\alpha&H40&}}TRANSMISSION 02"))
