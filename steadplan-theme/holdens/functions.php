@@ -1582,16 +1582,24 @@ add_action( 'rest_api_init', function () {
 
 // NBM: Hostinger server (LiteSpeed) page cache rules. Stock changes with every
 // AutoTrader webhook, so the showroom, van pages, vehicle filters and search are
-// never cached, nor is anything a logged-in user sees. Other pages are cached, and
-// any content change (including the AutoTrader sync) sends a purge.
+// never cached, nor is anything a logged-in user sees. Other pages are cached for an
+// hour, and any content change (including the AutoTrader sync) sends a purge. There
+// is no cache plugin, so the theme marks pages cacheable itself: without that header
+// Hostinger's cache switch caches nothing.
 add_action( 'template_redirect', function () {
     if ( headers_sent() ) {
         return;
     }
-    if ( is_user_logged_in() || is_search() || is_post_type_archive( 'vehicle' ) || is_singular( 'vehicle' )
+    // Logged-in visitors get their own cache key, so they never see a cached guest page.
+    header( 'X-LiteSpeed-Vary: cookie=' . LOGGED_IN_COOKIE );
+    $method = isset( $_SERVER['REQUEST_METHOD'] ) ? $_SERVER['REQUEST_METHOD'] : 'GET';
+    if ( is_user_logged_in() || is_search() || is_404() || is_preview() || ! in_array( $method, array( 'GET', 'HEAD' ), true )
+        || is_post_type_archive( 'vehicle' ) || is_singular( 'vehicle' )
         || is_tax( array( 'fuel_type', 'wheelbase_type', 'cab_type', 'body_type', 'colour' ) ) ) {
         header( 'X-LiteSpeed-Cache-Control: no-cache' );
+        return;
     }
+    header( 'X-LiteSpeed-Cache-Control: public,max-age=3600' );
 }, 0 );
 
 function nbm_purge_page_cache() {
