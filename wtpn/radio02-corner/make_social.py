@@ -23,5 +23,6 @@ run(["ffmpeg", "-nostdin", "-y", "-v", "error", "-i", str(D / "transmission02-pa
      "-c:v", "libx264", "-preset", "medium", "-crf", "25", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", str(D / "preview-transmission02-v4.mp4")])
 r = subprocess.run(["ffmpeg", "-nostdin", "-i", str(D / "transmission02-part1-social.mp4"), "-af", "ebur128=peak=true", "-f", "null", "-"],
                    capture_output=True, text=True).stderr
-print(f"social: {dur(D / 'transmission02-part1-social.mp4'):.2f}s (warning {dur(WARN):.2f}s + episode {TOT:.2f}s) | "
-      f"{re.findall(r'I:\s*(-?[\d.]+) LUFS', r)[-1]} LUFS, peak {re.findall(r'Peak:\s*(-?[\d.]+)', r)[-1]} dBFS")
+I_RE, P_RE = r"I:\s*(-?[\d.]+) LUFS", r"Peak:\s*(-?[\d.]+)"
+lu, pk = re.findall(I_RE, r)[-1], re.findall(P_RE, r)[-1]
+print(f"social: {dur(D / 'transmission02-part1-social.mp4'):.2f}s (warning {dur(WARN):.2f}s + episode {TOT:.2f}s) | {lu} LUFS, peak {pk} dBFS")
