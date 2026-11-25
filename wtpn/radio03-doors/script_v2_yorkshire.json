@@ -1,0 +1,317 @@
+{
+ "series": "TRANSMISSION",
+ "episode": "03 — DOORS (v2)",
+ "setting": "Haulage yard off the M62, West Yorkshire, England, 2 to 4.30 a.m., rain. We are in the transport office: Mick's desk, base radio, PC.",
+ "voices": {
+  "MICK": {
+   "name": "WTPN Yorkshire - Paul",
+   "id": "oCXdm5WkYoKVEdlbPLev",
+   "model": "eleven_v3",
+   "settings": {
+    "stability": 0.5,
+    "similarity_boost": 0.85,
+    "use_speaker_boost": true
+   },
+   "note": "night planner, room voice"
+  },
+  "ASH": {
+   "name": "Ashley - Bright, Yorkshire",
+   "id": "jIIwKmgS6dN9eWEJEvMJ",
+   "model": "eleven_v3",
+   "settings": {
+    "stability": 0.5,
+    "similarity_boost": 0.85,
+    "use_speaker_boost": true
+   },
+   "note": "gate man, radio"
+  },
+  "LEE": {
+   "name": "Tony - Northern",
+   "id": "v9I7auPeR1xGKYRPwQGG",
+   "model": "eleven_v3",
+   "settings": {
+    "stability": 0.5,
+    "similarity_boost": 0.85,
+    "use_speaker_boost": true
+   },
+   "note": "panicked driver, office phone"
+  },
+  "GAZ": {
+   "name": "Ryan - Authentic Yorkshire",
+   "id": "EvfUC5EzfWjmoPWebkXG",
+   "model": "eleven_v3",
+   "settings": {
+    "stability": 0.5,
+    "similarity_boost": 0.85,
+    "use_speaker_boost": true
+   },
+   "note": "early driver, radio from the cab"
+  }
+ },
+ "lines": [
+  {
+   "id": "e01",
+   "who": "GAZ",
+   "text": "Thirty-one's on, Dad. Bay next to Lee's. It's freezing down this end.",
+   "tag": "[cheerful]",
+   "bg": "yard_couple",
+   "pre": 1.4
+  },
+  {
+   "id": "e02",
+   "who": "MICK",
+   "text": "Mirrors, Gaz. Not your phone. And text your mam when you're at Hull.",
+   "tag": "[warmly]"
+  },
+  {
+   "id": "e03",
+   "who": "GAZ",
+   "text": "Yes, Dad. It's me first run on me own, not me first day at school.",
+   "tag": "[laughing]",
+   "bg": "cab_away",
+   "hold_after": 1.6
+  },
+  {
+   "id": "e04",
+   "who": "MICK",
+   "text": "Transport, Mick.",
+   "tag": "[tired]",
+   "aside": true,
+   "fx_before": [
+    [
+     "ring",
+     -30,
+     0.0
+    ]
+   ]
+  },
+  {
+   "id": "e05",
+   "who": "LEE",
+   "text": "Mick, it's Lee. Has anyone opened fourteen?",
+   "tag": "[panicked, out of breath]"
+  },
+  {
+   "id": "e06",
+   "who": "MICK",
+   "text": "Screen says its doors opened twenty minutes ago. Why?",
+   "tag": "[puzzled]",
+   "aside": true,
+   "fx_before": [
+    [
+     "keys_typing",
+     -34,
+     0.05
+    ]
+   ]
+  },
+  {
+   "id": "e07",
+   "who": "LEE",
+   "text": "It listened to me. All the way back down the motorway, I had the CB on, and it listened.",
+   "tag": "[terrified, whispering]",
+   "pause_cap": 0.7
+  },
+  {
+   "id": "e08",
+   "who": "LEE",
+   "text": "It knows my name now. Don't let it hear anybody's name.",
+   "tag": "[desperate]"
+  },
+  {
+   "id": "e09",
+   "who": "MICK",
+   "text": "Lee, what's in—",
+   "tag": "[confused]",
+   "aside": true,
+   "say": "Lee, what's in it",
+   "cutoff_word": "in",
+   "fx_after": [
+    [
+     "hangup",
+     -32,
+     0.2
+    ]
+   ]
+  },
+  {
+   "id": "e10",
+   "who": "MICK",
+   "text": "Twenty minutes ago.",
+   "tag": "[quietly, realising]",
+   "aside": true
+  },
+  {
+   "id": "e11",
+   "who": "MICK",
+   "text": "Gatehouse. Go and look at fourteen.",
+   "tag": "[tense]"
+  },
+  {
+   "id": "e12",
+   "who": "ASH",
+   "text": "Gatehouse? Since when am I gatehouse? ...Going.",
+   "tag": "[puzzled]",
+   "bg": "yard",
+   "pause_cap": 0.6
+  },
+  {
+   "id": "e13",
+   "who": "ASH",
+   "text": "Fourteen's wide open. There's frost on the floor, Mick. In November. It's not a fridge.",
+   "tag": "[uneasy]",
+   "bg": "trailer"
+  },
+  {
+   "id": "e14",
+   "who": "ASH",
+   "text": "There's writing in it. Like someone's done it with a finger. Lee. Lee. Lee. Over and over.",
+   "tag": "[unnerved, quietly]",
+   "bg": "trailer",
+   "pause_cap": 0.5
+  },
+  {
+   "id": "e15",
+   "who": "ASH",
+   "text": "And there's another one. Under the rest. Fresh. Three letters.",
+   "tag": "[whispering]",
+   "bg": "trailer",
+   "pause_cap": 0.6
+  },
+  {
+   "id": "e16",
+   "who": "MICK",
+   "text": "Read it.",
+   "tag": "[barely audible]"
+  },
+  {
+   "id": "e17",
+   "who": "ASH",
+   "text": "It's your lad's, Mick.",
+   "tag": "[whispering, scared]",
+   "bg": "trailer",
+   "pre": 1.6
+  },
+  {
+   "id": "e18",
+   "who": "MICK",
+   "text": "Driver of thirty-one. Pull over.",
+   "tag": "[forcing calm]"
+  },
+  {
+   "id": "e19",
+   "who": "GAZ",
+   "text": "Driver of thirty-one? Dad, you've been on nights too long. I'm on the M62, I'm behind already.",
+   "tag": "[laughing]",
+   "bg": "cab",
+   "say": "Driver of thirty-one? Dad, you've been on nights too long. I'm on the M sixty-two, I'm behind already."
+  },
+  {
+   "id": "e20",
+   "who": "MICK",
+   "text": "Just do it. Please.",
+   "tag": "[pleading]"
+  },
+  {
+   "id": "e21",
+   "who": "MICK",
+   "text": "Thirty-one. Rear doors opened.",
+   "tag": "[reading, frightened]",
+   "aside": true,
+   "fx_before": [
+    [
+     "ping",
+     -30,
+     0.35
+    ]
+   ]
+  },
+  {
+   "id": "e22",
+   "who": "MICK",
+   "text": "Your back doors have opened. Stay in the cab. Lock it.",
+   "tag": "[urgent]"
+  },
+  {
+   "id": "e23",
+   "who": "GAZ",
+   "text": "Opened? At fifty-six? Right. Pulling onto the hard shoulder. I'll have a look.",
+   "tag": "[sighs]",
+   "bg": "cab_stop",
+   "hold_after": 2.6,
+   "closing_cont": true
+  },
+  {
+   "id": "e24",
+   "who": "GAZ",
+   "text": "Doors are shut, Dad. ...Seal's gone, though.",
+   "tag": "[puzzled]",
+   "bg": "hardshoulder",
+   "cont": true,
+   "pause_cap": 0.9
+  },
+  {
+   "id": "e25",
+   "who": "GAZ",
+   "text": "Dad. Did you just say my name?",
+   "tag": "[quietly, uneasy]",
+   "bg": "hardshoulder",
+   "cont": true,
+   "pre": 1.2
+  },
+  {
+   "id": "e26",
+   "who": "MICK",
+   "text": "No.",
+   "tag": "[confused]"
+  },
+  {
+   "id": "e27",
+   "who": "GAZ",
+   "text": "Someone did.",
+   "tag": "[whispering, frightened]",
+   "bg": "hardshoulder",
+   "dropout": true,
+   "hold_after": 0.5
+  },
+  {
+   "id": "e28",
+   "who": "MICK",
+   "text": "Gaz?",
+   "tag": "[breaking]"
+  },
+  {
+   "id": "e29",
+   "who": "MICK",
+   "text": "Thirty-one. Rear doors opened.",
+   "tag": "[whispering]",
+   "aside": true,
+   "fx_before": [
+    [
+     "ping",
+     -30,
+     0.5
+    ]
+   ]
+  },
+  {
+   "id": "e30",
+   "who": "MICK",
+   "text": "Rear doors closed.",
+   "tag": "[barely a whisper]",
+   "aside": true,
+   "fx_before": [
+    [
+     "ping",
+     -30,
+     0.6
+    ]
+   ]
+  }
+ ],
+ "sfx_lines": [],
+ "notes": {
+  "ending": "e27 drops mid-transmission; Mick says the name; two pings: opened, closed; cut on 'Rear doors closed.'",
+  "rule": "after e08 Mick never says a name on the radio until e28."
+ }
+}

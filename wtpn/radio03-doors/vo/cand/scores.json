@@ -1279,5 +1279,698 @@
   "dur": 2.08,
   "lm": 0.3163120448589325,
   "rng": 8.19
+ },
+ "f01_30": {
+  "acc": 0.917,
+  "heard": "31's on Dad, bay next to Lee's. It's freezing down this end.",
+  "dur": 4.51,
+  "lm": 0.3781738877296448,
+  "rng": 7.25
+ },
+ "f01_31": {
+  "acc": 0.917,
+  "heard": "31's on, Dad. Bay next to Lee's. It's freezing down this end.",
+  "dur": 4.58,
+  "lm": 0.42397743463516235,
+  "rng": 14.98
+ },
+ "f01_32": {
+  "acc": 0.917,
+  "heard": "31's on, Dad. Bay next to Lee's. It's freezing down this end.",
+  "dur": 4.3,
+  "lm": 0.35242751240730286,
+  "rng": 15.58
+ },
+ "f02_30": {
+  "acc": 1.0,
+  "heard": "Mirrors, Harry, not your phone. And text your mum when you get to Leeds, or she'll be ringing me, and nobody wants that.",
+  "dur": 6.67,
+  "lm": 0.3143947422504425,
+  "rng": 12.19
+ },
+ "f02_31": {
+  "acc": 1.0,
+  "heard": "Mirrors, Harry, not your phone. And text your mum when you get to Leeds, or she'll be ringing me, and nobody wants that.",
+  "dur": 7.33,
+  "lm": 0.3292897641658783,
+  "rng": 10.1
+ },
+ "f02_32": {
+  "acc": 1.0,
+  "heard": "Mirrors, Harry, not your phone. And text your mum when you get to Leeds, or she'll be ringing me, and nobody wants that.",
+  "dur": 7.48,
+  "lm": 0.247356116771698,
+  "rng": 7.5
+ },
+ "f03_30": {
+  "acc": 1.0,
+  "heard": "Yes, Dad. It's me first run on me own, not me first day at school.",
+  "dur": 4.56,
+  "lm": 0.2242138385772705,
+  "rng": 21.09
+ },
+ "f03_31": {
+  "acc": 1.0,
+  "heard": "Yes, Dad. It's me first run on me own, not me first day at school.",
+  "dur": 4.92,
+  "lm": 0.3001355826854706,
+  "rng": 15.52
+ },
+ "f03_32": {
+  "acc": 1.0,
+  "heard": "Yes, Dad. It's me first run on me own, not me first day at school.",
+  "dur": 4.56,
+  "lm": 0.34968630969524384,
+  "rng": 10.99
+ },
+ "f04_30": {
+  "acc": 0.947,
+  "heard": "Go on then. Go make your old man proud.",
+  "dur": 3.2,
+  "lm": 0.03981262445449829,
+  "rng": 8.11
+ },
+ "f04_31": {
+  "acc": 1.0,
+  "heard": "Go on then. Go and make your old man proud.",
+  "dur": 3.59,
+  "lm": 0.15965867042541504,
+  "rng": 5.49
+ },
+ "f04_32": {
+  "acc": 1.0,
+  "heard": "Go on then. Go and make your old man proud.",
+  "dur": 2.94,
+  "lm": -0.061554402112960815,
+  "rng": 5.16
+ },
+ "f05_30": {
+  "acc": 1.0,
+  "heard": "Transport, Mick.",
+  "dur": 1.47,
+  "lm": 0.3144127428531647,
+  "rng": 11.53
+ },
+ "f05_31": {
+  "acc": 1.0,
+  "heard": "Transport, Mick.",
+  "dur": 1.42,
+  "lm": 0.0005384087562561035,
+  "rng": 5.25
+ },
+ "f05_32": {
+  "acc": 1.0,
+  "heard": "Transport, Mick.",
+  "dur": 1.4,
+  "lm": 0.20917391777038574,
+  "rng": 11.13
+ },
+ "f06_30": {
+  "acc": 1.0,
+  "heard": "Mick, it's Lee.",
+  "dur": 1.47,
+  "lm": 0.18720898032188416,
+  "rng": 8.93
+ },
+ "f06_31": {
+  "acc": 1.0,
+  "heard": "Mick, it's Lee.",
+  "dur": 1.45,
+  "lm": 0.4511205554008484,
+  "rng": 5.9
+ },
+ "f06_32": {
+  "acc": 1.0,
+  "heard": "Mick, it's Lee.",
+  "dur": 1.61,
+  "lm": 0.2968173176050186,
+  "rng": 7.0
+ },
+ "f07_30": {
+  "acc": 1.0,
+  "heard": "Lee, you come back for your Sarnies?",
+  "dur": 2.36,
+  "lm": 0.21103137731552124,
+  "rng": 12.58
+ },
+ "f07_31": {
+  "acc": 1.0,
+  "heard": "Lee, you come back for your sarnies?",
+  "dur": 2.52,
+  "lm": 0.2507513761520386,
+  "rng": 10.53
+ },
+ "f07_32": {
+  "acc": 1.0,
+  "heard": "Lee, you come back for your sarnies?",
+  "dur": 2.6,
+  "lm": -0.05980938673019409,
+  "rng": 11.85
+ },
+ "f08_30": {
+  "acc": 0.75,
+  "heard": "Has anyone opened 14?",
+  "dur": 2.23,
+  "lm": -0.07565370202064514,
+  "rng": 4.06
+ },
+ "f08_31": {
+  "acc": 0.75,
+  "heard": "Has anyone opened 14?",
+  "dur": 2.31,
+  "lm": 0.2030632197856903,
+  "rng": 4.96
+ },
+ "f08_32": {
+  "acc": 0.75,
+  "heard": "Has anyone opened 14?",
+  "dur": 2.39,
+  "lm": 0.32001665234565735,
+  "rng": 7.53
+ },
+ "f09_30": {
+  "acc": 0.889,
+  "heard": "Screen says its doors opened 20 minutes ago. Why?",
+  "dur": 3.23,
+  "lm": 0.2607795000076294,
+  "rng": 17.4
+ },
+ "f09_31": {
+  "acc": 0.889,
+  "heard": "Screen says its doors opened 20 minutes ago. Why?",
+  "dur": 3.46,
+  "lm": 0.36971257627010345,
+  "rng": 14.87
+ },
+ "f09_32": {
+  "acc": 0.889,
+  "heard": "Screen says its doors opened 20 minutes ago. Why?",
+  "dur": 3.23,
+  "lm": 0.29017356038093567,
+  "rng": 6.02
+ },
+ "f10_30": {
+  "acc": 0.923,
+  "heard": "It listened to me. All the way back down the M1, I had the CB on, and it listened.",
+  "dur": 7.12,
+  "lm": 0.008758068084716797,
+  "rng": 5.96
+ },
+ "f10_31": {
+  "acc": 0.923,
+  "heard": "It listened to me. All the way back down the M1, I had the CB on, and it listened.",
+  "dur": 7.35,
+  "lm": 0.3955884426832199,
+  "rng": 5.78
+ },
+ "f10_32": {
+  "acc": 0.923,
+  "heard": "It listened to me. All the way back down the M1, I had the CB on, and it listened.",
+  "dur": 7.56,
+  "lm": 0.3266492486000061,
+  "rng": 7.75
+ },
+ "f11_30": {
+  "acc": 1.0,
+  "heard": "It knows my name now. Don't let it hear anybody's name.",
+  "dur": 4.64,
+  "lm": -0.19127103686332703,
+  "rng": 7.25
+ },
+ "f11_31": {
+  "acc": 1.0,
+  "heard": "It knows my name now. Don't let it hear anybody's name.",
+  "dur": 4.9,
+  "lm": 0.3791320323944092,
+  "rng": 6.16
+ },
+ "f11_32": {
+  "acc": 1.0,
+  "heard": "It knows my name now. Don't let it hear anybody's name.",
+  "dur": 4.79,
+  "lm": 0.36365750432014465,
+  "rng": 9.85
+ },
+ "f12_30": {
+  "acc": 1.0,
+  "heard": "Lee, what's in it?",
+  "dur": 1.37,
+  "lm": 0.18565338850021362,
+  "rng": 19.92
+ },
+ "f12_31": {
+  "acc": 1.0,
+  "heard": "Lee, what's in it?",
+  "dur": 1.63,
+  "lm": 0.2557535171508789,
+  "rng": 9.62
+ },
+ "f12_32": {
+  "acc": 1.0,
+  "heard": "Lee, what's in it?",
+  "dur": 1.55,
+  "lm": 0.2122720181941986,
+  "rng": 11.8
+ },
+ "f13_30": {
+  "acc": 0.667,
+  "heard": "20 minutes ago.",
+  "dur": 1.89,
+  "lm": -0.1446399986743927,
+  "rng": 8.65
+ },
+ "f13_31": {
+  "acc": 0.667,
+  "heard": "20 minutes ago.",
+  "dur": 2.02,
+  "lm": 0.24104253947734833,
+  "rng": 3.73
+ },
+ "f13_32": {
+  "acc": 0.667,
+  "heard": "20 minutes ago.",
+  "dur": 1.81,
+  "lm": 0.020238488912582397,
+  "rng": 2.2
+ },
+ "f14_30": {
+  "acc": 0.833,
+  "heard": "Gatehouse. Go and look at 14.",
+  "dur": 3.09,
+  "lm": 0.201015442609787,
+  "rng": 9.46
+ },
+ "f14_31": {
+  "acc": 0.833,
+  "heard": "Gatehouse, go and look at 14.",
+  "dur": 2.96,
+  "lm": 0.16165462136268616,
+  "rng": 10.77
+ },
+ "f14_32": {
+  "acc": 0.833,
+  "heard": "Gatehouse, go and look at 14.",
+  "dur": 2.49,
+  "lm": -0.011947989463806152,
+  "rng": 9.52
+ },
+ "f15_30": {
+  "acc": 0.75,
+  "heard": "Gatehouse? Since when am I a gatehouse? Go in.",
+  "dur": 5.11,
+  "lm": -0.030673861503601074,
+  "rng": 12.84
+ },
+ "f15_31": {
+  "acc": 0.75,
+  "heard": "Gatehouse? Since when am I a gatehouse? Go in.",
+  "dur": 5.65,
+  "lm": 0.15815690159797668,
+  "rng": 14.52
+ },
+ "f15_32": {
+  "acc": 0.75,
+  "heard": "Gatehouse? Since when am I a gatehouse? Go in.",
+  "dur": 4.53,
+  "lm": 0.23158422112464905,
+  "rng": 12.5
+ },
+ "f16_30": {
+  "acc": 0.933,
+  "heard": "14's wide open. There's frost on the floor, Mick, in November. It ain't a fridge.",
+  "dur": 7.61,
+  "lm": 0.1937761902809143,
+  "rng": 8.03
+ },
+ "f16_31": {
+  "acc": 0.933,
+  "heard": "14's wide open. There's frost on the floor, Mick, in November. It ain't a fridge.",
+  "dur": 7.61,
+  "lm": 0.2404651939868927,
+  "rng": 10.58
+ },
+ "f16_32": {
+  "acc": 0.933,
+  "heard": "14's wide open. There's frost on the floor, Mick, in November. It ain't a fridge.",
+  "dur": 7.38,
+  "lm": 0.3470591604709625,
+  "rng": 13.02
+ },
+ "f17_30": {
+  "acc": 1.0,
+  "heard": "There's writing in it, like someone's done it with their finger. Lee, Lee, Lee, over and over.",
+  "dur": 11.22,
+  "lm": 0.014545708894729614,
+  "rng": 5.93
+ },
+ "f17_31": {
+  "acc": 1.0,
+  "heard": "There's writing in it, like someone's done it with their finger. Lee, Lee, Lee, over and over.",
+  "dur": 11.09,
+  "lm": 0.04822176694869995,
+  "rng": 6.0
+ },
+ "f17_32": {
+  "acc": 1.0,
+  "heard": "There's writing in it, like someone's done it with their finger. Lee, Lee, Lee, over and over.",
+  "dur": 10.43,
+  "lm": 0.04032337665557861,
+  "rng": 7.8
+ },
+ "f18_30": {
+  "acc": 1.0,
+  "heard": "And there's another one under the rest, fresh, five letters.",
+  "dur": 6.2,
+  "lm": 0.25145387649536133,
+  "rng": 5.94
+ },
+ "f18_31": {
+  "acc": 1.0,
+  "heard": "And there's another one under the rest, fresh, five letters.",
+  "dur": 6.54,
+  "lm": 0.19465774297714233,
+  "rng": 5.81
+ },
+ "f18_32": {
+  "acc": 1.0,
+  "heard": "And there's another one under the rest. Fresh, five letters.",
+  "dur": 6.23,
+  "lm": 0.28490281105041504,
+  "rng": 8.05
+ },
+ "f19_30": {
+  "acc": 1.0,
+  "heard": "Read it.",
+  "dur": 1.53,
+  "lm": 0.24341070652008057,
+  "rng": 3.55
+ },
+ "f19_31": {
+  "acc": 1.0,
+  "heard": "Read it.",
+  "dur": 1.14,
+  "lm": null,
+  "rng": 4.35
+ },
+ "f19_32": {
+  "acc": 1.0,
+  "heard": "Read it.",
+  "dur": 1.37,
+  "lm": 0.11339786648750305,
+  "rng": 8.65
+ },
+ "f20_30": {
+  "acc": 0.857,
+  "heard": "It's your boys,",
+  "dur": 2.02,
+  "lm": 0.08795452117919922,
+  "rng": 5.57
+ },
+ "f20_31": {
+  "acc": 0.0,
+  "heard": "He's",
+  "dur": 1.71,
+  "lm": -0.2537497580051422,
+  "rng": 2.55
+ },
+ "f20_32": {
+  "acc": 1.0,
+  "heard": "It's your boys, Mick.",
+  "dur": 2.05,
+  "lm": 0.040193647146224976,
+  "rng": 8.31
+ },
+ "f21_30": {
+  "acc": 0.8,
+  "heard": "Driver of 31, pull over.",
+  "dur": 2.81,
+  "lm": 0.1468050479888916,
+  "rng": 10.74
+ },
+ "f21_31": {
+  "acc": 0.8,
+  "heard": "Driver of 31, pull over.",
+  "dur": 2.57,
+  "lm": 0.25558388233184814,
+  "rng": 9.93
+ },
+ "f21_32": {
+  "acc": 0.8,
+  "heard": "Driver of 31, pull over.",
+  "dur": 2.49,
+  "lm": 0.18639320135116577,
+  "rng": 10.07
+ },
+ "f22_30": {
+  "acc": 0.857,
+  "heard": "Driver of 31? Dad, you've been on nights too long. I'm on the M1. I'm behind already.",
+  "dur": 6.73,
+  "lm": 0.46275317668914795,
+  "rng": 6.7
+ },
+ "f22_31": {
+  "acc": 0.857,
+  "heard": "Driver of 31? Dad, you've been on nights too long. I'm on the M1. I'm behind already.",
+  "dur": 6.52,
+  "lm": 0.4553526043891907,
+  "rng": 17.26
+ },
+ "f22_32": {
+  "acc": 0.857,
+  "heard": "Driver of 31? Dad, you've been on nights too long. I'm on the M1. I'm behind already.",
+  "dur": 6.33,
+  "lm": 0.37052634358406067,
+  "rng": 5.09
+ },
+ "f23_30": {
+  "acc": 1.0,
+  "heard": "Just do it, son. Please.",
+  "dur": 2.44,
+  "lm": 0.2854195833206177,
+  "rng": 12.25
+ },
+ "f23_31": {
+  "acc": 1.0,
+  "heard": "Just do it, son. Please.",
+  "dur": 2.34,
+  "lm": 0.27096834778785706,
+  "rng": 15.49
+ },
+ "f23_32": {
+  "acc": 1.0,
+  "heard": "Just do it, son, please.",
+  "dur": 2.13,
+  "lm": 0.26491738855838776,
+  "rng": 12.86
+ },
+ "f24_30": {
+  "acc": 0.75,
+  "heard": "31, rear doors opened.",
+  "dur": 2.78,
+  "lm": 0.2369648814201355,
+  "rng": 6.82
+ },
+ "f24_31": {
+  "acc": 0.75,
+  "heard": "31. Rear doors opened.",
+  "dur": 2.36,
+  "lm": 0.2601999044418335,
+  "rng": 7.18
+ },
+ "f24_32": {
+  "acc": 0.75,
+  "heard": "31. Rear doors opened.",
+  "dur": 2.73,
+  "lm": 0.2254854440689087,
+  "rng": 5.01
+ },
+ "f25_30": {
+  "acc": 1.0,
+  "heard": "Your back doors have opened. Stay in the cab. Lock it.",
+  "dur": 3.62,
+  "lm": 0.041264086961746216,
+  "rng": 9.29
+ },
+ "f25_31": {
+  "acc": 1.0,
+  "heard": "Your back doors have opened. Stay in the cab. Lock it.",
+  "dur": 3.85,
+  "lm": 0.2960405945777893,
+  "rng": 10.74
+ },
+ "f25_32": {
+  "acc": 1.0,
+  "heard": "Your back doors have opened. Stay in the cab. Lock it.",
+  "dur": 3.36,
+  "lm": 0.24580609798431396,
+  "rng": 9.2
+ },
+ "f26_30": {
+  "acc": 0.923,
+  "heard": "Opened at 56? Right, pulling onto the hard shoulder. I'll have a look.",
+  "dur": 5.76,
+  "lm": 0.3680915981531143,
+  "rng": 11.15
+ },
+ "f26_31": {
+  "acc": 0.923,
+  "heard": "Opened at 56? Right, pulling onto the hard shoulder. I'll have a look.",
+  "dur": 5.99,
+  "lm": 0.341095894575119,
+  "rng": 10.69
+ },
+ "f26_32": {
+  "acc": 0.923,
+  "heard": "Opened at 56? Right, pulling onto the hard shoulder. I'll have a look.",
+  "dur": 6.02,
+  "lm": 0.37582510709762573,
+  "rng": 7.1
+ },
+ "f27_30": {
+  "acc": 1.0,
+  "heard": "Doors are shut, Dad. Seal's gone, though.",
+  "dur": 2.89,
+  "lm": 0.32293976843357086,
+  "rng": 10.29
+ },
+ "f27_31": {
+  "acc": 1.0,
+  "heard": "Doors are shut, Dad. Seal's gone, though.",
+  "dur": 2.83,
+  "lm": 0.10720589756965637,
+  "rng": 9.02
+ },
+ "f27_32": {
+  "acc": 1.0,
+  "heard": "Doors are shut, Dad. Seal's gone, though.",
+  "dur": 2.91,
+  "lm": 0.27832579612731934,
+  "rng": 13.26
+ },
+ "f28_30": {
+  "acc": 1.0,
+  "heard": "Dad, did you just say my name?",
+  "dur": 2.96,
+  "lm": 0.3290104866027832,
+  "rng": 13.61
+ },
+ "f28_31": {
+  "acc": 1.0,
+  "heard": "Dad, did you just say my name?",
+  "dur": 2.89,
+  "lm": 0.2651470899581909,
+  "rng": 6.81
+ },
+ "f28_32": {
+  "acc": 1.0,
+  "heard": "Dad, did you just say my name?",
+  "dur": 2.96,
+  "lm": 0.33827823400497437,
+  "rng": 5.95
+ },
+ "f29_30": {
+  "acc": 1.0,
+  "heard": "No.",
+  "dur": 0.93,
+  "lm": null,
+  "rng": 14.26
+ },
+ "f29_31": {
+  "acc": 1.0,
+  "heard": "No.",
+  "dur": 0.9,
+  "lm": null,
+  "rng": 12.22
+ },
+ "f29_32": {
+  "acc": 1.0,
+  "heard": "No.",
+  "dur": 0.9,
+  "lm": null,
+  "rng": 11.96
+ },
+ "f30_30": {
+  "acc": 1.0,
+  "heard": "Someone did.",
+  "dur": 1.68,
+  "lm": 0.25955066084861755,
+  "rng": 28.62
+ },
+ "f30_31": {
+  "acc": 1.0,
+  "heard": "Someone did.",
+  "dur": 1.29,
+  "lm": null,
+  "rng": 14.07
+ },
+ "f30_32": {
+  "acc": 1.0,
+  "heard": "Someone did.",
+  "dur": 1.45,
+  "lm": 0.2616030275821686,
+  "rng": 6.27
+ },
+ "f31_30": {
+  "acc": 1.0,
+  "heard": "Harry?",
+  "dur": 0.98,
+  "lm": null,
+  "rng": 9.84
+ },
+ "f31_31": {
+  "acc": 1.0,
+  "heard": "Harry.",
+  "dur": 0.98,
+  "lm": null,
+  "rng": 6.26
+ },
+ "f31_32": {
+  "acc": 1.0,
+  "heard": "Harry!",
+  "dur": 0.9,
+  "lm": null,
+  "rng": 5.1
+ },
+ "f32_30": {
+  "acc": 0.75,
+  "heard": "31. Rear doors opened.",
+  "dur": 3.41,
+  "lm": 0.14231085777282715,
+  "rng": 5.39
+ },
+ "f32_31": {
+  "acc": 0.75,
+  "heard": "31. Rear doors opened.",
+  "dur": 2.73,
+  "lm": 0.11614620685577393,
+  "rng": 3.4
+ },
+ "f32_32": {
+  "acc": 0.75,
+  "heard": "31. Rear doors opened.",
+  "dur": 2.57,
+  "lm": 0.21333545446395874,
+  "rng": 3.64
+ },
+ "f33_30": {
+  "acc": 1.0,
+  "heard": "Rear doors closed.",
+  "dur": 1.92,
+  "lm": 0.17943671345710754,
+  "rng": 4.63
+ },
+ "f33_31": {
+  "acc": 1.0,
+  "heard": "Rear doors closed.",
+  "dur": 1.79,
+  "lm": 0.2244521975517273,
+  "rng": 2.6
+ },
+ "f33_32": {
+  "acc": 1.0,
+  "heard": "Rear doors closed.",
+  "dur": 1.68,
+  "lm": 0.1736149787902832,
+  "rng": 2.11
  }
 }

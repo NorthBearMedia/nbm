@@ -6,11 +6,10 @@ import json, urllib.request, urllib.error, base64, pathlib, subprocess, sys, tim
 D = pathlib.Path(__file__).parent; (D / "vo" / "cand").mkdir(parents=True, exist_ok=True)
 S = json.loads((D / "script.json").read_text()); V = S["voices"]
 who, N = sys.argv[1], int(sys.argv[2]); n0 = int(sys.argv[3]) if len(sys.argv) > 3 else 0
-LEAD = {"MICK": "[casual] Now then. It's been siling it down all day, and the M62's been a car park since four o'clock. I'm off home for me tea after this.",
-        "ASH": "[casual] Now then. It's been siling it down all day up at the yard, and I've not had me tea yet.",
-        "STEVE": "[casual] Now then. I've been at it since six this morning, and I'm off home for me tea.",
-        "LEE": "[casual] Now then. I've been driving since six this morning, and I'm off home for me tea.",
-        "GAZ": "[cheerful] Now then. It's been siling it down all week, and I've not had me breakfast yet."}
+LEAD = {"MICK": "[casual] Alright. It's been chucking it down all night, and the North Circular's been a car park since four.",
+        "HARRY": "[cheerful] Alright, Dad. It's been chucking it down all week, and I ain't had me breakfast yet.",
+        "ASH": "[casual] Alright. It's been chucking it down all night out here, and I ain't had a cuppa since two.",
+        "LEE": "[casual] Alright. I've been driving since six this morning, and I'm cream crackered."}
 SAC = "[calm] Right, I'll talk to you in a bit."
 def say(ln): return ln.get("say", ln["text"]).lstrip("—")
 def norm(s):

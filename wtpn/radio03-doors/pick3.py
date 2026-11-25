@@ -35,7 +35,8 @@ for k, ln in L.items():
         eff = s["lm"] if s["lm"] is not None else tm
         rows.append((n, s, tm, eff, 3 * eff + 0.08 * min(s["rng"], 12)))
     json.dump(sc, open(cache, "w"), indent=1)
-    ok = [r for r in rows if r[1]["acc"] >= 0.8] or sorted(rows, key=lambda r: -r[1]["acc"])[:1]
+    top_acc = max(r[1]["acc"] for r in rows)        # numbers read as digits ("14") cap acc for every take: compare like with like
+    ok = [r for r in rows if r[1]["acc"] >= min(0.8, top_acc - 0.02)]
     best = max(ok, key=lambda r: r[4])
     if k in FORCE: best = next(r for r in rows if r[0] == FORCE[k])
     out[k] = best[0]

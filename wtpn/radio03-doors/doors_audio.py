@@ -11,7 +11,7 @@ S = json.loads((D / "script.json").read_text()); LINES = S["lines"]; L = {l["id"
 ST = D / "stations"; ST.mkdir(exist_ok=True); FX = D / "sfx"
 SR = 48000
 PAUSE_CAP = 0.5
-TEMPO = {"MICK": 1.04, "ASH": 1.04, "LEE": 1.0, "GAZ": 1.02}
+TEMPO = {"MICK": 1.03, "ASH": 1.03, "LEE": 1.0, "HARRY": 1.02}
 
 def run(c): subprocess.run(c, check=True, capture_output=True)
 def dur(p):
@@ -51,7 +51,7 @@ GLASS = "highpass=f=180,lowpass=f=1300,aecho=0.7:0.45:28|52:0.3|0.18"           
 OFFMIC = "highpass=f=150,lowpass=f=3200,aecho=0.75:0.45:16|31:0.28|0.16"        # Ash beside Mick, not into the handset
 PHONE = ("highpass=f=320,lowpass=f=3300,acompressor=threshold=-22dB:ratio=3:attack=5:release=150:makeup=2,"
          "aresample=8000,aresample=48000,equalizer=f=1500:t=q:w=1.0:g=4,highpass=f=380,lowpass=f=3600")
-VOICE_T = {"ASH": -17.5, "GAZ": -17.5, "MICK": -17.0}
+VOICE_T = {"ASH": -17.5, "HARRY": -17.5, "MICK": -17.0}
 ROOM_T, ASIDE_T, PHONE_T, CLOSE_T = -17.5, -21.5, -20.5, -18.5
 ROOM_CLOSE = "highpass=f=80,lowpass=f=9000,aecho=0.8:0.4:19|37:0.08|0.04,acompressor=threshold=-24dB:ratio=2.5:attack=10:release=150"
 
@@ -83,7 +83,9 @@ def prep(ln):
 
 # ---------- places (what's behind a radio voice) ---------------------------------------------------
 def loop(src, d, off, out, extra=""):
-    run(["ffmpeg", "-y", "-v", "error", "-stream_loop", "-1", "-ss", f"{off:.2f}", "-i", str(src), "-t", f"{d:.3f}",
+    # seek AFTER the input: with -stream_loop, an input-side -ss on these mp3s made -t overrun (a 7.6 s bed came out
+    # 13.7 s), so every radio line held the air for seconds after the voice: the "pauses are wrong" the user heard
+    run(["ffmpeg", "-y", "-v", "error", "-stream_loop", "-1", "-i", str(src), "-ss", f"{off:.2f}", "-t", f"{d:.3f}",
          "-af", f"aresample={SR}" + ("," + extra if extra else ""), "-ac", "1", "-c:a", "pcm_s16le", str(out)])
 
 def place(kind, d, k):
@@ -127,7 +129,7 @@ def place(kind, d, k):
 
 BED_T = {"yard_couple": -31.0, "cab_away": -31.0, "hardshoulder": -31.5, "yard": -37.0, "yard_padlock": -32.0, "trailer": -36.0, "trailer_shut": -29.0, "cab": -35.0, "cab_stop": -31.0}
 
-def is_radio(ln): return ln["who"] in ("ASH", "GAZ")
+def is_radio(ln): return ln["who"] in ("ASH", "HARRY")
 
 def station(ln, dry, opening=True, closing=True):
     """-> (wav, voice_offset, keyed_dur, kind)"""
@@ -216,13 +218,13 @@ def room_fx(name, target):
          "-c:a", "pcm_s16le", str(out)])
     return out
 
-GAP = {"e04": 0.4, "e05": 0.15, "e09": 0.3, "e10": 1.2, "e11": 0.6, "e13": 2.0, "e16": 0.8, "e18": 0.9, "e20": 0.3,
-       "e21": 0.3, "e26": 0.35, "e27": 0.45, "e28": 1.3, "e29": 1.4, "e30": 2.6}
+GAP = {"f05": 0.5, "f06": 0.15, "f12": 0.25, "f13": 1.0, "f14": 0.5, "f16": 1.6, "f19": 0.6, "f21": 0.7, "f23": 0.25,
+       "f24": 0.3, "f29": 0.3, "f30": 0.4, "f31": 1.1, "f32": 1.3, "f33": 2.4}
 def gap_before(prev, ln):
     if prev is None: return 0.3                         # the desk phone, almost at once
     if ln.get("cont"): return 0.0
     if ln["id"] in GAP: return GAP[ln["id"]]
-    return 0.55 if prev["who"] == ln["who"] else 0.3
+    return 0.4 if prev["who"] == ln["who"] else 0.2       # radio talk answers quickly (user: pauses felt wrong)
 
 def main():
     import radio_sfx; radio_sfx.build(ST)

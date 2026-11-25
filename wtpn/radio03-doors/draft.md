@@ -1,4 +1,9 @@
-# TRANSMISSION 03 — "DOORS"  (Part 1)  — DRAFT v2, 25 Nov
+# TRANSMISSION 03 — "DOORS"  (Part 1)  — DRAFT v3 (London), 25 Nov
+v3 (user on v2: Yorkshire accents weird / 'Indian', pauses wrong, Mick a miserable bore; 'go English, can be Southern,
+working class'): North London yard; Mick = Eastend Steve, the son = Harry (voice and name, user), Ash = John, Lee = Jim;
+Mick rewritten warm and funny ('You come back for your sarnies?', 'Go and make your old man proud', 'Just do it, son');
+'five letters'; London speech. Pauses: the background loop over-ran (input-side -ss with -stream_loop), holding every
+radio line seconds past the voice: fixed; replies now come 0.2 s after the squelch. Lines in script.json (f01-f33).
 User on draft 1: "a bit boring". Agreed changes: Gaz is Mick's son on his first run on his own; real time (no
 overnight gap); the ending happens live. Then four QC passes (user: "think Stephen King, psychological horror,
 make it drip in the imagination; don't say there's a big scary dog, make people imagine the fear"):
