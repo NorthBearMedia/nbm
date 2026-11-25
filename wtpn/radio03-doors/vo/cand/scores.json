@@ -1,0 +1,653 @@
+{
+ "d02_0": {
+  "acc": 1.0,
+  "heard": "Mick, it's Lee. Has anyone opened my trailer?",
+  "dur": 3.54,
+  "lm": 0.1366693079471588,
+  "rng": 7.44
+ },
+ "d02_1": {
+  "acc": 1.0,
+  "heard": "Mick, it's Lee. Has anyone opened my trailer?",
+  "dur": 3.43,
+  "lm": 0.27387067675590515,
+  "rng": 11.66
+ },
+ "d02_2": {
+  "acc": 1.0,
+  "heard": "Mick, it's Lee. Has anyone opened my trailer?",
+  "dur": 3.28,
+  "lm": 0.250476598739624,
+  "rng": 15.79
+ },
+ "d03_0": {
+  "acc": 0.833,
+  "heard": "Lee, it's 2:00 in the morning.",
+  "dur": 2.75,
+  "lm": 0.4205864816904068,
+  "rng": 4.8
+ },
+ "d03_1": {
+  "acc": 0.833,
+  "heard": "Lee, it's 2:00 in the morning.",
+  "dur": 2.36,
+  "lm": 0.3661355972290039,
+  "rng": 3.11
+ },
+ "d03_2": {
+  "acc": 0.833,
+  "heard": "Lee, it's 2:00 in the morning.",
+  "dur": 2.44,
+  "lm": 0.09261605143547058,
+  "rng": 5.07
+ },
+ "d04_0": {
+  "acc": 0.8,
+  "heard": "14. Has anybody opened it?",
+  "dur": 2.78,
+  "lm": 0.34623003005981445,
+  "rng": 6.23
+ },
+ "d04_1": {
+  "acc": 0.8,
+  "heard": "14. Has anybody opened it?",
+  "dur": 2.81,
+  "lm": 0.33666667342185974,
+  "rng": 15.38
+ },
+ "d04_2": {
+  "acc": 0.8,
+  "heard": "14. Has anybody opened it?",
+  "dur": 3.12,
+  "lm": 0.33486315608024597,
+  "rng": 17.9
+ },
+ "d05_0": {
+  "acc": 0.889,
+  "heard": "Screen says its doors opened 10 minutes ago. Why?",
+  "dur": 3.8,
+  "lm": -0.15172460675239563,
+  "rng": 6.98
+ },
+ "d05_1": {
+  "acc": 0.889,
+  "heard": "Screen says its doors opened 10 minutes ago. Why?",
+  "dur": 3.3,
+  "lm": 0.20972862839698792,
+  "rng": 7.79
+ },
+ "d05_2": {
+  "acc": 0.889,
+  "heard": "Screen says its doors opened 10 minutes ago. Why?",
+  "dur": 3.46,
+  "lm": 0.26319509744644165,
+  "rng": 9.92
+ },
+ "d06_0": {
+  "acc": 1.0,
+  "heard": "Don't let anyone near it. Don't let anyone take it out.",
+  "dur": 3.88,
+  "lm": 0.3502323031425476,
+  "rng": 5.1
+ },
+ "d06_1": {
+  "acc": 1.0,
+  "heard": "Don't let anyone near it. Don't let anyone take it out.",
+  "dur": 3.8,
+  "lm": 0.19192370772361755,
+  "rng": 8.28
+ },
+ "d06_2": {
+  "acc": 1.0,
+  "heard": "Don't let anyone near it. Don't let anyone take it out.",
+  "dur": 3.9,
+  "lm": 0.280987024307251,
+  "rng": 5.45
+ },
+ "d07_0": {
+  "acc": 1.0,
+  "heard": "What's in it?",
+  "dur": 1.4,
+  "lm": -0.15393617749214172,
+  "rng": 12.17
+ },
+ "d07_1": {
+  "acc": 1.0,
+  "heard": "What's in it?",
+  "dur": 1.24,
+  "lm": null,
+  "rng": 13.4
+ },
+ "d07_2": {
+  "acc": 1.0,
+  "heard": "What's in it?",
+  "dur": 1.71,
+  "lm": 0.1027904748916626,
+  "rng": 8.75
+ },
+ "d08_0": {
+  "acc": 1.0,
+  "heard": "I came back empty. It's not empty.",
+  "dur": 3.83,
+  "lm": 0.3955557495355606,
+  "rng": 10.57
+ },
+ "d08_1": {
+  "acc": 1.0,
+  "heard": "I came back empty. It's not empty.",
+  "dur": 4.24,
+  "lm": 0.3509903848171234,
+  "rng": 12.71
+ },
+ "d08_2": {
+  "acc": 1.0,
+  "heard": "I came back empty. It's not empty.",
+  "dur": 4.43,
+  "lm": 0.28977641463279724,
+  "rng": 14.55
+ },
+ "d09_0": {
+  "acc": 1.0,
+  "heard": "Lee?",
+  "dur": 0.93,
+  "lm": null,
+  "rng": 13.92
+ },
+ "d09_1": {
+  "acc": 1.0,
+  "heard": "Lee?",
+  "dur": 0.93,
+  "lm": null,
+  "rng": 9.95
+ },
+ "d09_2": {
+  "acc": 1.0,
+  "heard": "Lee?",
+  "dur": 1.08,
+  "lm": null,
+  "rng": 11.06
+ },
+ "d10_0": {
+  "acc": 0.909,
+  "heard": "Ash, go and have a look at trailer 14 for me.",
+  "dur": 3.49,
+  "lm": 0.24730318784713745,
+  "rng": 10.32
+ },
+ "d10_1": {
+  "acc": 0.909,
+  "heard": "Ash, go and have a look at trailer 14 for me.",
+  "dur": 3.33,
+  "lm": 0.41094374656677246,
+  "rng": 3.65
+ },
+ "d10_2": {
+  "acc": 0.909,
+  "heard": "Ash, go and have a look at trailer 14 for me.",
+  "dur": 3.3,
+  "lm": 0.3087018132209778,
+  "rng": 10.36
+ },
+ "d11_0": {
+  "acc": 0.667,
+  "heard": "On our way.",
+  "dur": 1.37,
+  "lm": -0.13707146048545837,
+  "rng": 2.94
+ },
+ "d11_1": {
+  "acc": 0.667,
+  "heard": "On the way.",
+  "dur": 1.37,
+  "lm": 0.14610719680786133,
+  "rng": 4.29
+ },
+ "d11_2": {
+  "acc": 1.0,
+  "heard": "On my way.",
+  "dur": 1.29,
+  "lm": null,
+  "rng": 2.9
+ },
+ "d12_0": {
+  "acc": 0.933,
+  "heard": "Mick, 14's doors are wide open. There's frost on the floor. It's not a fridge.",
+  "dur": 6.28,
+  "lm": 0.3564625382423401,
+  "rng": 6.5
+ },
+ "d12_1": {
+  "acc": 0.933,
+  "heard": "Mick, 14's doors are wide open. There's frost on the floor. It's not a fridge.",
+  "dur": 7.12,
+  "lm": -0.08797857165336609,
+  "rng": 4.33
+ },
+ "d12_2": {
+  "acc": 0.933,
+  "heard": "Mick, 14's doors are wide open. There's frost on the floor. It's not a fridge.",
+  "dur": 6.23,
+  "lm": 0.3843337893486023,
+  "rng": 5.16
+ },
+ "d13_0": {
+  "acc": 0.9,
+  "heard": "There's something stood at the far end. It's not moving.",
+  "dur": 3.9,
+  "lm": -0.026319116353988647,
+  "rng": 4.66
+ },
+ "d13_1": {
+  "acc": 0.8,
+  "heard": "Their summit stood at the far end. It's not moving.",
+  "dur": 4.01,
+  "lm": -0.22861658036708832,
+  "rng": 3.52
+ },
+ "d13_2": {
+  "acc": 0.857,
+  "heard": "There's something that's stood at the far end. It's not moving.",
+  "dur": 3.9,
+  "lm": 0.17287683486938477,
+  "rng": 3.62
+ },
+ "d14_0": {
+  "acc": 1.0,
+  "heard": "Don't go in. Shut the doors now.",
+  "dur": 2.73,
+  "lm": -0.017856985330581665,
+  "rng": 5.34
+ },
+ "d14_1": {
+  "acc": 1.0,
+  "heard": "Don't go in. Shut the doors now.",
+  "dur": 2.57,
+  "lm": 0.25808146595954895,
+  "rng": 7.09
+ },
+ "d14_2": {
+  "acc": 1.0,
+  "heard": "Don't go in. Shut the doors now.",
+  "dur": 2.81,
+  "lm": 0.3076433837413788,
+  "rng": 6.78
+ },
+ "d16_0": {
+  "acc": 0.75,
+  "heard": "14 rear doors closed.",
+  "dur": 2.96,
+  "lm": 0.27645888924598694,
+  "rng": 4.17
+ },
+ "d16_1": {
+  "acc": 0.75,
+  "heard": "14. Rear doors closed.",
+  "dur": 2.7,
+  "lm": 0.34061893820762634,
+  "rng": 4.93
+ },
+ "d16_2": {
+  "acc": 0.75,
+  "heard": "14. Rear doors closed.",
+  "dur": 2.81,
+  "lm": 0.43040208518505096,
+  "rng": 8.07
+ },
+ "d17_0": {
+  "acc": 1.0,
+  "heard": "Padlock it.",
+  "dur": 1.4,
+  "lm": 0.008028477430343628,
+  "rng": 6.93
+ },
+ "d17_1": {
+  "acc": 1.0,
+  "heard": "Padlock it.",
+  "dur": 1.32,
+  "lm": 0.07947281002998352,
+  "rng": 6.64
+ },
+ "d17_2": {
+  "acc": 1.0,
+  "heard": "Padlock it.",
+  "dur": 1.32,
+  "lm": -0.26243941485881805,
+  "rng": 13.15
+ },
+ "d18_0": {
+  "acc": 1.0,
+  "heard": "Padlocked. Nobody's taking that out.",
+  "dur": 3.02,
+  "lm": 0.025913864374160767,
+  "rng": 6.21
+ },
+ "d18_1": {
+  "acc": 1.0,
+  "heard": "Padlocked. Nobody's taking that out.",
+  "dur": 3.15,
+  "lm": -0.010857880115509033,
+  "rng": 4.78
+ },
+ "d18_2": {
+  "acc": 1.0,
+  "heard": "Padlocked. Nobody's taking that out.",
+  "dur": 2.94,
+  "lm": 0.08059784770011902,
+  "rng": 3.95
+ },
+ "d19_0": {
+  "acc": 0.875,
+  "heard": "Morning, Mick. Hooked up to 31. Away now.",
+  "dur": 3.09,
+  "lm": 0.3316255807876587,
+  "rng": 4.91
+ },
+ "d19_1": {
+  "acc": 0.875,
+  "heard": "Morning, Mick. Hooked up to 31. Away now.",
+  "dur": 3.09,
+  "lm": 0.18589848279953003,
+  "rng": 5.66
+ },
+ "d19_2": {
+  "acc": 0.875,
+  "heard": "Morning, Mick. Hooked up to 31. Away now.",
+  "dur": 3.25,
+  "lm": 0.4391419589519501,
+  "rng": 7.83
+ },
+ "d20_0": {
+  "acc": 0.75,
+  "heard": "Morning, guys. Safe trip.",
+  "dur": 2.34,
+  "lm": 0.029790431261062622,
+  "rng": 4.66
+ },
+ "d20_1": {
+  "acc": 1.0,
+  "heard": "Morning, Gaz. Safe trip.",
+  "dur": 2.36,
+  "lm": -0.07302555441856384,
+  "rng": 4.68
+ },
+ "d20_2": {
+  "acc": 1.0,
+  "heard": "Morning, Gaz. Safe trip.",
+  "dur": 2.18,
+  "lm": 0.04733860492706299,
+  "rng": 5.73
+ },
+ "d21_0": {
+  "acc": 0.5,
+  "heard": "Mick, 14.",
+  "dur": 1.89,
+  "lm": 0.006803274154663086,
+  "rng": 6.11
+ },
+ "d21_1": {
+  "acc": 0.0,
+  "heard": "Mech 14.",
+  "dur": 2.21,
+  "lm": -0.3609969913959503,
+  "rng": 3.22
+ },
+ "d21_2": {
+  "acc": 0.5,
+  "heard": "Mick, 14.",
+  "dur": 1.87,
+  "lm": 0.2806510925292969,
+  "rng": 3.32
+ },
+ "d22_0": {
+  "acc": 1.0,
+  "heard": "What about it?",
+  "dur": 1.45,
+  "lm": -0.3841514065861702,
+  "rng": 7.57
+ },
+ "d22_1": {
+  "acc": 1.0,
+  "heard": "What about it?",
+  "dur": 1.37,
+  "lm": 0.21556827425956726,
+  "rng": 6.32
+ },
+ "d22_2": {
+  "acc": 1.0,
+  "heard": "What about it?",
+  "dur": 1.53,
+  "lm": 0.32533779740333557,
+  "rng": 9.16
+ },
+ "d23_0": {
+  "acc": 1.0,
+  "heard": "The padlock's on the floor. Doors are open. It's empty.",
+  "dur": 4.35,
+  "lm": 0.4169679135084152,
+  "rng": 6.99
+ },
+ "d23_1": {
+  "acc": 1.0,
+  "heard": "The padlock's on the floor. Doors are open. It's empty.",
+  "dur": 4.53,
+  "lm": -0.15369194746017456,
+  "rng": 4.87
+ },
+ "d23_2": {
+  "acc": 1.0,
+  "heard": "The padlock's on the floor. Doors are open. It's empty.",
+  "dur": 4.01,
+  "lm": 0.11385688185691833,
+  "rng": 6.29
+ },
+ "d24_0": {
+  "acc": 0.667,
+  "heard": "Fourteen, rear doors opened, 03:52. 31, rear doors opened, 03:52. 31, rear doors closed.",
+  "dur": 11.61,
+  "lm": 0.11622914671897888,
+  "rng": 4.07
+ },
+ "d24_1": {
+  "acc": 0.8,
+  "heard": "Fourteen rear doors opened, 3:52. Thirty-one rear doors opened, 3:52. Thirty-one rear doors closed.",
+  "dur": 12.89,
+  "lm": 0.3132646977901459,
+  "rng": 5.76
+ },
+ "d24_2": {
+  "acc": 0.6,
+  "heard": "14 rear doors opened, 3:52. 31 rear doors opened, 3:52. 31 rear doors closed.",
+  "dur": 12.13,
+  "lm": 0.3997165709733963,
+  "rng": 4.78
+ },
+ "d26_0": {
+  "acc": 0.75,
+  "heard": "31. Rear doors opened.",
+  "dur": 2.81,
+  "lm": 0.16295915842056274,
+  "rng": 4.35
+ },
+ "d26_1": {
+  "acc": 0.75,
+  "heard": "31. Rear doors opened.",
+  "dur": 3.3,
+  "lm": 0.13861507177352905,
+  "rng": 3.7
+ },
+ "d26_2": {
+  "acc": 0.75,
+  "heard": "31. Rear doors opened.",
+  "dur": 3.54,
+  "lm": 0.3257380425930023,
+  "rng": 3.0
+ },
+ "d27_0": {
+  "acc": 1.0,
+  "heard": "Gaz, pull over.",
+  "dur": 1.74,
+  "lm": -0.23774762451648712,
+  "rng": 4.22
+ },
+ "d27_1": {
+  "acc": 1.0,
+  "heard": "Gaz, pull over.",
+  "dur": 1.68,
+  "lm": 0.11566519737243652,
+  "rng": 5.34
+ },
+ "d27_2": {
+  "acc": 0.0,
+  "heard": "Gas pullover.",
+  "dur": 1.74,
+  "lm": -0.08732295036315918,
+  "rng": 4.61
+ },
+ "d28_0": {
+  "acc": 0.857,
+  "heard": "I'm on the M62, Mick. I'm late as it is.",
+  "dur": 3.51,
+  "lm": 0.4191139191389084,
+  "rng": 2.86
+ },
+ "d28_1": {
+  "acc": 0.857,
+  "heard": "I'm on the M62, Mick. I'm late as it is.",
+  "dur": 3.41,
+  "lm": 0.4839709997177124,
+  "rng": 5.5
+ },
+ "d28_2": {
+  "acc": 0.857,
+  "heard": "I'm on the M62, Mick. I'm late as it is.",
+  "dur": 3.59,
+  "lm": 0.3944919854402542,
+  "rng": 3.86
+ },
+ "d29_0": {
+  "acc": 1.0,
+  "heard": "Your back doors are open.",
+  "dur": 1.95,
+  "lm": 0.2502621114253998,
+  "rng": 3.89
+ },
+ "d29_1": {
+  "acc": 1.0,
+  "heard": "Your back doors are open.",
+  "dur": 1.95,
+  "lm": 0.36289113759994507,
+  "rng": 3.94
+ },
+ "d29_2": {
+  "acc": 1.0,
+  "heard": "Your back doors are open.",
+  "dur": 1.79,
+  "lm": 0.2190335988998413,
+  "rng": 4.06
+ },
+ "d30_0": {
+  "acc": 0.933,
+  "heard": "Oh, they heck. Go on then. Pulling onto the hard shoulder. I'll have a look.",
+  "dur": 4.43,
+  "lm": 0.5025158673524857,
+  "rng": 3.63
+ },
+ "d30_1": {
+  "acc": 1.0,
+  "heard": "Are they heck? Go on then. Pulling onto the hard shoulder. I'll have a look.",
+  "dur": 5.37,
+  "lm": 0.4091883599758148,
+  "rng": 5.35
+ },
+ "d30_2": {
+  "acc": 1.0,
+  "heard": "Are they? Heck. Go on then. Pulling onto the hard shoulder. I'll have a look.",
+  "dur": 5.03,
+  "lm": 0.21884632110595703,
+  "rng": 5.48
+ },
+ "d31_0": {
+  "acc": 1.0,
+  "heard": "Gaz? Gaz, talk to me.",
+  "dur": 3.02,
+  "lm": -0.24291393160820007,
+  "rng": 5.71
+ },
+ "d31_1": {
+  "acc": 1.0,
+  "heard": "Gaz? Gaz, talk to me.",
+  "dur": 3.09,
+  "lm": 0.04321107268333435,
+  "rng": 7.16
+ },
+ "d31_2": {
+  "acc": 1.0,
+  "heard": "Gaz? Gaz, talk to me.",
+  "dur": 2.83,
+  "lm": -0.0948387086391449,
+  "rng": 7.03
+ },
+ "d32_0": {
+  "acc": 1.0,
+  "heard": "Thirty-one rear doors closed.",
+  "dur": 3.23,
+  "lm": 0.13387441635131836,
+  "rng": 5.96
+ },
+ "d32_1": {
+  "acc": 0.75,
+  "heard": "31. Rear doors closed.",
+  "dur": 3.23,
+  "lm": 0.28129202127456665,
+  "rng": 2.7
+ },
+ "d32_2": {
+  "acc": 0.75,
+  "heard": "31. Rear doors closed.",
+  "dur": 3.46,
+  "lm": 0.36477814614772797,
+  "rng": 12.4
+ },
+ "d01_10": {
+  "acc": 1.0,
+  "heard": "Transport office, Mick speaking.",
+  "dur": 2.57,
+  "lm": 0.1536940336227417,
+  "rng": 9.35
+ },
+ "d01_11": {
+  "acc": 1.0,
+  "heard": "Transport office, Mick speaking.",
+  "dur": 2.13,
+  "lm": 0.20507092773914337,
+  "rng": 3.11
+ },
+ "d01_12": {
+  "acc": 1.0,
+  "heard": "Transport office, Mick speaking.",
+  "dur": 2.86,
+  "lm": 0.022822648286819458,
+  "rng": 8.88
+ },
+ "d25_10": {
+  "acc": 0.667,
+  "heard": "Gaz took 31.",
+  "dur": 2.05,
+  "lm": -0.055138587951660156,
+  "rng": 10.86
+ },
+ "d25_11": {
+  "acc": 0.0,
+  "heard": "Gastok 31.",
+  "dur": 2.15,
+  "lm": 0.20229706168174744,
+  "rng": 1.26
+ },
+ "d25_12": {
+  "acc": 0.333,
+  "heard": "Gus took 31?",
+  "dur": 2.13,
+  "lm": 0.20553922653198242,
+  "rng": 6.89
+ }
+}

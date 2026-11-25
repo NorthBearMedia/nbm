@@ -1,0 +1,1732 @@
+{
+ "total": 131.73,
+ "events": [
+  {
+   "name": "ring",
+   "at": 0.3,
+   "wav": "fx_ring.wav"
+  },
+  {
+   "name": "keys_typing",
+   "at": 14.63,
+   "wav": "fx_keys_typing.wav"
+  },
+  {
+   "name": "hangup",
+   "at": 28.365,
+   "wav": "fx_hangup.wav"
+  },
+  {
+   "name": "ping",
+   "at": 57.081,
+   "wav": "fx_ping.wav"
+  },
+  {
+   "name": "keys_typing",
+   "at": 85.988,
+   "wav": "fx_keys_typing.wav"
+  },
+  {
+   "name": "ping",
+   "at": 100.823,
+   "wav": "fx_ping.wav"
+  },
+  {
+   "name": "ping",
+   "at": 127.201,
+   "wav": "fx_ping.wav"
+  }
+ ],
+ "lines": [
+  {
+   "id": "d01",
+   "who": "MICK",
+   "kind": "room",
+   "start": 3.091,
+   "led_on": 3.091,
+   "led_off": 5.44,
+   "end": 5.44,
+   "text": "Transport office, Mick speaking.",
+   "wav": "d01_st.wav",
+   "bg": null,
+   "remap": {
+    "a": 0.0,
+    "cuts": [],
+    "tempo": 1.04,
+    "off": 3.091
+   },
+   "words": [
+    [
+     "Transport",
+     3.226,
+     3.629
+    ],
+    [
+     "office,",
+     3.706,
+     4.053
+    ],
+    [
+     "Mick",
+     4.495,
+     4.649
+    ],
+    [
+     "speaking.",
+     4.745,
+     5.168
+    ]
+   ]
+  },
+  {
+   "id": "d02",
+   "who": "LEE",
+   "kind": "phone",
+   "start": 5.64,
+   "led_on": 5.64,
+   "led_off": 8.753,
+   "end": 8.753,
+   "text": "Mick. It's Lee. Has anyone opened my trailer?",
+   "wav": "d02_st.wav",
+   "bg": null,
+   "remap": {
+    "a": 0.1,
+    "cuts": [],
+    "tempo": 1.0,
+    "off": 5.6399
+   },
+   "words": [
+    [
+     "Mick.",
+     5.78,
+     5.96
+    ],
+    [
+     "It's",
+     6.16,
+     6.32
+    ],
+    [
+     "Lee.",
+     6.4,
+     6.62
+    ],
+    [
+     "Has",
+     7.08,
+     7.2
+    ],
+    [
+     "anyone",
+     7.24,
+     7.5
+    ],
+    [
+     "opened",
+     7.56,
+     7.76
+    ],
+    [
+     "my",
+     7.8,
+     7.94
+    ],
+    [
+     "trailer?",
+     8.02,
+     8.48
+    ]
+   ]
+  },
+  {
+   "id": "d03",
+   "who": "MICK",
+   "kind": "room",
+   "start": 9.053,
+   "led_on": 9.053,
+   "led_off": 11.375,
+   "end": 11.375,
+   "text": "Lee, it's two in the morning.",
+   "wav": "d03_st.wav",
+   "bg": null,
+   "remap": {
+    "a": 0.02,
+    "cuts": [
+     [
+      0.65,
+      0.14
+     ]
+    ],
+    "tempo": 1.04,
+    "off": 9.0527
+   },
+   "words": [
+    [
+     "Lee,",
+     9.187,
+     9.418
+    ],
+    [
+     "it's",
+     9.899,
+     10.13
+    ],
+    [
+     "two",
+     10.187,
+     10.399
+    ],
+    [
+     "in",
+     10.437,
+     10.514
+    ],
+    [
+     "the",
+     10.553,
+     10.63
+    ],
+    [
+     "morning.",
+     10.687,
+     11.091
+    ]
+   ]
+  },
+  {
+   "id": "d04",
+   "who": "LEE",
+   "kind": "phone",
+   "start": 11.675,
+   "led_on": 11.675,
+   "led_off": 14.33,
+   "end": 14.33,
+   "text": "Fourteen. Has anybody opened it?",
+   "wav": "d04_st.wav",
+   "bg": null,
+   "remap": {
+    "a": 0.04,
+    "cuts": [],
+    "tempo": 1.0,
+    "off": 11.6745
+   },
+   "words": [
+    [
+     "Fourteen.",
+     11.815,
+     12.415
+    ],
+    [
+     "Has",
+     12.895,
+     13.015
+    ],
+    [
+     "anybody",
+     13.055,
+     13.415
+    ],
+    [
+     "opened",
+     13.495,
+     13.815
+    ],
+    [
+     "it?",
+     13.895,
+     14.055
+    ]
+   ]
+  },
+  {
+   "id": "d05",
+   "who": "MICK",
+   "kind": "room",
+   "start": 15.971,
+   "led_on": 15.971,
+   "led_off": 19.122,
+   "end": 19.122,
+   "text": "Screen says its doors opened ten minutes ago. Why?",
+   "wav": "d05_st.wav",
+   "bg": null,
+   "remap": {
+    "a": 0.06,
+    "cuts": [],
+    "tempo": 1.04,
+    "off": 15.9714
+   },
+   "words": [
+    [
+     "Screen",
+     16.106,
+     16.375
+    ],
+    [
+     "says",
+     16.433,
+     16.606
+    ],
+    [
+     "its",
+     16.644,
+     16.76
+    ],
+    [
+     "doors",
+     16.798,
+     17.068
+    ],
+    [
+     "opened",
+     17.125,
+     17.375
+    ],
+    [
+     "ten",
+     17.414,
+     17.587
+    ],
+    [
+     "minutes",
+     17.644,
+     17.894
+    ],
+    [
+     "ago.",
+     17.971,
+     18.221
+    ],
+    [
+     "Why?",
+     18.587,
+     18.856
+    ]
+   ]
+  },
+  {
+   "id": "d06",
+   "who": "LEE",
+   "kind": "phone",
+   "start": 19.422,
+   "led_on": 19.422,
+   "led_off": 23.136,
+   "end": 23.136,
+   "text": "Don't let anyone near it. Don't let anyone take it out.",
+   "wav": "d06_st.wav",
+   "bg": null,
+   "remap": {
+    "a": 0.04,
+    "cuts": [],
+    "tempo": 1.0,
+    "off": 19.4216
+   },
+   "words": [
+    [
+     "Don't",
+     19.562,
+     19.722
+    ],
+    [
+     "let",
+     19.762,
+     19.902
+    ],
+    [
+     "anyone",
+     19.982,
+     20.322
+    ],
+    [
+     "near",
+     20.402,
+     20.642
+    ],
+    [
+     "it.",
+     20.702,
+     20.822
+    ],
+    [
+     "Don't",
+     20.962,
+     21.262
+    ],
+    [
+     "let",
+     21.322,
+     21.562
+    ],
+    [
+     "anyone",
+     21.662,
+     22.082
+    ],
+    [
+     "take",
+     22.162,
+     22.342
+    ],
+    [
+     "it",
+     22.402,
+     22.482
+    ],
+    [
+     "out.",
+     22.602,
+     22.862
+    ]
+   ]
+  },
+  {
+   "id": "d07",
+   "who": "MICK",
+   "kind": "room",
+   "start": 23.436,
+   "led_on": 23.436,
+   "led_off": 24.243,
+   "end": 24.243,
+   "text": "What's in it?",
+   "wav": "d07_st.wav",
+   "bg": null,
+   "remap": {
+    "a": 0.22,
+    "cuts": [],
+    "tempo": 1.04,
+    "off": 23.4358
+   },
+   "words": [
+    [
+     "What's",
+     23.57,
+     23.724
+    ],
+    [
+     "in",
+     23.782,
+     23.859
+    ],
+    [
+     "it?",
+     23.917,
+     23.974
+    ]
+   ]
+  },
+  {
+   "id": "d08",
+   "who": "LEE",
+   "kind": "phone",
+   "start": 24.743,
+   "led_on": 24.743,
+   "led_off": 28.215,
+   "end": 28.215,
+   "text": "I came back empty... It's not empty.",
+   "wav": "d08_st.wav",
+   "bg": null,
+   "remap": {
+    "a": 0.26,
+    "cuts": [],
+    "tempo": 1.0,
+    "off": 24.7429
+   },
+   "words": [
+    [
+     "I",
+     24.883,
+     24.923
+    ],
+    [
+     "came",
+     25.003,
+     25.183
+    ],
+    [
+     "back",
+     25.223,
+     25.403
+    ],
+    [
+     "empty...",
+     25.483,
+     25.963
+    ],
+    [
+     "It's",
+     26.763,
+     27.023
+    ],
+    [
+     "not",
+     27.123,
+     27.363
+    ],
+    [
+     "empty.",
+     27.443,
+     27.943
+    ]
+   ]
+  },
+  {
+   "id": "d09",
+   "who": "MICK",
+   "kind": "room",
+   "start": 31.002,
+   "led_on": 31.002,
+   "led_off": 31.623,
+   "end": 31.623,
+   "text": "Lee?",
+   "wav": "d09_st.wav",
+   "bg": null,
+   "remap": {
+    "a": 0.0,
+    "cuts": [],
+    "tempo": 1.04,
+    "off": 31.0023
+   },
+   "words": [
+    [
+     "Lee?",
+     31.098,
+     31.348
+    ]
+   ]
+  },
+  {
+   "id": "d10",
+   "who": "MICK",
+   "kind": "tx",
+   "start": 32.223,
+   "led_on": 32.223,
+   "led_off": 35.603,
+   "end": 35.603,
+   "text": "Ash. Go and have a look at trailer fourteen for me.",
+   "wav": "d10_st.wav",
+   "bg": null,
+   "remap": {
+    "a": 0.0,
+    "cuts": [],
+    "tempo": 1.04,
+    "off": 32.3626
+   },
+   "words": [
+    [
+     "Ash.",
+     32.44,
+     32.786
+    ],
+    [
+     "Go",
+     33.209,
+     33.286
+    ],
+    [
+     "and",
+     33.324,
+     33.382
+    ],
+    [
+     "have",
+     33.401,
+     33.478
+    ],
+    [
+     "a",
+     33.516,
+     33.536
+    ],
+    [
+     "look",
+     33.574,
+     33.69
+    ],
+    [
+     "at",
+     33.709,
+     33.805
+    ],
+    [
+     "trailer",
+     33.843,
+     34.151
+    ],
+    [
+     "fourteen",
+     34.209,
+     34.728
+    ],
+    [
+     "for",
+     34.805,
+     34.978
+    ],
+    [
+     "me.",
+     35.055,
+     35.17
+    ]
+   ]
+  },
+  {
+   "id": "d11",
+   "who": "ASH",
+   "kind": "rx",
+   "start": 35.903,
+   "led_on": 35.903,
+   "led_off": 36.963,
+   "end": 37.305,
+   "text": "On my way.",
+   "wav": "d11_st.wav",
+   "bg": "yard",
+   "remap": {
+    "a": 0.16,
+    "cuts": [],
+    "tempo": 1.04,
+    "off": 36.0258
+   },
+   "words": [
+    [
+     "On",
+     36.16,
+     36.237
+    ],
+    [
+     "my",
+     36.295,
+     36.43
+    ],
+    [
+     "way.",
+     36.468,
+     36.66
+    ]
+   ]
+  },
+  {
+   "id": "d12",
+   "who": "ASH",
+   "kind": "rx",
+   "start": 39.505,
+   "led_on": 39.505,
+   "led_off": 45.394,
+   "end": 45.736,
+   "text": "Mick. Fourteen's doors are wide open. There's frost on the floor. It's not a fridge.",
+   "wav": "d12_st.wav",
+   "bg": "trailer",
+   "remap": {
+    "a": 0.04,
+    "cuts": [
+     [
+      0.73,
+      0.08
+     ]
+    ],
+    "tempo": 1.04,
+    "off": 39.6278
+   },
+   "words": [
+    [
+     "Mick.",
+     39.762,
+     40.051
+    ],
+    [
+     "Fourteen's",
+     40.532,
+     41.051
+    ],
+    [
+     "doors",
+     41.128,
+     41.416
+    ],
+    [
+     "are",
+     41.455,
+     41.551
+    ],
+    [
+     "wide",
+     41.609,
+     41.916
+    ],
+    [
+     "open.",
+     42.012,
+     42.339
+    ],
+    [
+     "There's",
+     42.647,
+     42.859
+    ],
+    [
+     "frost",
+     42.916,
+     43.243
+    ],
+    [
+     "on",
+     43.301,
+     43.377
+    ],
+    [
+     "the",
+     43.415,
+     43.493
+    ],
+    [
+     "floor.",
+     43.551,
+     43.839
+    ],
+    [
+     "It's",
+     44.185,
+     44.301
+    ],
+    [
+     "not",
+     44.359,
+     44.474
+    ],
+    [
+     "a",
+     44.532,
+     44.609
+    ],
+    [
+     "fridge.",
+     44.685,
+     45.089
+    ]
+   ]
+  },
+  {
+   "id": "d13",
+   "who": "ASH",
+   "kind": "rx",
+   "start": 46.286,
+   "led_on": 46.286,
+   "led_off": 49.828,
+   "end": 50.17,
+   "text": "There's summat stood at the far end. It's not moving.",
+   "wav": "d13_st.wav",
+   "bg": "trailer",
+   "remap": {
+    "a": 0.22,
+    "cuts": [],
+    "tempo": 1.04,
+    "off": 46.4088
+   },
+   "words": [
+    [
+     "There's",
+     46.543,
+     46.736
+    ],
+    [
+     "summat",
+     46.813,
+     47.082
+    ],
+    [
+     "stood",
+     47.255,
+     47.447
+    ],
+    [
+     "at",
+     47.486,
+     47.563
+    ],
+    [
+     "the",
+     47.601,
+     47.678
+    ],
+    [
+     "far",
+     47.755,
+     48.005
+    ],
+    [
+     "end.",
+     48.063,
+     48.332
+    ],
+    [
+     "It's",
+     48.659,
+     48.793
+    ],
+    [
+     "not",
+     48.851,
+     49.024
+    ],
+    [
+     "moving.",
+     49.082,
+     49.524
+    ]
+   ]
+  },
+  {
+   "id": "d14",
+   "who": "MICK",
+   "kind": "tx",
+   "start": 50.42,
+   "led_on": 50.42,
+   "led_off": 53.066,
+   "end": 53.066,
+   "text": "Don't go in. Shut the doors. Now.",
+   "wav": "d14_st.wav",
+   "bg": null,
+   "remap": {
+    "a": 0.24,
+    "cuts": [],
+    "tempo": 1.04,
+    "off": 50.5598
+   },
+   "words": [
+    [
+     "Don't",
+     50.694,
+     50.848
+    ],
+    [
+     "go",
+     50.887,
+     50.983
+    ],
+    [
+     "in.",
+     51.06,
+     51.175
+    ],
+    [
+     "Shut",
+     51.502,
+     51.656
+    ],
+    [
+     "the",
+     51.694,
+     51.752
+    ],
+    [
+     "doors.",
+     51.81,
+     52.252
+    ],
+    [
+     "Now.",
+     52.348,
+     52.637
+    ]
+   ]
+  },
+  {
+   "id": "d15",
+   "who": "ASH",
+   "kind": "rx",
+   "start": 53.416,
+   "led_on": 53.416,
+   "led_off": 56.881,
+   "end": 56.881,
+   "text": "",
+   "wav": "d15_st.wav",
+   "bg": "trailer_shut",
+   "words": []
+  },
+  {
+   "id": "d16",
+   "who": "MICK",
+   "kind": "room",
+   "start": 58.052,
+   "led_on": 58.052,
+   "led_off": 60.517,
+   "end": 60.517,
+   "text": "Fourteen. Rear doors closed.",
+   "wav": "d16_st.wav",
+   "bg": null,
+   "remap": {
+    "a": 0.04,
+    "cuts": [],
+    "tempo": 1.04,
+    "off": 58.0523
+   },
+   "words": [
+    [
+     "Fourteen.",
+     58.187,
+     58.745
+    ],
+    [
+     "Rear",
+     59.225,
+     59.418
+    ],
+    [
+     "doors",
+     59.475,
+     59.745
+    ],
+    [
+     "closed.",
+     59.802,
+     60.245
+    ]
+   ]
+  },
+  {
+   "id": "d17",
+   "who": "MICK",
+   "kind": "tx",
+   "start": 61.067,
+   "led_on": 61.067,
+   "led_off": 62.305,
+   "end": 62.305,
+   "text": "Padlock it.",
+   "wav": "d17_st.wav",
+   "bg": null,
+   "remap": {
+    "a": 0.14,
+    "cuts": [],
+    "tempo": 1.04,
+    "off": 61.2068
+   },
+   "words": [
+    [
+     "Padlock",
+     61.341,
+     61.707
+    ],
+    [
+     "it.",
+     61.764,
+     61.88
+    ]
+   ]
+  },
+  {
+   "id": "d18",
+   "who": "ASH",
+   "kind": "rx",
+   "start": 62.605,
+   "led_on": 62.605,
+   "led_off": 66.556,
+   "end": 66.898,
+   "text": "Padlocked. Nobody's taking that out.",
+   "wav": "d18_st.wav",
+   "bg": "yard_padlock",
+   "remap": {
+    "a": 0.06,
+    "cuts": [],
+    "tempo": 1.04,
+    "off": 63.8279
+   },
+   "words": [
+    [
+     "Padlocked.",
+     63.963,
+     64.578
+    ],
+    [
+     "Nobody's",
+     64.963,
+     65.386
+    ],
+    [
+     "taking",
+     65.443,
+     65.732
+    ],
+    [
+     "that",
+     65.77,
+     65.924
+    ],
+    [
+     "out.",
+     66.02,
+     66.251
+    ]
+   ]
+  },
+  {
+   "id": "d19",
+   "who": "GAZ",
+   "kind": "rx",
+   "start": 70.298,
+   "led_on": 70.298,
+   "led_off": 73.463,
+   "end": 73.805,
+   "text": "Morning, Mick. Hooked up to thirty-one. Away now.",
+   "wav": "d19_st.wav",
+   "bg": "cab",
+   "remap": {
+    "a": 0.0,
+    "cuts": [],
+    "tempo": 1.02,
+    "off": 70.4212
+   },
+   "words": [
+    [
+     "Morning,",
+     70.558,
+     70.813
+    ],
+    [
+     "Mick.",
+     70.892,
+     71.147
+    ],
+    [
+     "Hooked",
+     71.362,
+     71.558
+    ],
+    [
+     "up",
+     71.617,
+     71.715
+    ],
+    [
+     "to",
+     71.755,
+     71.833
+    ],
+    [
+     "thirty-one.",
+     71.892,
+     72.441
+    ],
+    [
+     "Away",
+     72.637,
+     72.833
+    ],
+    [
+     "now.",
+     72.951,
+     73.166
+    ]
+   ]
+  },
+  {
+   "id": "d20",
+   "who": "MICK",
+   "kind": "tx",
+   "start": 74.105,
+   "led_on": 74.105,
+   "led_off": 76.276,
+   "end": 76.276,
+   "text": "Morning, Gaz. Safe trip.",
+   "wav": "d20_st.wav",
+   "bg": null,
+   "remap": {
+    "a": 0.1,
+    "cuts": [],
+    "tempo": 1.04,
+    "off": 74.2452
+   },
+   "words": [
+    [
+     "Morning,",
+     74.38,
+     74.611
+    ],
+    [
+     "Gaz.",
+     74.688,
+     74.957
+    ],
+    [
+     "Safe",
+     75.245,
+     75.457
+    ],
+    [
+     "trip.",
+     75.534,
+     75.841
+    ]
+   ]
+  },
+  {
+   "id": "d21",
+   "who": "ASH",
+   "kind": "rx",
+   "start": 77.176,
+   "led_on": 77.176,
+   "led_off": 79.008,
+   "end": 79.35,
+   "text": "Mick. Fourteen.",
+   "wav": "d21_st.wav",
+   "bg": "yard",
+   "remap": {
+    "a": 0.02,
+    "cuts": [],
+    "tempo": 1.04,
+    "off": 77.2988
+   },
+   "words": [
+    [
+     "Mick.",
+     77.433,
+     77.722
+    ],
+    [
+     "Fourteen.",
+     78.03,
+     78.703
+    ]
+   ]
+  },
+  {
+   "id": "d22",
+   "who": "MICK",
+   "kind": "tx",
+   "start": 79.65,
+   "led_on": 79.65,
+   "led_off": 81.096,
+   "end": 81.096,
+   "text": "What about it?",
+   "wav": "d22_st.wav",
+   "bg": null,
+   "remap": {
+    "a": 0.18,
+    "cuts": [],
+    "tempo": 1.04,
+    "off": 79.79
+   },
+   "words": [
+    [
+     "What",
+     79.925,
+     80.04
+    ],
+    [
+     "about",
+     80.078,
+     80.405
+    ],
+    [
+     "it?",
+     80.501,
+     80.655
+    ]
+   ]
+  },
+  {
+   "id": "d23",
+   "who": "ASH",
+   "kind": "rx",
+   "start": 81.396,
+   "led_on": 81.396,
+   "led_off": 85.346,
+   "end": 85.688,
+   "text": "The padlock's on the floor. Doors are open. It's empty.",
+   "wav": "d23_st.wav",
+   "bg": "yard",
+   "remap": {
+    "a": 0.28,
+    "cuts": [],
+    "tempo": 1.04,
+    "off": 81.5186
+   },
+   "words": [
+    [
+     "The",
+     81.653,
+     81.749
+    ],
+    [
+     "padlock's",
+     81.807,
+     82.23
+    ],
+    [
+     "on",
+     82.269,
+     82.346
+    ],
+    [
+     "the",
+     82.384,
+     82.48
+    ],
+    [
+     "floor.",
+     82.538,
+     82.846
+    ],
+    [
+     "Doors",
+     83.211,
+     83.48
+    ],
+    [
+     "are",
+     83.519,
+     83.634
+    ],
+    [
+     "open.",
+     83.73,
+     84.076
+    ],
+    [
+     "It's",
+     84.365,
+     84.499
+    ],
+    [
+     "empty.",
+     84.557,
+     85.038
+    ]
+   ]
+  },
+  {
+   "id": "d24",
+   "who": "MICK",
+   "kind": "room",
+   "start": 87.329,
+   "led_on": 87.329,
+   "led_off": 97.889,
+   "end": 97.889,
+   "text": "Fourteen, rear doors opened, three fifty-two. Thirty-one, rear doors opened, three fifty-two. Thirty-one, rear doors closed.",
+   "wav": "d24_st.wav",
+   "bg": null,
+   "remap": {
+    "a": 0.04,
+    "cuts": [
+     [
+      3.805,
+      0.81
+     ],
+     [
+      5.765,
+      0.21
+     ],
+     [
+      8.945,
+      0.53
+     ],
+     [
+      10.605,
+      0.17
+     ]
+    ],
+    "tempo": 1.04,
+    "off": 87.3286
+   },
+   "words": [
+    [
+     "Fourteen,",
+     87.463,
+     88.079
+    ],
+    [
+     "rear",
+     88.482,
+     88.656
+    ],
+    [
+     "doors",
+     88.713,
+     89.04
+    ],
+    [
+     "opened,",
+     89.156,
+     89.521
+    ],
+    [
+     "three",
+     89.771,
+     90.091
+    ],
+    [
+     "fifty-two.",
+     90.091,
+     90.732
+    ],
+    [
+     "Thirty-one,",
+     91.165,
+     91.838
+    ],
+    [
+     "rear",
+     92.271,
+     92.425
+    ],
+    [
+     "doors",
+     92.502,
+     92.848
+    ],
+    [
+     "opened,",
+     92.982,
+     93.367
+    ],
+    [
+     "three",
+     93.732,
+     94.053
+    ],
+    [
+     "fifty-two.",
+     94.053,
+     94.694
+    ],
+    [
+     "Thirty-one,",
+     95.127,
+     95.781
+    ],
+    [
+     "rear",
+     96.213,
+     96.367
+    ],
+    [
+     "doors",
+     96.444,
+     96.809
+    ],
+    [
+     "closed.",
+     97.04,
+     97.617
+    ]
+   ]
+  },
+  {
+   "id": "d25",
+   "who": "ASH",
+   "kind": "rx",
+   "start": 98.189,
+   "led_on": 98.189,
+   "led_off": 100.081,
+   "end": 100.423,
+   "text": "Gaz took thirty-one.",
+   "wav": "d25_st.wav",
+   "bg": "yard",
+   "remap": {
+    "a": 0.08,
+    "cuts": [],
+    "tempo": 1.04,
+    "off": 98.3121
+   },
+   "words": [
+    [
+     "Gaz",
+     98.447,
+     98.678
+    ],
+    [
+     "took",
+     98.754,
+     98.966
+    ],
+    [
+     "thirty-one.",
+     99.062,
+     99.774
+    ]
+   ]
+  },
+  {
+   "id": "d26",
+   "who": "MICK",
+   "kind": "room",
+   "start": 101.844,
+   "led_on": 101.844,
+   "led_off": 104.58,
+   "end": 104.58,
+   "text": "Thirty-one. Rear doors opened.",
+   "wav": "d26_st.wav",
+   "bg": null,
+   "remap": {
+    "a": 0.08,
+    "cuts": [
+     [
+      1.07,
+      0.14
+     ]
+    ],
+    "tempo": 1.04,
+    "off": 101.8441
+   },
+   "words": [
+    [
+     "Thirty-one.",
+     101.979,
+     102.556
+    ],
+    [
+     "Rear",
+     103.036,
+     103.229
+    ],
+    [
+     "doors",
+     103.286,
+     103.633
+    ],
+    [
+     "opened.",
+     103.825,
+     104.306
+    ]
+   ]
+  },
+  {
+   "id": "d27",
+   "who": "MICK",
+   "kind": "tx",
+   "start": 105.13,
+   "led_on": 105.13,
+   "led_off": 106.873,
+   "end": 106.873,
+   "text": "Gaz. Pull over.",
+   "wav": "d27_st.wav",
+   "bg": null,
+   "remap": {
+    "a": 0.04,
+    "cuts": [],
+    "tempo": 1.04,
+    "off": 105.27
+   },
+   "words": [
+    [
+     "Gaz.",
+     105.405,
+     105.674
+    ],
+    [
+     "Pull",
+     105.962,
+     106.116
+    ],
+    [
+     "over.",
+     106.193,
+     106.443
+    ]
+   ]
+  },
+  {
+   "id": "d28",
+   "who": "GAZ",
+   "kind": "rx",
+   "start": 107.173,
+   "led_on": 107.173,
+   "led_off": 110.301,
+   "end": 110.643,
+   "text": "I'm on the M62, Mick. I'm late as it is.",
+   "wav": "d28_st.wav",
+   "bg": "cab",
+   "remap": {
+    "a": 0.24,
+    "cuts": [],
+    "tempo": 1.02,
+    "off": 107.2964
+   },
+   "words": [
+    [
+     "I'm",
+     107.434,
+     107.551
+    ],
+    [
+     "on",
+     107.591,
+     107.689
+    ],
+    [
+     "the",
+     107.728,
+     107.787
+    ],
+    [
+     "M",
+     107.865,
+     107.929
+    ],
+    [
+     "sixty-two,",
+     107.929,
+     108.571
+    ],
+    [
+     "Mick.",
+     108.669,
+     108.904
+    ],
+    [
+     "I'm",
+     109.041,
+     109.14
+    ],
+    [
+     "late",
+     109.198,
+     109.394
+    ],
+    [
+     "as",
+     109.453,
+     109.551
+    ],
+    [
+     "it",
+     109.61,
+     109.689
+    ],
+    [
+     "is.",
+     109.767,
+     110.002
+    ]
+   ]
+  },
+  {
+   "id": "d29",
+   "who": "MICK",
+   "kind": "tx",
+   "start": 110.943,
+   "led_on": 110.943,
+   "led_off": 112.82,
+   "end": 112.82,
+   "text": "Your back doors are open.",
+   "wav": "d29_st.wav",
+   "bg": null,
+   "remap": {
+    "a": 0.2,
+    "cuts": [],
+    "tempo": 1.04,
+    "off": 111.0834
+   },
+   "words": [
+    [
+     "Your",
+     111.218,
+     111.353
+    ],
+    [
+     "back",
+     111.41,
+     111.564
+    ],
+    [
+     "doors",
+     111.622,
+     111.872
+    ],
+    [
+     "are",
+     111.891,
+     111.987
+    ],
+    [
+     "open.",
+     112.064,
+     112.391
+    ]
+   ]
+  },
+  {
+   "id": "d30",
+   "who": "GAZ",
+   "kind": "rx",
+   "start": 113.12,
+   "led_on": 113.12,
+   "led_off": 121.422,
+   "end": 121.764,
+   "text": "Are they heck... Go on then. Pulling onto the hard shoulder. I'll have a look.",
+   "wav": "d30_st.wav",
+   "bg": "cab_stop",
+   "remap": {
+    "a": 0.3,
+    "cuts": [],
+    "tempo": 1.02,
+    "off": 113.2434
+   },
+   "words": [
+    [
+     "Are",
+     113.381,
+     113.439
+    ],
+    [
+     "they",
+     113.498,
+     113.616
+    ],
+    [
+     "heck...",
+     113.655,
+     113.851
+    ],
+    [
+     "Go",
+     114.008,
+     114.106
+    ],
+    [
+     "on",
+     114.165,
+     114.283
+    ],
+    [
+     "then.",
+     114.341,
+     114.518
+    ],
+    [
+     "Pulling",
+     114.714,
+     114.969
+    ],
+    [
+     "onto",
+     115.028,
+     115.243
+    ],
+    [
+     "the",
+     115.283,
+     115.361
+    ],
+    [
+     "hard",
+     115.4,
+     115.655
+    ],
+    [
+     "shoulder.",
+     115.734,
+     116.106
+    ],
+    [
+     "I'll",
+     116.302,
+     116.4
+    ],
+    [
+     "have",
+     116.459,
+     116.577
+    ],
+    [
+     "a",
+     116.636,
+     116.655
+    ],
+    [
+     "look.",
+     116.714,
+     116.929
+    ]
+   ]
+  },
+  {
+   "id": "d31",
+   "who": "MICK",
+   "kind": "tx",
+   "start": 122.264,
+   "led_on": 122.264,
+   "led_off": 125.401,
+   "end": 125.401,
+   "text": "Gaz? ... Gaz, talk to me.",
+   "wav": "d31_st.wav",
+   "bg": null,
+   "remap": {
+    "a": 0.0,
+    "cuts": [],
+    "tempo": 1.04,
+    "off": 122.4039
+   },
+   "words": [
+    [
+     "Gaz?",
+     122.519,
+     122.846
+    ],
+    [
+     "Gaz,",
+     123.923,
+     124.212
+    ],
+    [
+     "talk",
+     124.462,
+     124.635
+    ],
+    [
+     "to",
+     124.673,
+     124.75
+    ],
+    [
+     "me.",
+     124.808,
+     124.962
+    ]
+   ]
+  },
+  {
+   "id": "d32",
+   "who": "MICK",
+   "kind": "room",
+   "start": 128.472,
+   "led_on": 128.472,
+   "led_off": 131.28,
+   "end": 131.28,
+   "text": "Thirty-one. Rear doors closed.",
+   "wav": "d32_st.wav",
+   "bg": null,
+   "remap": {
+    "a": 0.04,
+    "cuts": [
+     [
+      1.09,
+      0.12
+     ]
+    ],
+    "tempo": 1.04,
+    "off": 128.4716
+   },
+   "words": [
+    [
+     "Thirty-one.",
+     128.606,
+     129.241
+    ],
+    [
+     "Rear",
+     129.722,
+     129.895
+    ],
+    [
+     "doors",
+     129.933,
+     130.318
+    ],
+    [
+     "closed.",
+     130.472,
+     131.01
+    ]
+   ]
+  }
+ ]
+}

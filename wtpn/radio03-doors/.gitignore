@@ -1,0 +1,7 @@
+stations/
+*.wav
+transmission03-*.mp3
+transmission03-*.mp4
+vo/cand/*.mp3
+aud/
+__pycache__/
