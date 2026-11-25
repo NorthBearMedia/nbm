@@ -1,50 +1,58 @@
-# TRANSMISSION 03 — "DOORS"  (Part 1)  — DRAFT v1, 25 Nov
-Replaces "Handover" (user: "I don't like handover at all"). User's brief: all from the radio in a transport office;
-something odd in the yard ends up on a trailer by accident; the driver goes quiet. Built from options 1 + 3
-(the warning call, the quarantine) into the ending the user liked (the door alerts; "rear doors closed").
-Setting: haulage yard off the M62, West Yorkshire, England, 2 a.m. to half four. Rain.
-Voices: MICK (night planner, in the office with us: room voice; Paul) · ASH (gate man, handheld, in the yard;
-Ashley) · LEE (the driver who brought trailer 14 back; on the office phone; Tony) · GAZ (early-start driver,
-on the radio from his cab; Ryan). The planner's PC pings whenever a trailer's back doors open or close.
+# TRANSMISSION 03 — "DOORS"  (Part 1)  — DRAFT v2, 25 Nov
+User on draft 1: "a bit boring". Agreed changes: Gaz is Mick's son on his first run on his own; real time (no
+overnight gap); the ending happens live. Then four QC passes (user: "think Stephen King, psychological horror,
+make it drip in the imagination; don't say there's a big scary dog, make people imagine the fear"):
+ QC1 clarity without pictures: Gaz's trailer is parked "next to Lee's", so the audience links 31 to 14 in the
+     first line; the screen alert is established by Mick reading it; the overnight log read is cut.
+ QC2 King's ordinary: a father and son on the radio at 4 a.m. ("Mirrors. Not your phone. Text your mam when
+     you're at Hull"); the gate man's dry humour; trucker detail ("At fifty-six?"); horror arriving into a
+     normal shift, never announced.
+ QC3 imagination: nothing is ever seen. "Summat stood at the far end" is cut. What's left is frost, and writing
+     in the frost: one man's name over and over, and under it a fresh one, three letters, that nobody reads aloud.
+ QC4 the psychological turn: Lee's rule ("It knows my name now. Don't let it hear anybody's name.") makes the
+     radio dangerous. Mick said his son's name at the start, near that trailer, so he stops using names
+     ("Gatehouse", "Driver of thirty-one") and can't explain why. At the end Gaz asks if his dad just said his
+     name; Mick says no, and believes it. The last two pings say where Gaz went without saying it.
+Setting: haulage yard off the M62, West Yorkshire, England, 4 a.m., rain. We are in the transport office.
+Voices: MICK (night planner, Gaz's dad; room voice; Paul) · GAZ (20s, first run on his own; radio from his cab;
+Ryan) · LEE (driver of trailer 14; desk phone on speaker; Tony) · ASH (gate man; radio; Ashley).
 
-0:00  The office. Rain. Hiss. The desk phone rings twice; picked up.
-MICK: Transport.
-LEE:  (phone, out of breath) Mick. It's Lee. Has anyone opened my trailer?
-MICK: Lee, it's two in the morning.
-LEE:  Fourteen. Has anybody opened it?
-MICK: (keyboard) Screen says its doors opened ten minutes ago. Why?
-LEE:  Don't let anyone near it. Don't let anyone take it out.
-MICK: What's in it?
-LEE:  I came back empty... It's not empty.
-      (the line goes dead)
-MICK: Lee?
-MICK: (radio) Ash. Go and have a look at trailer fourteen for me.
-ASH:  On my way.
-      (rain; hiss)
-ASH:  Mick. Fourteen's doors are wide open. There's frost on the floor. It's not a fridge.
-ASH:  (quietly) There's summat stood at the far end. It's not moving.
-MICK: Don't go in. Shut the doors. Now.
-      (through Ash's radio: the locking bars clank shut, one, two. In the office, the PC pings.)
-MICK: (reading) Fourteen. Rear doors closed.
-MICK: (radio) Padlock it.
-ASH:  Padlocked. Nobody's taking that out.
-      (a long gap: the night goes by)
-GAZ:  Morning, Mick. Hooked up to thirty-one. Away now.
-MICK: Morning, Gaz. Safe trip.
-ASH:  Mick. Fourteen.
-MICK: What about it?
-ASH:  The padlock's on the floor. Doors are open. It's empty.
-MICK: (keyboard; reading) Fourteen, rear doors opened, three fifty-two. Thirty-one, rear doors opened, three
-      fifty-two. Thirty-one, rear doors closed.
-ASH:  Gaz has got thirty-one.
+0:00  The office. Rain. Hiss. Through the radio: a wagon idling, the clunk of a trailer coupling on.
+GAZ:  Thirty-one's on, Dad. Bay next to Lee's. It's freezing down this end.
+MICK: Mirrors, Gaz. Not your phone. And text your mam when you're at Hull.
+GAZ:  (laughs) Yes, Dad. It's me first run on me own, not me first day at school.
+      (the wagon pulls away; the transmission drops. The desk phone rings.)
+MICK: Transport, Mick.
+LEE:  (phone, panicking) Mick, it's Lee. Has anyone opened fourteen?
+MICK: (keyboard) ...Screen says its doors opened twenty minutes ago. Why?
+LEE:  It listened to me. All the way back down the motorway, I had the CB on, and it listened.
+LEE:  It knows my name now. Don't let it hear anybody's name.
+MICK: Lee, what's in—
+      (a click. The line's dead tone.)
+MICK: (quietly, to himself) Twenty minutes ago.
+MICK: (radio) Gatehouse. Go and look at fourteen.
+ASH:  Gatehouse? Since when am I gatehouse? ...Going.
+ASH:  Fourteen's wide open. There's frost on the floor, Mick. In November. It's not a fridge.
+ASH:  There's writing in it. Like someone's done it with a finger. Lee. Lee. Lee. Over and over.
+ASH:  (quietly) And there's another one. Under the rest. Fresh. Three letters.
+MICK: ...Read it.
+ASH:  (a long pause) It's your lad's, Mick.
+MICK: (radio) Driver of thirty-one. Pull over.
+GAZ:  Driver of thirty-one? (laughs) Dad, you've been on nights too long. I'm on the M62, I'm behind already.
+MICK: Just do it. Please.
       (the PC pings)
+MICK: (reading, quietly) Thirty-one. Rear doors opened.
+MICK: (radio) Your back doors have opened. Stay in the cab. Lock it.
+GAZ:  Opened? At fifty-six? (sighs) Right. Pulling onto the hard shoulder. I'll have a look.
+      (he keeps the button down: the indicator, the cab door, lorries tearing past in the rain, his footsteps)
+GAZ:  Doors are shut, Dad. ...Seal's gone, though.
+GAZ:  (quieter) Dad. Did you just say my name?
+MICK: No.
+GAZ:  (very quiet) Someone did.
+      (the transmission drops)
+MICK: (radio, breaking) Gaz?
+      (nothing. rain. hiss. The PC pings.)
 MICK: (reading) Thirty-one. Rear doors opened.
-MICK: (radio) Gaz. Pull over.
-GAZ:  I'm on the M62, Mick. I'm late as it is.
-MICK: Your back doors are open.
-GAZ:  Are they heck... Go on then. Pulling onto the hard shoulder. I'll have a look.
-      (behind him: the indicator, the cab door, traffic roaring past in the rain; the transmission drops)
-MICK: Gaz? ... Gaz, talk to me.
-      (nothing. rain. hiss. Then the PC pings.)
-MICK: (reading, slowly) Thirty-one. Rear doors closed.
+      (silence. The PC pings.)
+MICK: (barely) Rear doors closed.
 Cut to black.

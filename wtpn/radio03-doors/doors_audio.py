@@ -60,7 +60,7 @@ def prep(ln):
     k = ln["id"]; al = json.loads((D / "vo" / f"{k}_align.json").read_text())
     ws = words(al); first, last = ws[0][1], ws[-1][2]
     a = first + 0.025 if ln.get("clip") else max(0.0, first - 0.14)
-    b = last + 0.22
+    b = last + (0.02 if ln['text'].rstrip().endswith('—') else 0.22)     # a cut-off line stops inside its last word
     cap = ln.get("pause_cap", PAUSE_CAP); cuts = []
     for w1, w2 in zip(ws, ws[1:]):
         g = w2[1] - w1[2]
@@ -106,6 +106,12 @@ def place(kind, d, k):
         Lp("gaterain", (seed * 2.9) % 14, 0); once("doorbars", 0.2, +10)
     elif kind == "cab":
         Lp("cab", (seed * 1.1) % 10, 0)
+    elif kind == "yard_couple":
+        Lp("gaterain", (seed * 2.9) % 14, 0); once("couple", 0.0, +8)
+    elif kind == "cab_away":
+        Lp("cab", (seed * 1.1) % 10, -6); once("away", 0.3, +6)
+    elif kind == "hardshoulder":
+        Lp("hardshoulder", (seed * 1.9) % 9, 0); once("steps", 0.0, -3)
     elif kind == "cab_stop":
         Lp("cab", (seed * 1.1) % 10, 0, "volume='if(lt(t,2.2),1,max(0.0,1-(t-2.2)/1.2))':eval=frame")
         once("cabstop", 1.6, +4)
@@ -119,7 +125,7 @@ def place(kind, d, k):
         run(["ffmpeg", "-y", "-v", "error"] + ins + ["-filter_complex", fc, "-map", "[o]", "-c:a", "pcm_s16le", str(out)])
     return out
 
-BED_T = {"yard": -37.0, "yard_padlock": -32.0, "trailer": -36.0, "trailer_shut": -29.0, "cab": -35.0, "cab_stop": -31.0}
+BED_T = {"yard_couple": -31.0, "cab_away": -31.0, "hardshoulder": -31.5, "yard": -37.0, "yard_padlock": -32.0, "trailer": -36.0, "trailer_shut": -29.0, "cab": -35.0, "cab_stop": -31.0}
 
 def is_radio(ln): return ln["who"] in ("ASH", "GAZ")
 
@@ -167,7 +173,8 @@ def station(ln, dry, opening=True, closing=True):
          f"[v][w]amix=inputs=2:normalize=0:duration=longest,alimiter=level=0:limit=0.85"
          + (",afade=t=in:d=0.03" if opening else "") + "[r]",
          "-map", "[r]", "-c:a", "pcm_s16le", str(ST / f"{k}_r.wav")])
-    parts = ([ST / "sq_open.wav"] if opening else []) + [ST / f"{k}_r.wav"] + ([ST / "sq_tail.wav"] if closing else [])
+    tail = ST / ("sq_tail_short.wav" if ln.get("dropout") else "sq_tail.wav")
+    parts = ([ST / "sq_open.wav"] if opening else []) + [ST / f"{k}_r.wav"] + ([tail] if closing else [])
     ins = sum((["-i", str(p)] for p in parts), [])
     run(["ffmpeg", "-y", "-v", "error"] + ins + ["-filter_complex",
          "".join(f"[{i}:a]" for i in range(len(parts))) + f"concat=n={len(parts)}:v=0:a=1[o]",
@@ -209,8 +216,8 @@ def room_fx(name, target):
          "-c:a", "pcm_s16le", str(out)])
     return out
 
-GAP = {"d01": 0.0, "d02": 0.2, "d08": 0.5, "d09": 0.8, "d10": 0.6, "d12": 2.2, "d14": 0.25, "d16": 0.2,
-       "d19": 3.4, "d21": 0.9, "d24": 0.3, "d26": 0.4, "d31": 0.5, "d32": 1.8}
+GAP = {"e04": 0.4, "e05": 0.15, "e09": 0.3, "e10": 1.2, "e11": 0.6, "e13": 2.0, "e16": 0.8, "e18": 0.9, "e20": 0.3,
+       "e21": 0.3, "e26": 0.35, "e27": 0.45, "e28": 1.3, "e29": 1.4, "e30": 2.6}
 def gap_before(prev, ln):
     if prev is None: return 0.3                         # the desk phone, almost at once
     if ln.get("cont"): return 0.0

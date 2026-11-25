@@ -1,0 +1,327 @@
+{
+ "series": "TRANSMISSION",
+ "episode": "03 — DOORS",
+ "setting": "Haulage yard off the M62, West Yorkshire, England, 2 to 4.30 a.m., rain. We are in the transport office: Mick's desk, base radio, PC.",
+ "voices": {
+  "MICK": {
+   "name": "WTPN Yorkshire - Paul",
+   "id": "oCXdm5WkYoKVEdlbPLev",
+   "model": "eleven_v3",
+   "settings": {
+    "stability": 0.5,
+    "similarity_boost": 0.85,
+    "use_speaker_boost": true
+   },
+   "note": "night planner, room voice"
+  },
+  "ASH": {
+   "name": "Ashley - Bright, Yorkshire",
+   "id": "jIIwKmgS6dN9eWEJEvMJ",
+   "model": "eleven_v3",
+   "settings": {
+    "stability": 0.5,
+    "similarity_boost": 0.85,
+    "use_speaker_boost": true
+   },
+   "note": "gate man, radio"
+  },
+  "LEE": {
+   "name": "Tony - Northern",
+   "id": "v9I7auPeR1xGKYRPwQGG",
+   "model": "eleven_v3",
+   "settings": {
+    "stability": 0.5,
+    "similarity_boost": 0.85,
+    "use_speaker_boost": true
+   },
+   "note": "panicked driver, office phone"
+  },
+  "GAZ": {
+   "name": "Ryan - Authentic Yorkshire",
+   "id": "EvfUC5EzfWjmoPWebkXG",
+   "model": "eleven_v3",
+   "settings": {
+    "stability": 0.5,
+    "similarity_boost": 0.85,
+    "use_speaker_boost": true
+   },
+   "note": "early driver, radio from the cab"
+  }
+ },
+ "lines": [
+  {
+   "id": "d01",
+   "who": "MICK",
+   "text": "Transport office, Mick speaking.",
+   "tag": "[tired]",
+   "aside": true,
+   "fx_before": [
+    [
+     "ring",
+     -30,
+     0.25
+    ]
+   ]
+  },
+  {
+   "id": "d02",
+   "who": "LEE",
+   "text": "Mick. It's Lee. Has anyone opened my trailer?",
+   "tag": "[panicked, out of breath]"
+  },
+  {
+   "id": "d03",
+   "who": "MICK",
+   "text": "Lee, it's two in the morning.",
+   "tag": "[groggy]",
+   "aside": true
+  },
+  {
+   "id": "d04",
+   "who": "LEE",
+   "text": "Fourteen. Has anybody opened it?",
+   "tag": "[urgent]"
+  },
+  {
+   "id": "d05",
+   "who": "MICK",
+   "text": "Screen says its doors opened ten minutes ago. Why?",
+   "tag": "[reading, puzzled]",
+   "aside": true,
+   "fx_before": [
+    [
+     "keys_typing",
+     -34,
+     0.1
+    ]
+   ]
+  },
+  {
+   "id": "d06",
+   "who": "LEE",
+   "text": "Don't let anyone near it. Don't let anyone take it out.",
+   "tag": "[desperate]"
+  },
+  {
+   "id": "d07",
+   "who": "MICK",
+   "text": "What's in it?",
+   "tag": "[confused]",
+   "aside": true
+  },
+  {
+   "id": "d08",
+   "who": "LEE",
+   "text": "I came back empty... It's not empty.",
+   "tag": "[scared, quietly]",
+   "pause_cap": 1.0,
+   "fx_after": [
+    [
+     "hangup",
+     -32,
+     0.2
+    ]
+   ]
+  },
+  {
+   "id": "d09",
+   "who": "MICK",
+   "text": "Lee?",
+   "tag": "[confused]",
+   "aside": true
+  },
+  {
+   "id": "d10",
+   "who": "MICK",
+   "text": "Ash. Go and have a look at trailer fourteen for me.",
+   "tag": "[tired]"
+  },
+  {
+   "id": "d11",
+   "who": "ASH",
+   "text": "On my way.",
+   "tag": "[casual]",
+   "bg": "yard"
+  },
+  {
+   "id": "d12",
+   "who": "ASH",
+   "text": "Mick. Fourteen's doors are wide open. There's frost on the floor. It's not a fridge.",
+   "tag": "[uneasy]",
+   "bg": "trailer"
+  },
+  {
+   "id": "d13",
+   "who": "ASH",
+   "text": "There's summat stood at the far end. It's not moving.",
+   "tag": "[whispering]",
+   "bg": "trailer"
+  },
+  {
+   "id": "d14",
+   "who": "MICK",
+   "text": "Don't go in. Shut the doors. Now.",
+   "tag": "[urgent]"
+  },
+  {
+   "id": "d16",
+   "who": "MICK",
+   "text": "Fourteen. Rear doors closed.",
+   "tag": "[reading quietly]",
+   "aside": true,
+   "fx_before": [
+    [
+     "ping",
+     -30,
+     0.3
+    ]
+   ]
+  },
+  {
+   "id": "d17",
+   "who": "MICK",
+   "text": "Padlock it.",
+   "tag": "[firm]"
+  },
+  {
+   "id": "d18",
+   "who": "ASH",
+   "text": "Padlocked. Nobody's taking that out.",
+   "tag": "[shaky]",
+   "bg": "yard_padlock",
+   "pre": 1.1
+  },
+  {
+   "id": "d19",
+   "who": "GAZ",
+   "text": "Morning, Mick. Hooked up to thirty-one. Away now.",
+   "tag": "[cheerful]",
+   "bg": "cab"
+  },
+  {
+   "id": "d20",
+   "who": "MICK",
+   "text": "Morning, Gaz. Safe trip.",
+   "tag": "[tired]"
+  },
+  {
+   "id": "d21",
+   "who": "ASH",
+   "text": "Mick. Fourteen.",
+   "tag": "[uneasy]",
+   "bg": "yard"
+  },
+  {
+   "id": "d22",
+   "who": "MICK",
+   "text": "What about it?",
+   "tag": "[tired]"
+  },
+  {
+   "id": "d23",
+   "who": "ASH",
+   "text": "The padlock's on the floor. Doors are open. It's empty.",
+   "tag": "[scared]",
+   "bg": "yard"
+  },
+  {
+   "id": "d24",
+   "who": "MICK",
+   "text": "Fourteen, rear doors opened, three fifty-two. Thirty-one, rear doors opened, three fifty-two. Thirty-one, rear doors closed.",
+   "tag": "[reading slowly, frightened]",
+   "aside": true,
+   "fx_before": [
+    [
+     "keys_typing",
+     -34,
+     0.1
+    ]
+   ],
+   "pause_cap": 0.45
+  },
+  {
+   "id": "d25",
+   "who": "ASH",
+   "text": "Gaz took thirty-one.",
+   "tag": "[scared]",
+   "bg": "yard"
+  },
+  {
+   "id": "d26",
+   "who": "MICK",
+   "text": "Thirty-one. Rear doors opened.",
+   "tag": "[reading, afraid]",
+   "aside": true,
+   "fx_before": [
+    [
+     "ping",
+     -30,
+     0.35
+    ]
+   ]
+  },
+  {
+   "id": "d27",
+   "who": "MICK",
+   "text": "Gaz. Pull over.",
+   "tag": "[urgent]"
+  },
+  {
+   "id": "d28",
+   "who": "GAZ",
+   "text": "I'm on the M62, Mick. I'm late as it is.",
+   "tag": "[laughing]",
+   "bg": "cab",
+   "say": "I'm on the M sixty-two, Mick. I'm late as it is."
+  },
+  {
+   "id": "d29",
+   "who": "MICK",
+   "text": "Your back doors are open.",
+   "tag": "[urgent]"
+  },
+  {
+   "id": "d30",
+   "who": "GAZ",
+   "text": "Are they heck... Go on then. Pulling onto the hard shoulder. I'll have a look.",
+   "tag": "[sighs]",
+   "bg": "cab_stop",
+   "pause_cap": 0.8,
+   "hold_after": 4.2
+  },
+  {
+   "id": "d31",
+   "who": "MICK",
+   "text": "Gaz? ... Gaz, talk to me.",
+   "tag": "[worried]",
+   "pause_cap": 1.4
+  },
+  {
+   "id": "d32",
+   "who": "MICK",
+   "text": "Thirty-one. Rear doors closed.",
+   "tag": "[whispering]",
+   "aside": true,
+   "fx_before": [
+    [
+     "ping",
+     -30,
+     0.6
+    ]
+   ]
+  }
+ ],
+ "sfx_lines": [
+  {
+   "id": "d15",
+   "who": "ASH",
+   "text": "",
+   "tag": "",
+   "bg": "trailer_shut",
+   "sfx_only": true
+  }
+ ],
+ "notes": {
+  "ending": "After d31, silence; the PC pings; Mick reads 'Thirty-one. Rear doors closed.'; cut."
+ }
+}

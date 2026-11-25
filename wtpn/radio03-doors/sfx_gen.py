@@ -10,6 +10,10 @@ SFX = {
  "padlock":     ("A heavy steel padlock snapped shut on a metal bar, close up, outdoors in rain.", 2),
  "trailer":     ("Standing inside the open back of an empty lorry trailer at night: heavy rain drumming on the thin metal roof, hollow echo, wind.", 15),
  "cab":         ("Inside a lorry cab driving on a motorway at night in rain: low diesel engine drone, tyre roar, windscreen wipers.", 15),
+ "couple":      ("A lorry reversing onto a trailer in a yard at night in rain: diesel engine idling, then one heavy metallic clunk as the coupling locks onto the trailer.", 6),
+ "away":        ("A lorry pulling out of a yard at night in rain: a hiss of air brakes releasing, the diesel engine revving, gears, driving away.", 6),
+ "hardshoulder":("Standing on a motorway hard shoulder at night in heavy rain: lorries and cars roaring past very close, spray hissing, gusts of wind.", 15),
+ "steps":       ("Slow footsteps walking along wet gravel beside a parked lorry in the rain, close.", 6),
  "cabstop":     ("A lorry pulling onto a motorway hard shoulder in rain: the indicator ticking, a hiss of air brakes, the cab door opening, heavy traffic roaring past outside in the wet.", 8),
 }
 for k in (sys.argv[1:] or list(SFX)):
