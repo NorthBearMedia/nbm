@@ -14,6 +14,8 @@ SQ = D.parent / "radio02-corner" / "stations"
 SR = 48000
 LINE = "If you're easily scared, scroll away. Everyone else, sound up."
 PUNCH = "Easily scared? Scroll away. Everyone else, sound up."
+SHORT = "Easily scared? Scroll. Everyone else, sound up."
+WVS = {"stability": 0.5, "similarity_boost": 0.85, "use_speaker_boost": True}
 V = {
  "A": dict(voice="ofMPN3qFIoaLyL5P87YZ", model="eleven_multilingual_v2", text=LINE,                       # WTPN Mark - Deep British
            vs={"stability": 0.55, "similarity_boost": 0.85, "style": 0.25, "use_speaker_boost": True, "speed": 1.12}, tempo=1.06),
@@ -23,7 +25,12 @@ V = {
            vs={"stability": 0.5, "similarity_boost": 0.85, "use_speaker_boost": True}, tempo=1.15),
  "D": dict(voice="C5rG2JoeFeqEgocBWvLg", model="eleven_multilingual_v2", text=PUNCH,                      # WTPN Jay - Gravelly British
            vs={"stability": 0.5, "similarity_boost": 0.85, "style": 0.35, "use_speaker_boost": True, "speed": 1.1}, tempo=1.04),
+ # user (25 Nov): D's punch and length, shorter still, C's whisper, and a picture that looks like a whisper
+ "E": dict(voice="AeRdCCKzvd23BpJoofzx", model="eleven_v3", text="[whispering quickly] " + PUNCH, vs=WVS, tempo=1.18, caps=(0.10, 0.02)),
+ "F": dict(voice="AeRdCCKzvd23BpJoofzx", model="eleven_v3", text="[whispering quickly] " + SHORT, vs=WVS, tempo=1.18, caps=(0.10, 0.02)),
+ "G": dict(voice="GsjQ0ydx7QzhDLqInGtT", model="eleven_v3", text="[whispering quickly] " + PUNCH, vs=WVS, tempo=1.18, caps=(0.10, 0.02)),
 }
+WHISPERED = ("E", "F", "G")
 RADIO = ("highpass=f=300,lowpass=f=3400,acompressor=threshold=-24dB:ratio=3.5:attack=6:release=200:makeup=2,"
          "aresample=16000,aresample=48000,highpass=f=280,lowpass=f=3600,equalizer=f=2200:t=q:w=1.2:g=3")
 CLEAN = "highpass=f=70,acompressor=threshold=-22dB:ratio=2.5:attack=8:release=160,aecho=0.8:0.3:14:0.05"
@@ -77,6 +84,7 @@ HEAD = ("[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrap
         "Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
         "Style: W,IBM Plex Mono SemiBold,70,&H00E8EFF2,&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,2,2,5,95,150,0,1\n"
         "Style: P,IBM Plex Mono SemiBold,92,&H00F2F2F2,&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,2,0,1,2,2,5,100,160,0,1\n"
+        "Style: H,IBM Plex Mono,62,&H00B8BEC2,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,1,0,1,0,0,5,95,150,0,1\n"
         "Style: S,IBM Plex Mono Medium,64,&H00C8CED2,&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,0,0,5,95,150,0,1\n\n"
         "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
 
@@ -112,6 +120,18 @@ def events(k, ws, t0, t_end):
             a = card[0][1] + t0 - 0.05; b = cs[ci + 1][0][1] + t0 - 0.05 if ci + 1 < len(cs) else t_end
             txt = " ".join(toks[:brk]) + ("\\N" + " ".join(toks[brk:]) if brk < len(toks) else "")
             ev.append(f"Dialogue: 0,{ass_time(a)},{ass_time(b)},S,,0,0,0,,{{\\fad(220,120)}}{txt}")
+    elif k in WHISPERED:                                # a whisper on screen: small, lowercase, soft, breathing in and out
+        phrases, cur = [], []
+        for w in ws:
+            cur.append(w)
+            if w[0].endswith((",", "?", ".")): phrases.append(cur); cur = []
+        if cur: phrases.append(cur)
+        for pi, ph in enumerate(phrases):
+            a = ph[0][1] + t0 - 0.03; b = phrases[pi + 1][0][1] + t0 - 0.03 if pi + 1 < len(phrases) else t_end
+            ms = int((b - a) * 1000); txt = " ".join(w[0] for w in ph).lower()
+            mv = f"\\move(512,972,512,960,0,{min(ms, 320)})"
+            ev.append(f"Dialogue: 0,{ass_time(a)},{ass_time(b)},H,,0,0,0,,{{\\blur9\\alpha&H98&\\fad(70,110){mv}\\fsp1\\t(0,{ms},\\fsp4)}}{txt}")
+            ev.append(f"Dialogue: 1,{ass_time(a)},{ass_time(b)},H,,0,0,0,,{{\\blur0.7\\fad(70,110){mv}\\fsp1\\t(0,{ms},\\fsp4)}}{txt}")
     else:                                               # D: phrase by phrase, stamped
         phrases, cur = [], []
         for w in ws:
@@ -129,7 +149,7 @@ def build(k):
     lead = 0.08; radio = k == "B"; tempo = V[k]["tempo"]
     a0 = max(0.0, ws[0][1] - 0.04); keeps, pos, cut = [], a0, []
     for w1, w2 in zip(ws, ws[1:]):
-        cap = 0.22 if w1[0].endswith((".", "?", ",")) else 0.06
+        cp, ci = V[k].get("caps", (0.22, 0.06)); cap = cp if w1[0].endswith((".", "?", ",")) else ci
         g = w2[1] - w1[2]
         if g > cap: keeps.append((pos, w1[2] + cap / 2)); pos = w2[1] - cap / 2; cut.append((w1[2] + cap / 2, g - cap))
     keeps.append((pos, ws[-1][2] + 0.12))
@@ -139,7 +159,7 @@ def build(k):
     def rm(t): return (t - a0 - sum(r for p, r in cut if p < t)) / tempo
     ws = [[w, rm(s), rm(e)] for w, s, e in ws]; vo = B / f"{k}_tight.mp3"
     # ---- audio: the voice, processed, at -16 LUFS ----
-    chain = RADIO if radio else WHISPER if k == "C" else CLEAN
+    chain = RADIO if radio else WHISPER if k in ("C",) + WHISPERED else CLEAN
     run(["ffmpeg", "-y", "-v", "error", "-i", str(vo), "-af", f"aresample={SR},{chain}", "-ac", "1", "-c:a", "pcm_s16le", str(B / f"{k}_v.wav")])
     g = -16.0 - lufs(B / f"{k}_v.wav")
     run(["ffmpeg", "-y", "-v", "error", "-i", str(B / f"{k}_v.wav"), "-af", f"volume={g:.2f}dB,alimiter=level=0:limit=0.9",
@@ -155,7 +175,7 @@ def build(k):
         mix = "[b][o][v][t]amix=inputs=4:normalize=0:duration=first"
         bed_src = ["-stream_loop", "-1", "-i", str(D.parent / "radio02-corner" / "sfx" / "kitchen.mp3")]
     else:
-        voff = lead; total = voff + last + 0.3
+        voff = lead; total = voff + last + (0.18 if k in WHISPERED else 0.3)
         fc = f"[1:a]adelay={int(voff*1000)}|{int(voff*1000)}[v];"
         ins = ["-i", str(B / f"{k}_vn.wav")]
         bed = "[0:a]bandpass=f=1700:width_type=h:w=2600,volume=0.035,afade=t=out:st=" + f"{total-0.3:.2f}:d=0.3[b];"
@@ -173,8 +193,8 @@ def build(k):
               f"drawbox=x={x-5}:y={y-3}:w=10:h=6:color=0xff3020@0.95:t=fill:enable='between(t,{on:.2f},{off:.2f})'")
         vin = ["-loop", "1", "-framerate", "30", "-t", f"{total:.3f}", "-i", str(B / "corner_f0.png")]
     else:
-        bg = "[0:v]null"
-        vin = ["-f", "lavfi", "-i", f"color=c=black:s=1080x1920:r=30:d={total:.3f}"]
+        bg = "[0:v]noise=alls=6:allf=t+u" if k in WHISPERED else "[0:v]null"     # a little grain: breath, not a stamp
+        vin = ["-f", "lavfi", "-i", f"color=c={'0x080808' if k in WHISPERED else 'black'}:s=1080x1920:r=30:d={total:.3f}"]
     run(["ffmpeg", "-y", "-v", "error"] + vin + ["-i", str(B / f"{k}_intro.wav"), "-filter_complex",
          f"{bg},ass={B / f'{k}.ass'}:fontsdir=/root/.fonts,format=yuv420p,fps=30[vv]", "-map", "[vv]", "-map", "1:a",
          "-t", f"{total:.3f}", "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-c:a", "aac", "-b:a", "192k", "-ar", str(SR), str(B / f"{k}_intro.mp4")])
