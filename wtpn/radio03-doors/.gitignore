@@ -5,3 +5,4 @@ transmission03-*.mp4
 vo/cand/*.mp3
 aud/
 __pycache__/
+aud/*.mp3
