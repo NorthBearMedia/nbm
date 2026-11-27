@@ -1,4 +1,4 @@
-# TRANSMISSION — "PASSENGER" (Part 1) — draft v2
+# TRANSMISSION — "PASSENGER" (Part 1) — draft v3 (v2 + an explicit phone call)
 
 User's notes on draft 1: slow the ending, add delay; show the passage of time (he's asleep, it's the middle of the
 night when it starts, not straight after he parks); something's presence first (the trailer rocking, more than the
@@ -9,7 +9,8 @@ rocks on a dead-still foggy night instead. draft v1 + QC notes: draft_v1.md, scr
 
 PART 1 — driving, parking, goodnight (0:00-0:54)
 [Cab, fog. Ding... ding... the passenger seatbelt.]
-JAMIE: Oh, shut up. / TONY (hands-free): What's that? / JAMIE: Passenger seatbelt. It thinks me bag's a person. [bag in the bunk; chime stops]
+JAMIE: Oh, shut up. [He rings the office over the hands-free. It rings; Tony picks up.]
+TONY: Transport office, Tony speaking. / JAMIE: Tone, it's Jamie. Hang on. [bag in the bunk; chime stops] Passenger seatbelt. It thinks me bag's a person.
 TONY: Where are you? / JAMIE: Top of Stainmore. Fog's like soup. And I'm out of hours in ten minutes.
 TONY: So where you stopping? / JAMIE: Bowes Moor lay-by. / TONY: ...Nobody parks there. / JAMIE: Why? / TONY: Just keep your curtains shut, son.
 [Pull-in; the side sensor beeps at the barrier] JAMIE: Yeah, alright, I can see it! / TONY: What's that one? / JAMIE: Side sensor. Beeps if anything's down the passenger side.
@@ -34,3 +35,7 @@ three at 0.0); j23 came out spoken (63-86% voiced) in all 14 attempts, so the ch
 LPC fit per frame, re-excited with noise; 10% voiced, Scribe still hears every word). The "sleep" breathing clips and the
 lay-by/heater beds were ~95% sub-80 Hz rumble: high-passed before levelling; slow breaths are single breaths cut from
 breathfast_0 and spaced out.
+
+Draft 3 (user: the office being constantly on to him isn't how it works; CB, or make it the phone): kept the phone
+(a planner can't be on CB to a driver on the A66: CB is driver-to-driver, a few miles). Draft 2 opened mid-call, which
+read as an always-open line; now he rings the office at the top (gen_open.py: t00, j00; t01 'What's that?' dropped).

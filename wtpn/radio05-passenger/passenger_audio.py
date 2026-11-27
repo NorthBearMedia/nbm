@@ -7,7 +7,8 @@ Draft 2 (user's notes): he says goodnight and the call ends; a time jump (3:12 A
 dead-still foggy night and wakes him; he rings Tony back; the sensor; it stops dead and the heater dies; a long quiet
 while he calms down; then the passenger chime, slowly, and the click. After the engine goes off, Tony is on the phone's
 own speaker (the hands-free dies with the ignition). Whispers sit 6 dB under his talking. Voices: the best cut per line
-from six v3 dialogue takes (picks2.json); the payoff line is whisperized (whisperize.py). Usage: passenger_audio.py [draftN]
+from six v3 dialogue takes (picks2.json); the payoff line is whisperized (whisperize.py). Draft 3: the opening is an explicit call (the user: an always-open line to the office isn't how it works).
+Usage: passenger_audio.py [draftN]
 -> st/mix.wav, master_social.wav (-14 LUFS stereo), timeline.json, passenger-draftN.mp3"""
 import json, pathlib, subprocess, re, sys
 import numpy as np
@@ -113,13 +114,19 @@ def winddown(x, d=1.2, end=0.2):
 
 # ---- part 1: driving, parking, goodnight -------------------------------------------------------------------------
 t_chime = 0.45
-t = say("j01", 1.75) + gap("j01")
-t = say("t01", t) + gap("t01")
-t_j02 = t; t_j02_end = say("j02", t)
-t_bag = t_j02 + 1.75                                                          # he slings the bag in the bunk as he says it
+t_j01_end = say("j01", 1.75)
+# draft 3: an explicit phone call, not an open line: he rings the office over the hands-free and Tony picks up
+t_ring0 = t_j01_end + 0.3
+put(pk(chain(ringback(), HANDS), -21), t_ring0, "ringing_office")
+t_pick0 = t_ring0 + 1.45
+put(pk(chain(pickup(), HANDS), -25), t_pick0)
+t = say("t00", t_pick0 + 0.25) + gap("t00")
+t_j00_end = say("j00", t)
+t_bag = t_j00_end + 0.25                                                      # "Hang on." The bag goes in the bunk
 put(pk(chain(fade(seg(load(FX / "bag_0.mp3"), 0.0, 0.9)), INCAB), -20), t_bag, "bag")
 dings(t_chime, t_bag + 0.12)
-t = say("t02", max(t_j02_end + 0.35, t_bag + 0.5)) + gap("t02")
+t = say("j02", t_bag + 0.55) + gap("j02")
+t = say("t02", t) + gap("t02")
 t = say("j03", t) + gap("j03")
 t = say("t03", t) + gap("t03")
 t = say("j04", t) + 0.75                                                      # Tony takes a moment

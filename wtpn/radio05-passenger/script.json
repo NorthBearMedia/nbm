@@ -1,54 +1,282 @@
 {
  "voices": {
-  "JAMIE": {"name": "Harry (East London, 20s)", "id": "kOVqQImaJYcrUxZmjqgl"},
-  "TONY":  {"name": "Eastend Steve (Cockney)", "id": "1TE7ou3jyxHsyRehUuMB"}
+  "JAMIE": {
+   "name": "Harry (East London, 20s)",
+   "id": "kOVqQImaJYcrUxZmjqgl"
+  },
+  "TONY": {
+   "name": "Eastend Steve (Cockney)",
+   "id": "1TE7ou3jyxHsyRehUuMB"
+  }
  },
  "lead": [
-  ["JAMIE", "[nervous] Alright, Tone. I hate this fog, mate. Can't see a thing out here, and I ain't had a cuppa since Leeds."],
-  ["TONY",  "[warm] Alright, son. It's dead in here tonight, just me and the kettle."]
+  [
+   "JAMIE",
+   "[nervous] Alright, Tone. I hate this fog, mate. Can't see a thing out here, and I ain't had a cuppa since Leeds."
+  ],
+  [
+   "TONY",
+   "[warm] Alright, son. It's dead in here tonight, just me and the kettle."
+  ]
  ],
  "lines": [
-  {"id": "j01", "who": "JAMIE", "tag": "[annoyed]", "text": "Oh, shut up."},
-  {"id": "t01", "who": "TONY",  "tag": "", "text": "What's that?"},
-  {"id": "j02", "who": "JAMIE", "tag": "", "text": "Passenger seatbelt. It thinks me bag's a person."},
-  {"id": "t02", "who": "TONY",  "tag": "", "text": "Where are you?"},
-  {"id": "j03", "who": "JAMIE", "tag": "[nervous]", "text": "Top of Stainmore. Fog's like soup. And I'm out of hours in ten minutes."},
-  {"id": "t03", "who": "TONY",  "tag": "", "text": "So where you stopping?"},
-  {"id": "j04", "who": "JAMIE", "tag": "", "text": "Bowes Moor lay-by.", "say": "Boze Moor lay-by."},
-  {"id": "t04", "who": "TONY",  "tag": "[quietly]", "text": "Nobody parks there."},
-  {"id": "j05", "who": "JAMIE", "tag": "", "text": "Why?"},
-  {"id": "t05", "who": "TONY",  "tag": "[serious]", "text": "Just keep your curtains shut, son."},
-  {"id": "j06", "who": "JAMIE", "tag": "[annoyed]", "text": "Yeah, alright, I can see it!"},
-  {"id": "t06", "who": "TONY",  "tag": "", "text": "What's that one?"},
-  {"id": "j07", "who": "JAMIE", "tag": "", "text": "Side sensor. Beeps if anything's down the passenger side."},
-  {"id": "j08", "who": "JAMIE", "tag": "", "text": "Right. Engine off."},
-  {"id": "j09", "who": "JAMIE", "tag": "", "text": "Key out."},
-  {"id": "j10", "who": "JAMIE", "tag": "", "text": "Doors locked."},
-  {"id": "j11", "who": "JAMIE", "tag": "", "text": "Curtains shut."},
-  {"id": "t07", "who": "TONY",  "tag": "", "text": "You alright?"},
-  {"id": "j12", "who": "JAMIE", "tag": "[nervous]", "text": "Don't like it up here, Tone. It's too quiet."},
-  {"id": "t08", "who": "TONY",  "tag": "[teasing]", "text": "Want me to sing you to sleep?"},
-  {"id": "j13", "who": "JAMIE", "tag": "[laughs]", "text": "Do one."},
-  {"id": "t09", "who": "TONY",  "tag": "[laughs]", "text": "Big baby. Get your head down. Ring me if you need me."},
-  {"id": "j14", "who": "JAMIE", "tag": "", "text": "Night, Tone."},
-  {"id": "t10", "who": "TONY",  "tag": "[concerned]", "text": "Jamie? It's gone three. You alright?"},
-  {"id": "j15", "who": "JAMIE", "tag": "[whispering]", "text": "The trailer's rocking."},
-  {"id": "t11", "who": "TONY",  "tag": "", "text": "It'll be the wind, son."},
-  {"id": "j16", "who": "JAMIE", "tag": "[whispering]", "text": "There's no wind, Tone. It's fog."},
-  {"id": "j17", "who": "JAMIE", "tag": "[whispering]", "text": "That's the side sensor."},
-  {"id": "t12", "who": "TONY",  "tag": "[quietly]", "text": "You said the key's out."},
-  {"id": "j18", "who": "JAMIE", "tag": "[whispering]", "text": "It is. It's up here with me."},
-  {"id": "j19", "who": "JAMIE", "tag": "[whispering]", "text": "It's coming up the passenger side."},
-  {"id": "t13", "who": "TONY",  "tag": "[quietly]", "text": "Jamie?"},
-  {"id": "j20", "who": "JAMIE", "tag": "[whispering]", "text": "It's stopped."},
-  {"id": "t14", "who": "TONY",  "tag": "[quietly]", "text": "Doors?"},
-  {"id": "j21", "who": "JAMIE", "tag": "[whispering]", "text": "Locked."},
-  {"id": "t15", "who": "TONY",  "tag": "[serious]", "text": "Don't open them curtains."},
-  {"id": "t16", "who": "TONY",  "tag": "[quietly]", "text": "Still there?"},
-  {"id": "j22", "who": "JAMIE", "tag": "[relieved]", "text": "Yeah. I think it's gone."},
-  {"id": "t17", "who": "TONY",  "tag": "[warm]", "text": "Try and get your head down. I'm not going anywhere."},
-  {"id": "t18", "who": "TONY",  "tag": "[quietly]", "text": "Is that your bag?"},
-  {"id": "j23", "who": "JAMIE", "tag": "[whispering]", "text": "It's in here with me."}
+  {
+   "id": "j01",
+   "who": "JAMIE",
+   "tag": "[annoyed]",
+   "text": "Oh, shut up."
+  },
+  {
+   "id": "t00",
+   "who": "TONY",
+   "tag": "",
+   "text": "Transport office, Tony speaking."
+  },
+  {
+   "id": "j00",
+   "who": "JAMIE",
+   "tag": "",
+   "text": "Tone, it's Jamie. Hang on."
+  },
+  {
+   "id": "j02",
+   "who": "JAMIE",
+   "tag": "",
+   "text": "Passenger seatbelt. It thinks me bag's a person."
+  },
+  {
+   "id": "t02",
+   "who": "TONY",
+   "tag": "",
+   "text": "Where are you?"
+  },
+  {
+   "id": "j03",
+   "who": "JAMIE",
+   "tag": "[nervous]",
+   "text": "Top of Stainmore. Fog's like soup. And I'm out of hours in ten minutes."
+  },
+  {
+   "id": "t03",
+   "who": "TONY",
+   "tag": "",
+   "text": "So where you stopping?"
+  },
+  {
+   "id": "j04",
+   "who": "JAMIE",
+   "tag": "",
+   "text": "Bowes Moor lay-by.",
+   "say": "Boze Moor lay-by."
+  },
+  {
+   "id": "t04",
+   "who": "TONY",
+   "tag": "[quietly]",
+   "text": "Nobody parks there."
+  },
+  {
+   "id": "j05",
+   "who": "JAMIE",
+   "tag": "",
+   "text": "Why?"
+  },
+  {
+   "id": "t05",
+   "who": "TONY",
+   "tag": "[serious]",
+   "text": "Just keep your curtains shut, son."
+  },
+  {
+   "id": "j06",
+   "who": "JAMIE",
+   "tag": "[annoyed]",
+   "text": "Yeah, alright, I can see it!"
+  },
+  {
+   "id": "t06",
+   "who": "TONY",
+   "tag": "",
+   "text": "What's that one?"
+  },
+  {
+   "id": "j07",
+   "who": "JAMIE",
+   "tag": "",
+   "text": "Side sensor. Beeps if anything's down the passenger side."
+  },
+  {
+   "id": "j08",
+   "who": "JAMIE",
+   "tag": "",
+   "text": "Right. Engine off."
+  },
+  {
+   "id": "j09",
+   "who": "JAMIE",
+   "tag": "",
+   "text": "Key out."
+  },
+  {
+   "id": "j10",
+   "who": "JAMIE",
+   "tag": "",
+   "text": "Doors locked."
+  },
+  {
+   "id": "j11",
+   "who": "JAMIE",
+   "tag": "",
+   "text": "Curtains shut."
+  },
+  {
+   "id": "t07",
+   "who": "TONY",
+   "tag": "",
+   "text": "You alright?"
+  },
+  {
+   "id": "j12",
+   "who": "JAMIE",
+   "tag": "[nervous]",
+   "text": "Don't like it up here, Tone. It's too quiet."
+  },
+  {
+   "id": "t08",
+   "who": "TONY",
+   "tag": "[teasing]",
+   "text": "Want me to sing you to sleep?"
+  },
+  {
+   "id": "j13",
+   "who": "JAMIE",
+   "tag": "[laughs]",
+   "text": "Do one."
+  },
+  {
+   "id": "t09",
+   "who": "TONY",
+   "tag": "[laughs]",
+   "text": "Big baby. Get your head down. Ring me if you need me."
+  },
+  {
+   "id": "j14",
+   "who": "JAMIE",
+   "tag": "",
+   "text": "Night, Tone."
+  },
+  {
+   "id": "t10",
+   "who": "TONY",
+   "tag": "[concerned]",
+   "text": "Jamie? It's gone three. You alright?"
+  },
+  {
+   "id": "j15",
+   "who": "JAMIE",
+   "tag": "[whispering]",
+   "text": "The trailer's rocking."
+  },
+  {
+   "id": "t11",
+   "who": "TONY",
+   "tag": "",
+   "text": "It'll be the wind, son."
+  },
+  {
+   "id": "j16",
+   "who": "JAMIE",
+   "tag": "[whispering]",
+   "text": "There's no wind, Tone. It's fog."
+  },
+  {
+   "id": "j17",
+   "who": "JAMIE",
+   "tag": "[whispering]",
+   "text": "That's the side sensor."
+  },
+  {
+   "id": "t12",
+   "who": "TONY",
+   "tag": "[quietly]",
+   "text": "You said the key's out."
+  },
+  {
+   "id": "j18",
+   "who": "JAMIE",
+   "tag": "[whispering]",
+   "text": "It is. It's up here with me."
+  },
+  {
+   "id": "j19",
+   "who": "JAMIE",
+   "tag": "[whispering]",
+   "text": "It's coming up the passenger side."
+  },
+  {
+   "id": "t13",
+   "who": "TONY",
+   "tag": "[quietly]",
+   "text": "Jamie?"
+  },
+  {
+   "id": "j20",
+   "who": "JAMIE",
+   "tag": "[whispering]",
+   "text": "It's stopped."
+  },
+  {
+   "id": "t14",
+   "who": "TONY",
+   "tag": "[quietly]",
+   "text": "Doors?"
+  },
+  {
+   "id": "j21",
+   "who": "JAMIE",
+   "tag": "[whispering]",
+   "text": "Locked."
+  },
+  {
+   "id": "t15",
+   "who": "TONY",
+   "tag": "[serious]",
+   "text": "Don't open them curtains."
+  },
+  {
+   "id": "t16",
+   "who": "TONY",
+   "tag": "[quietly]",
+   "text": "Still there?"
+  },
+  {
+   "id": "j22",
+   "who": "JAMIE",
+   "tag": "[relieved]",
+   "text": "Yeah. I think it's gone."
+  },
+  {
+   "id": "t17",
+   "who": "TONY",
+   "tag": "[warm]",
+   "text": "Try and get your head down. I'm not going anywhere."
+  },
+  {
+   "id": "t18",
+   "who": "TONY",
+   "tag": "[quietly]",
+   "text": "Is that your bag?"
+  },
+  {
+   "id": "j23",
+   "who": "JAMIE",
+   "tag": "[whispering]",
+   "text": "It's in here with me."
+  }
  ],
- "sac": ["TONY", "[scared] Jamie? Jamie, talk to me."]
+ "sac": [
+  "TONY",
+  "[scared] Jamie? Jamie, talk to me."
+ ],
+ "note": "draft 3: the opening is an explicit call (he rings the office); t01 'What's that?' dropped"
 }
