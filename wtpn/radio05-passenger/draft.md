@@ -48,3 +48,18 @@ TONY: Is that your bag?
 JAMIE: It's in here with me.
 [Ding. Ding. — CLICK.]
 CUT. — PART 1 / FOLLOW FOR PART 2
+
+## QC of draft 1 (user: "It's okay. One of the better ones. Don't know what it is though.")
+Measured on passenger-draft1.mp3:
+- Loudness is flat start to finish (3 s windows sit between -16 and -20 dB; the climax windows are as loud as the chat).
+- Jamie's whispers are as loud as his normal lines (every line was levelled to the same LUFS). j19 "It's in here with me",
+  tagged [whispering], came out 85% voiced (i.e. not a whisper) with 2.5 st of pitch movement: the payoff line is flat.
+- Most of Jamie's lines move under 4 semitones (flat read): j03, j04, j07, j09, j11, j12 ("Don't like it up here"), j13.
+- The climax exchange (Jamie? / It's stopped. / Doors? / Locked.) runs on the same ~0.5 s pauses as the banter.
+- No breathing anywhere. Nothing is wrong until 53 s in; "Nobody parks there" is defused at once by "Ah, ignore me."
+- Logic: with the ignition off the hands-free would drop; Tony should move from the cab speakers to the phone in Jamie's hand.
+Suggestions put to the user: sensor beeping while he drives (dread from the first seconds, the original Blind Spot idea);
+regenerate Jamie scared (expressive setting, nervous lead-in, keep only takes with real whispers); whispers 6 dB down and
+close, Tony to the phone speaker at engine off; breathing + held breath, ignition relay clunk before the first beep, heater
+dying when the beeps stop; slow the climax; Tony's turn ("keep your curtains shut" / "don't open them curtains");
+optional ending: the engine starts with the key in his hand.
