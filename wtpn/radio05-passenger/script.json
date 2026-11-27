@@ -268,15 +268,21 @@
    "text": "Is that your bag?"
   },
   {
-   "id": "j23",
+   "id": "j24",
    "who": "JAMIE",
-   "tag": "[whispering]",
-   "text": "It's in here with me."
+   "tag": "[whispers]",
+   "text": "Me bag's up here with me."
+  },
+  {
+   "id": "t19",
+   "who": "TONY",
+   "tag": "[scared]",
+   "text": "Then what's in the passenger seat?"
   }
  ],
  "sac": [
   "TONY",
   "[scared] Jamie? Jamie, talk to me."
  ],
- "note": "draft 3: the opening is an explicit call (he rings the office); t01 'What's that?' dropped"
+ "note": "draft 4: no breathing; the ending is plain (user: 'It's in here with me' read as either the bag or the thing): Is that your bag? / Me bag's up here with me. / Then what's in the passenger seat?"
 }

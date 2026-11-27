@@ -1,4 +1,4 @@
-# TRANSMISSION — "PASSENGER" (Part 1) — draft v3 (v2 + an explicit phone call)
+# TRANSMISSION — "PASSENGER" (Part 1) — draft v4 (v3, no breathing, plain ending)
 
 User's notes on draft 1: slow the ending, add delay; show the passage of time (he's asleep, it's the middle of the
 night when it starts, not straight after he parks); something's presence first (the trailer rocking, more than the
@@ -28,7 +28,7 @@ TONY: It'll be the wind, son. / JAMIE: There's no wind, Tone. It's fog. [The tra
 [Beep... beep... faster and faster] JAMIE: It's coming up the passenger side. [continuous tone — stops dead; the heater winds down and dies; he holds his breath]
 TONY: Jamie? / JAMIE: It's stopped. / TONY: Doors? / JAMIE: Locked. / TONY: Don't open them curtains.
 [A long quiet. His breathing slows.] TONY: Still there? / [a relieved breath] JAMIE: Yeah. I think it's gone. / TONY: Try and get your head down. I'm not going anywhere.
-[Quiet. Then: ding. ding. ding.] TONY: Is that your bag? / JAMIE (whisper): It's in here with me. [ding. ding.] [click — the belt goes in] [silence] CUT.
+[Quiet. Then: ding. ding. ding.] TONY: Is that your bag? / JAMIE (whisper): Me bag's up here with me. / TONY: Then what's in the passenger seat? [ding.] [click — the belt goes in] [silence] CUT.
 
 Build notes: voices = best Scribe-cut line from six v3 dialogue takes (score2.py -> picks2.json; three at stability 0.5,
 three at 0.0); j23 came out spoken (63-86% voiced) in all 14 attempts, so the chosen take is whisperized (whisperize.py:
@@ -39,3 +39,7 @@ breathfast_0 and spaced out.
 Draft 3 (user: the office being constantly on to him isn't how it works; CB, or make it the phone): kept the phone
 (a planner can't be on CB to a driver on the A66: CB is driver-to-driver, a few miles). Draft 2 opened mid-call, which
 read as an always-open line; now he rings the office at the top (gen_open.py: t00, j00; t01 'What's that?' dropped).
+
+Draft 4 (user: lose the breathing, it sounds like somebody else is there; the ending doesn't land, 'It's in here with me'
+could mean the bag or the thing): every breath is gone (his waking is his sleeping bag rustling instead); the ending is
+plain, so the click answers Tony's question. gen_end2.py, take F3 for all three lines (one performance), not whisperized.

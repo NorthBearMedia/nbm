@@ -8,6 +8,7 @@ dead-still foggy night and wakes him; he rings Tony back; the sensor; it stops d
 while he calms down; then the passenger chime, slowly, and the click. After the engine goes off, Tony is on the phone's
 own speaker (the hands-free dies with the ignition). Whispers sit 6 dB under his talking. Voices: the best cut per line
 from six v3 dialogue takes (picks2.json); the payoff line is whisperized (whisperize.py). Draft 3: the opening is an explicit call (the user: an always-open line to the office isn't how it works).
+Draft 4: no breathing (it read as a second person); the ending is plain: bag / up here with me / then what's in the seat.
 Usage: passenger_audio.py [draftN]
 -> st/mix.wav, master_social.wav (-14 LUFS stereo), timeline.json, passenger-draftN.mp3"""
 import json, pathlib, subprocess, re, sys
@@ -66,8 +67,7 @@ DING = chain(ding(), DASH); BEEP = chain(pulse(), DASH)
 # ---- the voices -----------------------------------------------------------------------------------------------
 def line(k):
     tk = PICK[k]; al = json.loads((VO / f"{tk}_{k}_align.json").read_text())
-    x = load(VO / "W_Q2_j23.wav") if k == "j23" else load(VO / f"{tk}_{k}.mp3")
-    if k == "j23": al = json.loads((VO / "Q2_j23_align.json").read_text())
+    x = load(VO / f"{tk}_{k}.mp3")
     a = max(0.0, al["start"] - 0.08); b = min(len(x) / SR, al["end"] + 0.16)
     return fade(x[int(a * SR): int(b * SR)]), al["gap_after_in_take"]
 L = {k: line(k) for k in WHO}
@@ -172,7 +172,7 @@ tl.append({"id": "time_jump", "who": "SFX", "start": round(t_fade0, 2), "end": r
 t_rock1 = t_n + 1.8                                                           # asleep; the trailer starts to rock
 t_rock1_end = put(at(chain(fade(seg(load(FX / "rock_2.mp3"), 0.0, 4.2), 0.3, 0.6), INCAB), -23.0), t_rock1, "rock1")
 t_wake = t_rock1 + 2.0
-put(pk(chain(fade(seg(load(FX / "wake_0.mp3"), 0.15, 1.15), 0.01, 0.1), WHISPER), -14), t_wake, "wake")
+put(pk(chain(fade(seg(load(FX / "bunk_1.mp3"), 0.5, 2.3), 0.05, 0.3), INCAB), -24), t_wake, "wakes_sits_up")   # his sleeping bag, not a breath
 t_ring = t_rock1_end + 0.3
 put(pk(chain(ringback(), PHONESPK), -22), t_ring, "ringing")
 t_pick = t_ring + 1.45
@@ -196,7 +196,6 @@ IV = [1.4, 1.2, 1.0, 0.82, 0.66, 0.52, 0.40, 0.31, 0.24, 0.18, 0.14, 0.11]
 say("j19", t_app + sum(IV[:4]) + 0.2)
 t_dead = beeps(t_app, IV, cont=1.3, level=-13)                                # up the passenger side, then nothing
 tl.append({"id": "beep_approach", "who": "SFX", "start": round(t_app, 2), "end": round(t_dead, 2)})
-put(at(chain(fade(seg(load(FX / "hold_0.mp3"), 0.0, 2.9), 0.05, 0.3), WHISPER), -30.0), t_dead + 0.4, "held_breath")
 t = say("t13", t_dead + 2.8) + 1.0
 t = say("j20", t) + 0.9
 t = say("t14", t) + 0.8
@@ -204,13 +203,13 @@ t = say("j21", t) + 1.2
 t_t15_end = say("t15", t)
 t_calm = t_t15_end + 3.5                                                      # quiet. he starts to calm down
 t_t16_end = say("t16", t_calm)
-put(pk(chain(fade(seg(load(FX / "relief_0.mp3"), 0.0, 1.1), 0.02, 0.2), WHISPER), -22), t_t16_end + 0.35, "relief")
 t = say("j22", t_t16_end + 1.2) + 0.6
 t_t17_end = say("t17", t)
 t_ding = t_t17_end + 3.2
 t_t18_end = say("t18", t_ding + 3 * 1.05 + 0.3)
-t_j23_end = say("j23", t_t18_end + 0.9)
-t_last = t_ding + 1.05 * np.ceil((t_j23_end - t_ding) / 1.05 + 1)            # two more after he says it
+t_j24_end = say("j24", t_t18_end + 0.9)                                       # "Me bag's up here with me."
+t_t19_end = say("t19", t_j24_end + 1.0, -23.5)                                # "Then what's in the passenger seat?"
+t_last = t_ding + 1.05 * np.ceil((t_t19_end + 0.35 - t_ding) / 1.05)          # one more chime: then the answer
 dings(t_ding, t_last + 0.1)
 buckle = load(FX / "buckle_0.mp3"); t_click = t_last + 0.6                    # the belt goes in; the chime stops
 put(pk(chain(fade(seg(buckle, 0.0, 0.75), 0.01, 0.1), INCAB), -9), t_click - 0.45, "buckle")
@@ -258,24 +257,7 @@ night_heat = at(chain(loop(seg(load(FX / "heater_0.mp3"), 1.3, 9.5), N), "highpa
 i = int(t_dead * SR); w = winddown(night_heat[i:i + int(2.0 * SR)], 1.2, 0.2); night_heat[i:] = 0; night_heat[i:i + len(w)] = w
 tl.append({"id": "heater_dies", "who": "SFX", "start": round(t_dead, 2), "end": round(t_dead + 1.2, 2)})
 bed += night_lay + night_heat
-# his breathing: asleep; fast and shallow from waking to the stop; held; calming down; frozen at the first ding
-def breath_bed(name, a, b, s0, s1, target):
-    if b <= a: return
-    x = at(loop(seg(load(FX / name), s0, s1), int((b - a) * SR) + 10), target); x = fade(x[: int((b - a) * SR)], 0.4, 0.15)
-    i = int(a * SR); bed[i:i + len(x)] += x[: max(0, N - i)]
-# the "sleep" clips came back as 98% sub-80 Hz rumble with hardly any breath in them, so his slow breathing is
-# single breaths cut from the clean fast-breathing clip, spaced out
-BF = load(FX / "breathfast_0.mp3")
-def slow_breaths(a, b, period, target, seed):
-    if b - a < 1.0: return
-    r = np.random.default_rng(seed); out = np.zeros(int((b - a) * SR) + SR); t = 0.3
-    while t < b - a - 0.6:
-        s0 = float(r.choice([0.55, 1.15, 1.75, 2.35, 2.95])); br = chain(fade(seg(BF, s0, s0 + 0.5), 0.05, 0.2), "lowpass=f=5000")
-        i = int(t * SR); out[i:i + len(br)] += br * r.uniform(0.75, 1.0); t += period * r.uniform(0.9, 1.12)
-    out = at(out[: int((b - a) * SR)], target); i = int(a * SR); bed[i:i + len(out)] += out[: max(0, N - i)]
-slow_breaths(t_night, t_wake - 0.2, 3.4, -40.0, 1)                          # asleep
-breath_bed("breathfast_0.mp3", t_wake + 0.7, t_dead, 0.0, 5.8, -39.0)       # awake and frightened, until the stop
-slow_breaths(t_t15_end + 0.8, t_ding, 2.4, -40.0, 2)                        # calming down; frozen at the first ding
+# draft 4: no breathing at all (user: the breath clips sounded like someone else in the cab)
 mix += bed
 mix[:int(0.25 * SR)] *= np.linspace(0, 1, int(0.25 * SR))
 c = int(t_cut * SR); mix[c - int(0.01 * SR): c] *= np.linspace(1, 0, int(0.01 * SR)); mix[c:] = 0          # the hard cut

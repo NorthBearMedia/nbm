@@ -1,6 +1,6 @@
 {
- "total": 142.42,
- "cut": 139.92,
+ "total": 144.52,
+ "cut": 142.02,
  "events": [
   {
    "id": "chime",
@@ -214,10 +214,10 @@
    "end": 70.45
   },
   {
-   "id": "wake",
+   "id": "wakes_sits_up",
    "who": "SFX",
    "start": 68.24,
-   "end": 69.25
+   "end": 70.05
   },
   {
    "id": "ringing",
@@ -304,12 +304,6 @@
    "end": 105.5
   },
   {
-   "id": "held_breath",
-   "who": "SFX",
-   "start": 104.7,
-   "end": 107.6
-  },
-  {
    "id": "t13",
    "who": "TONY",
    "start": 107.1,
@@ -346,12 +340,6 @@
    "end": 120.1
   },
   {
-   "id": "relief",
-   "who": "SFX",
-   "start": 120.45,
-   "end": 121.56
-  },
-  {
    "id": "j22",
    "who": "JAMIE",
    "start": 121.3,
@@ -367,25 +355,31 @@
    "id": "chime",
    "who": "SFX",
    "start": 129.42,
-   "end": 138.87
+   "end": 140.97
   },
   {
    "id": "t18",
    "who": "TONY",
    "start": 132.87,
-   "end": 134.09
+   "end": 133.97
   },
   {
-   "id": "j23",
+   "id": "j24",
    "who": "JAMIE",
-   "start": 134.99,
-   "end": 136.44
+   "start": 134.87,
+   "end": 136.42
+  },
+  {
+   "id": "t19",
+   "who": "TONY",
+   "start": 137.42,
+   "end": 139.01
   },
   {
    "id": "buckle",
    "who": "SFX",
-   "start": 137.97,
-   "end": 138.73
+   "start": 140.07,
+   "end": 140.83
   }
  ]
 }
