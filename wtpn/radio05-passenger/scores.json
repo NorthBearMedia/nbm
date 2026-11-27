@@ -1,0 +1,770 @@
+{
+ "A0_j01": {
+  "acc": 1.0,
+  "st": 3.1,
+  "dur": 1.63,
+  "heard": "Oh, shut up."
+ },
+ "A0_j02": {
+  "acc": 0.75,
+  "st": 13.6,
+  "dur": 3.07,
+  "heard": "Passenger seatbelt. It thinks me bags are person."
+ },
+ "A0_j03": {
+  "acc": 0.8,
+  "st": 7.2,
+  "dur": 4.51,
+  "heard": "Are you? Top of Stainmore, fogs like soup, and I'm out of hours in 10 minutes."
+ },
+ "A0_j04": {
+  "acc": 0.4,
+  "st": 10.1,
+  "dur": 1.81,
+  "heard": "Bosemore Layby."
+ },
+ "A0_j05": {
+  "acc": 0.0,
+  "st": 0.0,
+  "dur": 0.43,
+  "heard": "[\u0932\u0917\u093e\u0924\u093e\u0930 \u0938\u0902\u0917\u0940\u0924 \u0915\u0940 \u0906\u0935\u093e\u095b]"
+ },
+ "A0_j06": {
+  "acc": 0.77,
+  "st": 8.9,
+  "dur": 2.13,
+  "heard": "Yeah, all right. I can see it."
+ },
+ "A0_j07": {
+  "acc": 0.9,
+  "st": 7.6,
+  "dur": 4.19,
+  "heard": "That one. Side sensor. Beeps if anything's down the passenger side."
+ },
+ "A0_j08": {
+  "acc": 0.8,
+  "st": 6.8,
+  "dur": 1.21,
+  "heard": "Right. Engine-"
+ },
+ "A0_j09": {
+  "acc": 0.0,
+  "st": 1.9,
+  "dur": 0.67,
+  "heard": "Okay."
+ },
+ "A0_j10": {
+  "acc": 0.0,
+  "st": 2.5,
+  "dur": 0.74,
+  "heard": "\u7136\u540e\u90fd"
+ },
+ "A0_j11": {
+  "acc": 0.5,
+  "st": 2.8,
+  "dur": 0.9,
+  "heard": "locks, curtains."
+ },
+ "A0_j12": {
+  "acc": 0.95,
+  "st": 3.7,
+  "dur": 2.94,
+  "heard": "Right. Don't like it up here, Tone. It's too quiet."
+ },
+ "A0_j13": {
+  "acc": 1.0,
+  "st": 1.2,
+  "dur": 1.08,
+  "heard": "Do one."
+ },
+ "A0_j14": {
+  "acc": 1.0,
+  "st": 11.0,
+  "dur": 1.71,
+  "heard": "That's the side sensor."
+ },
+ "A0_j15": {
+  "acc": 1.0,
+  "st": 2.2,
+  "dur": 2.0,
+  "heard": "It is. It's up here with me."
+ },
+ "A0_j16": {
+  "acc": 0.77,
+  "st": 13.1,
+  "dur": 2.78,
+  "heard": "Tone is coming up the passenger-"
+ },
+ "A0_j17": {
+  "acc": 0.0,
+  "st": 10.9,
+  "dur": 1.45,
+  "heard": "Jamie?"
+ },
+ "A0_j18": {
+  "acc": 0.0,
+  "st": 10.3,
+  "dur": 0.74,
+  "heard": "Dose?"
+ },
+ "A0_j19": {
+  "acc": 0.4,
+  "st": 11.1,
+  "dur": 1.53,
+  "heard": "that your bag? It's in"
+ },
+ "A0_t01": {
+  "acc": 0.0,
+  "st": 7.7,
+  "dur": 0.43,
+  "heard": "Mo\u00e7a."
+ },
+ "A0_t02": {
+  "acc": 0.67,
+  "st": 6.8,
+  "dur": 0.98,
+  "heard": "Listen. Where are"
+ },
+ "A0_t03": {
+  "acc": 0.75,
+  "st": 8.3,
+  "dur": 1.71,
+  "heard": "it. So, where you"
+ },
+ "A0_t04": {
+  "acc": 1.0,
+  "st": 2.6,
+  "dur": 1.53,
+  "heard": "Nobody parks there."
+ },
+ "A0_t05": {
+  "acc": 0.6,
+  "st": 7.9,
+  "dur": 2.42,
+  "heard": "Why? Ah, ignore me. Drivers"
+ },
+ "A0_t06": {
+  "acc": 0.4,
+  "st": 15.2,
+  "dur": 0.67,
+  "heard": "What's up?"
+ },
+ "A0_t07": {
+  "acc": 0.0,
+  "st": 6.4,
+  "dur": 0.98,
+  "heard": "shot."
+ },
+ "A0_t08": {
+  "acc": 1.0,
+  "st": 6.7,
+  "dur": 1.84,
+  "heard": "Want me to sing you to sleep?"
+ },
+ "A0_t09": {
+  "acc": 1.0,
+  "st": 2.5,
+  "dur": 1.55,
+  "heard": "[laughs] Big baby."
+ },
+ "A0_t10": {
+  "acc": 0.6,
+  "st": 13.0,
+  "dur": 1.37,
+  "heard": "You said the keys, Al."
+ },
+ "A0_t11": {
+  "acc": 0.0,
+  "st": 0.4,
+  "dur": 0.69,
+  "heard": "just saw it."
+ },
+ "A0_t12": {
+  "acc": 0.0,
+  "st": 1.0,
+  "dur": 0.85,
+  "heard": "Stopped."
+ },
+ "A0_t13": {
+  "acc": 0.0,
+  "st": 5.1,
+  "dur": 1.45,
+  "heard": "Locked."
+ },
+ "A1_j01": {
+  "acc": 1.0,
+  "st": 22.3,
+  "dur": 1.4,
+  "heard": "Oh, shut up."
+ },
+ "A1_j02": {
+  "acc": 1.0,
+  "st": 4.4,
+  "dur": 3.15,
+  "heard": "Passenger seatbelt. It thinks me bag's a person."
+ },
+ "A1_j03": {
+  "acc": 0.93,
+  "st": 3.7,
+  "dur": 4.43,
+  "heard": "Top of Stainmore. Fog's like soup, and I'm out of hours in 10 minutes."
+ },
+ "A1_j04": {
+  "acc": 0.0,
+  "st": 4.8,
+  "dur": 1.55,
+  "heard": "Bosemore Labour."
+ },
+ "A1_j05": {
+  "acc": 1.0,
+  "st": 11.2,
+  "dur": 0.51,
+  "heard": "Why?"
+ },
+ "A1_j06": {
+  "acc": 0.77,
+  "st": 5.9,
+  "dur": 1.63,
+  "heard": "Yeah, all right. I can see it."
+ },
+ "A1_j07": {
+  "acc": 0.74,
+  "st": 6.2,
+  "dur": 3.04,
+  "heard": "that one? Side sensor. Beeps if anything's down the passage."
+ },
+ "A1_j08": {
+  "acc": 0.4,
+  "st": 21.1,
+  "dur": 1.42,
+  "heard": "side. Right."
+ },
+ "A1_j09": {
+  "acc": 0.0,
+  "st": 1.5,
+  "dur": 0.61,
+  "heard": "ginov."
+ },
+ "A1_j10": {
+  "acc": 0.0,
+  "st": 3.9,
+  "dur": 0.85,
+  "heard": "k out to"
+ },
+ "A1_j11": {
+  "acc": 0.0,
+  "st": 17.9,
+  "dur": 0.72,
+  "heard": "is locked."
+ },
+ "A1_j12": {
+  "acc": 0.76,
+  "st": 9.0,
+  "dur": 2.78,
+  "heard": "You all right? Don't like it up here, Time. It's too quiet."
+ },
+ "A1_j13": {
+  "acc": 0.0,
+  "st": 8.1,
+  "dur": 0.74,
+  "heard": "you to sleep."
+ },
+ "A1_j14": {
+  "acc": 0.0,
+  "st": 4.5,
+  "dur": 1.19,
+  "heard": "Big baby."
+ },
+ "A1_j15": {
+  "acc": 0.57,
+  "st": 12.8,
+  "dur": 1.81,
+  "heard": "The key's out. It is. It's up."
+ },
+ "A1_j16": {
+  "acc": 0.43,
+  "st": 3.8,
+  "dur": 2.91,
+  "heard": "here with me. Tone is coming up"
+ },
+ "A1_j17": {
+  "acc": 0.0,
+  "st": 12.7,
+  "dur": 1.0,
+  "heard": "Jamie?"
+ },
+ "A1_j18": {
+  "acc": 0.0,
+  "st": 12.7,
+  "dur": 1.19,
+  "heard": "Doors."
+ },
+ "A1_j19": {
+  "acc": 0.71,
+  "st": 12.9,
+  "dur": 2.34,
+  "heard": "Is that your bag? It's in here with me."
+ },
+ "A1_t01": {
+  "acc": 1.0,
+  "st": 16.2,
+  "dur": 0.67,
+  "heard": "What's that?"
+ },
+ "A1_t02": {
+  "acc": 1.0,
+  "st": 8.7,
+  "dur": 0.74,
+  "heard": "Where are you?"
+ },
+ "A1_t03": {
+  "acc": 1.0,
+  "st": 8.5,
+  "dur": 1.14,
+  "heard": "So where you stopping?"
+ },
+ "A1_t04": {
+  "acc": 1.0,
+  "st": 4.9,
+  "dur": 1.29,
+  "heard": "Nobody parks there."
+ },
+ "A1_t05": {
+  "acc": 0.8,
+  "st": 6.6,
+  "dur": 2.81,
+  "heard": "Ah, ignore me. Driver's talk."
+ },
+ "A1_t06": {
+  "acc": 0.5,
+  "st": 1.5,
+  "dur": 0.35,
+  "heard": "What's-"
+ },
+ "A1_t07": {
+  "acc": 0.0,
+  "st": 20.5,
+  "dur": 0.77,
+  "heard": "And sharp."
+ },
+ "A1_t08": {
+  "acc": 0.55,
+  "st": 11.7,
+  "dur": 1.24,
+  "heard": "Quiet. Want me to-"
+ },
+ "A1_t09": {
+  "acc": 0.0,
+  "st": 10.7,
+  "dur": 1.27,
+  "heard": "Day one."
+ },
+ "A1_t10": {
+  "acc": 0.25,
+  "st": 16.4,
+  "dur": 1.74,
+  "heard": "the side sensor."
+ },
+ "A1_t11": {
+  "acc": 0.0,
+  "st": 2.9,
+  "dur": 0.61,
+  "heard": "the passing"
+ },
+ "A1_t12": {
+  "acc": 0.0,
+  "st": 0.0,
+  "dur": 0.4,
+  "heard": "is"
+ },
+ "A1_t13": {
+  "acc": 0.0,
+  "st": 20.0,
+  "dur": 0.82,
+  "heard": "Locked."
+ },
+ "A2_j01": {
+  "acc": 1.0,
+  "st": 13.4,
+  "dur": 1.79,
+  "heard": "Oh, shut up."
+ },
+ "A2_j02": {
+  "acc": 1.0,
+  "st": 13.1,
+  "dur": 3.3,
+  "heard": "Passenger seatbelt. It thinks me bag's a person."
+ },
+ "A2_j03": {
+  "acc": 0.93,
+  "st": 4.0,
+  "dur": 4.74,
+  "heard": "Top of Stainmore. Fog's like soup, and I'm out of hours in 10 minutes."
+ },
+ "A2_j04": {
+  "acc": 0.4,
+  "st": 2.6,
+  "dur": 1.81,
+  "heard": "Bosemore lay-by."
+ },
+ "A2_j05": {
+  "acc": 1.0,
+  "st": 3.0,
+  "dur": 0.35,
+  "heard": "Why?"
+ },
+ "A2_j06": {
+  "acc": 0.77,
+  "st": 6.3,
+  "dur": 2.15,
+  "heard": "Yeah, all right. I can see it."
+ },
+ "A2_j07": {
+  "acc": 1.0,
+  "st": 3.6,
+  "dur": 3.54,
+  "heard": "Side sensor beeps if anything's down the passenger side."
+ },
+ "A2_j08": {
+  "acc": 1.0,
+  "st": 4.1,
+  "dur": 2.02,
+  "heard": "Right. Engine off."
+ },
+ "A2_j09": {
+  "acc": 0.0,
+  "st": 2.3,
+  "dur": 0.67,
+  "heard": "chaos."
+ },
+ "A2_j10": {
+  "acc": 0.5,
+  "st": 3.4,
+  "dur": 0.74,
+  "heard": "Two's locked."
+ },
+ "A2_j11": {
+  "acc": 0.5,
+  "st": 19.8,
+  "dur": 0.82,
+  "heard": "curtain shut."
+ },
+ "A2_j12": {
+  "acc": 1.0,
+  "st": 4.0,
+  "dur": 2.96,
+  "heard": "Don't like it up here, Tone. It's too quiet."
+ },
+ "A2_j13": {
+  "acc": 1.0,
+  "st": 1.8,
+  "dur": 1.0,
+  "heard": "Do one."
+ },
+ "A2_j14": {
+  "acc": 1.0,
+  "st": 9.9,
+  "dur": 1.45,
+  "heard": "That's the side sensor."
+ },
+ "A2_j15": {
+  "acc": 1.0,
+  "st": 15.5,
+  "dur": 2.05,
+  "heard": "It is. It's up here with me."
+ },
+ "A2_j16": {
+  "acc": 0.71,
+  "st": 11.9,
+  "dur": 2.94,
+  "heard": "tone is coming out the passenger side."
+ },
+ "A2_j17": {
+  "acc": 0.5,
+  "st": 24.2,
+  "dur": 1.53,
+  "heard": "It stopped."
+ },
+ "A2_j18": {
+  "acc": 1.0,
+  "st": 20.6,
+  "dur": 0.95,
+  "heard": "Locked."
+ },
+ "A2_j19": {
+  "acc": 1.0,
+  "st": 2.5,
+  "dur": 1.71,
+  "heard": "It's in here with me."
+ },
+ "A2_t01": {
+  "acc": 1.0,
+  "st": 1.4,
+  "dur": 0.43,
+  "heard": "What's that?"
+ },
+ "A2_t02": {
+  "acc": 1.0,
+  "st": 11.7,
+  "dur": 0.9,
+  "heard": "Where are you?"
+ },
+ "A2_t03": {
+  "acc": 1.0,
+  "st": 7.6,
+  "dur": 1.29,
+  "heard": "So where you stopping?"
+ },
+ "A2_t04": {
+  "acc": 1.0,
+  "st": 4.5,
+  "dur": 2.08,
+  "heard": "Nobody parks there."
+ },
+ "A2_t05": {
+  "acc": 0.8,
+  "st": 6.3,
+  "dur": 2.86,
+  "heard": "Ah, ignore me. Driver's talk."
+ },
+ "A2_t06": {
+  "acc": 1.0,
+  "st": 11.4,
+  "dur": 0.74,
+  "heard": "What's that one?"
+ },
+ "A2_t07": {
+  "acc": 0.0,
+  "st": 5.0,
+  "dur": 1.06,
+  "heard": "You're right."
+ },
+ "A2_t08": {
+  "acc": 1.0,
+  "st": 6.8,
+  "dur": 1.89,
+  "heard": "Want me to sing you to sleep?"
+ },
+ "A2_t09": {
+  "acc": 1.0,
+  "st": 3.5,
+  "dur": 1.47,
+  "heard": "[chuckles] Big baby."
+ },
+ "A2_t10": {
+  "acc": 1.0,
+  "st": 10.4,
+  "dur": 1.71,
+  "heard": "You said the key's out."
+ },
+ "A2_t11": {
+  "acc": 1.0,
+  "st": 8.2,
+  "dur": 0.82,
+  "heard": "Jamie?"
+ },
+ "A2_t12": {
+  "acc": 0.0,
+  "st": 6.7,
+  "dur": 0.85,
+  "heard": "Dose."
+ },
+ "A2_t13": {
+  "acc": 1.0,
+  "st": 12.6,
+  "dur": 1.27,
+  "heard": "Is that your bag?"
+ },
+ "A3_j01": {
+  "acc": 1.0,
+  "st": 12.2,
+  "dur": 1.68,
+  "heard": "Oh, shut up."
+ },
+ "A3_j02": {
+  "acc": 0.93,
+  "st": 11.7,
+  "dur": 3.07,
+  "heard": "Passenger seatbelt thinks me bag's a person."
+ },
+ "A3_j03": {
+  "acc": 0.81,
+  "st": 3.3,
+  "dur": 3.7,
+  "heard": "Top of Stainmore, fog's like soup, and amount of hours in 10 minutes."
+ },
+ "A3_j04": {
+  "acc": 0.0,
+  "st": 1.7,
+  "dur": 1.34,
+  "heard": "Bosemore lay by."
+ },
+ "A3_j05": {
+  "acc": 1.0,
+  "st": 4.1,
+  "dur": 0.9,
+  "heard": "Why?"
+ },
+ "A3_j06": {
+  "acc": 0.77,
+  "st": 3.6,
+  "dur": 2.13,
+  "heard": "Yeah, all right. I can see it."
+ },
+ "A3_j07": {
+  "acc": 1.0,
+  "st": 3.9,
+  "dur": 3.46,
+  "heard": "Side sensor, beeps if anything's down the passenger side."
+ },
+ "A3_j08": {
+  "acc": 1.0,
+  "st": 4.2,
+  "dur": 0.98,
+  "heard": "Right. Engine off."
+ },
+ "A3_j09": {
+  "acc": 0.0,
+  "st": 3.1,
+  "dur": 0.59,
+  "heard": "care."
+ },
+ "A3_j10": {
+  "acc": 1.0,
+  "st": 13.8,
+  "dur": 0.8,
+  "heard": "Doors locked."
+ },
+ "A3_j11": {
+  "acc": 0.5,
+  "st": 17.8,
+  "dur": 1.27,
+  "heard": "curtain shut."
+ },
+ "A3_j12": {
+  "acc": 1.0,
+  "st": 2.6,
+  "dur": 3.02,
+  "heard": "Don't like it up here, Tone. It's too quiet."
+ },
+ "A3_j13": {
+  "acc": 0.5,
+  "st": 2.2,
+  "dur": 0.77,
+  "heard": "Two, one."
+ },
+ "A3_j14": {
+  "acc": 1.0,
+  "st": 3.5,
+  "dur": 1.55,
+  "heard": "That's the side sensor."
+ },
+ "A3_j15": {
+  "acc": 1.0,
+  "st": 2.7,
+  "dur": 2.15,
+  "heard": "It is. It's up here with me."
+ },
+ "A3_j16": {
+  "acc": 0.77,
+  "st": 2.3,
+  "dur": 2.94,
+  "heard": "Tone is coming up the passenger"
+ },
+ "A3_j17": {
+  "acc": 0.0,
+  "st": 13.9,
+  "dur": 1.63,
+  "heard": "Jamie?"
+ },
+ "A3_j18": {
+  "acc": 0.0,
+  "st": 2.4,
+  "dur": 0.85,
+  "heard": "Was?"
+ },
+ "A3_j19": {
+  "acc": 0.6,
+  "st": 6.3,
+  "dur": 1.76,
+  "heard": "Your bag? It's in here."
+ },
+ "A3_t01": {
+  "acc": 1.0,
+  "st": 11.1,
+  "dur": 0.9,
+  "heard": "What's that?"
+ },
+ "A3_t02": {
+  "acc": 1.0,
+  "st": 17.2,
+  "dur": 1.14,
+  "heard": "Where are you?"
+ },
+ "A3_t03": {
+  "acc": 0.89,
+  "st": 10.3,
+  "dur": 1.87,
+  "heard": "So where are you stopping?"
+ },
+ "A3_t04": {
+  "acc": 1.0,
+  "st": 5.0,
+  "dur": 1.63,
+  "heard": "Nobody parks there."
+ },
+ "A3_t05": {
+  "acc": 0.8,
+  "st": 4.7,
+  "dur": 2.42,
+  "heard": "Ah, ignore me. Driver's talk."
+ },
+ "A3_t06": {
+  "acc": 1.0,
+  "st": 14.6,
+  "dur": 1.21,
+  "heard": "What's that one?"
+ },
+ "A3_t07": {
+  "acc": 0.4,
+  "st": 7.7,
+  "dur": 0.74,
+  "heard": "You all right?"
+ },
+ "A3_t08": {
+  "acc": 1.0,
+  "st": 6.3,
+  "dur": 2.02,
+  "heard": "Want me to sing you to sleep?"
+ },
+ "A3_t09": {
+  "acc": 1.0,
+  "st": 2.5,
+  "dur": 1.42,
+  "heard": "[chuckles] Big baby."
+ },
+ "A3_t10": {
+  "acc": 1.0,
+  "st": 9.1,
+  "dur": 1.84,
+  "heard": "You said the key's out."
+ },
+ "A3_t11": {
+  "acc": 0.0,
+  "st": 1.1,
+  "dur": 0.82,
+  "heard": "side."
+ },
+ "A3_t12": {
+  "acc": 0.0,
+  "st": 0.0,
+  "dur": 0.77,
+  "heard": "Opt."
+ },
+ "A3_t13": {
+  "acc": 0.67,
+  "st": 21.0,
+  "dur": 1.55,
+  "heard": "Is that"
+ }
+}

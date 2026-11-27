@@ -1,0 +1,1 @@
+{"start": 0.12, "end": 1.1, "gap_after_in_take": 0.16, "heard": "You said the key's out.", "words": [{"w": "You", "s": 0.12, "e": 0.18}, {"w": "said", "s": 0.24, "e": 0.4}, {"w": "the", "s": 0.42, "e": 0.5}, {"w": "key's", "s": 0.56, "e": 0.82}, {"w": "out.", "s": 0.92, "e": 1.1}]}
