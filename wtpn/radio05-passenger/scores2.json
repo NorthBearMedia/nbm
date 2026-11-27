@@ -1,0 +1,2544 @@
+{
+ "j01": [
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 9.3,
+   "voiced": 0.32,
+   "dur": 0.9,
+   "gap": 0.58,
+   "heard": "Oh, shut up.",
+   "score": 2.771
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 8.8,
+   "voiced": 0.45,
+   "dur": 0.94,
+   "gap": 0.48,
+   "heard": "Oh, shut up.",
+   "score": 2.733
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 8.3,
+   "voiced": 0.38,
+   "dur": 0.86,
+   "gap": 0.48,
+   "heard": "Oh, shut up.",
+   "score": 2.691
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 7.5,
+   "voiced": 0.32,
+   "dur": 0.9,
+   "gap": 0.62,
+   "heard": "Oh, shut up.",
+   "score": 2.628
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 6.2,
+   "voiced": 0.34,
+   "dur": 0.78,
+   "gap": 0.68,
+   "heard": "Oh, shut up.",
+   "score": 2.518
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 2.6,
+   "voiced": 0.22,
+   "dur": 0.82,
+   "gap": 0.58,
+   "heard": "Oh, shut up.",
+   "score": 2.215
+  }
+ ],
+ "t01": [
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 12.9,
+   "voiced": 0.53,
+   "dur": 0.5,
+   "gap": 0.54,
+   "heard": "What's that?",
+   "score": 3.0
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 15.4,
+   "voiced": 0.38,
+   "dur": 0.44,
+   "gap": 0.6,
+   "heard": "What's that?",
+   "score": 3.0
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 12.7,
+   "voiced": 0.57,
+   "dur": 0.46,
+   "gap": 0.56,
+   "heard": "What's that?",
+   "score": 3.0
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 10.1,
+   "voiced": 0.38,
+   "dur": 0.5,
+   "gap": 0.64,
+   "heard": "What's that?",
+   "score": 2.84
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 7.2,
+   "voiced": 0.49,
+   "dur": 0.42,
+   "gap": 0.58,
+   "heard": "What's that?",
+   "score": 2.602
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 4.2,
+   "voiced": 0.64,
+   "dur": 0.48,
+   "gap": 0.5,
+   "heard": "What's that?",
+   "score": 2.348
+  }
+ ],
+ "j02": [
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 5.3,
+   "voiced": 0.64,
+   "dur": 2.6,
+   "gap": 0.58,
+   "heard": "Passenger seatbelt. It thinks me bag's a person.",
+   "score": 2.438
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 4.3,
+   "voiced": 0.61,
+   "dur": 2.64,
+   "gap": 0.3,
+   "heard": "Passenger seatbelt. It thinks me bag's a person.",
+   "score": 2.355
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 3.9,
+   "voiced": 0.55,
+   "dur": 2.82,
+   "gap": 0.62,
+   "heard": "Passenger seatbelt. It thinks me bag's a person.",
+   "score": 2.326
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 3.2,
+   "voiced": 0.65,
+   "dur": 2.8,
+   "gap": 0.58,
+   "heard": "Passenger seatbelt. It thinks me bag's a person.",
+   "score": 2.267
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 3.0,
+   "voiced": 0.59,
+   "dur": 2.68,
+   "gap": 0.58,
+   "heard": "Passenger seatbelt. It thinks me bag's a person.",
+   "score": 2.253
+  },
+  {
+   "take": "R1",
+   "acc": 0.93,
+   "spread": 3.1,
+   "voiced": 0.52,
+   "dur": 2.76,
+   "gap": 0.56,
+   "heard": "Passenger seatbelt. Thinks me bag's a person.",
+   "score": 2.127
+  }
+ ],
+ "t02": [
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 20.5,
+   "voiced": 0.98,
+   "dur": 0.6,
+   "gap": 0.64,
+   "heard": "Where are you?",
+   "score": 3.0
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 13.6,
+   "voiced": 0.98,
+   "dur": 0.64,
+   "gap": 0.46,
+   "heard": "Where are you?",
+   "score": 3.0
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 21.7,
+   "voiced": 0.97,
+   "dur": 0.64,
+   "gap": 0.6,
+   "heard": "Where are you?",
+   "score": 3.0
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 14.5,
+   "voiced": 0.92,
+   "dur": 0.64,
+   "gap": 0.56,
+   "heard": "Where are you?",
+   "score": 3.0
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 13.9,
+   "voiced": 0.8,
+   "dur": 0.56,
+   "gap": 0.54,
+   "heard": "Where are you?",
+   "score": 3.0
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 10.7,
+   "voiced": 0.88,
+   "dur": 0.54,
+   "gap": 0.381,
+   "heard": "Where are you?",
+   "score": 2.891
+  }
+ ],
+ "j03": [
+  {
+   "take": "R1",
+   "acc": 0.93,
+   "spread": 6.0,
+   "voiced": 0.7,
+   "dur": 4.26,
+   "gap": 0.62,
+   "heard": "Top of Stainmore. Fog's like soup, and I'm out of hours in 10 minutes.",
+   "score": 2.355
+  },
+  {
+   "take": "Q1",
+   "acc": 0.93,
+   "spread": 4.3,
+   "voiced": 0.67,
+   "dur": 4.18,
+   "gap": 0.7,
+   "heard": "Top of Stainmore. Fog's like soup, and I'm out of hours in 10 minutes.",
+   "score": 2.214
+  },
+  {
+   "take": "Q0",
+   "acc": 0.93,
+   "spread": 4.1,
+   "voiced": 0.73,
+   "dur": 4.3,
+   "gap": 0.46,
+   "heard": "Top of Stainmore. Fog's like soup, and I'm out of hours in 10 minutes.",
+   "score": 2.197
+  },
+  {
+   "take": "R2",
+   "acc": 0.93,
+   "spread": 4.0,
+   "voiced": 0.67,
+   "dur": 4.28,
+   "gap": 0.7,
+   "heard": "Top of Stainmore. Fog's like soup, and I'm out of hours in 10 minutes.",
+   "score": 2.193
+  },
+  {
+   "take": "Q2",
+   "acc": 0.93,
+   "spread": 3.1,
+   "voiced": 0.75,
+   "dur": 3.76,
+   "gap": 0.72,
+   "heard": "Top of Stainmore. Fog's like soup, and I'm out of hours in 10 minutes.",
+   "score": 2.114
+  },
+  {
+   "take": "R0",
+   "acc": 0.86,
+   "spread": 3.8,
+   "voiced": 0.64,
+   "dur": 4.3,
+   "gap": 0.58,
+   "heard": "Top of Stainmoor. Fog's like soup. And I'm out of hours in 10 minutes.",
+   "score": 2.03
+  }
+ ],
+ "t03": [
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 9.8,
+   "voiced": 0.78,
+   "dur": 0.9,
+   "gap": 0.56,
+   "heard": "So where you stopping?",
+   "score": 2.82
+  },
+  {
+   "take": "R2",
+   "acc": 0.89,
+   "spread": 14.3,
+   "voiced": 0.79,
+   "dur": 0.94,
+   "gap": 0.54,
+   "heard": "So where are you stopping?",
+   "score": 2.778
+  },
+  {
+   "take": "Q1",
+   "acc": 0.89,
+   "spread": 8.0,
+   "voiced": 0.75,
+   "dur": 0.98,
+   "gap": 0.46,
+   "heard": "So where are you stopping?",
+   "score": 2.448
+  },
+  {
+   "take": "Q0",
+   "acc": 0.89,
+   "spread": 7.8,
+   "voiced": 0.69,
+   "dur": 0.88,
+   "gap": 0.58,
+   "heard": "So where are you stopping?",
+   "score": 2.424
+  },
+  {
+   "take": "R0",
+   "acc": 0.89,
+   "spread": 7.4,
+   "voiced": 0.72,
+   "dur": 0.9,
+   "gap": 0.54,
+   "heard": "So where are you stopping?",
+   "score": 2.397
+  },
+  {
+   "take": "Q2",
+   "acc": 0.89,
+   "spread": 6.4,
+   "voiced": 0.76,
+   "dur": 0.9,
+   "gap": 0.42,
+   "heard": "So where are you stopping?",
+   "score": 2.312
+  }
+ ],
+ "j04": [
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 3.6,
+   "voiced": 0.92,
+   "dur": 0.88,
+   "gap": 0.64,
+   "heard": "Bosemore lay-by.",
+   "score": 2.301
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 2.9,
+   "voiced": 0.99,
+   "dur": 0.94,
+   "gap": 0.46,
+   "heard": "Bose Moor lay-by.",
+   "score": 2.24
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 2.5,
+   "voiced": 0.92,
+   "dur": 0.9,
+   "gap": 0.6,
+   "heard": "Bosemore lay-by.",
+   "score": 2.204
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 2.1,
+   "voiced": 0.86,
+   "dur": 1.02,
+   "gap": 0.9,
+   "heard": "Bose Moor lay-by.",
+   "score": 2.177
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 2.0,
+   "voiced": 0.93,
+   "dur": 0.86,
+   "gap": 0.78,
+   "heard": "Bose Moor lay-by.",
+   "score": 2.165
+  },
+  {
+   "take": "Q1",
+   "acc": 0.75,
+   "spread": 2.2,
+   "voiced": 0.94,
+   "dur": 1.0,
+   "gap": 0.76,
+   "heard": "Bows Moor lay-by.",
+   "score": 1.684
+  }
+ ],
+ "t04": [
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 6.0,
+   "voiced": 0.58,
+   "dur": 1.22,
+   "gap": 0.66,
+   "heard": "Nobody parks there.",
+   "score": 2.5
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 5.6,
+   "voiced": 0.72,
+   "dur": 1.32,
+   "gap": 0.68,
+   "heard": "Nobody parks there.",
+   "score": 2.471
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 4.5,
+   "voiced": 0.52,
+   "dur": 1.18,
+   "gap": 0.66,
+   "heard": "Nobody parks there.",
+   "score": 2.378
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 3.6,
+   "voiced": 0.68,
+   "dur": 1.36,
+   "gap": 0.54,
+   "heard": "Nobody parks there.",
+   "score": 2.296
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 3.3,
+   "voiced": 0.55,
+   "dur": 1.22,
+   "gap": 0.78,
+   "heard": "Nobody parks there.",
+   "score": 2.276
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 2.8,
+   "voiced": 0.59,
+   "dur": 1.14,
+   "gap": 0.72,
+   "heard": "Nobody parks there.",
+   "score": 2.231
+  }
+ ],
+ "j05": [
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 4.5,
+   "voiced": 1.0,
+   "dur": 0.22,
+   "gap": 0.86,
+   "heard": "Why?",
+   "score": 2.374
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 3.7,
+   "voiced": 0.92,
+   "dur": 0.22,
+   "gap": 0.58,
+   "heard": "Why?",
+   "score": 2.312
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 3.6,
+   "voiced": 1.0,
+   "dur": 0.24,
+   "gap": 0.72,
+   "heard": "Why?",
+   "score": 2.304
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 3.2,
+   "voiced": 1.0,
+   "dur": 0.2,
+   "gap": 0.74,
+   "heard": "Why?",
+   "score": 2.263
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 2.8,
+   "voiced": 0.92,
+   "dur": 0.22,
+   "gap": 0.54,
+   "heard": "Why?",
+   "score": 2.23
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 2.5,
+   "voiced": 1.0,
+   "dur": 0.22,
+   "gap": 0.56,
+   "heard": "Why?",
+   "score": 2.209
+  }
+ ],
+ "t05": [
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 17.0,
+   "voiced": 0.55,
+   "dur": 1.68,
+   "gap": 0.56,
+   "heard": "Just keep your curtains shut, son.",
+   "score": 3.0
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 9.1,
+   "voiced": 0.52,
+   "dur": 1.54,
+   "gap": 0.5,
+   "heard": "Just keep your curtains shut, son.",
+   "score": 2.755
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 8.4,
+   "voiced": 0.56,
+   "dur": 1.56,
+   "gap": 0.54,
+   "heard": "Just keep your curtains shut, son.",
+   "score": 2.699
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 6.7,
+   "voiced": 0.39,
+   "dur": 1.58,
+   "gap": 0.54,
+   "heard": "Just keep your curtains shut, son.",
+   "score": 2.559
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 5.5,
+   "voiced": 0.56,
+   "dur": 1.68,
+   "gap": 0.56,
+   "heard": "Just keep your curtains shut, son.",
+   "score": 2.458
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 4.4,
+   "voiced": 0.49,
+   "dur": 1.62,
+   "gap": 0.48,
+   "heard": "Just keep your curtains shut, son.",
+   "score": 2.365
+  }
+ ],
+ "j06": [
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 7.4,
+   "voiced": 0.69,
+   "dur": 1.5,
+   "gap": 0.52,
+   "heard": "Yeah, all right. I can see it.",
+   "score": 2.618
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 6.0,
+   "voiced": 0.75,
+   "dur": 1.52,
+   "gap": 0.64,
+   "heard": "Yeah, all right. I can see it.",
+   "score": 2.498
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 5.6,
+   "voiced": 0.73,
+   "dur": 1.4,
+   "gap": 0.5,
+   "heard": "Yeah, all right. I can see it.",
+   "score": 2.468
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 5.6,
+   "voiced": 0.7,
+   "dur": 1.44,
+   "gap": 0.58,
+   "heard": "Yeah, all right. I can see it.",
+   "score": 2.463
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 5.4,
+   "voiced": 0.74,
+   "dur": 1.54,
+   "gap": 0.58,
+   "heard": "Yeah, all right. I can see it.",
+   "score": 2.451
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 4.0,
+   "voiced": 0.75,
+   "dur": 1.42,
+   "gap": 0.7,
+   "heard": "Yeah, all right. I can see it.",
+   "score": 2.333
+  }
+ ],
+ "t06": [
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 14.0,
+   "voiced": 0.69,
+   "dur": 0.64,
+   "gap": 0.68,
+   "heard": "What's that one?",
+   "score": 3.0
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 20.8,
+   "voiced": 0.65,
+   "dur": 0.66,
+   "gap": 0.6,
+   "heard": "What's that one?",
+   "score": 3.0
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 15.7,
+   "voiced": 0.64,
+   "dur": 0.54,
+   "gap": 0.56,
+   "heard": "What's that one?",
+   "score": 3.0
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 10.7,
+   "voiced": 0.68,
+   "dur": 0.7,
+   "gap": 0.6,
+   "heard": "What's that one?",
+   "score": 2.895
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 10.7,
+   "voiced": 0.59,
+   "dur": 0.64,
+   "gap": 0.64,
+   "heard": "What's that one?",
+   "score": 2.89
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 9.3,
+   "voiced": 0.6,
+   "dur": 0.6,
+   "gap": 0.6,
+   "heard": "What's that one?",
+   "score": 2.772
+  }
+ ],
+ "j07": [
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 4.4,
+   "voiced": 0.65,
+   "dur": 3.16,
+   "gap": 0.92,
+   "heard": "Side sensor. Beeps if anything's down the passenger side.",
+   "score": 2.368
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 3.9,
+   "voiced": 0.71,
+   "dur": 2.8,
+   "gap": 0.86,
+   "heard": "Side sensor. Beeps if anything's down the passenger side.",
+   "score": 2.327
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 3.3,
+   "voiced": 0.64,
+   "dur": 2.96,
+   "gap": 1.12,
+   "heard": "Side sensor. Beeps if anything's down the passenger side.",
+   "score": 2.278
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 3.3,
+   "voiced": 0.66,
+   "dur": 3.04,
+   "gap": 0.74,
+   "heard": "Side sensor. Beeps if anything's down the passenger side.",
+   "score": 2.278
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 2.9,
+   "voiced": 0.59,
+   "dur": 3.12,
+   "gap": 0.76,
+   "heard": "Side sensor. Beeps if anything's down the passenger side.",
+   "score": 2.24
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 2.8,
+   "voiced": 0.58,
+   "dur": 2.94,
+   "gap": 1.06,
+   "heard": "Side sensor. Beeps if anything's down the passenger side.",
+   "score": 2.233
+  }
+ ],
+ "j08": [
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 21.5,
+   "voiced": 0.87,
+   "dur": 1.32,
+   "gap": 0.66,
+   "heard": "Right. Engine off,",
+   "score": 3.0
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 5.1,
+   "voiced": 0.69,
+   "dur": 1.04,
+   "gap": 0.44,
+   "heard": "Right, engine off,",
+   "score": 2.426
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 4.7,
+   "voiced": 0.92,
+   "dur": 1.06,
+   "gap": 0.32,
+   "heard": "Right, engine off,",
+   "score": 2.388
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 4.5,
+   "voiced": 0.74,
+   "dur": 1.14,
+   "gap": 0.4,
+   "heard": "Right. Engine off,",
+   "score": 2.374
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 4.0,
+   "voiced": 0.78,
+   "dur": 1.14,
+   "gap": 0.7,
+   "heard": "Right, engine off,",
+   "score": 2.337
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 3.8,
+   "voiced": 0.71,
+   "dur": 1.08,
+   "gap": 0.32,
+   "heard": "Right, engine off,",
+   "score": 2.315
+  }
+ ],
+ "j09": [
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 4.0,
+   "voiced": 0.79,
+   "dur": 0.36,
+   "gap": 0.28,
+   "heard": "key out,",
+   "score": 2.333
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 4.0,
+   "voiced": 0.84,
+   "dur": 0.42,
+   "gap": 0.3,
+   "heard": "key out,",
+   "score": 2.331
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 2.8,
+   "voiced": 0.8,
+   "dur": 0.44,
+   "gap": 0.52,
+   "heard": "key out,",
+   "score": 2.235
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 2.7,
+   "voiced": 0.82,
+   "dur": 0.5,
+   "gap": 0.58,
+   "heard": "key out,",
+   "score": 2.228
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 2.6,
+   "voiced": 0.83,
+   "dur": 0.5,
+   "gap": 0.6,
+   "heard": "key out,",
+   "score": 2.215
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 1.6,
+   "voiced": 0.9,
+   "dur": 0.48,
+   "gap": 0.4,
+   "heard": "key out,",
+   "score": 2.132
+  }
+ ],
+ "j10": [
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 4.7,
+   "voiced": 0.7,
+   "dur": 0.6,
+   "gap": 0.44,
+   "heard": "doors locked,",
+   "score": 2.395
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 4.0,
+   "voiced": 0.84,
+   "dur": 0.58,
+   "gap": 0.18,
+   "heard": "doors locked,",
+   "score": 2.336
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 3.3,
+   "voiced": 0.75,
+   "dur": 0.62,
+   "gap": 0.24,
+   "heard": "doors locked,",
+   "score": 2.278
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 3.2,
+   "voiced": 0.89,
+   "dur": 0.6,
+   "gap": 0.28,
+   "heard": "doors locked,",
+   "score": 2.268
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 2.8,
+   "voiced": 0.73,
+   "dur": 0.62,
+   "gap": 0.5,
+   "heard": "doors locked,",
+   "score": 2.236
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 2.8,
+   "voiced": 0.76,
+   "dur": 0.66,
+   "gap": 0.5,
+   "heard": "doors locked,",
+   "score": 2.232
+  }
+ ],
+ "j11": [
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 23.3,
+   "voiced": 0.54,
+   "dur": 0.76,
+   "gap": 0.74,
+   "heard": "curtains shut.",
+   "score": 3.0
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 8.1,
+   "voiced": 0.44,
+   "dur": 0.74,
+   "gap": 0.62,
+   "heard": "curtains shut.",
+   "score": 2.672
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 4.2,
+   "voiced": 0.42,
+   "dur": 0.72,
+   "gap": 0.5,
+   "heard": "curtains shut.",
+   "score": 2.347
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 3.1,
+   "voiced": 0.31,
+   "dur": 0.72,
+   "gap": 0.64,
+   "heard": "curtains shut.",
+   "score": 2.255
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 2.3,
+   "voiced": 0.3,
+   "dur": 0.72,
+   "gap": 0.58,
+   "heard": "curtains shut.",
+   "score": 2.188
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 1.4,
+   "voiced": 0.27,
+   "dur": 0.72,
+   "gap": 0.62,
+   "heard": "curtains shut.",
+   "score": 2.114
+  }
+ ],
+ "t07": [
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 9.4,
+   "voiced": 0.72,
+   "dur": 0.5,
+   "gap": 0.68,
+   "heard": "You all right?",
+   "score": 2.78
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 9.2,
+   "voiced": 0.98,
+   "dur": 0.44,
+   "gap": 0.56,
+   "heard": "You all right?",
+   "score": 2.764
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 8.9,
+   "voiced": 0.9,
+   "dur": 0.6,
+   "gap": 0.66,
+   "heard": "You all right?",
+   "score": 2.743
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 8.2,
+   "voiced": 1.0,
+   "dur": 0.72,
+   "gap": 0.5,
+   "heard": "You all right?",
+   "score": 2.684
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 7.8,
+   "voiced": 0.92,
+   "dur": 0.58,
+   "gap": 0.5,
+   "heard": "You all right?",
+   "score": 2.648
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 7.0,
+   "voiced": 0.96,
+   "dur": 0.5,
+   "gap": 0.58,
+   "heard": "You all right?",
+   "score": 2.585
+  }
+ ],
+ "j12": [
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 19.1,
+   "voiced": 0.57,
+   "dur": 2.34,
+   "gap": 0.76,
+   "heard": "Don't like it up here, Tone. It's too quiet.",
+   "score": 3.0
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 4.7,
+   "voiced": 0.58,
+   "dur": 2.62,
+   "gap": 0.62,
+   "heard": "Don't like it up here, Tone. It's too quiet.",
+   "score": 2.39
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 3.9,
+   "voiced": 0.69,
+   "dur": 2.32,
+   "gap": 0.38,
+   "heard": "Don't like it up here, Tone. It's too quiet.",
+   "score": 2.329
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 3.7,
+   "voiced": 0.67,
+   "dur": 2.64,
+   "gap": 0.62,
+   "heard": "Don't like it up here, Tone. It's too quiet.",
+   "score": 2.311
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 3.7,
+   "voiced": 0.61,
+   "dur": 2.52,
+   "gap": 0.58,
+   "heard": "Don't like it up here, Tone. It's too quiet.",
+   "score": 2.307
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 2.0,
+   "voiced": 0.49,
+   "dur": 2.38,
+   "gap": 0.56,
+   "heard": "Don't like it up here, Tone. It's too quiet.",
+   "score": 2.17
+  }
+ ],
+ "t08": [
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 8.1,
+   "voiced": 0.74,
+   "dur": 1.28,
+   "gap": 0.78,
+   "heard": "Want me to sing you to sleep?",
+   "score": 2.674
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 7.8,
+   "voiced": 0.64,
+   "dur": 1.34,
+   "gap": 0.94,
+   "heard": "Want me to sing you to sleep?",
+   "score": 2.649
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 5.6,
+   "voiced": 0.71,
+   "dur": 1.28,
+   "gap": 1.02,
+   "heard": "Want me to sing you to sleep?",
+   "score": 2.465
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 5.1,
+   "voiced": 0.77,
+   "dur": 1.28,
+   "gap": 1.0,
+   "heard": "Want me to sing you to sleep?",
+   "score": 2.427
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 4.8,
+   "voiced": 0.7,
+   "dur": 1.4,
+   "gap": 1.18,
+   "heard": "Want me to sing you to sleep?",
+   "score": 2.4
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 4.4,
+   "voiced": 0.72,
+   "dur": 1.26,
+   "gap": 1.22,
+   "heard": "Want me to sing you to sleep?",
+   "score": 2.369
+  }
+ ],
+ "j13": [
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 3.3,
+   "voiced": 0.96,
+   "dur": 0.48,
+   "gap": 1.02,
+   "heard": "Do one.",
+   "score": 2.277
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 3.2,
+   "voiced": 0.96,
+   "dur": 0.46,
+   "gap": 1.2,
+   "heard": "Do one.",
+   "score": 2.267
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 2.6,
+   "voiced": 0.62,
+   "dur": 0.48,
+   "gap": 1.26,
+   "heard": "Do one.",
+   "score": 2.216
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 2.4,
+   "voiced": 0.67,
+   "dur": 0.48,
+   "gap": 1.2,
+   "heard": "Do one.",
+   "score": 2.201
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 2.4,
+   "voiced": 0.92,
+   "dur": 0.48,
+   "gap": 1.16,
+   "heard": "Do one.",
+   "score": 2.197
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 1.5,
+   "voiced": 0.62,
+   "dur": 0.5,
+   "gap": 1.5,
+   "heard": "Do one.",
+   "score": 2.128
+  }
+ ],
+ "t09": [
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 10.4,
+   "voiced": 0.9,
+   "dur": 3.34,
+   "gap": 0.68,
+   "heard": "Big baby. Get your head down. Ring me if you need me.",
+   "score": 2.865
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 9.5,
+   "voiced": 0.91,
+   "dur": 3.18,
+   "gap": 0.66,
+   "heard": "Big baby. Get your head down. Ring me if you need me.",
+   "score": 2.792
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 9.2,
+   "voiced": 0.97,
+   "dur": 3.34,
+   "gap": 0.62,
+   "heard": "Big baby. Get your head down. Ring me if you need me.",
+   "score": 2.767
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 9.1,
+   "voiced": 0.92,
+   "dur": 3.02,
+   "gap": 0.54,
+   "heard": "Big baby. Get your head down. Ring me if you need me.",
+   "score": 2.759
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 7.7,
+   "voiced": 0.85,
+   "dur": 3.64,
+   "gap": 0.66,
+   "heard": "Big baby. Get your head down. Ring me if you need me.",
+   "score": 2.642
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 7.1,
+   "voiced": 0.88,
+   "dur": 3.78,
+   "gap": 0.6,
+   "heard": "Big baby. Get your head down. Ring me if you need me.",
+   "score": 2.59
+  }
+ ],
+ "j14": [
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 2.6,
+   "voiced": 0.64,
+   "dur": 0.56,
+   "gap": 0.68,
+   "heard": "Night, Tone.",
+   "score": 2.22
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 2.4,
+   "voiced": 0.73,
+   "dur": 0.54,
+   "gap": 0.58,
+   "heard": "Night, Tone.",
+   "score": 2.203
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 2.3,
+   "voiced": 0.76,
+   "dur": 0.52,
+   "gap": 0.5,
+   "heard": "Night, Tone.",
+   "score": 2.188
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 2.1,
+   "voiced": 0.77,
+   "dur": 0.52,
+   "gap": 0.8,
+   "heard": "Night, Tone.",
+   "score": 2.176
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 2.0,
+   "voiced": 0.68,
+   "dur": 0.5,
+   "gap": 1.0,
+   "heard": "Night, Tone.",
+   "score": 2.169
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 2.0,
+   "voiced": 0.86,
+   "dur": 0.48,
+   "gap": 0.7,
+   "heard": "Night, Tone.",
+   "score": 2.163
+  }
+ ],
+ "t10": [
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 13.9,
+   "voiced": 0.86,
+   "dur": 2.84,
+   "gap": 0.6,
+   "heard": "Jamie, it's gone three. You all right?",
+   "score": 3.0
+  },
+  {
+   "take": "R0",
+   "acc": 0.77,
+   "spread": 10.7,
+   "voiced": 0.86,
+   "dur": 2.74,
+   "gap": 0.62,
+   "heard": "Jamie? It's gone 3:00. You all right?",
+   "score": 2.426
+  },
+  {
+   "take": "Q0",
+   "acc": 0.77,
+   "spread": 9.9,
+   "voiced": 0.93,
+   "dur": 2.3,
+   "gap": 0.56,
+   "heard": "Jamie, it's gone 3:00. You all right?",
+   "score": 2.366
+  },
+  {
+   "take": "R1",
+   "acc": 0.77,
+   "spread": 9.0,
+   "voiced": 0.93,
+   "dur": 2.96,
+   "gap": 0.58,
+   "heard": "Jamie, it's gone 3:00. You all right?",
+   "score": 2.285
+  },
+  {
+   "take": "Q1",
+   "acc": 0.77,
+   "spread": 8.5,
+   "voiced": 0.96,
+   "dur": 3.0,
+   "gap": 0.48,
+   "heard": "Jamie? It's gone 3:00. You all right?",
+   "score": 2.25
+  },
+  {
+   "take": "R2",
+   "acc": 0.77,
+   "spread": 8.2,
+   "voiced": 0.94,
+   "dur": 3.08,
+   "gap": 0.66,
+   "heard": "Jamie, it's gone 3:00. You all right?",
+   "score": 2.224
+  }
+ ],
+ "j15": [
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 3.0,
+   "voiced": 0.42,
+   "dur": 1.28,
+   "gap": 0.58,
+   "heard": "The trailer's rocking.",
+   "score": 2.585
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 3.9,
+   "voiced": 0.47,
+   "dur": 1.02,
+   "gap": 0.5,
+   "heard": "The trailer's rocking.",
+   "score": 2.529
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 14.7,
+   "voiced": 0.54,
+   "dur": 1.1,
+   "gap": 0.52,
+   "heard": "The trailer's rocking.",
+   "score": 2.455
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 15.2,
+   "voiced": 0.61,
+   "dur": 1.16,
+   "gap": 0.66,
+   "heard": "The trailer's rocking.",
+   "score": 2.387
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 5.7,
+   "voiced": 0.64,
+   "dur": 1.34,
+   "gap": 0.44,
+   "heard": "The trailer's rocking.",
+   "score": 2.363
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 7.2,
+   "voiced": 0.7,
+   "dur": 1.16,
+   "gap": 0.6,
+   "heard": "The trailer's rocking.",
+   "score": 2.302
+  }
+ ],
+ "t11": [
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 14.9,
+   "voiced": 0.84,
+   "dur": 1.14,
+   "gap": 0.36,
+   "heard": "It'll be the wind, son.",
+   "score": 3.0
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 11.6,
+   "voiced": 0.77,
+   "dur": 1.2,
+   "gap": 0.56,
+   "heard": "It'll be the wind, son.",
+   "score": 2.963
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 8.5,
+   "voiced": 0.64,
+   "dur": 1.18,
+   "gap": 0.42,
+   "heard": "It'll be the wind, son.",
+   "score": 2.712
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 7.9,
+   "voiced": 0.72,
+   "dur": 1.14,
+   "gap": 0.42,
+   "heard": "It'll be the wind, son.",
+   "score": 2.655
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 7.4,
+   "voiced": 0.75,
+   "dur": 1.26,
+   "gap": 0.46,
+   "heard": "It'll be the wind, son.",
+   "score": 2.614
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 7.1,
+   "voiced": 0.8,
+   "dur": 1.26,
+   "gap": 0.5,
+   "heard": "It'll be the wind, son.",
+   "score": 2.59
+  }
+ ],
+ "j16": [
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 20.1,
+   "voiced": 0.58,
+   "dur": 2.18,
+   "gap": 0.98,
+   "heard": "There's no wind, Tone. It's fog.",
+   "score": 2.423
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 3.9,
+   "voiced": 0.59,
+   "dur": 1.96,
+   "gap": 0.8,
+   "heard": "There's no wind, Tone. It's fog.",
+   "score": 2.409
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 4.9,
+   "voiced": 0.61,
+   "dur": 2.58,
+   "gap": 0.7,
+   "heard": "There's no wind, Tone. It's fog.",
+   "score": 2.389
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 3.0,
+   "voiced": 0.64,
+   "dur": 2.22,
+   "gap": 0.74,
+   "heard": "There's no wind, Tone. It's fog.",
+   "score": 2.364
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 6.1,
+   "voiced": 0.72,
+   "dur": 2.12,
+   "gap": 0.68,
+   "heard": "There's no wind, Tone. It's fog.",
+   "score": 2.279
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 4.4,
+   "voiced": 0.74,
+   "dur": 2.4,
+   "gap": 0.74,
+   "heard": "There's no wind, Tone. It's fog.",
+   "score": 2.263
+  }
+ ],
+ "j17": [
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 4.3,
+   "voiced": 0.17,
+   "dur": 1.32,
+   "gap": 0.64,
+   "heard": "That's the side sensor.",
+   "score": 2.832
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 5.0,
+   "voiced": 0.33,
+   "dur": 1.2,
+   "gap": 0.66,
+   "heard": "That's the side sensor.",
+   "score": 2.675
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 4.0,
+   "voiced": 0.33,
+   "dur": 1.24,
+   "gap": 0.62,
+   "heard": "That's the side sensor.",
+   "score": 2.669
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 20.2,
+   "voiced": 0.36,
+   "dur": 1.26,
+   "gap": 0.7,
+   "heard": "That's the side sensor.",
+   "score": 2.643
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 6.4,
+   "voiced": 0.37,
+   "dur": 1.24,
+   "gap": 0.36,
+   "heard": "That's the side sensor.",
+   "score": 2.632
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 4.7,
+   "voiced": 0.37,
+   "dur": 1.18,
+   "gap": 0.82,
+   "heard": "That's the side sensor.",
+   "score": 2.628
+  }
+ ],
+ "t12": [
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 7.0,
+   "voiced": 0.52,
+   "dur": 1.26,
+   "gap": 0.56,
+   "heard": "You said the key's out.",
+   "score": 2.584
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 6.4,
+   "voiced": 0.68,
+   "dur": 1.28,
+   "gap": 0.56,
+   "heard": "You said the key's out.",
+   "score": 2.534
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 6.2,
+   "voiced": 0.47,
+   "dur": 1.26,
+   "gap": 0.7,
+   "heard": "You said the key's out.",
+   "score": 2.52
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 4.8,
+   "voiced": 0.35,
+   "dur": 1.18,
+   "gap": 0.44,
+   "heard": "You said the key's out.",
+   "score": 2.402
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 4.1,
+   "voiced": 0.45,
+   "dur": 1.32,
+   "gap": 0.42,
+   "heard": "You said the key's out.",
+   "score": 2.338
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 2.6,
+   "voiced": 0.52,
+   "dur": 1.34,
+   "gap": 0.54,
+   "heard": "You said the key's out.",
+   "score": 2.213
+  }
+ ],
+ "j18": [
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 2.7,
+   "voiced": 0.54,
+   "dur": 1.8,
+   "gap": 1.22,
+   "heard": "It is. It's up here with me.",
+   "score": 2.461
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 4.9,
+   "voiced": 0.62,
+   "dur": 1.84,
+   "gap": 0.68,
+   "heard": "It is. It's up here with me.",
+   "score": 2.382
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 19.0,
+   "voiced": 0.65,
+   "dur": 1.74,
+   "gap": 0.96,
+   "heard": "It is. It's up here with me.",
+   "score": 2.35
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 16.7,
+   "voiced": 0.66,
+   "dur": 1.92,
+   "gap": 0.84,
+   "heard": "It is. It's up here with me.",
+   "score": 2.337
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 18.8,
+   "voiced": 0.69,
+   "dur": 1.86,
+   "gap": 0.68,
+   "heard": "It is. It's up here with me.",
+   "score": 2.308
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 5.0,
+   "voiced": 0.71,
+   "dur": 1.76,
+   "gap": 0.84,
+   "heard": "It is. It's up here with me.",
+   "score": 2.294
+  }
+ ],
+ "j19": [
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 19.2,
+   "voiced": 0.25,
+   "dur": 1.58,
+   "gap": 0.68,
+   "heard": "It's coming up the passenger side.",
+   "score": 2.753
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 21.5,
+   "voiced": 0.29,
+   "dur": 1.52,
+   "gap": 0.68,
+   "heard": "It's coming up the passenger side.",
+   "score": 2.713
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 19.4,
+   "voiced": 0.36,
+   "dur": 1.56,
+   "gap": 0.7,
+   "heard": "It's coming up the passenger side.",
+   "score": 2.642
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 19.3,
+   "voiced": 0.36,
+   "dur": 1.66,
+   "gap": 0.4,
+   "heard": "It's coming up the passenger side.",
+   "score": 2.636
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 15.8,
+   "voiced": 0.41,
+   "dur": 1.56,
+   "gap": 0.76,
+   "heard": "It's coming up the passenger side.",
+   "score": 2.586
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 20.5,
+   "voiced": 0.47,
+   "dur": 1.58,
+   "gap": 0.64,
+   "heard": "It's coming up the passenger side.",
+   "score": 2.528
+  }
+ ],
+ "t13": [
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 8.9,
+   "voiced": 0.83,
+   "dur": 0.44,
+   "gap": 0.96,
+   "heard": "Jamie?",
+   "score": 2.738
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 7.7,
+   "voiced": 0.96,
+   "dur": 0.44,
+   "gap": 0.62,
+   "heard": "Jamie?",
+   "score": 2.644
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 4.3,
+   "voiced": 0.98,
+   "dur": 0.5,
+   "gap": 0.72,
+   "heard": "Jamie.",
+   "score": 2.356
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 3.9,
+   "voiced": 0.98,
+   "dur": 0.46,
+   "gap": 0.84,
+   "heard": "Jamie.",
+   "score": 2.324
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 2.0,
+   "voiced": 0.8,
+   "dur": 0.48,
+   "gap": 0.82,
+   "heard": "Jamie.",
+   "score": 2.165
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 1.8,
+   "voiced": 0.8,
+   "dur": 0.42,
+   "gap": 0.82,
+   "heard": "Jamie?",
+   "score": 2.147
+  }
+ ],
+ "j20": [
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 21.1,
+   "voiced": 0.18,
+   "dur": 0.76,
+   "gap": 0.64,
+   "heard": "It's stopped.",
+   "score": 2.818
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 21.6,
+   "voiced": 0.19,
+   "dur": 0.68,
+   "gap": 0.72,
+   "heard": "It's stopped.",
+   "score": 2.814
+  },
+  {
+   "take": "Q2",
+   "acc": 0.5,
+   "spread": 21.4,
+   "voiced": 0.16,
+   "dur": 0.66,
+   "gap": 0.76,
+   "heard": "It stopped.",
+   "score": 1.845
+  },
+  {
+   "take": "R1",
+   "acc": 0.5,
+   "spread": 1.4,
+   "voiced": 0.24,
+   "dur": 0.62,
+   "gap": 0.82,
+   "heard": "It stopped.",
+   "score": 1.755
+  },
+  {
+   "take": "Q1",
+   "acc": 0.5,
+   "spread": 18.8,
+   "voiced": 0.25,
+   "dur": 0.62,
+   "gap": 0.68,
+   "heard": "It stopped.",
+   "score": 1.754
+  },
+  {
+   "take": "Q0",
+   "acc": 0.5,
+   "spread": 26.9,
+   "voiced": 0.32,
+   "dur": 0.64,
+   "gap": 0.56,
+   "heard": "It stopped.",
+   "score": 1.681
+  }
+ ],
+ "t14": [
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 9.8,
+   "voiced": 0.67,
+   "dur": 0.46,
+   "gap": 0.74,
+   "heard": "Doors?",
+   "score": 2.821
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 8.6,
+   "voiced": 0.7,
+   "dur": 0.42,
+   "gap": 0.68,
+   "heard": "Doors?",
+   "score": 2.715
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 8.1,
+   "voiced": 0.73,
+   "dur": 0.44,
+   "gap": 0.8,
+   "heard": "Doors?",
+   "score": 2.675
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 7.8,
+   "voiced": 0.71,
+   "dur": 0.44,
+   "gap": 0.66,
+   "heard": "Doors?",
+   "score": 2.646
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 7.5,
+   "voiced": 0.73,
+   "dur": 0.44,
+   "gap": 0.8,
+   "heard": "Doors?",
+   "score": 2.627
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 5.7,
+   "voiced": 0.79,
+   "dur": 0.4,
+   "gap": 0.68,
+   "heard": "Doors?",
+   "score": 2.476
+  }
+ ],
+ "j21": [
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 1.7,
+   "voiced": 0.21,
+   "dur": 0.38,
+   "gap": 0.72,
+   "heard": "Locked.",
+   "score": 2.788
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 22.5,
+   "voiced": 0.29,
+   "dur": 0.38,
+   "gap": 0.78,
+   "heard": "Locked.",
+   "score": 2.714
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 23.2,
+   "voiced": 0.3,
+   "dur": 0.38,
+   "gap": 0.74,
+   "heard": "Locked.",
+   "score": 2.697
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 0.8,
+   "voiced": 0.36,
+   "dur": 0.38,
+   "gap": 0.6,
+   "heard": "Locked.",
+   "score": 2.636
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 23.7,
+   "voiced": 0.38,
+   "dur": 0.4,
+   "gap": 0.56,
+   "heard": "Locked.",
+   "score": 2.618
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 21.5,
+   "voiced": 0.52,
+   "dur": 0.38,
+   "gap": 0.5,
+   "heard": "Locked.",
+   "score": 2.48
+  }
+ ],
+ "t15": [
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 7.0,
+   "voiced": 0.69,
+   "dur": 1.56,
+   "gap": 0.82,
+   "heard": "Don't open them curtains.",
+   "score": 2.587
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 6.9,
+   "voiced": 0.74,
+   "dur": 1.26,
+   "gap": 0.9,
+   "heard": "Don't open them curtains.",
+   "score": 2.578
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 6.7,
+   "voiced": 0.74,
+   "dur": 1.34,
+   "gap": 1.68,
+   "heard": "Don't open them curtains.",
+   "score": 2.556
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 5.9,
+   "voiced": 0.77,
+   "dur": 1.34,
+   "gap": 0.66,
+   "heard": "Don't open them curtains.",
+   "score": 2.49
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 5.7,
+   "voiced": 0.73,
+   "dur": 1.34,
+   "gap": 0.94,
+   "heard": "Don't open them curtains.",
+   "score": 2.475
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 5.4,
+   "voiced": 0.73,
+   "dur": 1.32,
+   "gap": 0.84,
+   "heard": "Don't open them curtains.",
+   "score": 2.446
+  }
+ ],
+ "t16": [
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 8.2,
+   "voiced": 0.9,
+   "dur": 0.52,
+   "gap": 0.54,
+   "heard": "Still there?",
+   "score": 2.682
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 6.7,
+   "voiced": 0.79,
+   "dur": 0.56,
+   "gap": 0.7,
+   "heard": "Still there?",
+   "score": 2.558
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 6.5,
+   "voiced": 0.75,
+   "dur": 0.6,
+   "gap": 0.96,
+   "heard": "Still there?",
+   "score": 2.538
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 5.6,
+   "voiced": 0.96,
+   "dur": 0.5,
+   "gap": 0.64,
+   "heard": "Still there?",
+   "score": 2.47
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 4.8,
+   "voiced": 0.81,
+   "dur": 0.54,
+   "gap": 0.78,
+   "heard": "Still there?",
+   "score": 2.4
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 4.2,
+   "voiced": 0.91,
+   "dur": 0.56,
+   "gap": 0.74,
+   "heard": "Still there?",
+   "score": 2.353
+  }
+ ],
+ "j22": [
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 19.5,
+   "voiced": 0.56,
+   "dur": 1.48,
+   "gap": 0.68,
+   "heard": "Yeah. I think it's gone.",
+   "score": 3.0
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 20.1,
+   "voiced": 0.6,
+   "dur": 1.38,
+   "gap": 0.6,
+   "heard": "Yeah. I think it's gone.",
+   "score": 3.0
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 5.2,
+   "voiced": 0.67,
+   "dur": 1.5,
+   "gap": 0.54,
+   "heard": "Yeah. I think it's gone.",
+   "score": 2.432
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 4.6,
+   "voiced": 0.63,
+   "dur": 1.42,
+   "gap": 0.62,
+   "heard": "Yeah. I think it's gone.",
+   "score": 2.383
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 4.4,
+   "voiced": 0.59,
+   "dur": 1.28,
+   "gap": 0.56,
+   "heard": "Yeah, I think it's gone.",
+   "score": 2.369
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 4.2,
+   "voiced": 0.59,
+   "dur": 1.48,
+   "gap": 0.66,
+   "heard": "Yeah. I think it's gone.",
+   "score": 2.348
+  }
+ ],
+ "t17": [
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 11.8,
+   "voiced": 0.89,
+   "dur": 2.34,
+   "gap": 0.98,
+   "heard": "Try and get your head down. I'm not going anywhere.",
+   "score": 2.982
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 10.8,
+   "voiced": 0.92,
+   "dur": 2.48,
+   "gap": 1.12,
+   "heard": "Try and get your head down. I'm not going anywhere.",
+   "score": 2.901
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 10.1,
+   "voiced": 0.93,
+   "dur": 2.44,
+   "gap": 0.86,
+   "heard": "Try and get your head down. I'm not going anywhere.",
+   "score": 2.839
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 9.7,
+   "voiced": 0.8,
+   "dur": 2.54,
+   "gap": 0.8,
+   "heard": "Try and get your head down. I'm not going anywhere.",
+   "score": 2.808
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 8.4,
+   "voiced": 0.92,
+   "dur": 2.54,
+   "gap": 1.42,
+   "heard": "Try and get your head down. I'm not going anywhere.",
+   "score": 2.701
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 8.2,
+   "voiced": 0.83,
+   "dur": 2.4,
+   "gap": 1.04,
+   "heard": "Try and get your head down. I'm not going anywhere.",
+   "score": 2.682
+  }
+ ],
+ "t18": [
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 11.2,
+   "voiced": 0.96,
+   "dur": 0.98,
+   "gap": 0.44,
+   "heard": "Is that your bag?",
+   "score": 2.931
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 9.0,
+   "voiced": 0.89,
+   "dur": 0.9,
+   "gap": 0.74,
+   "heard": "Is that your bag?",
+   "score": 2.751
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 7.8,
+   "voiced": 0.67,
+   "dur": 0.96,
+   "gap": 0.56,
+   "heard": "Is that your bag?",
+   "score": 2.651
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 7.2,
+   "voiced": 0.84,
+   "dur": 0.98,
+   "gap": 0.64,
+   "heard": "Is that your bag?",
+   "score": 2.599
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 6.9,
+   "voiced": 0.68,
+   "dur": 0.92,
+   "gap": 0.6,
+   "heard": "Is that your bag?",
+   "score": 2.578
+  },
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 5.5,
+   "voiced": 0.56,
+   "dur": 1.0,
+   "gap": 0.7,
+   "heard": "Is that your bag?",
+   "score": 2.458
+  }
+ ],
+ "j23": [
+  {
+   "take": "Q2",
+   "acc": 1.0,
+   "spread": 3.4,
+   "voiced": 0.75,
+   "dur": 1.2,
+   "gap": 0.72,
+   "heard": "It's in here with me.",
+   "score": 2.25
+  },
+  {
+   "take": "R1",
+   "acc": 1.0,
+   "spread": 2.2,
+   "voiced": 0.77,
+   "dur": 1.0,
+   "gap": 0.7,
+   "heard": "It's in here with me.",
+   "score": 2.235
+  },
+  {
+   "take": "Q0",
+   "acc": 1.0,
+   "spread": 3.2,
+   "voiced": 0.77,
+   "dur": 1.1,
+   "gap": 0.48,
+   "heard": "It's in here with me.",
+   "score": 2.229
+  },
+  {
+   "take": "Q1",
+   "acc": 1.0,
+   "spread": 3.3,
+   "voiced": 0.78,
+   "dur": 1.1,
+   "gap": 0.52,
+   "heard": "It's in here with me.",
+   "score": 2.223
+  },
+  {
+   "take": "R0",
+   "acc": 1.0,
+   "spread": 3.7,
+   "voiced": 0.79,
+   "dur": 1.0,
+   "gap": 0.7,
+   "heard": "It's in here with me.",
+   "score": 2.214
+  },
+  {
+   "take": "R2",
+   "acc": 1.0,
+   "spread": 2.8,
+   "voiced": 0.82,
+   "dur": 0.92,
+   "gap": 0.56,
+   "heard": "It's in here with me.",
+   "score": 2.183
+  }
+ ]
+}

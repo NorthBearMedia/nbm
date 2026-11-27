@@ -6,6 +6,7 @@ Writes vo/A<n>_<id>.mp3 + _align.json. Usage: gen.py N [start]"""
 import json, urllib.request, urllib.error, base64, pathlib, subprocess, sys, time, re
 D = pathlib.Path(__file__).parent; S = json.loads((D / "script.json").read_text()); V = S["voices"]; VO = D / "vo"
 N = int(sys.argv[1]); n0 = int(sys.argv[2]) if len(sys.argv) > 2 else 0
+import os; PFX = os.environ.get("PFX", "A"); STAB = float(os.environ.get("STAB", "0.5"))
 def say(l): return l.get("say", l["text"])
 def post(url, body):
     for attempt in range(6):
@@ -27,13 +28,13 @@ inputs += [{"voice_id": V[S["sac"][0]]["id"], "text": S["sac"][1]}]
 lead_chars = len(norm(" ".join(re.sub(r"\[[^\]]*\]", "", t) for _, t in S["lead"]))[0])
 for n in range(n0, n0 + N):
     d = post("https://api.elevenlabs.io/v1/text-to-dialogue/with-timestamps",
-             {"inputs": inputs, "model_id": "eleven_v3", "settings": {"stability": 0.5}})
-    take = VO / f"A{n}_take.mp3"; take.write_bytes(base64.b64decode(d["audio_base64"]))
+             {"inputs": inputs, "model_id": "eleven_v3", "settings": {"stability": STAB}})
+    take = VO / f"{PFX}{n}_take.mp3"; take.write_bytes(base64.b64decode(d["audio_base64"]))
     al = d["alignment"]; ch, st, en = al["characters"], al["character_start_times_seconds"], al["character_end_times_seconds"]
     nal, idx = norm("".join(ch)); pos = lead_chars - 3; spans = []
     for l in S["lines"]:
         nl, _ = norm(say(l)); f = nal.find(nl, pos)
-        if f < 0: print(f"A{n}: {l['id']} missing"); continue
+        if f < 0: print(f"{PFX}{n}: {l['id']} missing"); continue
         i0, i1 = idx[f], idx[f + len(nl) - 1]
         while i1 + 1 < len(ch) and ch[i1 + 1] in ".?!,'": i1 += 1
         spans.append((l, i0, i1, st[i0], en[i1])); pos = f + len(nl)
@@ -43,8 +44,8 @@ for n in range(n0, n0 + N):
         next_st = spans[j+1][3] if j + 1 < len(spans) else sac0
         a = max((prev_end + t0) / 2, t0 - 0.3, 0.0); b = min((t1 + next_st) / 2, t1 + 0.35)
         subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(take), "-af", f"atrim={a:.4f}:{b:.4f},asetpts=N/SR/TB",
-                        "-c:a", "libmp3lame", "-q:a", "2", str(VO / f"A{n}_{l['id']}.mp3")], check=True)
+                        "-c:a", "libmp3lame", "-q:a", "2", str(VO / f"{PFX}{n}_{l['id']}.mp3")], check=True)
         json.dump({"characters": ch[i0:i1+1], "character_start_times_seconds": [round(x - a, 4) for x in st[i0:i1+1]],
                    "character_end_times_seconds": [round(x - a, 4) for x in en[i0:i1+1]],
-                   "gap_after_in_take": round(next_st - t1, 3)}, open(VO / f"A{n}_{l['id']}_align.json", "w"))
-    print(f"A{n}: {en[-1]:.1f}s, {len(spans)}/{len(S['lines'])} lines", flush=True)
+                   "gap_after_in_take": round(next_st - t1, 3)}, open(VO / f"{PFX}{n}_{l['id']}_align.json", "w"))
+    print(f"{PFX}{n} (stability {STAB}): {en[-1]:.1f}s, {len(spans)}/{len(S['lines'])} lines", flush=True)

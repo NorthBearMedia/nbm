@@ -15,6 +15,13 @@ SFX = {
  "bunk":    ("Someone climbing up into a bunk bed inside a lorry cab and settling into a sleeping bag, rustling, close and quiet.", 4, 2),
  "heater":  ("A diesel night heater running inside a parked lorry cab at night: a soft steady whirring fan, quiet.", 10, 1),
  "layby":   ("Inside a parked lorry cab at night on a lay-by on a remote moor in fog: almost silent, a faint wind against the cab.", 15, 1),
+ "rock":    ("Inside a parked lorry cab at night: the trailer coupled behind creaks and groans as it slowly rocks from side to side, heavy metal creaking and suspension squeaks, the cab shifting with it.", 6, 3),
+ "rockbig": ("Heard from inside the cab of a parked articulated lorry at night: the whole trailer lurches once, a deep metallic groan and a heavy clunk from the coupling, then stillness.", 3, 3),
+ "sleep":   ("A young man asleep in a small dark space, slow deep breathing through the nose, very close, quiet, nothing else.", 8, 2),
+ "wake":    ("A young man jolted awake in the dark, one sharp frightened intake of breath, very close, nothing else.", 1.5, 3),
+ "breathfast": ("A frightened young man breathing fast and shallow, trying to stay silent, very close, in the dark, nothing else.", 6, 2),
+ "hold":    ("A young man holding his breath in fear, then letting it out in a long shaky exhale, very close, silent room.", 4, 2),
+ "relief":  ("A young man lets out a long relieved breath and a tiny nervous laugh under his breath, very close, quiet room.", 2.5, 2),
  "buckle":  ("A car seatbelt buckle clicking into its lock, close, inside a quiet car at night, nothing else.", 1, 3),
 }
 for k in (sys.argv[1:] or list(SFX)):

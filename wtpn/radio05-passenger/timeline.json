@@ -1,6 +1,6 @@
 {
- "total": 85.86,
- "cut": 83.36,
+ "total": 136.62,
+ "cut": 134.12,
  "events": [
   {
    "id": "chime",
@@ -12,253 +12,368 @@
    "id": "j01",
    "who": "JAMIE",
    "start": 1.75,
-   "end": 3.02
+   "end": 2.9
   },
   {
    "id": "t01",
    "who": "TONY",
-   "start": 3.54,
-   "end": 4.21
+   "start": 3.35,
+   "end": 4.1
   },
   {
    "id": "j02",
    "who": "JAMIE",
-   "start": 4.71,
-   "end": 7.62
+   "start": 4.55,
+   "end": 7.4
   },
   {
    "id": "bag",
    "who": "SFX",
-   "start": 6.46,
-   "end": 7.37
+   "start": 6.3,
+   "end": 7.21
   },
   {
    "id": "t02",
    "who": "TONY",
-   "start": 7.97,
-   "end": 8.74
+   "start": 7.75,
+   "end": 8.6
   },
   {
    "id": "j03",
    "who": "JAMIE",
-   "start": 9.16,
-   "end": 13.52
+   "start": 9.05,
+   "end": 13.57
   },
   {
    "id": "t03",
    "who": "TONY",
-   "start": 14.07,
-   "end": 15.22
+   "start": 14.02,
+   "end": 15.17
   },
   {
    "id": "j04",
    "who": "JAMIE",
-   "start": 15.7,
-   "end": 16.91
+   "start": 15.62,
+   "end": 16.75
   },
   {
    "id": "t04",
    "who": "TONY",
-   "start": 17.66,
-   "end": 19.03
+   "start": 17.5,
+   "end": 18.97
   },
   {
    "id": "j05",
    "who": "JAMIE",
-   "start": 19.58,
-   "end": 20.03
+   "start": 19.42,
+   "end": 19.89
   },
   {
    "id": "t05",
    "who": "TONY",
-   "start": 20.58,
-   "end": 22.83
+   "start": 20.34,
+   "end": 22.27
   },
   {
    "id": "j06",
    "who": "JAMIE",
-   "start": 25.53,
-   "end": 27.26
+   "start": 25.12,
+   "end": 26.87
   },
   {
    "id": "t06",
    "who": "TONY",
-   "start": 28.43,
-   "end": 29.32
+   "start": 28.02,
+   "end": 28.91
   },
   {
    "id": "j07",
    "who": "JAMIE",
-   "start": 29.74,
-   "end": 33.09
+   "start": 29.36,
+   "end": 32.77
   },
   {
    "id": "engine_off",
    "who": "SFX",
-   "start": 33.84,
-   "end": 34.54
+   "start": 33.52,
+   "end": 34.22
   },
   {
    "id": "j08",
    "who": "JAMIE",
-   "start": 34.09,
-   "end": 35.41
+   "start": 33.77,
+   "end": 35.34
   },
   {
    "id": "keys_out",
    "who": "SFX",
-   "start": 35.51,
-   "end": 36.42
+   "start": 35.44,
+   "end": 36.35
   },
   {
    "id": "j09",
    "who": "JAMIE",
-   "start": 36.06,
-   "end": 36.68
+   "start": 35.99,
+   "end": 36.58
   },
   {
    "id": "locks",
    "who": "SFX",
-   "start": 36.88,
-   "end": 37.45
+   "start": 36.78,
+   "end": 37.35
   },
   {
    "id": "j10",
    "who": "JAMIE",
-   "start": 37.23,
-   "end": 38.04
+   "start": 37.13,
+   "end": 37.99
   },
   {
    "id": "curtains",
    "who": "SFX",
-   "start": 38.24,
-   "end": 40.45
+   "start": 38.19,
+   "end": 40.4
   },
   {
    "id": "j11",
    "who": "JAMIE",
-   "start": 40.09,
-   "end": 41.06
+   "start": 40.04,
+   "end": 41.05
   },
   {
    "id": "into_bunk",
    "who": "SFX",
-   "start": 41.31,
-   "end": 45.17
+   "start": 41.3,
+   "end": 45.16
   },
   {
    "id": "t07",
    "who": "TONY",
-   "start": 41.66,
-   "end": 42.37
+   "start": 41.65,
+   "end": 42.39
   },
   {
    "id": "j12",
    "who": "JAMIE",
-   "start": 42.85,
-   "end": 45.42
+   "start": 42.84,
+   "end": 45.43
   },
   {
    "id": "t08",
    "who": "TONY",
-   "start": 45.8,
-   "end": 47.35
+   "start": 45.88,
+   "end": 47.41
   },
   {
    "id": "j13",
    "who": "JAMIE",
-   "start": 47.77,
-   "end": 48.58
+   "start": 47.86,
+   "end": 48.59
   },
   {
    "id": "t09",
    "who": "TONY",
-   "start": 48.93,
-   "end": 49.96
-  },
-  {
-   "id": "beep_single",
-   "who": "SFX",
-   "start": 52.76,
-   "end": 52.86
+   "start": 48.94,
+   "end": 52.53
   },
   {
    "id": "j14",
    "who": "JAMIE",
-   "start": 53.86,
-   "end": 55.23
+   "start": 52.98,
+   "end": 53.79
+  },
+  {
+   "id": "call_end",
+   "who": "SFX",
+   "start": 54.24,
+   "end": 54.54
+  },
+  {
+   "id": "time_jump",
+   "who": "SFX",
+   "start": 55.74,
+   "end": 58.64,
+   "caption": "3:12 AM"
+  },
+  {
+   "id": "rock1",
+   "who": "SFX",
+   "start": 60.44,
+   "end": 64.65
+  },
+  {
+   "id": "wake",
+   "who": "SFX",
+   "start": 62.44,
+   "end": 63.45
+  },
+  {
+   "id": "ringing",
+   "who": "SFX",
+   "start": 64.95,
+   "end": 66.36
   },
   {
    "id": "t10",
    "who": "TONY",
-   "start": 55.77,
-   "end": 57.08
+   "start": 66.7,
+   "end": 69.79
   },
   {
    "id": "j15",
    "who": "JAMIE",
-   "start": 57.4,
-   "end": 59.17
-  },
-  {
-   "id": "beep_approach",
-   "who": "SFX",
-   "start": 60.27,
-   "end": 67.78
-  },
-  {
-   "id": "j16",
-   "who": "JAMIE",
-   "start": 63.6,
-   "end": 66.36
+   "start": 70.24,
+   "end": 71.77
   },
   {
    "id": "t11",
    "who": "TONY",
-   "start": 69.18,
-   "end": 69.84
+   "start": 72.27,
+   "end": 73.65
+  },
+  {
+   "id": "j16",
+   "who": "JAMIE",
+   "start": 74.15,
+   "end": 76.58
+  },
+  {
+   "id": "rock3",
+   "who": "SFX",
+   "start": 77.28,
+   "end": 79.19
+  },
+  {
+   "id": "ignition_relay",
+   "who": "SFX",
+   "start": 81.19,
+   "end": 81.26
+  },
+  {
+   "id": "beep_single",
+   "who": "SFX",
+   "start": 81.54,
+   "end": 81.64
   },
   {
    "id": "j17",
    "who": "JAMIE",
-   "start": 70.39,
-   "end": 71.3
+   "start": 82.74,
+   "end": 84.31
   },
   {
    "id": "t12",
    "who": "TONY",
-   "start": 71.85,
-   "end": 72.5
+   "start": 84.81,
+   "end": 86.32
   },
   {
    "id": "j18",
    "who": "JAMIE",
-   "start": 72.98,
-   "end": 73.61
+   "start": 86.77,
+   "end": 88.81
   },
   {
-   "id": "chime",
+   "id": "beep_approach",
    "who": "SFX",
-   "start": 75.61,
-   "end": 82.96
-  },
-  {
-   "id": "t13",
-   "who": "TONY",
-   "start": 78.21,
-   "end": 79.42
+   "start": 90.21,
+   "end": 98.49
   },
   {
    "id": "j19",
    "who": "JAMIE",
-   "start": 79.94,
-   "end": 81.27
+   "start": 94.83,
+   "end": 96.66
+  },
+  {
+   "id": "heater_dies",
+   "who": "SFX",
+   "start": 98.49,
+   "end": 99.69
+  },
+  {
+   "id": "held_breath",
+   "who": "SFX",
+   "start": 98.89,
+   "end": 101.8
+  },
+  {
+   "id": "t13",
+   "who": "TONY",
+   "start": 101.29,
+   "end": 101.98
+  },
+  {
+   "id": "j20",
+   "who": "JAMIE",
+   "start": 102.98,
+   "end": 103.99
+  },
+  {
+   "id": "t14",
+   "who": "TONY",
+   "start": 104.89,
+   "end": 105.6
+  },
+  {
+   "id": "j21",
+   "who": "JAMIE",
+   "start": 106.4,
+   "end": 107.02
+  },
+  {
+   "id": "t15",
+   "who": "TONY",
+   "start": 108.22,
+   "end": 110.03
+  },
+  {
+   "id": "t16",
+   "who": "TONY",
+   "start": 113.53,
+   "end": 114.3
+  },
+  {
+   "id": "relief",
+   "who": "SFX",
+   "start": 114.65,
+   "end": 115.76
+  },
+  {
+   "id": "j22",
+   "who": "JAMIE",
+   "start": 115.5,
+   "end": 117.23
+  },
+  {
+   "id": "t17",
+   "who": "TONY",
+   "start": 117.83,
+   "end": 120.42
+  },
+  {
+   "id": "chime",
+   "who": "SFX",
+   "start": 123.62,
+   "end": 133.07
+  },
+  {
+   "id": "t18",
+   "who": "TONY",
+   "start": 127.07,
+   "end": 128.29
+  },
+  {
+   "id": "j23",
+   "who": "JAMIE",
+   "start": 129.19,
+   "end": 130.64
   },
   {
    "id": "buckle",
    "who": "SFX",
-   "start": 82.06,
-   "end": 82.82
+   "start": 132.17,
+   "end": 132.93
   }
  ]
 }

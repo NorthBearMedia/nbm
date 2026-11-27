@@ -18,8 +18,9 @@ units = [("lead", t) for _, t in S["lead"]] + [(l["id"], l.get("say", l["text"])
 ref, owner = [], []
 for k, t in units:
     for w in tok(t): ref.append(w.strip("'")); owner.append(k)
+import os; PFX, OUT = os.environ.get("PFX", "A"), os.environ.get("OUT", "S")
 for n in [int(a) for a in sys.argv[1:]] or range(4):
-    take = VO / f"A{n}_take.mp3"; cache = VO / f"A{n}_scribe.json"
+    take = VO / f"{PFX}{n}_take.mp3"; cache = VO / f"{PFX}{n}_scribe.json"
     d = json.loads(cache.read_text()) if cache.exists() else scribe(take); cache.write_text(json.dumps(d))
     W = [w for w in d["words"] if w["type"] == "word"]; hyp = [tok(w["text"])[0].strip("'") if tok(w["text"]) else "" for w in W]
     sm = difflib.SequenceMatcher(None, ref, hyp, autojunk=False); r2h = {}
@@ -49,10 +50,10 @@ for n in [int(a) for a in sys.argv[1:]] or range(4):
         t0, t1 = W[h0]["start"], W[h1]["end"]
         a = max((prev_end + t0) / 2, t0 - 0.3); b = min((t1 + next_st) / 2, t1 + 0.3)
         subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(take), "-af", f"atrim={a:.4f}:{b:.4f},asetpts=N/SR/TB",
-                        "-c:a", "libmp3lame", "-q:a", "2", str(VO / f"S{n}_{k}.mp3")], check=True)
+                        "-c:a", "libmp3lame", "-q:a", "2", str(VO / f"{OUT}{n}_{k}.mp3")], check=True)
         heard = " ".join(W[i]["text"] for i in range(h0, h1 + 1))
         json.dump({"start": round(t0 - a, 3), "end": round(t1 - a, 3), "gap_after_in_take": round(next_st - t1, 3), "heard": heard,
                    "words": [{"w": W[i]["text"], "s": round(W[i]["start"] - a, 3), "e": round(W[i]["end"] - a, 3)} for i in range(h0, h1 + 1)]},
-                  open(VO / f"S{n}_{k}_align.json", "w"))
+                  open(VO / f"{OUT}{n}_{k}_align.json", "w"))
     missing = [l["id"] for l in S["lines"] if l["id"] not in spans]
-    print(f"S{n}: {len(keys) - 2}/{len(S['lines'])} lines" + (f", missing {missing}" if missing else ""))
+    print(f"{OUT}{n}: {len(keys) - 2}/{len(S['lines'])} lines" + (f", missing {missing}" if missing else ""))

@@ -1,0 +1,1 @@
+{"start": 0.3, "end": 3.14, "gap_after_in_take": 0.6, "heard": "Jamie, it's gone three. You all right?", "words": [{"w": "Jamie,", "s": 0.3, "e": 0.66}, {"w": "it's", "s": 1.52, "e": 1.62}, {"w": "gone", "s": 1.66, "e": 1.84}, {"w": "three.", "s": 1.9, "e": 2.2}, {"w": "You", "s": 2.58, "e": 2.64}, {"w": "all", "s": 2.66, "e": 2.78}, {"w": "right?", "s": 2.84, "e": 3.14}]}
